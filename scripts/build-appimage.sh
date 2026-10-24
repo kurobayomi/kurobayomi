@@ -5,7 +5,8 @@
 # Usage: [CHANNEL=nightly] [FFMPEG_PREFIX=DIR] scripts/build-appimage.sh BINARY OUTPUT.AppImage
 # CHANNEL=nightly packs the Nightly app: its own app id, name and gold icon, and it leaves the file types and links to the
 # stable app. Without it the stable app is packed. FFMPEG_PREFIX names a decode-only FFmpeg built by
-# scripts/build-ffmpeg.sh, bundled in place of the system's (whose encoder libraries are about 33 MiB of the AppImage).
+# scripts/build-ffmpeg.sh, bundled in place of the system's (whose encoder libraries are about 33 MiB of the AppImage),
+# with its ffmpeg and ffprobe programs next to the app (anime downloads and video previews run them).
 # The binary's debug info is left out of the AppImage and written next to it as OUTPUT without .AppImage, plus .debug.
 # Needs the libraries the binary links (libgtk-4, libmpv, ...) installed on this machine: they are what gets bundled, so
 # build on the oldest distro you want the AppImage to run on (CI uses Ubuntu 24.04, the first with GTK 4.14).
@@ -73,16 +74,28 @@ ln -s "$tools/linuxdeploy-plugin-gtk.sh" "$work/bin/linuxdeploy-plugin-gtk.sh"
 export PATH="$work/bin:$PATH" APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=4 NO_STRIP=1
 # NO_STRIP: linuxdeploy would strip the symbol table too, and the crash reports name functions from it (the debug info
 # is already split off above)
+executables=(--executable "$appdir/usr/bin/kurobayomi")
 if [ -n "${FFMPEG_PREFIX:-}" ]; then
     # linuxdeploy finds libraries through LD_LIBRARY_PATH first, so it bundles this FFmpeg rather than the system's
     [ -f "$FFMPEG_PREFIX/lib/libavcodec.so.60" ] || { echo "no libavcodec.so.60 in $FFMPEG_PREFIX/lib" >&2; exit 1; }
     export LD_LIBRARY_PATH="$FFMPEG_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    # the programs go next to the app, where it looks for them before PATH (kuro_platform::process::find_program)
+    for program in ffmpeg ffprobe; do
+        install -m755 "$FFMPEG_PREFIX/bin/$program" "$appdir/usr/bin/$program"
+        executables+=(--executable "$appdir/usr/bin/$program")
+    done
 fi
 
 "$tools/linuxdeploy" --appdir "$appdir" --plugin gtk \
-    --executable "$appdir/usr/bin/kurobayomi" \
+    "${executables[@]}" \
     --desktop-file "$appdir/usr/share/applications/$id.desktop" \
     --icon-file "$icons/hicolor/256x256/apps/$id.png" --icon-filename "$id"
+if [ -n "${FFMPEG_PREFIX:-}" ]; then
+    # the bundled programs start with the bundled libraries alone (linuxdeploy set their rpath)
+    for program in ffmpeg ffprobe; do
+        LD_LIBRARY_PATH= "$appdir/usr/bin/$program" -hide_banner -version >/dev/null || { echo "the bundled $program does not start" >&2; exit 1; }
+    done
+fi
 
 # The GTK plugin's launcher hook forces `GTK_THEME=Adwaita:<light|dark>` (so the app ignores the user's GTK theme) and
 # `GDK_BACKEND=x11` (so it runs through XWayland on a Wayland desktop). Both are removed: the app follows the user's theme

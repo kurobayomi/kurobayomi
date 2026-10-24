@@ -5,6 +5,8 @@
 # libavcodec.so.60 and so on, with the same symbol versions), so Ubuntu's libmpv loads it in place of Ubuntu's FFmpeg.
 # Only what playback needs is enabled: the built-in decoders and demuxers, dav1d for AV1, TLS for https streams, libxml2
 # for DASH, and VA-API and VDPAU for hardware decoding. LGPL: no --enable-gpl, so no libpostproc (libmpv does not need it).
+# The ffmpeg and ffprobe programs are built too: anime downloads copy streams into Matroska (no encoding) and local
+# videos get a preview frame, and the AppImage carries them so this works without a system ffmpeg.
 # Usage: scripts/build-ffmpeg.sh <prefix> [extra configure flags]
 set -euo pipefail
 
@@ -20,7 +22,7 @@ echo "$sha256  $work/ffmpeg.tar.xz" | sha256sum -c --quiet
 tar -xf "$work/ffmpeg.tar.xz" -C "$work"
 
 cd "$work/ffmpeg-$version"
-./configure --prefix="$prefix" --enable-shared --disable-static --disable-programs --disable-doc \
+./configure --prefix="$prefix" --enable-shared --disable-static --disable-ffplay --disable-doc \
     --disable-autodetect --enable-pthreads --enable-zlib --enable-bzlib --enable-iconv \
     --enable-gnutls --enable-libdav1d --enable-libxml2 --enable-libdrm --enable-vaapi --enable-vdpau \
     --disable-indevs --disable-outdevs "$@"
