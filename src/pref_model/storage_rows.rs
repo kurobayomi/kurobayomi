@@ -1,64 +1,13 @@
-//! The storage usage rows of Data and storage (T-22a-035): one row per mounted storage root with its path, a usage bar
-//! and the caption "Available: X / Total: Y". The mounts come from the kernel's mount table, the sizes from GIO, and the
+//! The storage usage rows of Data and storage (T-22a-035): one row per storage root with its path, a usage bar and the
+//! caption "Available: X / Total: Y". The roots come from `kuro_platform::storage::roots`, the sizes from GIO, and the
 //! sizes are formatted by `glib::format_size`, since `kuro-backup` has no GTK.
 
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
 use kuro_backup::storage_info::{StorageRow, storage_row_with};
-
-/// The mount table the kernel keeps for this process.
-const MOUNT_TABLE: &str = "/proc/self/mounts";
-
-/// The mount points of the storage devices in a mount table: lines whose source is a block device, loop devices and
-/// squashfs images left out, one mount point per device (the shortest path when a device is mounted twice, as with
-/// subvolumes). Paths come back sorted.
-pub fn storage_roots(table: &str) -> Vec<PathBuf> {
-    let mut by_device: BTreeMap<String, PathBuf> = BTreeMap::new();
-    for line in table.lines() {
-        let mut fields = line.split_whitespace();
-        let (Some(device), Some(mount), Some(fs_type)) = (fields.next(), fields.next(), fields.next()) else { continue };
-        if !device.starts_with("/dev/") || device.starts_with("/dev/loop") || fs_type == "squashfs" {
-            continue;
-        }
-        let mount = PathBuf::from(unescape(mount));
-        match by_device.get(device) {
-            Some(kept) if kept.as_os_str().len() <= mount.as_os_str().len() => {}
-            _ => {
-                by_device.insert(device.to_owned(), mount);
-            }
-        }
-    }
-    let mut roots: Vec<PathBuf> = by_device.into_values().collect();
-    roots.sort();
-    roots
-}
-
-/// The mount table writes a space as `\040` and a tab as `\011`: three octal digits after a backslash.
-fn unescape(field: &str) -> String {
-    let bytes = field.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        let octal = (bytes[i] == b'\\' && i + 3 < bytes.len())
-            .then(|| std::str::from_utf8(&bytes[i + 1..i + 4]).ok().and_then(|d| u8::from_str_radix(d, 8).ok()))
-            .flatten();
-        match octal {
-            Some(byte) => {
-                out.push(byte);
-                i += 4;
-            }
-            None => {
-                out.push(bytes[i]);
-                i += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
 
 /// `(total, available)` bytes of the file system at `path`, or `None` when GIO cannot tell.
 fn sizes(path: &Path) -> Option<(u64, u64)> {
@@ -70,8 +19,8 @@ fn sizes(path: &Path) -> Option<(u64, u64)> {
 
 /// One row per mounted storage root.
 pub fn rows() -> Vec<StorageRow> {
-    let table = std::fs::read_to_string(MOUNT_TABLE).unwrap_or_default();
-    storage_roots(&table)
+    let data_dir = kuro_platform::system_paths::SystemPaths::system().map(|p| kuro_platform::paths::Paths::data_dir(&p)).unwrap_or_default();
+    kuro_platform::storage::roots(&data_dir)
         .into_iter()
         .map(|root| {
             let (total, available) = sizes(&root).unwrap_or((0, 0));
@@ -121,39 +70,4 @@ pub fn replace_usage_row(page: &gtk::Widget, rows: &[StorageRow]) -> bool {
     }
     list.remove(&row);
     true
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const TABLE: &str = "\
-proc /proc proc rw,nosuid 0 0
-tmpfs /run tmpfs rw 0 0
-/dev/nvme0n1p2 / ext4 rw 0 0
-/dev/nvme0n1p3 /home btrfs rw,subvol=/@home 0 0
-/dev/nvme0n1p3 /home/snap/.snapshots btrfs rw,subvol=/@snap 0 0
-/dev/sdb1 /run/media/me/My\\040Disk exfat rw 0 0
-/dev/loop3 /snap/core squashfs ro 0 0
-/dev/sdc1 /mnt/img squashfs ro 0 0
-";
-
-    #[test]
-    fn roots_are_the_block_device_mounts_once_per_device_and_sorted() {
-        let roots = storage_roots(TABLE);
-        let shown: Vec<_> = roots.iter().map(|p| p.display().to_string()).collect();
-        assert_eq!(shown, ["/", "/home", "/run/media/me/My Disk"]);
-    }
-
-    #[test]
-    fn an_empty_table_has_no_roots() {
-        assert!(storage_roots("").is_empty());
-    }
-
-    #[test]
-    fn octal_escapes_are_decoded() {
-        assert_eq!(unescape("a\\040b\\011c"), "a b\tc");
-        assert_eq!(unescape("plain"), "plain");
-        assert_eq!(unescape("tail\\04"), "tail\\04", "a short escape stays as written");
-    }
 }

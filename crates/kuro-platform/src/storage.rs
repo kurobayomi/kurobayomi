@@ -1,11 +1,12 @@
-//! Free disk space for the filesystem that holds a path, and the modified time of a file or folder.
+//! Free disk space for the filesystem that holds a path, the storage roots a storage page lists, and the modified time
+//! of a file or folder.
 //!
 //! The engine is per platform: `statvfs` on Linux (`linux::storage`), `GetDiskFreeSpaceExW` on Windows
 //! (`windows::storage`). Elsewhere there is none yet, so [`free_bytes`] gives `None`, which callers treat as "unknown"
 //! and skip their space checks.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 /// Bytes available to unprivileged users on the filesystem holding `path`. `None` when the path is missing, the call
@@ -17,6 +18,17 @@ pub fn free_bytes(path: &Path) -> Option<u64> {
     #[cfg(all(target_os = "windows", feature = "platform-windows"))]
     return crate::windows::storage::free_bytes(path);
     None
+}
+
+/// The storage roots to show sizes for, sorted: the mounted disks and the mount holding `data_dir` on Linux
+/// (`linux::storage`), the fixed and removable drives on Windows. Empty where the platform has no engine.
+#[allow(unused_variables, unreachable_code)]
+pub fn roots(data_dir: &Path) -> Vec<PathBuf> {
+    #[cfg(all(target_os = "linux", feature = "platform-linux"))]
+    return crate::linux::storage::roots(data_dir);
+    #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+    return crate::windows::storage::roots();
+    Vec::new()
 }
 
 /// Sets the modified time of a file or a folder. Windows opens a folder only with a flag (`windows::storage`);

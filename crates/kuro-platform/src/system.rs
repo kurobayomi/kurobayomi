@@ -1,5 +1,6 @@
 //! Facts about the running system that crash reports print. The OS sources (`/etc/os-release`,
-//! `/proc`, `XDG_*` variables) are read only here, so no other crate names them.
+//! `/proc`, `XDG_*` variables; the registry on Windows, `windows::system`) are read only here, so no other crate names
+//! them.
 
 use std::env;
 use std::fs;
@@ -14,12 +15,23 @@ pub fn facts() -> Vec<(&'static str, String)> {
         ("kernel", kernel()),
         ("desktop", or_unknown(env_value("XDG_CURRENT_DESKTOP"))),
         ("session", or_unknown(env_value("XDG_SESSION_TYPE"))),
-        ("locale", or_unknown(["LC_ALL", "LC_MESSAGES", "LANG"].into_iter().find_map(env_value))),
+        ("locale", or_unknown(["LC_ALL", "LC_MESSAGES", "LANG"].into_iter().find_map(env_value).or_else(system_locale))),
     ]
 }
 
-/// `PRETTY_NAME` from `/etc/os-release`, else `ID`, else `unknown`.
+/// The locale the system reports when no variable names one (Windows), as `en-US`.
+#[allow(unreachable_code)]
+fn system_locale() -> Option<String> {
+    #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+    return crate::windows::system::locale();
+    None
+}
+
+/// `PRETTY_NAME` from `/etc/os-release`, else `ID`, else `unknown`. Windows: its product name and version.
+#[allow(unreachable_code)]
 fn os_name() -> String {
+    #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+    return or_unknown(crate::windows::system::os_name());
     let text = fs::read_to_string("/etc/os-release").unwrap_or_default();
     or_unknown(os_release_value(&text, "PRETTY_NAME").or_else(|| os_release_value(&text, "ID")))
 }
@@ -33,8 +45,11 @@ fn os_release_value(text: &str, key: &str) -> Option<String> {
     })
 }
 
-/// The `uname -sr` text, from `/proc/sys/kernel`.
+/// The `uname -sr` text, from `/proc/sys/kernel`. Windows: `Windows NT` with its version and build.
+#[allow(unreachable_code)]
 fn kernel() -> String {
+    #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+    return or_unknown(crate::windows::system::kernel());
     let read = |name: &str| fs::read_to_string(format!("/proc/sys/kernel/{name}")).map(|s| s.trim().to_owned());
     match (read("ostype"), read("osrelease")) {
         (Ok(sys), Ok(release)) => format!("{sys} {release}"),

@@ -152,13 +152,14 @@ pub fn color_hex(argb: i32) -> String {
 }
 
 /// Chooses the mpv `hwdec` value from the decoder and the candidates reported by mpv.
-/// Copy-back candidates are tried first for `Hw`; `HwPlus` tries zero-copy first. When none of
-/// the candidates is available the result is `auto` (Linux mapping, area 45 rust-design section 6).
+/// Copy-back candidates are tried first for `Hw`; `HwPlus` tries zero-copy first. Only what mpv reports is picked, so
+/// the list holds the decoders of every system: VA-API and NVDEC on Linux, D3D11 on Windows. When none of the
+/// candidates is available the result is `auto` (area 45 rust-design section 6).
 pub fn resolve_hwdec(decoder: Decoder, available: &[String]) -> String {
     let candidates: &[&str] = match decoder {
         Decoder::AutoCopy | Decoder::Auto | Decoder::Sw => return decoder.mpv_value().to_owned(),
-        Decoder::Hw => &["vaapi-copy", "nvdec-copy", "auto-copy"],
-        Decoder::HwPlus => &["vaapi", "nvdec", "vaapi-copy", "nvdec-copy", "auto-copy"],
+        Decoder::Hw => &["vaapi-copy", "nvdec-copy", "d3d11va-copy", "auto-copy"],
+        Decoder::HwPlus => &["vaapi", "nvdec", "d3d11va", "vaapi-copy", "nvdec-copy", "d3d11va-copy", "auto-copy"],
     };
     candidates
         .iter()
@@ -612,6 +613,9 @@ mod tests {
         let avail = vec!["nvdec-copy".to_owned(), "auto-copy".to_owned()];
         assert_eq!(resolve_hwdec(Decoder::Hw, &avail), "nvdec-copy");
         assert_eq!(resolve_hwdec(Decoder::Hw, &[]), "auto");
+        let windows: Vec<String> = ["d3d11va", "d3d11va-copy", "dxva2-copy"].map(String::from).to_vec();
+        assert_eq!(resolve_hwdec(Decoder::Hw, &windows), "d3d11va-copy", "Windows' decoder is picked where mpv has it");
+        assert_eq!(resolve_hwdec(Decoder::HwPlus, &windows), "d3d11va");
         assert_eq!(resolve_hwdec(Decoder::Sw, &avail), "no");
         assert_eq!(resolve_hwdec(Decoder::AutoCopy, &[]), "auto-copy");
     }
