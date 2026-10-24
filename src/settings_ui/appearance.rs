@@ -11,7 +11,7 @@ use kuro_prefs::ui::StartScreen;
 
 use crate::pref_model::model::{Preference, PreferenceItem};
 use crate::pref_model::widgets::theme_mode;
-use crate::settings_ui::rows::{enum_choice, group, int_choice, requires_restart};
+use crate::settings_ui::rows::{enum_choice, group, requires_restart};
 
 /// The Theme mode row: System, Light and Dark as linked toggle buttons (`widgets::theme_mode`). A click stores the
 /// mode and applies it through `theme::apply`; a click on the selected segment writes nothing.
@@ -52,17 +52,6 @@ pub fn start_screen_row(prefs: &Prefs) -> PreferenceItem {
     row
 }
 
-/// The cover size of the Library and Browse grids: Small, Medium or Large (`kuro_domain::library::columns::column_width`).
-/// The grids follow a change at once; the column count still follows the window.
-pub fn cover_size_row(prefs: &Prefs) -> PreferenceItem {
-    let options = [
-        (0, tr(MsgKey::cover_size_small)),
-        (1, tr(MsgKey::cover_size_medium)),
-        (2, tr(MsgKey::cover_size_large)),
-    ];
-    int_choice(&tr(MsgKey::pref_cover_size), &prefs.library.cover_size, &options, true)
-}
-
 /// The nav destination a start screen opens: its tab id in the app window and, for the two libraries, the page of the
 /// Anime | Manga switcher inside it.
 pub fn nav_target(screen: StartScreen) -> (&'static str, Option<&'static str>) {
@@ -90,7 +79,7 @@ pub fn open_start_tab(tabs: &gtk::Stack, prefs: &Prefs) {
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     vec![
         group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs)]),
-        group(&tr(MsgKey::pref_category_display), vec![start_screen_row(prefs), cover_size_row(prefs)]),
+        group(&tr(MsgKey::pref_category_display), vec![start_screen_row(prefs)]),
     ]
 }
 
@@ -113,9 +102,9 @@ mod tests {
     }
 
     #[test]
-    fn the_display_group_holds_the_start_screen_and_the_cover_size() {
+    fn the_display_group_holds_only_the_start_screen() {
         let prefs = Prefs::in_memory();
-        assert_eq!(titles_of(&page_rows(&prefs), "Display"), ["Start Screen", "Cover size"]);
+        assert_eq!(titles_of(&page_rows(&prefs), "Display"), ["Start Screen"]);
     }
 
     #[test]

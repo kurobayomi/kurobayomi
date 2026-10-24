@@ -27,7 +27,7 @@ mod tests {
 
     #[test]
     fn a_cover_fills_its_column_less_the_cell_margins_at_every_size() {
-        for size in 0..3 {
+        for size in [100, 160, 320] {
             assert_eq!(cover_width(size) + 2 * CELL_MARGIN_PX, column_width(size));
         }
     }
@@ -36,13 +36,13 @@ mod tests {
     fn the_count_follows_the_viewport_with_at_least_two_columns() {
         crate::testing::with_display(|| {
             let grid = gtk::GridView::new(None::<gtk::NoSelection>, None::<gtk::ListItemFactory>);
-            apply_columns(&grid, 1000, 1);
+            apply_columns(&grid, 1000, 160);
             assert_eq!((grid.min_columns(), grid.max_columns()), (1, 6));
-            apply_columns(&grid, 100, 1);
+            apply_columns(&grid, 100, 160);
             assert_eq!(grid.max_columns(), 2);
-            apply_columns(&grid, 1000, 0);
-            assert_eq!(grid.max_columns(), 8, "small covers fit more columns");
-            apply_columns(&grid, 1000, 2);
+            apply_columns(&grid, 1000, 100);
+            assert_eq!(grid.max_columns(), 10, "small covers fit more columns");
+            apply_columns(&grid, 1000, 250);
             assert_eq!(grid.max_columns(), 4, "large covers fit fewer");
         });
     }

@@ -199,7 +199,39 @@ fn sections(kind: Kind, has_tracker: bool) -> Vec<Section> {
         Section::new(tr(MsgKey::ui_sort_by), sort),
         Section::new("View", vec![Item::radio("mode", "grid", "Grid"), Item::radio("mode", "list", tr(MsgKey::action_display_list))]),
         Section::new(tr(MsgKey::ui_grid_style), grid_styles().iter().map(|(token, label, _)| Item::radio("style", *token, label)).collect()),
+        Section::new(tr(MsgKey::pref_cover_size), vec![Item::custom(COVER_SIZE)]),
     ]
+}
+
+/// The custom slot of the cover size slider.
+const COVER_SIZE: &str = "cover_size";
+
+/// The cover size slider: the column width of the Library and Browse grids. A move is stored at once, and the grids
+/// follow the stored value, so the covers resize while it moves.
+fn cover_size_slider(pref: &Pref<i32>) -> gtk::Widget {
+    use gtk::prelude::*;
+    use kuro_domain::library::columns::{COVER_WIDTH_MAX_PX, COVER_WIDTH_MIN_PX, COVER_WIDTH_STEP_PX, column_width, snap_cover_width};
+    let scale = gtk::Scale::with_range(
+        gtk::Orientation::Horizontal,
+        f64::from(COVER_WIDTH_MIN_PX),
+        f64::from(COVER_WIDTH_MAX_PX),
+        f64::from(COVER_WIDTH_STEP_PX),
+    );
+    scale.set_value(f64::from(column_width(pref.get())));
+    scale.set_draw_value(false);
+    scale.set_hexpand(true);
+    scale.set_size_request(200, -1);
+    scale.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::pref_cover_size))]);
+    let pref = pref.clone();
+    scale.connect_value_changed(move |scale| {
+        let width = snap_cover_width(scale.value());
+        if width != pref.get()
+            && let Err(e) = pref.set(width)
+        {
+            tracing::warn!(error = %e, "the cover size could not be saved");
+        }
+    });
+    scale.upcast()
 }
 
 impl Options {
@@ -212,6 +244,10 @@ impl Options {
     /// Connects the picks. A filter or view write reloads through the view's preference watch; a sort write goes
     /// through `CategoryService::set_sort_mode` (which draws a new Random seed) and reloads when it is done.
     pub fn wire(&self, weak: &Weak<RefCell<Inner>>) {
+        if let Some(inner) = weak.upgrade() {
+            let pref = inner.borrow().deps.prefs.cover_size.clone();
+            self.menu.set_custom(COVER_SIZE, move || cover_size_slider(&pref));
+        }
         let weak = weak.clone();
         self.menu.connect(move |choice| {
             let Some(inner) = weak.upgrade() else { return };

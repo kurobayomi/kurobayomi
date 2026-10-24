@@ -10,14 +10,20 @@ pub const COLUMN_WIDTH_PX: i32 = 160;
 /// Window width where the landscape preference takes over from the portrait one, in pixels.
 pub const PORTRAIT_BREAKPOINT_PX: i32 = 900;
 
-/// Column width of each cover size (Small, Medium, Large), in pixels. Medium is the default.
-pub const COVER_SIZE_COLUMN_PX: [i32; 3] = [120, COLUMN_WIDTH_PX, 210];
-/// The stored cover size that means Medium.
-pub const COVER_SIZE_MEDIUM: i32 = 1;
+/// The cover size slider: the column width of the cover grids, in pixels. [`COLUMN_WIDTH_PX`] is the default.
+pub const COVER_WIDTH_MIN_PX: i32 = 100;
+pub const COVER_WIDTH_MAX_PX: i32 = 320;
+/// The slider moves in steps of this many pixels.
+pub const COVER_WIDTH_STEP_PX: i32 = 10;
 
-/// Column width of a stored cover size; any other stored value reads as Medium.
-pub fn column_width(cover_size: i32) -> i32 {
-    usize::try_from(cover_size).ok().and_then(|i| COVER_SIZE_COLUMN_PX.get(i)).copied().unwrap_or(COLUMN_WIDTH_PX)
+/// The column width for a stored cover size, kept in the slider's range.
+pub fn column_width(stored: i32) -> i32 {
+    stored.clamp(COVER_WIDTH_MIN_PX, COVER_WIDTH_MAX_PX)
+}
+
+/// A slider position as the cover size to store: the nearest step, in range.
+pub fn snap_cover_width(value: f64) -> i32 {
+    column_width((value / f64::from(COVER_WIDTH_STEP_PX)).round() as i32 * COVER_WIDTH_STEP_PX)
 }
 
 /// A stored value kept in `0..=10`.
@@ -65,11 +71,11 @@ mod tests {
     }
 
     #[test]
-    fn each_cover_size_has_its_column_width_and_unknown_sizes_read_as_medium() {
-        assert_eq!([column_width(0), column_width(1), column_width(2)], [120, 160, 210]);
-        assert_eq!(column_width(COVER_SIZE_MEDIUM), COLUMN_WIDTH_PX);
-        assert_eq!(column_width(-1), COLUMN_WIDTH_PX);
-        assert_eq!(column_width(3), COLUMN_WIDTH_PX);
+    fn the_cover_width_stays_in_the_slider_range_and_snaps_to_its_steps() {
+        assert_eq!(column_width(COLUMN_WIDTH_PX), 160);
+        assert_eq!((column_width(0), column_width(999)), (COVER_WIDTH_MIN_PX, COVER_WIDTH_MAX_PX));
+        assert_eq!((snap_cover_width(163.0), snap_cover_width(166.0)), (160, 170));
+        assert_eq!((snap_cover_width(40.0), snap_cover_width(400.0)), (100, 320));
     }
 
     #[test]

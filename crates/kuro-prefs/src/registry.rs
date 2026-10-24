@@ -285,7 +285,7 @@ define_prefs! {
     "enabled_sources", Normal, Set, &[], "sources", "enabled_sources";
     "__APP_STATE_source_keys", AppState, Set, &[], "sources", "source_keys";
     "cache_size_mb", Normal, Int, 500, "storage", "cache_size_mb";
-    "library_cover_size", Normal, Int, 1, "library", "cover_size";
+    "library_cover_size", Normal, Int, 160, "library", "cover_size";
     "manga_reader_theme_{id}", Normal, Int, 1, "reader.manga_reader_theme", "";
     "manga_image_scale_type_{id}", Normal, Int, 1, "reader.manga_image_scale_type", "";
     "manga_zoom_start_{id}", Normal, Int, 1, "reader.manga_zoom_start", "";
@@ -691,7 +691,7 @@ mod tests {
         // out of the applications menu), `auto_hide_bars` (the reader's and the player's bars hide by themselves) and
         // `pref_player_default_quality` (the height an episode starts at), `enabled_sources` (the sources that are on) and
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
-        // `library_cover_size` (Small, Medium or Large covers in the grids), and the five reader settings of one manga
+        // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
         // (`MangaReaderPrefs`)
         assert_eq!(REGISTRY.len(), rows.len() + 16);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");

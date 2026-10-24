@@ -23,6 +23,8 @@ pub enum Item {
     Radio { name: &'static str, value: String, label: String },
     Action { name: &'static str, label: String },
     Submenu { label: String, items: Vec<Item> },
+    /// A widget of the owner's in the menu (a slider): `id` names the slot, `ViewOptions::set_custom` gives the widget.
+    Custom { id: &'static str },
 }
 
 impl Item {
@@ -40,6 +42,10 @@ impl Item {
 
     pub fn submenu(label: impl Into<String>, items: Vec<Item>) -> Self {
         Item::Submenu { label: label.into(), items }
+    }
+
+    pub fn custom(id: &'static str) -> Self {
+        Item::Custom { id }
     }
 }
 
@@ -81,7 +87,7 @@ pub fn filter_names(sections: &[Section]) -> Vec<&'static str> {
             match item {
                 Item::Toggle { name, .. } => out.push(*name),
                 Item::Submenu { items, .. } => walk(items, out),
-                Item::Radio { .. } | Item::Action { .. } => {}
+                Item::Radio { .. } | Item::Action { .. } | Item::Custom { .. } => {}
             }
         }
     }
@@ -103,6 +109,11 @@ fn menu_of(items: &[Item]) -> gio::Menu {
                 menu.append_item(&entry);
             }
             Item::Submenu { label, items } => menu.append_submenu(Some(label.as_str()), &menu_of(items)),
+            Item::Custom { id } => {
+                let entry = gio::MenuItem::new(None, None);
+                entry.set_attribute_value("custom", Some(&id.to_variant()));
+                menu.append_item(&entry);
+            }
         }
     }
     menu
@@ -120,6 +131,8 @@ struct Inner {
     /// A filter the menu has no toggle for (the manga's scanlator exclusions) is on.
     extra: Cell<bool>,
     handler: RefCell<Option<Rc<dyn Fn(Pick)>>>,
+    /// The custom slots and what builds their widget. A rebuilt menu is a new popover, so each gets a fresh widget.
+    customs: RefCell<Vec<(&'static str, Rc<dyn Fn() -> gtk::Widget>)>>,
 }
 
 impl Inner {
@@ -165,7 +178,7 @@ impl ViewOptions {
         let widget = gtk::Overlay::new();
         widget.set_child(Some(&button));
         widget.add_overlay(&dot);
-        let inner = Rc::new(Inner { dot, actions: RefCell::default(), filters: RefCell::default(), extra: Cell::new(false), handler: RefCell::default() });
+        let inner = Rc::new(Inner { dot, actions: RefCell::default(), filters: RefCell::default(), extra: Cell::new(false), handler: RefCell::default(), customs: RefCell::default() });
         // the actions reach the menu's state weakly, so the button keeps it alive: a caller may drop this value once the
         // button is placed
         let keep = Rc::clone(&inner);
@@ -192,7 +205,23 @@ impl ViewOptions {
         }
         *self.inner.filters.borrow_mut() = filter_names(sections);
         self.button.set_menu_model(Some(&menu));
+        self.place_customs();
         self.inner.refresh_dot();
+    }
+
+    /// Gives the custom slot `id` the widget `build` makes, now and each time the menu is rebuilt.
+    pub fn set_custom(&self, id: &'static str, build: impl Fn() -> gtk::Widget + 'static) {
+        self.inner.customs.borrow_mut().retain(|(slot, _)| *slot != id);
+        self.inner.customs.borrow_mut().push((id, Rc::new(build)));
+        self.place_customs();
+    }
+
+    /// Puts a fresh widget in every custom slot of the current popover.
+    fn place_customs(&self) {
+        let Some(popover) = self.button.popover().and_downcast::<gtk::PopoverMenu>() else { return };
+        for (id, build) in self.inner.customs.borrow().iter() {
+            popover.add_child(&build(), id);
+        }
     }
 
     /// Creates the actions the items name and that do not exist yet.
@@ -203,6 +232,7 @@ impl ViewOptions {
                     self.ensure(items);
                     continue;
                 }
+                Item::Custom { .. } => continue,
                 Item::Toggle { name, .. } | Item::Radio { name, .. } | Item::Action { name, .. } if self.inner.actions.borrow().contains_key(name) => continue,
                 Item::Toggle { name, .. } => (*name, self.toggle_action(*name)),
                 Item::Radio { name, .. } => (*name, self.radio_action(*name)),
@@ -336,6 +366,33 @@ mod tests {
     use std::rc::Rc;
 
     use super::*;
+
+    #[test]
+    fn a_custom_slot_holds_the_owner_widget_and_keeps_it_when_the_menu_is_rebuilt() {
+        crate::testing::with_display(|| {
+            let slider_in = |menu: &ViewOptions| {
+                let popover = menu.button().popover().and_downcast::<gtk::PopoverMenu>().expect("the popover");
+                let mut stack = vec![popover.upcast::<gtk::Widget>()];
+                while let Some(widget) = stack.pop() {
+                    if widget.is::<gtk::Scale>() {
+                        return true;
+                    }
+                    let mut child = widget.first_child();
+                    while let Some(c) = child {
+                        child = c.next_sibling();
+                        stack.push(c);
+                    }
+                }
+                false
+            };
+            let with_slot = || vec![Section::new("Cover size", vec![Item::custom("size")])];
+            let menu = ViewOptions::new("View", &with_slot());
+            menu.set_custom("size", || gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.1).upcast());
+            assert!(slider_in(&menu));
+            menu.set_sections(&with_slot());
+            assert!(slider_in(&menu), "a rebuilt menu gets a fresh slider");
+        });
+    }
 
     fn sections() -> Vec<Section> {
         vec![

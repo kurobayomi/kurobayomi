@@ -37,7 +37,7 @@ define_prefs! {
         default_manga_category: i32 = "default_category" => -1;
         last_used_anime_category: i32 = "__APP_STATE_last_used_anime_category" => 0;
         last_used_manga_category: i32 = "__APP_STATE_last_used_category" => 0;
-        cover_size: i32 = "library_cover_size" => 1;
+        cover_size: i32 = "library_cover_size" => 160;
     }
 }
 

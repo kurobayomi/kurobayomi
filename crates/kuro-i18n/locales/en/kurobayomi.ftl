@@ -5143,9 +5143,3 @@ player_link_refused = This source gave a video address that is not allowed: sour
 
 # source: kurobayomi
 pref_cover_size = Cover size
-# source: kurobayomi
-cover_size_small = Small
-# source: kurobayomi
-cover_size_medium = Medium
-# source: kurobayomi
-cover_size_large = Large
