@@ -69,7 +69,7 @@ fn build(app: &gtk::Application, path: &Path, text: Option<&str>) {
         if let (Some(display), Some(text)) = (gtk::gdk::Display::default(), &text) {
             display.clipboard().set_text(text);
         }
-        if let Err(e) = kuro_platform::opener::Opener::reveal(&kuro_platform::opener::XdgOpener, &dir.join("report")) {
+        if let Err(e) = kuro_platform::opener::Opener::reveal(&kuro_platform::opener::SystemOpener, &dir.join("report")) {
             eprintln!("kurobayomi: could not reveal the crash report folder: {e}");
         }
     });

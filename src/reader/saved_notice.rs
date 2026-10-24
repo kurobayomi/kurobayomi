@@ -65,7 +65,7 @@ fn install_actions(app: &gtk::Application) {
         app.add_action(&action);
     };
     register(OPEN_ACTION, |path| {
-        if let Err(error) = kuro_platform::opener::Opener::open_target(&kuro_platform::opener::XdgOpener, &path.to_string_lossy()) {
+        if let Err(error) = kuro_platform::opener::Opener::open_target(&kuro_platform::opener::SystemOpener, &path.to_string_lossy()) {
             tracing::warn!(error = %error, "the saved picture could not be opened");
         }
     });
@@ -132,7 +132,7 @@ pub fn show_shared(app: &gtk::Application, text: &str, path: &Path) {
 
 /// Opens a staged file with the desktop's default handler (T-43a-056).
 pub fn open_with_default(path: &Path) -> std::io::Result<()> {
-    kuro_platform::opener::Opener::open_target(&kuro_platform::opener::XdgOpener, &path.to_string_lossy())
+    kuro_platform::opener::Opener::open_target(&kuro_platform::opener::SystemOpener, &path.to_string_lossy())
 }
 
 /// Shows "Error" with the message, or "Unknown error" when there is none.

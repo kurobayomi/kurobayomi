@@ -76,17 +76,12 @@ pub const DEFAULT_PORT: u16 = 8090;
 /// The name of the server binary looked up on the search path.
 pub const BINARY: &str = "torrserver";
 
-/// The first `name` file in the directories of `search_path`. `is_file` is passed in so a test needs no disk.
-pub fn find_binary(search_path: &std::ffi::OsStr, name: &str, is_file: impl Fn(&std::path::Path) -> bool) -> Option<std::path::PathBuf> {
-    std::env::split_paths(search_path).map(|dir| dir.join(name)).find(|candidate| is_file(candidate))
-}
-
 /// The real start: spawns the server binary found on the search path, detached, on [`DEFAULT_PORT`]. A missing binary is
 /// `MissingBinary`; a failed spawn carries its text.
 pub fn spawn_server() -> Result<(), StartError> {
     let search = std::env::var_os("PATH").unwrap_or_default();
-    let binary = find_binary(&search, BINARY, |p| p.is_file()).ok_or(StartError::MissingBinary)?;
-    std::process::Command::new(binary)
+    let binary = kuro_platform::process::find_program(BINARY, &search).ok_or(StartError::MissingBinary)?;
+    kuro_platform::process::no_console(&mut std::process::Command::new(binary))
         .args(["--port", &DEFAULT_PORT.to_string()])
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -161,14 +156,6 @@ mod tests {
             Outcome::Toast("The torrent server was not found".to_owned())
         );
         assert!(toast_text(&StartError::Failed("boom".to_owned())).ends_with("boom"));
-    }
-
-    #[test]
-    fn the_binary_is_the_first_match_on_the_search_path() {
-        let search = std::env::join_paths(["/a", "/b", "/c"]).unwrap();
-        let found = find_binary(&search, "torrserver", |p| p.starts_with("/b") || p.starts_with("/c"));
-        assert_eq!(found, Some(std::path::PathBuf::from("/b/torrserver")));
-        assert_eq!(find_binary(&search, "torrserver", |_| false), None);
     }
 
     #[test]

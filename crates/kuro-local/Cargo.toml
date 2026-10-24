@@ -9,6 +9,7 @@ license.workspace = true
 kuro-archive = { path = "../kuro-archive" }
 kuro-core = { path = "../kuro-core" }
 kuro-domain = { path = "../kuro-domain" }
+kuro-platform = { path = "../kuro-platform" }
 kuro-source = { path = "../kuro-source" }
 async-trait = { workspace = true }
 chrono = { workspace = true }
@@ -22,6 +23,4 @@ tracing.workspace = true
 url = { workspace = true }
 
 [dev-dependencies]
-# set_modified: tests age folders, which needs a flag on Windows
-kuro-platform = { path = "../kuro-platform" }
 kuro-prefs = { path = "../kuro-prefs" }

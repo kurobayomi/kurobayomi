@@ -31,7 +31,7 @@ pub fn share_or_reveal(
 
 /// Opens the folder that holds `path` with the desktop's default handler, which is the file manager for folders.
 pub fn reveal(path: &Path) -> io::Result<()> {
-    kuro_platform::opener::Opener::reveal(&kuro_platform::opener::XdgOpener, path)
+    kuro_platform::opener::Opener::reveal(&kuro_platform::opener::SystemOpener, path)
 }
 
 #[cfg(test)]

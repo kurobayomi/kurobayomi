@@ -1,5 +1,6 @@
 //! Hands URLs and paths to the desktop's default handler. Every caller goes through the [`Opener`] trait, so a test can
-//! record the calls. A folder opens in the file manager.
+//! record the calls. A folder opens in the file manager. The engine is per platform: `xdg-open` on Linux, the shell's
+//! `ShellExecuteW` on Windows (`windows::opener`).
 
 use std::io;
 use std::path::Path;
@@ -19,12 +20,15 @@ pub trait Opener: Send + Sync {
     }
 }
 
-/// The `xdg-open` implementation of [`Opener`].
+/// The system's [`Opener`]: `xdg-open`, or the shell on Windows.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct XdgOpener;
+pub struct SystemOpener;
 
-impl Opener for XdgOpener {
+impl Opener for SystemOpener {
+    #[allow(unreachable_code)]
     fn open_target(&self, target: &str) -> io::Result<()> {
+        #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+        return crate::windows::opener::open(target);
         spawn_detached(Path::new("xdg-open"), &[std::ffi::OsStr::new(target)])
     }
 }

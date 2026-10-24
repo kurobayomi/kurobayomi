@@ -6,7 +6,7 @@
 
 use std::ffi::{OsStr, OsString};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
@@ -204,7 +204,7 @@ fn knows_extension_picky(ffprobe: &OsStr) -> bool {
     static KNOWS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<OsString, bool>>> = std::sync::OnceLock::new();
     let mut known = KNOWS.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
     *known.entry(ffprobe.to_owned()).or_insert_with(|| {
-        std::process::Command::new(ffprobe)
+        kuro_platform::process::no_console(&mut std::process::Command::new(ffprobe))
             .args(["-hide_banner", "-h", "demuxer=hls"])
             .output()
             .is_ok_and(|out| String::from_utf8_lossy(&out.stdout).contains("extension_picky"))
@@ -253,7 +253,9 @@ pub async fn probe_duration(program: &OsStr, video_url: &str, headers: &[(String
         args.insert(at, value.into());
         args.insert(at, format!("-{key}").into());
     }
-    let output = Command::new(program)
+    let mut command = Command::new(program);
+    kuro_platform::process::no_console(command.as_std_mut());
+    let output = command
         .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -284,7 +286,9 @@ pub async fn run_remux(
     if cancel.is_cancelled() {
         return Err(DownloadError::Cancelled);
     }
-    let mut child = Command::new(program)
+    let mut command = Command::new(program);
+    kuro_platform::process::no_console(command.as_std_mut());
+    let mut child = command
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -357,14 +361,10 @@ pub async fn run_remux(
     Err(DownloadError::FfmpegFailed)
 }
 
-/// The first file called `program` in the `PATH` directories `path_var`.
-pub fn find_on_path(program: &str, path_var: &OsStr) -> Option<PathBuf> {
-    std::env::split_paths(path_var).map(|dir| dir.join(program)).find(|candidate| candidate.is_file())
-}
-
 /// Startup check (T-24a-067): `ffmpeg` and `ffprobe` must both be on `path_var`, else `FfmpegMissing`.
 pub fn check_binaries(path_var: &OsStr) -> Result<(), DownloadError> {
-    if find_on_path(FFMPEG, path_var).is_some() && find_on_path(FFPROBE, path_var).is_some() {
+    let found = |program| kuro_platform::process::find_program(program, path_var).is_some();
+    if found(FFMPEG) && found(FFPROBE) {
         Ok(())
     } else {
         Err(DownloadError::FfmpegMissing)
@@ -396,6 +396,11 @@ pub fn startup_notice(path_var: &OsStr) -> Option<FfmpegNotice> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The file name of a program on this system (`ffmpeg.exe` on Windows).
+    fn program_file(name: &str) -> String {
+        format!("{name}{}", std::env::consts::EXE_SUFFIX)
+    }
     use crate::anime::model::VideoStatus;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
@@ -701,11 +706,10 @@ mod tests {
         let other = tempfile::tempdir().unwrap();
         let path = std::env::join_paths([dir.path(), other.path()]).unwrap();
         assert!(matches!(check_binaries(&path), Err(DownloadError::FfmpegMissing)));
-        std::fs::write(other.path().join(FFMPEG), b"x").unwrap();
+        std::fs::write(other.path().join(program_file(FFMPEG)), b"x").unwrap();
         assert!(matches!(check_binaries(&path), Err(DownloadError::FfmpegMissing)), "ffprobe is still missing");
-        std::fs::write(dir.path().join(FFPROBE), b"x").unwrap();
+        std::fs::write(dir.path().join(program_file(FFPROBE)), b"x").unwrap();
         check_binaries(&path).unwrap();
-        assert_eq!(find_on_path(FFMPEG, &path), Some(other.path().join(FFMPEG)));
     }
 
     #[cfg(unix)]
@@ -747,8 +751,8 @@ mod tests {
         let notice = startup_notice(&path).expect("both binaries are missing");
         assert_eq!(notice.message, "ffmpeg is not installed");
         assert_eq!(notice.help_url, FFMPEG_HELP_URL);
-        std::fs::write(dir.path().join(FFMPEG), b"x").unwrap();
-        std::fs::write(dir.path().join(FFPROBE), b"x").unwrap();
+        std::fs::write(dir.path().join(program_file(FFMPEG)), b"x").unwrap();
+        std::fs::write(dir.path().join(program_file(FFPROBE)), b"x").unwrap();
         assert_eq!(startup_notice(&path), None);
     }
 }

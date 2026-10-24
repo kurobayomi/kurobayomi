@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use kuro_net::cookies::CookieJar;
 use kuro_net::{NetError, NetworkClient};
-use kuro_platform::opener::XdgOpener;
+use kuro_platform::opener::SystemOpener;
 use kuro_platform::paths::Paths;
 use kuro_platform::toast::{Toaster, toast_channel};
 use kuro_prefs::network::NetworkPrefs;
@@ -58,7 +58,7 @@ pub fn app_jar() -> Option<CookieJar> {
 
 /// The client over `paths`, with the browser host as the challenge solver and the app's shared jar.
 pub fn build(prefs: &NetworkPrefs, paths: &dyn Paths) -> Result<NetworkClient, NetError> {
-    NetworkClient::for_desktop_with_cookies(prefs, paths, shared_jar(paths), None, Arc::new(XdgOpener), toaster())
+    NetworkClient::for_desktop_with_cookies(prefs, paths, shared_jar(paths), None, Arc::new(SystemOpener), toaster())
 }
 
 #[cfg(test)]

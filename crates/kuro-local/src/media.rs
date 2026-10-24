@@ -56,13 +56,13 @@ impl Tool {
         self
     }
 
-    /// The first file called `name` in a directory of `PATH`.
+    /// The program `name` on `PATH` (`name.exe` on Windows).
     pub fn on_path(name: &str) -> Option<Self> {
         Self::in_path_var(name, std::env::var_os("PATH")?.as_os_str())
     }
 
     fn in_path_var(name: &str, path: &std::ffi::OsStr) -> Option<Self> {
-        std::env::split_paths(path).map(|dir| dir.join(name)).find(|p| p.is_file()).map(Self::new)
+        kuro_platform::process::find_program(name, path).map(Self::new)
     }
 }
 
@@ -80,7 +80,7 @@ impl Drop for ChildGuard {
 /// after `timeout` is killed.
 fn run(tool: &Tool, args: &[OsString], timeout: Duration, label: &'static str) -> Result<Vec<u8>, MediaError> {
     let mut child = ChildGuard(
-        Command::new(&tool.program)
+        kuro_platform::process::no_console(&mut Command::new(&tool.program))
             .args(&tool.args)
             .args(args)
             .stdin(Stdio::null())

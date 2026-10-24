@@ -149,6 +149,7 @@ impl TorrServerSupervisor {
 
         self.set(ServerStatus::Starting);
         let mut cmd = Command::new(&cfg.program);
+        kuro_platform::process::no_console(cmd.as_std_mut());
         cmd.args(&cfg.base_args)
             .arg("--port")
             .arg(port.to_string())

@@ -98,6 +98,8 @@ jobs:
         with:
           msystem: UCRT64
           update: true
+          # git: kuro-core's build script reads the commit for `--version`
+          install: git
           pacboy: >-
             toolchain:p rust:p pkgconf:p cmake:p nasm:p
             gtk4:p mpv:p dav1d:p libarchive:p
