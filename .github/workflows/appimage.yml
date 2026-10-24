@@ -12,11 +12,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# a running build finishes (a cancelled one never saves its build cache, so the next would compile everything again); a
-# newer push waits, and replaces any older one still waiting, so the release still ends on the newest commit
-concurrency:
-  group: nightly-appimage
-  cancel-in-progress: false
+# The newest commit always wins: a newer run cancels the builds of an older one (each build job has its own group with
+# cancel-in-progress). The build caches survive that: they are restored from the last saved one, keyed on Cargo.lock, so a
+# cancelled build only loses work the next one redoes anyway. Publishing is never cancelled once it started: it replaces
+# each file by deleting and uploading it, and a cancel in between would leave the release without that file.
 
 permissions:
   contents: write
@@ -35,6 +34,9 @@ defaults:
 jobs:
   appimage:
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    concurrency:
+      group: nightly-build-appimage
+      cancel-in-progress: true
     # The AppImage bundles the build machine's libraries, so it runs on distros with glibc 2.39 or newer. The machine is
     # Ubuntu 24.04 (also the first with GTK 4.14, which the gtk4 v4_14 feature needs) with every system package already
     # in it (ci/Dockerfile, built by build-image.yml): nothing is installed from Ubuntu's mirror here.
@@ -112,6 +114,9 @@ jobs:
   # installer (dist/windows/kurobayomi.iss), installed and tried on the runner, then handed to the publish job.
   windows:
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    concurrency:
+      group: nightly-build-windows
+      cancel-in-progress: true
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -224,6 +229,9 @@ jobs:
   # installer is not up yet: the self-updaters of both read the commit from the notes.
   publish:
     needs: [appimage, windows]
+    concurrency:
+      group: nightly-publish
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
