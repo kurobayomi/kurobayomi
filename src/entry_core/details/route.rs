@@ -27,7 +27,7 @@ use kuro_downloads::DownloadState;
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::store::PrefStore;
 
-use crate::entry_core::constants::{FALLBACK_WIDTH, LEFT_PANE_WIDTH};
+use crate::entry_core::constants::{FALLBACK_WIDTH, left_pane_width};
 
 /// The width the page is laid out for before it has one: the window's, so a narrow window never gets the two-pane layout
 /// for a frame (its minimum width would push the window wider); the app's default size before there is a window.
@@ -759,12 +759,14 @@ impl View {
     fn apply_width(self: &Rc<Self>, width: i32) {
         let resized = self.width.replace(width) != width;
         let two = two_pane(width);
+        // the left pane is a share of the page, so it and the header's cover in it grow with the window
+        let pane_resized = two && self.panes.set_width(left_pane_width(width));
         if self.two_pane.get() == Some(two) {
             // the layout is the same, but the automatic columns of the season grid follow the width (T-39a-034), and so does
-            // the header's cover in one column
+            // the header's cover in either layout
             if resized && let Some(m) = self.model.borrow().as_ref() {
                 self.show_seasons(m, m.entry.fetch_type() == FetchType::Seasons);
-                if !two {
+                if !two || pane_resized {
                     self.render_info(m);
                 }
             }
@@ -1173,7 +1175,7 @@ impl View {
     /// The width the season grid has: the page, or the right pane of the two-pane layout.
     fn grid_width(&self) -> i32 {
         let width = self.width.get();
-        if self.two_pane.get() == Some(true) { (width - LEFT_PANE_WIDTH - 1).max(0) } else { width }
+        if self.two_pane.get() == Some(true) { (width - self.panes.width() - 1).max(0) } else { width }
     }
 
     /// The season grid of a `Seasons` entry. Its minimum column count is the entry's size setting (`Layout::columns_for`); it
@@ -1309,7 +1311,7 @@ impl View {
     fn render_info(self: &Rc<Self>, m: &EntryModel) {
         let two = self.two_pane.get().unwrap_or(false);
         let model = header_model(&m.entry, &m.source);
-        let column = if two { LEFT_PANE_WIDTH } else { self.width.get() };
+        let column = if two { self.panes.width() } else { self.width.get() };
         let handlers = self.handlers();
         self.info.set_header(&model, two, column, &handlers);
         self.info.set_description(&description(m.entry.description.as_deref()), &model.genres, &self.expansion, &handlers);
@@ -1854,7 +1856,7 @@ mod tests {
             assert!(fab.is_visible() && fab.is_sensitive(), "an unseen episode exists");
             let (min, _, _, _) = page.measure(gtk::Orientation::Horizontal, -1);
             assert!(min <= 360, "no horizontal minimum above 360 px, got {min}");
-            let left = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::ScrolledWindow>().ok()).find(|w| w.width_request() == LEFT_PANE_WIDTH).expect("the left pane");
+            let left = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::ScrolledWindow>().ok()).find(|w| w.width_request() == crate::entry_core::constants::LEFT_PANE_WIDTH).expect("the left pane");
             assert!(!left.is_visible(), "no left pane in one column");
             // one list options menu in the top bar, with the episode options; the count row is no button
             let options: Vec<gtk::MenuButton> = descendants(page.upcast_ref())
