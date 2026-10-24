@@ -43,13 +43,69 @@ fn nightly_icons(from: &Path, to: &Path) {
     }
 }
 
+/// The app icon as a Windows `.ico`: the channel's hicolor PNGs (16 to 256 px) stored as they are, which Windows reads
+/// since Vista. Six directory entries, then the images.
+fn windows_icon(nightly: bool, to: &Path) {
+    let (dir, name) = if nightly {
+        ("src/shell/data/icons-nightly", "io.github.anas1412.Kurobayomi.Nightly")
+    } else {
+        ("src/shell/data/icons", "io.github.anas1412.Kurobayomi")
+    };
+    let sizes = [16u32, 24, 32, 48, 128, 256];
+    let images: Vec<Vec<u8>> = sizes
+        .iter()
+        .map(|size| {
+            let png = format!("{dir}/hicolor/{size}x{size}/apps/{name}.png");
+            println!("cargo:rerun-if-changed={png}");
+            std::fs::read(&png).expect("read app icon")
+        })
+        .collect();
+    let mut ico = Vec::new();
+    for field in [0u16, 1, sizes.len() as u16] {
+        ico.extend(field.to_le_bytes());
+    }
+    let mut offset = 6 + 16 * sizes.len() as u32;
+    for (size, png) in sizes.iter().zip(&images) {
+        // a side of 256 is written as 0
+        let side = u8::try_from(*size).unwrap_or(0);
+        ico.extend([side, side, 0, 0]);
+        ico.extend(1u16.to_le_bytes()); // colour planes
+        ico.extend(32u16.to_le_bytes()); // bits per pixel
+        ico.extend((png.len() as u32).to_le_bytes());
+        ico.extend(offset.to_le_bytes());
+        offset += png.len() as u32;
+    }
+    for png in &images {
+        ico.extend(png);
+    }
+    std::fs::write(to, ico).expect("write app icon");
+}
+
 fn main() {
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let source = PathBuf::from("src/theme/icons");
     println!("cargo:rerun-if-changed=src/theme/icons");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=KB_CHANNEL");
-    let root = if std::env::var("KB_CHANNEL").is_ok_and(|channel| channel == "nightly") {
+    let nightly = std::env::var("KB_CHANNEL").is_ok_and(|channel| channel == "nightly");
+    // Windows takes a program's icon (taskbar, Explorer, title bar) from the exe; without one GTK shows its own logo
+    if std::env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows") {
+        let ico = out.join("kurobayomi.ico");
+        windows_icon(nightly, &ico);
+        let script = out.join("kurobayomi.rc");
+        std::fs::write(&script, format!("1 ICON \"{}\"\n", ico.display().to_string().replace('\\', "/"))).expect("write resource script");
+        let object = out.join("kurobayomi-resources.o");
+        // ponytail: windres of the MinGW toolchain (the MSYS2 build); an MSVC build would need rc.exe
+        let status = Command::new("windres")
+            .arg(&script)
+            .args(["-O", "coff", "-o"])
+            .arg(&object)
+            .status()
+            .expect("windres must be installed (MinGW binutils)");
+        assert!(status.success(), "windres failed");
+        println!("cargo:rustc-link-arg-bins={}", object.display());
+    }
+    let root = if nightly {
         nightly_icons(&source, &out.join("icons"));
         out.join("icons")
     } else {
