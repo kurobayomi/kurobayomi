@@ -251,15 +251,16 @@ impl Pages {
 
     /// Makes the page of `origin` in the hidden window; it loads the front page once it exists.
     fn create(pages: &Rc<Self>, origin: &str) {
-        let (weak, origin) = (Rc::downgrade(pages), origin.to_owned());
+        let (weak, site_origin) = (Rc::downgrade(pages), origin.to_owned());
         let handler = CreateCoreWebView2ControllerCompletedHandler::create(Box::new(move |error, controller| {
+            let origin = site_origin.as_str();
             let Some(pages) = weak.upgrade() else { return Ok(()) };
             let made = error.map_err(|e| e.to_string()).and_then(|()| controller.ok_or_else(|| "no page".to_owned())).and_then(|controller| {
                 // SAFETY: COM calls on the thread that owns the page
-                unsafe { configure(&pages, &origin, &controller) }.map(|view| (controller, view)).map_err(|e| e.to_string())
+                unsafe { configure(&pages, origin, &controller) }.map(|view| (controller, view)).map_err(|e| e.to_string())
             });
             let Ok(mut sites) = pages.sites.try_borrow_mut() else { return Ok(()) };
-            let Some(site) = sites.get_mut(&origin) else { return Ok(()) };
+            let Some(site) = sites.get_mut(origin) else { return Ok(()) };
             match made {
                 Ok((controller, view)) => {
                     site.controller = Some(controller);
