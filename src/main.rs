@@ -1,3 +1,6 @@
+// a release build on Windows opens no console window next to the app (a debug build keeps it, for the logs)
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod app_update;
 mod appimage_update;
 mod channel;

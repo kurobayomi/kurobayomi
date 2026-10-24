@@ -118,3 +118,60 @@ jobs:
             gh release create nightly "$APPIMAGE" "$APPIMAGE.zsync" --target "$SHA" --prerelease \
               --title "Nightly ($short)" --notes "Built from commit $SHA."
           fi
+
+  # A test build of the Windows nightly: the app with every DLL and the GTK data it needs (scripts/bundle-windows.sh), as
+  # a zip on this run's page, not on the release. For trying the app on Windows until the installer replaces it
+  # (plans/addenda/requirements-cross-platform.md, packaging).
+  windows:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          pacboy: >-
+            toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
+            gtk4:p mpv:p dav1d:p libarchive:p
+
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build
+        # as the AppImage's build above: the nightly channel and commit baked in, the quick release profile
+        env:
+          KB_COMMIT: ${{ env.SHA }}
+          KB_CHANNEL: nightly
+          CARGO_PROFILE_RELEASE_LTO: "false"
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+        run: cargo build --release --locked
+
+      - name: Bundle
+        run: scripts/bundle-windows.sh target/release/kurobayomi.exe Kurobayomi-Nightly
+
+      # the bundled exe started with Windows' own folders on PATH only: Windows loads every DLL before main runs, so a
+      # missing one fails here. It has no console of its own (a GUI program), so its output goes to a file.
+      - name: Start the bundled app
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $run = Start-Process -FilePath Kurobayomi-Nightly\bin\kurobayomi.exe -ArgumentList '--version' -NoNewWindow -Wait -PassThru -RedirectStandardOutput version.txt
+          Get-Content version.txt
+          if ($run.ExitCode -ne 0) { throw "the bundled app exited with $($run.ExitCode)" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kurobayomi-Nightly-windows-x86_64
+          path: Kurobayomi-Nightly
+          retention-days: 14

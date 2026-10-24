@@ -14,7 +14,9 @@ fn files(dir: &Path, root: &Path, out: &mut Vec<String>) {
         if path.is_dir() {
             files(&path, root, out);
         } else if path.extension().is_some_and(|e| e == "svg") {
-            out.push(path.strip_prefix(root).expect("under root").to_string_lossy().into_owned());
+            // resource names use `/` on every system (Windows would give `actions\x.svg`, which no lookup finds)
+            let relative = path.strip_prefix(root).expect("under root").components();
+            out.push(relative.map(|part| part.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/"));
         }
     }
 }
