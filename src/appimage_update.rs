@@ -364,6 +364,10 @@ fn update(package: &Package, target: &Path, track: Track, api: &str, step: &dyn 
         newer.sha256 = Some(sum_of(&sums, asset).ok_or(tr(MsgKey::ui_sha256sums_does_not_list_the_appimage))?);
     }
     step(Step::Found { build: newer.build.clone(), size: newer.size });
+    // the setup's folder (the app's temporary folder) may not exist yet; an AppImage's folder always does
+    if let Some(folder) = target.parent() {
+        std::fs::create_dir_all(folder).map_err(|e| format!("cannot create {}: {e}", folder.display()))?;
+    }
     let part = download(&http(900)?, &newer, package, target, &|bytes| step(Step::Bytes(bytes)), control)?;
     kuro_platform::self_update::replace_file(&part, target).map_err(|e| e.to_string())?;
     if *package == Package::Installer {
@@ -933,7 +937,8 @@ mod tests {
     fn a_windows_copy_downloads_the_setup_and_keeps_it_for_the_quit() {
         const SETUP: &str = "Kurobayomi-Setup-x86_64.exe";
         let dir = tempfile::tempdir().unwrap();
-        let target = dir.path().join(SETUP);
+        // the app's temporary folder, not made yet on a fresh install
+        let target = dir.path().join("cache").join("tmp").join(SETUP);
         let track = Track::Stable("0.1.0");
         let run = |body: Vec<u8>| {
             let hash = hex(&body);
