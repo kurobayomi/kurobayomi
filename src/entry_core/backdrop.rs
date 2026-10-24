@@ -1,14 +1,19 @@
 //! The backdrop behind the entry header (T-38a-014). Upstream: `MangaInfoHeader.kt`. The cover is drawn behind the header at
-//! alpha 0.2 with a gradient from transparent to the window background. The blur is computed once per cover and cached by
+//! alpha 0.85 with a gradient from transparent to the window background. The blur is computed once per cover and cached by
 //! the cover's url and modification time, so a changed cover is blurred again. Pure: the widget draws the result.
 
 use image::RgbaImage;
 
-/// The alpha of the backdrop at its top edge: the blurred cover, and the theme colour fading out behind the header.
-pub const BACKDROP_ALPHA: f64 = 0.2;
+/// The alpha of the blurred cover behind the header: strong enough to colour the whole header, the fade keeps the text
+/// readable.
+pub const BACKDROP_ALPHA: f64 = 0.85;
 
-/// The blur strength in pixels at 1x (a Gaussian sigma of about 4 px).
-pub const BLUR_SIGMA_PX: f32 = 4.0;
+/// The alpha of the theme colour at the top of the header, under the cover, fading out downward.
+pub const TINT_ALPHA: f64 = 0.2;
+
+/// The blur strength in pixels on the shrunk copy (`BLUR_MAX_SIDE`): stretched over the header it is a soft wash of the
+/// cover's colours with its big shapes still readable.
+pub const BLUR_SIGMA_PX: f32 = 3.0;
 
 /// The CSS class of the gradient layer over the backdrop. Its rule is in `theme/style.css`: clear at the top, the window
 /// background at the bottom.
@@ -42,8 +47,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_backdrop_is_faint() {
-        assert_eq!(BACKDROP_ALPHA, 0.2);
+    fn the_backdrop_shows_and_the_tint_stays_faint() {
+        assert_eq!(BACKDROP_ALPHA, 0.85);
+        assert_eq!(TINT_ALPHA, 0.2);
     }
 
     #[test]

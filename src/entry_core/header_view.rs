@@ -10,7 +10,7 @@ use gtk::{Align, Box as GBox, Label, Orientation as O};
 use kuro_i18n::{Arg, MsgKey, tr, trf};
 
 use crate::entry_core::action_row::{self, Tone, tone_alpha};
-use crate::entry_core::backdrop::BACKDROP_ALPHA;
+use crate::entry_core::backdrop::TINT_ALPHA;
 use crate::entry_core::backdrop_view;
 use crate::entry_core::header::{Field, HeaderModel, SearchRequest, cover_size};
 use crate::entry_core::cover_view::CoverView;
@@ -139,7 +139,7 @@ fn icon_row(icon: &str, content: &impl IsA<gtk::Widget>, centered: bool) -> GBox
     row
 }
 
-/// The theme colour behind the header: `BACKDROP_ALPHA` at the top, fading out downward.
+/// The theme colour behind the header: `TINT_ALPHA` at the top, fading out downward.
 fn fade() -> gtk::DrawingArea {
     let area = gtk::DrawingArea::new();
     area.set_can_target(false);
@@ -147,7 +147,7 @@ fn fade() -> gtk::DrawingArea {
         let color = area.color();
         let (r, g, b) = (f64::from(color.red()), f64::from(color.green()), f64::from(color.blue()));
         let gradient = gtk::cairo::LinearGradient::new(0.0, 0.0, 0.0, f64::from(h));
-        gradient.add_color_stop_rgba(0.0, r, g, b, BACKDROP_ALPHA);
+        gradient.add_color_stop_rgba(0.0, r, g, b, TINT_ALPHA);
         gradient.add_color_stop_rgba(1.0, r, g, b, 0.0);
         let _ = cr.set_source(&gradient);
         cr.rectangle(0.0, 0.0, f64::from(w), f64::from(h));

@@ -304,7 +304,7 @@ mod base_css_tests {
             (".reader-bg-gray", "background-color: #202125;"),
             (".reader-scrim", "background-color: rgba(0, 0, 0, 0.5);"),
             (".reader-text-light", "color: #ffffff;"),
-            (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@theme_bg_color, 0) 0%, alpha(@theme_bg_color, 1) 100%);"),
+            (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);"),
             (".kb-banner", "background-color: alpha(@theme_selected_bg_color, 0.18); color: @theme_fg_color; padding: 4px 16px;"),
             (".kb-banner.kb-banner-error", "background-color: alpha(@error_color, 0.18); padding: 16px;"),
             (".kuro-cal-day:focus-visible", "outline: 2px solid @theme_selected_bg_color;"),

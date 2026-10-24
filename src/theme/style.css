@@ -256,9 +256,9 @@ entry.search > image:first-child {
   background-color: rgba(0, 0, 0, 0.5);
 }
 
-/* Manga header backdrop (entry_core/backdrop.rs): the blurred cover fades from clear at the top to the window background. */
+/* Manga header backdrop (entry_core/backdrop.rs): the blurred cover shows clearly at the top and eases into the window background by the bottom edge. */
 .kuro-backdrop-fade {
-  background-image: linear-gradient(to bottom, alpha(@theme_bg_color, 0) 0%, alpha(@theme_bg_color, 1) 100%);
+  background-image: linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);
 }
 
 /* Banners (shell/banners.rs, shell/warning.rs, browse/banner.rs): a strip tinted with the theme's selection colour, or

@@ -1,4 +1,4 @@
-//! The backdrop behind the manga header (T-38a-014): the blurred cover at alpha 0.2 with a gradient from transparent to the
+//! The backdrop behind the manga header (T-38a-014): the blurred cover at alpha 0.85 with a gradient from transparent to the
 //! window background (`backdrop.rs`). The blur is made once per cover and kept in a cache keyed by the cover's url and
 //! modification time, so a header drawn again shows it at once and a changed cover is blurred again.
 
