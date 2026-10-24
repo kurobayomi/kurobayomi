@@ -6,6 +6,28 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-25
+
+### Added
+
+- A Cover size slider in the Library's view menu sets how big the covers of the Library and Browse grids are, from 100
+  to 320 px wide; the covers resize while it moves and the number of columns follows the window.
+- Reader settings per manga: the reader's own settings (reading mode, background, scale type, zoom start, crop borders,
+  split wide pages) and its crop button now change only the open manga. Settings > Reader holds the defaults that every
+  manga follows until a value is picked for it. A reading mode picked in the reader is kept in the manga, where Aniyomi
+  backups keep it too.
+
+### Changed
+
+- On a wide window the info pane of a title page (and its cover) grows with the window, at 30% of the width, instead of
+  staying 360 px wide beside an empty page.
+- The blurred cover behind a title's header shows clearly, fading into the window background only at the bottom.
+
+### Fixed
+
+- Windows: sources behind a site's browser check (Cloudflare) work; they answered with the check before, because the
+  hidden pages that pass it had no Windows engine. They now run through WebView2.
+
 ## [0.2.0] - 2026-10-24
 
 ### Added
