@@ -6,11 +6,13 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// The program `name` in the folders of a `PATH` value: the first file there with the system's program suffix (`.exe`
-/// on Windows), so callers name a program the same way on every system.
+/// The program `name` next to the app, else in the folders of a `PATH` value: the first file with the system's program
+/// suffix (`.exe` on Windows), so callers name a program the same way on every system. The app's own folder comes first,
+/// as when Windows starts a program by name; the Windows installer ships ffmpeg there.
 pub fn find_program(name: &str, path_var: &OsStr) -> Option<PathBuf> {
     let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
-    std::env::split_paths(path_var).map(|dir| dir.join(&file)).find(|path| path.is_file())
+    let own = std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf));
+    own.into_iter().chain(std::env::split_paths(path_var)).map(|dir| dir.join(&file)).find(|path| path.is_file())
 }
 
 /// Opens no console window for a console program (ffmpeg, a torrent server): on Windows a program started from a
@@ -65,5 +67,18 @@ mod lookup_tests {
         let path = std::env::join_paths([first.path(), second.path()]).unwrap();
         assert_eq!(find_program("ffmpeg", &path), Some(second.path().join(&file)), "a folder of that name is skipped");
         assert_eq!(find_program("ffprobe", &path), None);
+    }
+
+    #[test]
+    fn a_program_next_to_the_app_comes_before_path() {
+        let name = format!("kb-find-program-test-{}", std::process::id());
+        let file = format!("{name}{}", std::env::consts::EXE_SUFFIX);
+        let own = std::env::current_exe().unwrap().parent().unwrap().join(&file);
+        let elsewhere = tempfile::tempdir().unwrap();
+        std::fs::write(elsewhere.path().join(&file), b"x").unwrap();
+        std::fs::write(&own, b"x").unwrap();
+        let found = find_program(&name, elsewhere.path().as_os_str());
+        let _ = std::fs::remove_file(&own);
+        assert_eq!(found, Some(own));
     }
 }

@@ -18,6 +18,9 @@ cp "$exe" "$out/bin/"
 strip --strip-debug "$out/bin/$(basename "$exe")"
 # GLib's helper that starts a session bus, which GApplication's single instance uses on Windows
 cp "$prefix/bin/gdbus.exe" "$out/bin/"
+# the programs anime downloads and local video previews run: a Windows PC seldom has them, and their libraries are
+# bundled anyway (libmpv uses them). The app looks next to itself before PATH (kuro_platform::process::find_program)
+cp "$prefix/bin/ffmpeg.exe" "$prefix/bin/ffprobe.exe" "$out/bin/"
 # the image loaders (librsvg's draws the SVG icons) with their cache, whose paths are relative to the prefix
 cp -r "$prefix/lib/gdk-pixbuf-2.0" "$out/lib/"
 cp "$prefix/share/glib-2.0/schemas/gschemas.compiled" "$out/share/glib-2.0/schemas/"
@@ -59,7 +62,7 @@ If you cannot get a source you are entitled to, write to the project at https://
 OFFER
 } > "$lic/SOURCE-OFFER.txt"
 {
-    for file in "${dlls[@]}" "$prefix/bin/gdbus.exe" "$prefix/lib/gdk-pixbuf-2.0/2.10.0/loaders/"*.dll "$prefix/share/icons/Adwaita/index.theme"; do
+    for file in "${dlls[@]}" "$prefix/bin/"{gdbus,ffmpeg,ffprobe}.exe "$prefix/lib/gdk-pixbuf-2.0/2.10.0/loaders/"*.dll "$prefix/share/icons/Adwaita/index.theme"; do
         pacman -Qqo "$file" 2>/dev/null || true
     done
 } | sort -u | while read -r package; do

@@ -112,8 +112,8 @@ administrator prompt, and adds Kurobayomi to the Start menu.
 
 The installer is not signed, so Windows SmartScreen may warn about it the first time: click **More info**, then **Run
 anyway**. The installed app updates itself like the AppImage below, except that the new version installs when you quit
-Kurobayomi (or at once with **Restart**). Uninstall it from **Settings → Apps**. Anime downloads need
-[ffmpeg](https://ffmpeg.org/download.html) on your `PATH`, as on Linux.
+Kurobayomi (or at once with **Restart**). Uninstall it from **Settings → Apps**. It comes with ffmpeg, which anime
+downloads use; on Linux, install your distribution's `ffmpeg` package for them.
 
 ### Linux (AppImage)
 
