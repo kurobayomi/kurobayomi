@@ -4,9 +4,9 @@
 //! earned it, so its cookie cannot be replayed from the app's own client. One page per site, closed after
 //! [`IDLE_CLOSE`] unused; its cookies stay in [`Paths::web_pages_data_dir`].
 //!
-//! The engine is per platform: WebKitGTK on Linux (`linux::hidden_pages`). Elsewhere there is none yet, so
-//! [`hidden_pages`] gives `None` and such sites answer with their check (a Windows port adds WebView2 here). The request
-//! and answer shapes, the page script and the rules below are shared by every engine.
+//! The engine is per platform: WebKitGTK on Linux (`linux::hidden_pages`), the system's Edge WebView2 on Windows
+//! (`windows::hidden_pages`). Elsewhere there is none yet, so [`hidden_pages`] gives `None` and such sites answer with their
+//! check. The request and answer shapes, the page script and the rules below are shared by every engine.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -28,6 +28,9 @@ pub trait HiddenPages: Send + Sync {
 pub fn hidden_pages(paths: &dyn Paths) -> Option<Arc<dyn HiddenPages>> {
     #[cfg(all(target_os = "linux", feature = "platform-linux"))]
     return Some(Arc::new(crate::linux::hidden_pages::WebKitPages::new(paths.web_pages_data_dir(), paths.web_pages_cache_dir())));
+    // WebView2 keeps its cache inside its data folder
+    #[cfg(all(target_os = "windows", feature = "platform-windows"))]
+    return Some(Arc::new(crate::windows::hidden_pages::WebView2Pages::new(paths.web_pages_data_dir())));
     None
 }
 

@@ -1,11 +1,12 @@
-//! Windows-specific integration: the GL entry points, disks and their space, memory, the default program opener and the
-//! system facts of crash reports.
+//! Windows-specific integration: the GL entry points, disks and their space, memory, the default program opener, the
+//! hidden pages that pass a site's browser check (WebView2) and the system facts of crash reports.
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 
 pub mod device;
 pub mod gl;
+pub mod hidden_pages;
 pub mod opener;
 pub mod storage;
 pub mod system;
