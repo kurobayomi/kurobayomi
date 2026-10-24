@@ -6,11 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-kuro-data = { version = "0.1.0", path = "../kuro-data" }
-kuro-db = { version = "0.1.0", path = "../kuro-db" }
-kuro-platform = { version = "0.1.0", path = "../kuro-platform" }
-kuro-prefs = { version = "0.1.0", path = "../kuro-prefs" }
-kuro-track = { version = "0.1.0", path = "../kuro-track" }
+kuro-data = { path = "../kuro-data" }
+kuro-db = { path = "../kuro-db" }
+kuro-platform = { path = "../kuro-platform" }
+kuro-prefs = { path = "../kuro-prefs" }
+kuro-track = { path = "../kuro-track" }
 async-trait = { workspace = true }
 rusqlite = { workspace = true }
 tokio = { workspace = true }

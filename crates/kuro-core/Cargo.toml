@@ -25,7 +25,7 @@ md-5 = { workspace = true }
 sha1 = "0.11.0"
 sha2 = { workspace = true }
 thiserror = { workspace = true }
-kuro-platform = { version = "0.1.0", path = "../kuro-platform" }
+kuro-platform = { path = "../kuro-platform" }
 kuro-prefs = { path = "../kuro-prefs" }
 async-trait = { workspace = true }
 icu_collator = "2"

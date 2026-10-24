@@ -6,6 +6,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-24
+
 ### Added
 
 - Windows 10 and 11 (64-bit): `Kurobayomi-Setup-x86_64.exe` installs Kurobayomi for the current user, without an
@@ -17,17 +19,27 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - The player's HW and HW+ decoding also use Direct3D 11 where mpv offers it.
 - The AppImage and the Windows installer come with ffmpeg and ffprobe, so anime downloads and local video previews work
   without installing ffmpeg. The app uses the one next to it first, then one on `PATH`.
+- Help opens Kurobayomi's own help on the website: an FAQ (general, library, updates, browse, downloads, player, reader,
+  storage) and guides (troubleshooting, backups, tracking, categories, local folders, source migration, keyboard
+  shortcuts). The other help buttons (Upcoming, migration, update errors, the large-update warning) open its pages
+  instead of Aniyomi's.
 
 ### Changed
 
 - Data and storage lists the same storage roots wherever it is opened: the mounted disks and the one that holds the app's
   data (on Windows, the fixed and removable drives).
+- Anime downloads take the player's Default quality, else the source's best video, as playing does.
+- Keyboard shortcuts left the side panel and the menu; F1 or ? still show them on a title page, and the help lists
+  them all.
+- The large download and update warnings and the update-failure notice say Kurobayomi and Click, not Aniyomi and Tap.
 
 ### Fixed
 
 - A GTK theme written for a newer GTK (adw-gtk3 6 writes its stylesheet in CSS variables) no longer leaves the window
   see-through: on a GTK older than 4.16 such a theme falls back to Adwaita, or Adwaita-dark for a dark one, for that run
   (issue #5).
+- Open the Local folder, and showing the crash log or the update error log, failed in the AppImage
+  ("gio-launch-desktop") and on Windows; they open through the system's own opener now.
 
 ## [0.1.10] - 2026-10-24
 

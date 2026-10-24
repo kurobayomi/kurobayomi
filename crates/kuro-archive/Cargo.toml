@@ -11,7 +11,7 @@ license.workspace = true
 unsafe_code = "deny"
 
 [dependencies]
-kuro-core = { version = "0.1.0", path = "../kuro-core" }
+kuro-core = { path = "../kuro-core" }
 chrono.workspace = true
 memmap2 = "0.9.11"
 scraper.workspace = true
