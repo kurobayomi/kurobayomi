@@ -25,7 +25,7 @@ use tokio::sync::watch;
 
 use super::content::ContentPlan;
 use super::glue::{consume_events, follow_changes, follow_ready, keep_alive, own_tasks};
-use super::grid::{COVER_WIDTH_PX, CONTAINER_MARGIN_PX, CoverBinds, last_visible_index};
+use super::grid::{CONTAINER_MARGIN_PX, CoverBinds, last_visible_index};
 use super::listing::{ListItem, ListedPage, Listing, PageLoader};
 use super::prefs::BrowsePrefs;
 use super::primitives::{EmptyAction, ToastAction, ToastDuration, ToastSpec, stub_source_label};
@@ -325,7 +325,14 @@ impl ListingView {
         });
         inner.list.connect_activate(move |_, position| open(position));
 
-        inner.apply_display();
+        // the cells are drawn at the stored cover size, now and again whenever the setting changes
+        let weak = Rc::downgrade(inner);
+        crate::bind::bind(&inner.grid, &inner.deps.prefs.cover_size, move |_, _| {
+            if let Some(inner) = weak.upgrade() {
+                inner.apply_display();
+                inner.apply_columns();
+            }
+        });
         inner.prefill();
         inner.render();
         inner.pump();
@@ -461,7 +468,7 @@ impl Inner {
     fn apply_columns(self: &Rc<Self>) {
         let viewport = self.scroller.hadjustment().page_size() as i32;
         if viewport > 0 {
-            crate::widgets::cover_grid::apply_columns(&self.grid, viewport);
+            crate::widgets::cover_grid::apply_columns(&self.grid, viewport, self.deps.prefs.cover_size.get());
         }
     }
 
@@ -470,7 +477,7 @@ impl Inner {
         let mode = self.display.get();
         let load = Rc::clone(&self.deps.load_cover);
         let menu = Rc::clone(&self.deps.menu);
-        let cover_px = COVER_WIDTH_PX;
+        let cover_px = crate::widgets::cover_grid::cover_width(self.deps.prefs.cover_size.get());
         // one ticket per recycled cell: a cover that arrives after its cell was rebound is dropped (edge R10)
         let binds: Rc<RefCell<CoverBinds>> = Rc::default();
         let factory = gtk::SignalListItemFactory::new();

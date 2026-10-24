@@ -10,6 +10,16 @@ pub const COLUMN_WIDTH_PX: i32 = 160;
 /// Window width where the landscape preference takes over from the portrait one, in pixels.
 pub const PORTRAIT_BREAKPOINT_PX: i32 = 900;
 
+/// Column width of each cover size (Small, Medium, Large), in pixels. Medium is the default.
+pub const COVER_SIZE_COLUMN_PX: [i32; 3] = [120, COLUMN_WIDTH_PX, 210];
+/// The stored cover size that means Medium.
+pub const COVER_SIZE_MEDIUM: i32 = 1;
+
+/// Column width of a stored cover size; any other stored value reads as Medium.
+pub fn column_width(cover_size: i32) -> i32 {
+    usize::try_from(cover_size).ok().and_then(|i| COVER_SIZE_COLUMN_PX.get(i)).copied().unwrap_or(COLUMN_WIDTH_PX)
+}
+
 /// A stored value kept in `0..=10`.
 pub fn clamp_columns(stored: i32) -> i32 {
     stored.clamp(AUTO, MAX_COLUMNS)
@@ -52,6 +62,14 @@ mod tests {
         assert_eq!(auto_columns(1000), 6);
         assert_eq!(auto_columns(320), 2);
         assert_eq!(auto_columns(100), 2);
+    }
+
+    #[test]
+    fn each_cover_size_has_its_column_width_and_unknown_sizes_read_as_medium() {
+        assert_eq!([column_width(0), column_width(1), column_width(2)], [120, 160, 210]);
+        assert_eq!(column_width(COVER_SIZE_MEDIUM), COLUMN_WIDTH_PX);
+        assert_eq!(column_width(-1), COLUMN_WIDTH_PX);
+        assert_eq!(column_width(3), COLUMN_WIDTH_PX);
     }
 
     #[test]

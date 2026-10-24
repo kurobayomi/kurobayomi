@@ -37,6 +37,7 @@ define_prefs! {
         default_manga_category: i32 = "default_category" => -1;
         last_used_anime_category: i32 = "__APP_STATE_last_used_anime_category" => 0;
         last_used_manga_category: i32 = "__APP_STATE_last_used_category" => 0;
+        cover_size: i32 = "library_cover_size" => 1;
     }
 }
 
@@ -296,7 +297,7 @@ mod tests {
     fn every_field_is_registered_under_the_library_table() {
         let lib = LibraryPrefs::new(PrefStore::in_memory());
         assert_eq!(LibraryPrefs::TABLE, "library");
-        assert_eq!(LibraryPrefs::FIELDS.len(), 17, "the settings diet kept 17 keys here, plus the tracked-filter families");
+        assert_eq!(LibraryPrefs::FIELDS.len(), 18, "the settings diet kept 17 keys here, the cover size came back, plus the tracked-filter families");
         assert_section_registered(LibraryPrefs::TABLE, LibraryPrefs::FIELDS, &lib.defaults());
     }
 

@@ -5,7 +5,7 @@
 pub const GRID_PADDING_PX: i32 = 8;
 /// The container carries the padding minus half a gap and every cell carries half a gap on each side (the shared
 /// `cover_grid::CELL_MARGIN_PX`), so the cells sit 4 px apart and the content 8 px from the edge (B§2.7).
-pub use crate::widgets::cover_grid::{CELL_MARGIN_PX, COVER_WIDTH_PX};
+pub use crate::widgets::cover_grid::CELL_MARGIN_PX;
 pub const CONTAINER_MARGIN_PX: i32 = GRID_PADDING_PX - CELL_MARGIN_PX;
 /// Alpha of a favourite's cover; non-favourites are drawn at full strength (B§2.7, D§13).
 pub const FAVORITE_ALPHA: f64 = 0.34;

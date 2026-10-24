@@ -6,7 +6,6 @@ use kuro_i18n::{MsgKey, tr};
 use kuro_platform::kind::Kind;
 use gtk::prelude::*;
 use gtk::{Align, Orientation as O};
-use kuro_domain::library::columns::COLUMN_WIDTH_PX;
 use kuro_domain::library::page::LibraryItem;
 use kuro_images::art::ArtRef;
 use kuro_prefs::library::LibraryDisplayMode;
@@ -25,6 +24,8 @@ pub struct Extras<'a> {
     pub art: Option<&'a ArtRef>,
     pub kind: Kind,
     pub season_parent: bool,
+    /// The width of a grid card: the column width of the stored cover size (`columns::column_width`).
+    pub width: i32,
 }
 
 /// The cover of a card: the shared cover (`look::cover`), `width` x `height`.
@@ -91,7 +92,7 @@ fn title_label(text: &str, class: &str) -> gtk::Label {
 /// Builds the grid card of `item`. `selected` marks it; `show_continue` adds the continue button.
 pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, selected: bool, show_continue: bool, extras: &Extras) -> Card {
     let model = layout::card_model(item, mode, extras.kind, extras.season_parent);
-    let width = COLUMN_WIDTH_PX;
+    let width = extras.width;
     let overlay = gtk::Overlay::new();
     overlay.add_css_class("kb-card-cover");
     overlay.set_overflow(gtk::Overflow::Hidden);
@@ -179,6 +180,7 @@ fn ui_inset(widget: &impl IsA<gtk::Widget>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kuro_domain::library::columns::COLUMN_WIDTH_PX;
 
     fn labels(root: &gtk::Widget, out: &mut Vec<String>) {
         let mut child = root.first_child();
@@ -199,7 +201,7 @@ mod tests {
     #[test]
     fn a_card_without_a_cover_shows_initials_worded_badges_and_the_title_below() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false };
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX };
             let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, false, &extras);
             let mut text = vec![];
             labels(&card.root, &mut text);
@@ -217,7 +219,7 @@ mod tests {
     #[test]
     fn t_49b_029_a_selected_list_row_takes_the_selected_tint_and_an_unselected_one_none() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false };
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX };
             let selected = build_list(&local_anime(), true, false, 76.0, &extras);
             assert!(selected.root.has_css_class("kb-selected") && selected.root.has_css_class("kb-card-selected"));
             let plain = build_list(&local_anime(), false, false, 76.0, &extras);
@@ -228,7 +230,7 @@ mod tests {
     #[test]
     fn the_cover_only_grid_has_no_title_and_the_compact_grid_puts_it_on_the_cover() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false };
+            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX };
             let bare = build(&local_anime(), LibraryDisplayMode::CoverOnlyGrid, false, true, &extras);
             let mut text = vec![];
             labels(&bare.root, &mut text);

@@ -292,6 +292,19 @@ impl LibraryView {
             }
             glib::ControlFlow::Continue
         });
+        // a new cover size redraws the cards at their new width and recounts the columns (the first call is the seed: the
+        // first render draws them)
+        let (weak, seeded) = (Rc::downgrade(&inner), FlagCell::new(false));
+        let (grid, cover_size) = (inner.borrow().grid.clone(), inner.borrow().deps.prefs.cover_size.clone());
+        crate::bind::bind(&grid, &cover_size, move |_, _| {
+            if !seeded.replace(true) {
+                return;
+            }
+            if let Some(inner) = weak.upgrade() {
+                apply_columns(&inner);
+                render(&inner);
+            }
+        });
         view.wire(&replies_rx);
         view.refresh();
         Ok(view)
@@ -909,8 +922,8 @@ fn window_width(widget: &impl IsA<gtk::Widget>) -> i32 {
     widget.root().map_or_else(|| widget.width(), |root| root.width())
 }
 
-/// Sets the grid's column count from the window width (T-08a-043): the column settings are cut, so it is always the
-/// automatic count, `max(2, width / 160)`.
+/// Sets the grid's column count from the width of the grid's area and the stored cover size (T-08a-043): as many columns
+/// of that size as fit, at least two.
 fn apply_columns(inner: &Rc<RefCell<Inner>>) {
     let (grid, columns) = {
         let st = inner.borrow();
@@ -922,7 +935,8 @@ fn apply_columns(inner: &Rc<RefCell<Inner>>) {
         };
         (st.grid.clone(), width)
     };
-    crate::widgets::cover_grid::apply_columns(&grid, columns);
+    let cover_size = inner.borrow().deps.prefs.cover_size.get();
+    crate::widgets::cover_grid::apply_columns(&grid, columns, cover_size);
 }
 
 /// Everything `render` draws, read in one borrow and applied without it.
@@ -1118,7 +1132,12 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
             }
         });
     }
-    let extras = card::Extras { art: art.as_ref(), kind, season_parent: is_season_parent(&inner.borrow(), &item) };
+    let extras = card::Extras {
+        art: art.as_ref(),
+        kind,
+        season_parent: is_season_parent(&inner.borrow(), &item),
+        width: kuro_domain::library::columns::column_width(inner.borrow().deps.prefs.cover_size.get()),
+    };
     let card = if mode == kuro_prefs::library::LibraryDisplayMode::List {
         let row_height = list_row_height(&inner.borrow());
         card::build_list(&item, selected, show_continue, row_height, &extras)

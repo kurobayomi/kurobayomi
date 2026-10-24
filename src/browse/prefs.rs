@@ -18,6 +18,8 @@ pub struct BrowsePrefs {
     /// `default_category` or `default_anime_category` (owned by the library screen): -1 asks, 0 is uncategorised, above 0
     /// a category id.
     pub default_category: Pref<i32>,
+    /// `library_cover_size`: the cover size the Library grids use too.
+    pub cover_size: Pref<i32>,
 }
 
 impl BrowsePrefs {
@@ -27,7 +29,7 @@ impl BrowsePrefs {
             Kind::Manga => library.default_manga_category.clone(),
             Kind::Anime => library.default_anime_category.clone(),
         };
-        Self { sources: SourcePrefs::new(store), default_category }
+        Self { sources: SourcePrefs::new(store), default_category, cover_size: library.cover_size.clone() }
     }
 
     /// The display mode of the source grids: the compact grid, since the setting is cut.

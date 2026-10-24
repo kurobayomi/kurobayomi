@@ -52,7 +52,7 @@ pub const LIBRARY_LANGUAGE_BADGE: bool = false;
 pub const LIBRARY_CONTINUE_BUTTON: bool = false;
 pub const LIBRARY_CATEGORY_TABS: bool = true;
 pub const LIBRARY_ITEM_COUNT: bool = false;
-/// Grid columns of the library and the source grids, at every window width: 0 is automatic.
+/// The list size of the library List mode, at every window width: 0 is automatic. (The grids follow the Cover size setting.)
 pub const LIBRARY_COLUMNS: i32 = 0;
 pub const LIBRARY_CATEGORISED_DISPLAY: bool = false;
 pub const LIBRARY_HIDE_HIDDEN_CATEGORIES: bool = false;

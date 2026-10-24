@@ -82,7 +82,7 @@ Not a registry key but you asked for it: **player quality and server choice**. A
 
 ### Appearance (settings_appearance, App language)
 
-8 keys: 5 CUT, 3 KEEP.
+9 keys: 5 CUT, 4 KEEP.
 
 | Key | Where the user sees it | What it does | Verdict | If CUT: hard-code | Reason | Flags and import |
 |---|---|---|---|---|---|---|
@@ -92,6 +92,7 @@ Not a registry key but you asked for it: **player quality and server choice**. A
 | `relative_time_v2` | Appearance > Display > Relative timestamps | Shows Today instead of a date in lists. | **CUT** | true | Micro option; the default is the right one. | import: keep accepting on import |
 | `app_date_format` | Appearance > Display > Date format | Picks a date pattern for lists. | **CUT** | "" (locale short date) | The system locale already formats dates. | import: keep accepting on import |
 | `start_screen` | Appearance > Display > Start screen | Tab that opens at launch (Anime, Manga, Updates, History, Browse). | **KEEP** |  | A manga-only or anime-only user wants it in the first 10 minutes. | - |
+| `library_cover_size` | Appearance > Display > Cover size | Small, Medium or Large covers in the Library and Browse grids; the column count follows the window. Kurobayomi key, added 2026-10-24. | **KEEP** |  | Users asked to control cover size; the cut column keys only left gaps because covers have a fixed width. | - |
 | `bottom_rail_nav_style` | Appearance > Display > Navigation style | Chooses which tab moves into the More tab. | **CUT** | MOVE_HISTORY_TO_MORE | Phone bottom-bar idea; a desktop sidebar has room for every tab. | import: keep accepting on import |
 | `app_language` | Appearance > Display > App language (page settings_app_language) | Language of the app, empty means follow the system. NOT in the registry (stored by src/pref_model/language.rs). | **KEEP** |  | Always keep; add it to the registry so import and tests see it. | OUTSIDE-REGISTRY |
 
