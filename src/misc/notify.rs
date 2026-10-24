@@ -622,7 +622,7 @@ mod tests {
         // T-26a-096
         let log = Path::new("/cache/update_errors.txt");
         let post = error_post(Kind::Anime, 2, Some(log)).expect("shown");
-        assert_eq!(post.body.as_deref(), Some("Tap to see details"));
+        assert_eq!(post.body.as_deref(), Some("Click to see details"));
         assert_eq!(post.tap, Some(Target::OpenLog("/cache/update_errors.txt".to_owned())));
         let (action, value) = post.tap.expect("tap").action().expect("encodes");
         assert_eq!(action, "app.notice");

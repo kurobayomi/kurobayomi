@@ -210,7 +210,7 @@ mod tests {
         assert!(error_notice(0, true).is_none());
         let with_log = error_notice(3, true).expect("shown");
         assert_eq!(with_log.title, "3 update(s) failed");
-        assert_eq!(with_log.text, "Tap to see details");
+        assert_eq!(with_log.text, "Click to see details");
         assert!(with_log.opens_log);
         assert!(!error_notice(1, false).expect("shown").opens_log);
     }

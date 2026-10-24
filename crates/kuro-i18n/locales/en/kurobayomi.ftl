@@ -97,7 +97,7 @@ dialog_with_checkbox_reset = Reset all chapters for this manga
 download_insufficient_space = Couldn't download due to low storage space
 
 # source: i18n-aniyomi
-download_queue_size_warning = Warning: large bulk downloads may lead to sources becoming slower and/or blocking Aniyomi. Tap to learn more.
+download_queue_size_warning = Warning: large bulk downloads may lead to sources becoming slower and/or blocking Kurobayomi. Click to learn more.
 
 # source: i18n-aniyomi
 pref_invalidate_download_cache_summary = Force app to recheck downloaded chapters and episodes
@@ -2131,7 +2131,7 @@ action_close = Close
 action_open_log = Open log
 
 # source: i18n
-action_show_errors = Tap to see details
+action_show_errors = Click to see details
 
 # source: i18n
 action_restore = Restore
@@ -3835,7 +3835,7 @@ download_queue_error = Couldn't download chapters. You can try again in the down
 notification_updating_progress = Updating library… ({ $arg1 })
 
 # source: i18n
-notification_size_warning = Large updates harm sources and may lead to slower updates and also increased battery usage. Tap to learn more.
+notification_size_warning = Large updates harm sources and may lead to slower updates. Click to learn more.
 
 # source: i18n
 notification_new_chapters = New chapters found

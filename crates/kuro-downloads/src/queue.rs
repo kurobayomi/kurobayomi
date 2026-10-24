@@ -23,7 +23,7 @@ use crate::error::DownloadError;
 /// How long the bulk-download warning stays.
 pub const WARNING_TIMEOUT_SECS: u32 = 30;
 pub const BULK_WARNING_TEXT: &str =
-    "Warning: large bulk downloads may lead to sources becoming slower and/or blocking Aniyomi. Tap to learn more.";
+    "Warning: large bulk downloads may lead to sources becoming slower and/or blocking Kurobayomi. Click to learn more.";
 pub const BULK_WARNING_HELP_URL: &str = kuro_platform::links::URL_LARGE_UPDATES;
 
 pub struct Layouts {
