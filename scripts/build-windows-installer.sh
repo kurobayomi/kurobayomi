@@ -12,9 +12,10 @@ icon="$(ls -t target/release/build/kurobayomi-*/out/kurobayomi.ico | head -1)"
 iscc="${ISCC:-/c/Program Files (x86)/Inno Setup 6/ISCC.exe}"
 
 mkdir -p "$out"
-# MSYS2 rewrites arguments that start with / as paths; ISCC's /D options must reach it as written
+# MSYS2 rewrites arguments that start with / as paths; ISCC's /D options must reach it as written. The paths are absolute:
+# ISCC reads a relative one from the script's folder (dist\windows)
 MSYS2_ARG_CONV_EXCL='*' "$iscc" /Q \
     "/DChannel=$channel" "/DVersion=$version" \
-    "/DBundle=$(cygpath -w "$bundle")" "/DIcon=$(cygpath -w "$icon")" "/DOutput=$(cygpath -w "$out")" \
-    "$(cygpath -w dist/windows/kurobayomi.iss)"
+    "/DBundle=$(cygpath -wa "$bundle")" "/DIcon=$(cygpath -wa "$icon")" "/DOutput=$(cygpath -wa "$out")" \
+    "$(cygpath -wa dist/windows/kurobayomi.iss)"
 ls -l "$out"
