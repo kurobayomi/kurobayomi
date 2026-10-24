@@ -103,10 +103,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Once main has a newer commit that changed a workflow file, this token may make the tag only on main's newest
+          # commit, so tagging this one would fail, and only after the old tag was deleted, leaving the release a draft the
+          # app cannot see. Skip then: a newer run updates the nightly. A newer commit without a workflow change (docs,
+          # plans) starts no CI and so no nightly of its own; this run still publishes then.
+          git fetch -q --depth=1 origin main
+          if [ "$(git rev-parse FETCH_HEAD)" != "$SHA" ] && ! git diff --quiet "$SHA" FETCH_HEAD -- .github/workflows; then
+            echo "main has moved past $SHA with a workflow change; a newer run updates the nightly"
+            exit 0
+          fi
           short="$(git rev-parse --short=8 HEAD)"
           # the tag moves to this commit; the release itself stays, so there is never a moment without one. It is deleted
           # and made again rather than moved: GitHub refuses to let this token move a tag across a commit that changed a
-          # workflow file, but making a tag on a commit already on main is allowed. Deleting the tag turns the release into a
+          # workflow file, but making a tag on main's newest commit is allowed. Deleting the tag turns the release into a
           # draft, which the app cannot see (it reads it as no update), so the edit below publishes it again
           git push origin :refs/tags/nightly || true
           git push origin "$SHA:refs/tags/nightly"
