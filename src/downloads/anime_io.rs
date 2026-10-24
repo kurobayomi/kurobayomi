@@ -1,5 +1,5 @@
-//! The two app-side ports of the anime downloads: the hoster resolver, which picks the best video the way the player
-//! does (without its quality sheet), and the direct-file copy used when ffmpeg is not installed. Both run on the
+//! The two app-side ports of the anime downloads: the hoster resolver, which picks the video of the player's Default
+//! quality setting, else the source's best, and the direct-file copy used when ffmpeg is not installed. Both run on the
 //! runtime, off the GTK thread, so they only read the live sources and the network client.
 
 use std::path::Path;
@@ -52,8 +52,9 @@ fn to_download_video(video: kuro_source::anime::Video) -> Video {
     }
 }
 
-/// `getHosters` then `getBestVideo` (behaviour 5.2): the source's hosters, sorted, and the first one that resolves.
-pub struct LiveHosters;
+/// `getHosters` then the video of the Default quality setting (else `getBestVideo`, behaviour 5.2): the source's hosters,
+/// sorted, and the first one that resolves. The setting is read at each episode, so a change applies to the queue.
+pub struct LiveHosters(pub kuro_prefs::player::PlayerPrefs);
 
 #[async_trait]
 impl HosterResolver for LiveHosters {
@@ -71,7 +72,7 @@ impl HosterResolver for LiveHosters {
         } else {
             vec![Hoster::synthetic(live.videos_for_episode(&s_episode).await?)]
         };
-        let found = kuro_source::anime::best_video(live.as_ref(), &hosters).await?;
+        let found = crate::player_view::default_or_best(live.as_ref(), &hosters, self.0.default_quality.get()).await?;
         Ok(found.map(to_download_video))
     }
 }

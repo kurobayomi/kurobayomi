@@ -13,6 +13,7 @@ mod menu;
 mod neighbours;
 mod playback;
 mod sheets;
+pub(crate) use sheets::quality::default_or_best;
 mod skip_button;
 
 /// "1080p": how the player and its settings name a video height.

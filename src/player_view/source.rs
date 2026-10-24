@@ -314,6 +314,16 @@ mod tests {
     }
 
     #[test]
+    fn a_download_takes_the_default_quality_else_the_best() {
+        let hoster = |name: &str, videos| Hoster { hoster_name: name.into(), video_list: Some(videos), ..Hoster::default() };
+        let fake = Fake { hosters: vec![hoster("A", vec![video("https://cdn.test/a1080.m3u8", 1080), video("https://cdn.test/a480.m3u8", 480)])], fail: false };
+        let rt = tokio::runtime::Builder::new_current_thread().enable_time().build().expect("runtime");
+        let pick = |quality| rt.block_on(super::super::default_or_best(&fake, &fake.hosters, quality)).expect("no error").expect("a video").video_url;
+        assert_eq!(pick(480), "https://cdn.test/a480.m3u8");
+        assert_eq!(pick(720), "https://cdn.test/a1080.m3u8", "no 720p: the best");
+    }
+
+    #[test]
     fn the_best_quality_plays_with_the_source_headers_and_side_tracks() {
         let hoster = |name: &str, videos| Hoster { hoster_name: name.into(), video_list: Some(videos), ..Hoster::default() };
         let fake = Fake {

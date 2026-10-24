@@ -82,7 +82,7 @@ pub fn start_service(paths: &dyn Paths, db: Arc<Db>, prefs: PrefStore, notifier:
     let client = crate::net_client::build(&NetworkPrefs::new(prefs.clone()), paths).map_err(|e| e.to_string())?;
     let runners: Vec<Arc<dyn UnitRunner>> = vec![
         Arc::new(ChapterPipeline::new(directory.clone())),
-        Arc::new(EpisodeEngine::new(Arc::new(LiveHosters)).with_fetch(Arc::new(HttpVideoFetch::new(client)))),
+        Arc::new(EpisodeEngine::new(Arc::new(LiveHosters(kuro_prefs::player::PlayerPrefs::new(prefs.clone())))).with_fetch(Arc::new(HttpVideoFetch::new(client)))),
     ];
     let index = DownloadIndex::open(
         IndexRoots { manga: storage.downloads_path(Kind::Manga), anime: storage.downloads_path(Kind::Anime) },

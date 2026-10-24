@@ -188,6 +188,17 @@ pub async fn choose(source: &dyn AnimeSource, hosters: &[Hoster], quality: i32) 
     Ok(best)
 }
 
+/// The video a download takes: the first video of the `quality` height, else the source's best video. Unlike [`choose`]
+/// it neither reads nor keeps the session's last choice, which belongs to what is playing.
+pub(crate) async fn default_or_best(source: &dyn AnimeSource, hosters: &[Hoster], quality: i32) -> Result<Option<Video>, SourceError> {
+    if let Some((_, video)) = with_height(source, hosters, quality).await {
+        if let Some(resolved) = resolve_once(source, video).await? {
+            return Ok(Some(resolved));
+        }
+    }
+    best_video(source, hosters).await
+}
+
 /// The first video of `height`, servers in the source's order (its preferred first). A lazy server's list is fetched here.
 async fn with_height(source: &dyn AnimeSource, hosters: &[Hoster], wanted: i32) -> Option<(Pick, Video)> {
     for hoster in hosters {
