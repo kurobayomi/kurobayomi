@@ -1,4 +1,4 @@
-For help on how to fix library update errors, see https://aniyomi.org/help/guides/troubleshooting
+For help on how to fix library update errors, see https://kurobayomi.github.io/docs/guides/troubleshooting#library-update-errors
 
 
 ! No chapters found

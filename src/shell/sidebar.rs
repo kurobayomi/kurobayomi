@@ -1,7 +1,6 @@
 //! The left panel and its narrow-window twin, the bottom bar (docs/design/app-flow.md). The panel lists Library, Browse,
 //! Updates, History and, while something is queued, Downloads with a filling circle and a count. Settings is pinned at
-//! the bottom. The "Kurobayomi" title is the app menu (the GTK primary menu): Incognito mode, Keyboard shortcuts, Help
-//! and About, with a small icon beside the title while Incognito mode is on. Clicking the item that is already shown only
+//! the bottom. The "Kurobayomi" title is the app menu (the GTK primary menu): Incognito mode, Help and About, with a small icon beside the title while Incognito mode is on. Clicking the item that is already shown only
 //! scrolls its page to the top.
 
 use std::cell::Cell;
@@ -149,18 +148,17 @@ fn open_help() {
     crate::ui::open_link(crate::pref_model::widgets::HELP_URL, None);
 }
 
-/// A menu button with the app menu: Incognito mode (the `app.incognito` check item), then Keyboard shortcuts, Help and
-/// About, whose actions (`appmenu.*`) live on the button itself.
+/// A menu button with the app menu: Incognito mode (the `app.incognito` check item), then Help and About, whose actions (`appmenu.*`) live on the button itself.
 /// The name of the Incognito switch, in the panel and in the narrow window's menu.
 fn incognito_label() -> String {
     tr(MsgKey::shell_incognito_label)
 }
 
 /// The app's own pages under the places, in the panel and in the narrow window's menu: icon, label, action name, opener.
-/// About is a page of Settings only (user, 2026-10-15: one place for it).
-fn app_pages() -> [(&'static str, String, &'static str, fn()); 3] {
+/// About is a page of Settings only (user, 2026-10-15: one place for it). The keyboard shortcuts open with F1 or `?` on a
+/// title page and are listed in the online help, not here (user, 2026-10-24).
+fn app_pages() -> [(&'static str, String, &'static str, fn()); 2] {
     [
-        ("input-keyboard-symbolic", tr(MsgKey::ui_keyboard_shortcuts).to_owned(), "shortcuts", crate::entry_core::shortcut_help_view::open),
         ("help-browser-symbolic", tr(MsgKey::label_help), "help", open_help),
         ("emblem-system-symbolic", tr(MsgKey::label_settings), "settings", open_settings),
     ]
@@ -208,7 +206,7 @@ fn title() -> GBox {
     title
 }
 
-/// The rows at the bottom of the panel: Incognito mode with its switch, Keyboard shortcuts, Help and Settings. Only
+/// The rows at the bottom of the panel: Incognito mode with its switch, Help and Settings. Only
 /// Settings is ever selected: while it is the page on screen (`follow_pages`).
 fn bottom_rows() -> gtk::ListBox {
     let list = gtk::ListBox::new();
@@ -320,7 +318,7 @@ pub fn build(tabs: &gtk::Stack) -> GBox {
 }
 
 /// The narrow window's bar: the same items as the panel. The places switch the tab pages, then the app menu (Incognito,
-/// Keyboard shortcuts, Help, About and Settings).
+/// Help, About and Settings).
 pub fn bottom_bar(tabs: &gtk::Stack) -> GBox {
     let bar = GBox::new(O::Horizontal, 6);
     bar.add_css_class("kb-bottom-bar");
@@ -375,7 +373,7 @@ mod tests {
             let panel = build(&gtk::Stack::new());
             let texts = labels(panel.upcast_ref());
             assert!(!texts.iter().any(|l| *l == tr(MsgKey::pref_category_about)), "About is in Settings only");
-            let wanted = [incognito_label().to_owned(), "Keyboard shortcuts".to_owned(), tr(MsgKey::label_help)];
+            let wanted = [incognito_label().to_owned(), tr(MsgKey::label_help)];
             for title in ["Library", "Browse", "Updates", "History", "Downloads", "Settings", "Kurobayomi"].map(str::to_owned).iter().chain(&wanted) {
                 assert!(texts.iter().any(|l| l == title), "{title}");
             }
@@ -408,7 +406,7 @@ mod tests {
                     labels.extend(part.item_attribute_value(i, "label", None).and_then(|v| v.get::<String>()));
                 }
             }
-            assert_eq!(labels, [incognito_label().to_owned(), "Keyboard shortcuts".to_owned(), tr(MsgKey::label_help), tr(MsgKey::label_settings)]);
+            assert_eq!(labels, [incognito_label().to_owned(), tr(MsgKey::label_help), tr(MsgKey::label_settings)]);
         });
     }
 

@@ -24,8 +24,7 @@ use crate::error::DownloadError;
 pub const WARNING_TIMEOUT_SECS: u32 = 30;
 pub const BULK_WARNING_TEXT: &str =
     "Warning: large bulk downloads may lead to sources becoming slower and/or blocking Aniyomi. Tap to learn more.";
-pub const BULK_WARNING_HELP_URL: &str =
-    "https://aniyomi.org/docs/faq/library#why-am-i-warned-about-large-bulk-updates-and-downloads";
+pub const BULK_WARNING_HELP_URL: &str = kuro_platform::links::URL_LARGE_UPDATES;
 
 pub struct Layouts {
     pub manga: Layout,

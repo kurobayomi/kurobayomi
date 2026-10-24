@@ -261,7 +261,7 @@ pub(crate) mod tests {
         let tab = migrate_tab(deps);
         let help = buttons_of(&tab).into_iter().find(|b| b.tooltip_text().as_deref() == Some(&*kuro_i18n::tr(kuro_i18n::MsgKey::label_help))).expect("help");
         help.emit_clicked();
-        assert_eq!(*opened.borrow(), ["https://aniyomi.org/help/guides/source-migration/"]);
+        assert_eq!(*opened.borrow(), ["https://kurobayomi.github.io/docs/guides/source-migration"]);
     }
 
     fn the_tab_lists_the_library_sources_and_an_empty_library_shows_the_empty_state() {

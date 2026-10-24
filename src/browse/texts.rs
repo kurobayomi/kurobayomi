@@ -39,7 +39,7 @@ pub fn open_website() -> String {
 
 #[cfg(test)]
 /// The migrate tab's help action (T-41b-040, help URLs of `p2-data-and-config.md` section 5).
-pub const SOURCE_MIGRATION_HELP_URL: &str = "https://aniyomi.org/help/guides/source-migration/";
+pub const SOURCE_MIGRATION_HELP_URL: &str = kuro_platform::links::URL_SOURCE_MIGRATION;
 
 #[cfg(test)]
 mod tests {
@@ -51,7 +51,7 @@ mod tests {
         assert_eq!(loading_sources(), "Loading sources…");
         assert_eq!(MIGRATE_SOURCES_EMPTY, "No source has favorites to migrate");
         assert_eq!(migrate_tracks_always(), "Tracking data is always transferred.");
-        assert_eq!(SOURCE_MIGRATION_HELP_URL, "https://aniyomi.org/help/guides/source-migration/");
+        assert_eq!(SOURCE_MIGRATION_HELP_URL, "https://kurobayomi.github.io/docs/guides/source-migration");
         assert_eq!(migration_failed("disk full"), "Migration failed: disk full");
     }
 }

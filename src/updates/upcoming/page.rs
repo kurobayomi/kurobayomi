@@ -530,7 +530,7 @@ mod tests {
         crate::testing::with_display(|| {
             let menu = crate::ui::menu_button(help_menu()).expect("the page has a menu");
             assert_eq!(crate::widgets::view_options::menu_labels(&menu.menu_model().expect("a menu")), ["Upcoming Guide"]);
-            assert_eq!(layout::help_url(), "https://aniyomi.org/docs/faq/updates/upcoming");
+            assert_eq!(layout::help_url(), "https://kurobayomi.github.io/docs/faq/updates#upcoming");
         });
     }
 }

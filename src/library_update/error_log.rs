@@ -21,12 +21,9 @@ use crate::library_update::pass::Failure;
 /// The file name inside the cache directory.
 pub const FILE_NAME: &str = "update_errors.txt";
 
-/// The help page of the header (`ERROR_LOG_HELP_URL` of each job).
-pub fn help_url(kind: Kind) -> &'static str {
-    match kind {
-        Kind::Manga => "https://aniyomi.org/help/guides/troubleshooting",
-        Kind::Anime => "https://aniyomi.org/docs/guides/troubleshooting/",
-    }
+/// The help page of the header (`ERROR_LOG_HELP_URL` of each job): one page for both kinds.
+pub fn help_url(_kind: Kind) -> &'static str {
+    kuro_platform::links::URL_UPDATE_ERRORS
 }
 
 /// Where the log of a pass is written: `FILE_NAME` in the cache directory of the app.
@@ -120,7 +117,7 @@ mod tests {
     #[test]
     fn the_anime_log_names_the_anime_help_page() {
         let text = render(Kind::Anime, &[failure(9, "T", "x")], &names);
-        assert!(text.starts_with("For help on how to fix library update errors, see https://aniyomi.org/docs/guides/troubleshooting/\n\n"));
+        assert!(text.starts_with("For help on how to fix library update errors, see https://kurobayomi.github.io/docs/guides/troubleshooting#library-update-errors\n\n"));
         assert!(text.contains("\n! x\n  # 9\n    - T\n"), "an unknown source shows its id");
     }
 

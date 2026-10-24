@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn help_points_at_the_upcoming_guide() {
-        assert_eq!(help_url(), "https://aniyomi.org/docs/faq/updates/upcoming");
+        assert_eq!(help_url(), "https://kurobayomi.github.io/docs/faq/updates#upcoming");
     }
 
     #[test]

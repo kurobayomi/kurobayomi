@@ -19,9 +19,8 @@ pub fn queue_warning_title() -> String {
 pub fn queue_warning_text() -> String {
     tr(MsgKey::notification_size_warning)
 }
-/// The help page the warning opens (the Kotlin FAQ anchor, kept until the Kurobayomi site has its own).
-pub const QUEUE_WARNING_URL: &str =
-    "https://aniyomi.org/docs/faq/library#why-am-i-warned-about-large-bulk-updates-and-downloads";
+/// The help page the warning opens.
+pub const QUEUE_WARNING_URL: &str = kuro_platform::links::URL_LARGE_UPDATES;
 
 /// Whether the large-queue warning shows: `per_source` holds (queued entries, unmetered) for each source of the pass.
 /// Only a source that is not unmetered and has more than [`QUEUE_WARNING_THRESHOLD`] entries counts.
