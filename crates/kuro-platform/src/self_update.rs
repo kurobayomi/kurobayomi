@@ -28,9 +28,13 @@ fn installed_by_setup() -> bool {
 }
 
 /// Runs a downloaded Windows setup without its windows, over the installed copy. It closes a running Kurobayomi itself;
-/// `relaunch` starts the app again when it is done (the setup reads `/RELAUNCH=1`, `dist/windows/kurobayomi.iss`).
+/// `relaunch` starts the app again when it is done (the setup reads `/RELAUNCH=1`, `dist/windows/kurobayomi.iss`). The
+/// setup writes its log next to itself (`<setup>.log`), the one trace of a silent install that failed.
 pub fn run_installer(setup: &Path, relaunch: bool) -> io::Result<()> {
+    let mut log = std::ffi::OsString::from("/LOG=");
+    log.push(setup.with_extension("log"));
     let mut args = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"].map(std::ffi::OsStr::new).to_vec();
+    args.push(&log);
     if relaunch {
         args.push("/RELAUNCH=1".as_ref());
     }

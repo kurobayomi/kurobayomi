@@ -394,21 +394,31 @@ fn take_pending_setup() -> Option<PathBuf> {
     PENDING_SETUP.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
 }
 
-/// At quit: a downloaded Windows setup installs the update now, so the next launch runs the new build.
+/// Whether the setup starts the app again when it is done: Restart was pressed.
+static RELAUNCH_AFTER_SETUP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// At quit: a downloaded Windows setup installs the update now, so the next launch runs the new build. It runs here, at
+/// the very end of shutdown, also for Restart: started earlier, it had to close an app still saving its settings (or still
+/// asking whether to quit while downloads run), and when that failed the app never came back.
 pub fn on_quit() {
+    let relaunch = RELAUNCH_AFTER_SETUP.load(std::sync::atomic::Ordering::Relaxed);
     if let Some(setup) = take_pending_setup()
-        && let Err(error) = kuro_platform::self_update::run_installer(&setup, false)
+        && let Err(error) = kuro_platform::self_update::run_installer(&setup, relaunch)
     {
         tracing::warn!(%error, "the downloaded update could not be installed");
     }
 }
 
-/// Starts the new build once the app has quit: the AppImage starts again, or the Windows setup installs the update and
-/// starts it. `false` when there is nothing to start; the caller then closes the window.
+/// Starts the new build once the app has quit: the AppImage starts again, or the Windows setup installs the update at quit
+/// ([`on_quit`]) and starts it. `false` when there is nothing to start; the caller then closes the window.
 pub fn restart_into_update() -> bool {
     match kuro_platform::self_update::package() {
         Some(Package::AppImage(file)) => kuro_platform::self_update::relaunch_after_exit(&file).is_ok(),
-        Some(Package::Installer) => take_pending_setup().is_some_and(|setup| kuro_platform::self_update::run_installer(&setup, true).is_ok()),
+        Some(Package::Installer) => {
+            let waiting = PENDING_SETUP.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).is_some();
+            RELAUNCH_AFTER_SETUP.store(waiting, std::sync::atomic::Ordering::Relaxed);
+            waiting
+        }
         None => false,
     }
 }
