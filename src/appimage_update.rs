@@ -1,6 +1,7 @@
-//! The AppImage updates itself, on both channels. At start it reads the release its channel follows, and when that is
-//! newer it downloads the new AppImage next to the running one, checks it and moves it into place. The next launch runs
-//! the new build.
+//! The app updates itself, on both channels, when it runs as an AppImage or as a copy the Windows setup installed
+//! (`kuro_platform::self_update::Package`). At start it reads the release its channel follows, and when that is newer it
+//! downloads the new file and checks it. An AppImage is moved into place at once; a Windows setup runs when the app quits
+//! (or at Restart), since a running program cannot replace its own files there. The next launch runs the new build.
 //! - A nightly build knows its commit (`channel::commit`, set by the workflow) and follows the `nightly` release: newer is
 //!   a build from another commit.
 //! - A stable build with the release check (`app_update::available`) follows the latest release: newer is a higher
@@ -20,6 +21,7 @@ use std::time::Duration;
 
 use gtk::glib;
 use gtk::prelude::*;
+use kuro_platform::self_update::Package;
 use sha2::{Digest, Sha256};
 
 const USER_AGENT: &str = concat!("kurobayomi/", env!("CARGO_PKG_VERSION"));
@@ -50,10 +52,13 @@ impl Track {
         }
     }
 
-    fn asset(self) -> &'static str {
-        match self {
-            Self::Nightly(_) => "Kurobayomi-nightly-x86_64.AppImage",
-            Self::Stable(_) => "Kurobayomi-x86_64.AppImage",
+    /// The release file of this track for `package`: the AppImage, or the Windows setup.
+    fn asset(self, package: &Package) -> &'static str {
+        match (package, self) {
+            (Package::AppImage(_), Self::Nightly(_)) => "Kurobayomi-nightly-x86_64.AppImage",
+            (Package::AppImage(_), Self::Stable(_)) => "Kurobayomi-x86_64.AppImage",
+            (Package::Installer, Self::Nightly(_)) => "Kurobayomi-Nightly-Setup-x86_64.exe",
+            (Package::Installer, Self::Stable(_)) => "Kurobayomi-Setup-x86_64.exe",
         }
     }
 }
@@ -76,8 +81,8 @@ fn commit_in(notes: &str) -> Option<String> {
     (hash.len() == 40).then_some(hash)
 }
 
-/// `Some` when the release JSON is newer than the running build and carries the track's AppImage.
-fn newer(release: &[u8], track: Track) -> Option<Newer> {
+/// `Some` when the release JSON is newer than the running build and carries the file `asset`.
+fn newer(release: &[u8], track: Track, asset: &str) -> Option<Newer> {
     let json: serde_json::Value = serde_json::from_slice(release).ok()?;
     let build = match track {
         Track::Nightly(current) => Some(commit_in(json["body"].as_str()?)?).filter(|commit| commit != current)?,
@@ -86,7 +91,7 @@ fn newer(release: &[u8], track: Track) -> Option<Newer> {
             kuro_domain::release::version::is_newer(tag, current).then(|| tag.trim_start_matches('v').to_owned())?
         }
     };
-    let asset = json["assets"].as_array()?.iter().find(|asset| asset["name"] == track.asset())?;
+    let asset = json["assets"].as_array()?.iter().find(|entry| entry["name"] == asset)?;
     Some(Newer {
         build,
         url: asset["browser_download_url"].as_str()?.to_owned(),
@@ -109,7 +114,8 @@ fn sum_of(sums: &str, name: &str) -> Option<String> {
     })
 }
 
-/// Downloads the update beside `target` and checks its size, its hash (when GitHub gives one) and that it is an ELF file.
+/// Downloads the update beside `target` and checks its size, its hash (when GitHub gives one) and that it is the
+/// package's kind of file ([`header`]).
 /// What the Pause and Cancel buttons ask of the running download; the download looks at it between reads.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 enum Wish {
@@ -234,18 +240,27 @@ fn fastest_address(host: &str, url: &str, addrs: &[SocketAddr]) -> Option<Socket
     rx.recv_timeout(Duration::from_secs(10)).ok()
 }
 
-fn download(client: &reqwest::blocking::Client, update: &Newer, target: &Path, progress: &dyn Fn(u64), control: &Control) -> Result<PathBuf, String> {
+fn download(client: &reqwest::blocking::Client, update: &Newer, package: &Package, target: &Path, progress: &dyn Fn(u64), control: &Control) -> Result<PathBuf, String> {
     let mut name = target.as_os_str().to_owned();
     name.push(".update");
     let part = PathBuf::from(name);
-    let result = fetch_checked(client, update, &part, progress, control);
+    let result = fetch_checked(client, update, package, &part, progress, control);
     if result.is_err() {
         let _ = std::fs::remove_file(&part);
     }
     result.map(|()| part)
 }
 
-fn fetch_checked(client: &reqwest::blocking::Client, update: &Newer, part: &Path, progress: &dyn Fn(u64), control: &Control) -> Result<(), String> {
+/// The first bytes of the package's kind of file, and what the file is called when they differ: an ELF program (the
+/// AppImage), or a Windows program (`MZ`, the setup).
+fn header(package: &Package) -> (&'static [u8], &'static str) {
+    match package {
+        Package::AppImage(_) => (b"\x7fELF", "the downloaded file is not an AppImage"),
+        Package::Installer => (b"MZ", "the downloaded file is not a Windows setup"),
+    }
+}
+
+fn fetch_checked(client: &reqwest::blocking::Client, update: &Newer, package: &Package, part: &Path, progress: &dyn Fn(u64), control: &Control) -> Result<(), String> {
     let mut file = std::fs::File::create(part).map_err(|e| e.to_string())?;
     let (mut hasher, mut total, mut buf) = (Sha256::new(), 0_u64, [0_u8; 64 * 1024]);
     // one pass per connection: the first, and a new one after each pause, asking for the rest of the file
@@ -284,10 +299,11 @@ fn fetch_checked(client: &reqwest::blocking::Client, update: &Newer, part: &Path
     if update.sha256.as_deref().is_some_and(|expected| !expected.eq_ignore_ascii_case(&hash)) {
         return Err("the downloaded file does not match its checksum".to_owned());
     }
-    let mut magic = [0_u8; 4];
+    let (expected, wrong) = header(package);
+    let mut magic = vec![0_u8; expected.len()];
     std::fs::File::open(part).and_then(|mut file| file.read_exact(&mut magic)).map_err(|e| e.to_string())?;
-    if magic != *b"\x7fELF" {
-        return Err("the downloaded file is not an AppImage".to_owned());
+    if magic != expected {
+        return Err(wrong.to_owned());
     }
     Ok(())
 }
@@ -327,9 +343,10 @@ enum Step {
     Bytes(u64),
 }
 
-/// One check against the releases at `api` and, when there is a newer release, the replacement. `Some(build)` when the
-/// file was replaced. `step` hears what happens along the way.
-fn update(file: &Path, track: Track, api: &str, step: &dyn Fn(Step), control: &Control) -> Result<Option<String>, String> {
+/// One check against the releases at `api` and, when there is a newer release, the download to `target`: the AppImage,
+/// which is replaced, or the Windows setup, which waits as [`PENDING_SETUP`]. `Some(build)` when the update is in place
+/// or waiting. `step` hears what happens along the way.
+fn update(package: &Package, target: &Path, track: Track, api: &str, step: &dyn Fn(Step), control: &Control) -> Result<Option<String>, String> {
     let http = |timeout| reqwest::blocking::Client::builder().timeout(Duration::from_secs(timeout)).user_agent(USER_AGENT).build().map_err(|e| e.to_string());
     let url = format!("{api}/repos/{}/{}", crate::channel::REPOSITORY, track.release_path());
     let response = http(30)?.get(url).send().map_err(|e| describe(&e))?;
@@ -338,22 +355,63 @@ fn update(file: &Path, track: Track, api: &str, step: &dyn Fn(Step), control: &C
         return Ok(None);
     }
     let body = response.error_for_status().and_then(|r| r.bytes()).map_err(|e| describe(&e))?;
-    let Some(mut newer) = newer(&body, track) else { return Ok(None) };
+    let asset = track.asset(package);
+    let Some(mut newer) = newer(&body, track, asset) else { return Ok(None) };
     if newer.sha256.is_none()
         && let Some(url) = &newer.sums_url
     {
         let sums = http(30)?.get(url).send().and_then(|r| r.error_for_status()).and_then(|r| r.text()).map_err(|e| describe(&e))?;
-        newer.sha256 = Some(sum_of(&sums, track.asset()).ok_or(tr(MsgKey::ui_sha256sums_does_not_list_the_appimage))?);
+        newer.sha256 = Some(sum_of(&sums, asset).ok_or(tr(MsgKey::ui_sha256sums_does_not_list_the_appimage))?);
     }
     step(Step::Found { build: newer.build.clone(), size: newer.size });
-    let part = download(&http(900)?, &newer, file, &|bytes| step(Step::Bytes(bytes)), control)?;
-    kuro_platform::self_update::replace_file(&part, file).map_err(|e| e.to_string())?;
+    let part = download(&http(900)?, &newer, package, target, &|bytes| step(Step::Bytes(bytes)), control)?;
+    kuro_platform::self_update::replace_file(&part, target).map_err(|e| e.to_string())?;
+    if *package == Package::Installer {
+        *PENDING_SETUP.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(target.to_path_buf());
+    }
     Ok(Some(newer.build))
 }
 
-/// Whether this run can update itself: an AppImage of a build that follows releases.
+/// Where the update goes: over the AppImage, or the setup file in the app's temporary folder.
+fn target(package: &Package, track: Track) -> Option<PathBuf> {
+    match package {
+        Package::AppImage(file) => Some(file.clone()),
+        Package::Installer => {
+            let paths = kuro_platform::system_paths::SystemPaths::system().ok()?;
+            Some(kuro_platform::paths::Paths::temp_dir(&paths).join(track.asset(package)))
+        }
+    }
+}
+
+/// The downloaded Windows setup that installs the update when the app quits, or at Restart.
+static PENDING_SETUP: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+fn take_pending_setup() -> Option<PathBuf> {
+    PENDING_SETUP.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).take()
+}
+
+/// At quit: a downloaded Windows setup installs the update now, so the next launch runs the new build.
+pub fn on_quit() {
+    if let Some(setup) = take_pending_setup()
+        && let Err(error) = kuro_platform::self_update::run_installer(&setup, false)
+    {
+        tracing::warn!(%error, "the downloaded update could not be installed");
+    }
+}
+
+/// Starts the new build once the app has quit: the AppImage starts again, or the Windows setup installs the update and
+/// starts it. `false` when there is nothing to start; the caller then closes the window.
+pub fn restart_into_update() -> bool {
+    match kuro_platform::self_update::package() {
+        Some(Package::AppImage(file)) => kuro_platform::self_update::relaunch_after_exit(&file).is_ok(),
+        Some(Package::Installer) => take_pending_setup().is_some_and(|setup| kuro_platform::self_update::run_installer(&setup, true).is_ok()),
+        None => false,
+    }
+}
+
+/// Whether this run can update itself: an AppImage or an installed Windows copy, of a build that follows releases.
 pub fn can_update() -> bool {
-    kuro_platform::self_update::appimage_file().is_some() && Track::current().is_some()
+    kuro_platform::self_update::package().is_some() && Track::current().is_some()
 }
 
 /// Where the self-update is. The About page's Version row shows it.
@@ -463,7 +521,8 @@ pub fn check() {
     if status.busy() || matches!(status, Status::Installed(_)) {
         return;
     }
-    let (Some(file), Some(track)) = (kuro_platform::self_update::appimage_file(), Track::current()) else { return };
+    let (Some(package), Some(track)) = (kuro_platform::self_update::package(), Track::current()) else { return };
+    let Some(target) = target(&package, track) else { return };
     set(Status::Checking);
     let control = Arc::new(Control::default());
     *ACTIVE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(control.clone());
@@ -487,7 +546,7 @@ pub fn check() {
             }
             let _ = tx.send_blocking(Ok(next));
         };
-        let result = update(&file, track, GITHUB_API, &step, &worker_control);
+        let result = update(&package, &target, track, GITHUB_API, &step, &worker_control);
         // before the last message, so a check started by it finds no control of this run
         *ACTIVE.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
         let _ = tx.send_blocking(Err(result));
@@ -562,17 +621,17 @@ mod tests {
 
     #[test]
     fn a_release_from_another_commit_is_an_update() {
-        let found = newer(&release(NEW, NIGHTLY), Track::Nightly(OLD)).expect("an update");
+        let found = newer(&release(NEW, NIGHTLY), Track::Nightly(OLD), NIGHTLY).expect("an update");
         assert_eq!(found, Newer { build: NEW.into(), url: "https://example.test/a".into(), size: 7, sha256: Some("abc".into()), sums_url: None });
     }
 
     #[test]
     fn the_same_commit_a_missing_asset_or_odd_notes_are_no_update() {
-        assert_eq!(newer(&release(OLD, NIGHTLY), Track::Nightly(OLD)), None);
-        assert_eq!(newer(&release(NEW, "Other.AppImage"), Track::Nightly(OLD)), None);
-        assert_eq!(newer(&release(NEW, STABLE), Track::Nightly(OLD)), None, "a nightly takes only the nightly file");
-        assert_eq!(newer(br#"{"body":"nothing here","assets":[]}"#, Track::Nightly(OLD)), None);
-        assert_eq!(newer(b"not json", Track::Nightly(OLD)), None);
+        assert_eq!(newer(&release(OLD, NIGHTLY), Track::Nightly(OLD), NIGHTLY), None);
+        assert_eq!(newer(&release(NEW, "Other.AppImage"), Track::Nightly(OLD), NIGHTLY), None);
+        assert_eq!(newer(&release(NEW, STABLE), Track::Nightly(OLD), NIGHTLY), None, "a nightly takes only the nightly file");
+        assert_eq!(newer(br#"{"body":"nothing here","assets":[]}"#, Track::Nightly(OLD), NIGHTLY), None);
+        assert_eq!(newer(b"not json", Track::Nightly(OLD), NIGHTLY), None);
     }
 
     fn stable(tag: &str) -> Vec<u8> {
@@ -588,7 +647,7 @@ mod tests {
 
     #[test]
     fn a_higher_stable_version_is_an_update_and_takes_the_appimage_not_its_zsync() {
-        let found = newer(&stable("v0.2.0"), Track::Stable("0.1.0")).expect("an update");
+        let found = newer(&stable("v0.2.0"), Track::Stable("0.1.0"), STABLE).expect("an update");
         assert_eq!(found.build, "0.2.0");
         assert_eq!(found.url, format!("https://example.test/{STABLE}"));
         assert_eq!((found.sha256, found.sums_url.as_deref()), (None, Some("https://example.test/SHA256SUMS")), "no digest: the sums file is read");
@@ -604,15 +663,18 @@ mod tests {
 
     #[test]
     fn the_same_or_an_older_stable_version_is_no_update() {
-        assert_eq!(newer(&stable("v0.1.0"), Track::Stable("0.1.0")), None);
-        assert_eq!(newer(&stable("v0.0.9"), Track::Stable("0.1.0")), None);
-        assert_eq!(newer(&stable("nightly"), Track::Stable("0.1.0")), None, "a tag that is no version is never newer");
+        assert_eq!(newer(&stable("v0.1.0"), Track::Stable("0.1.0"), STABLE), None);
+        assert_eq!(newer(&stable("v0.0.9"), Track::Stable("0.1.0"), STABLE), None);
+        assert_eq!(newer(&stable("nightly"), Track::Stable("0.1.0"), STABLE), None, "a tag that is no version is never newer");
     }
 
     #[test]
     fn a_track_reads_its_own_release_and_file() {
-        assert_eq!((Track::Nightly(OLD).release_path(), Track::Nightly(OLD).asset()), ("releases/tags/nightly", NIGHTLY));
-        assert_eq!((Track::Stable("0.1.0").release_path(), Track::Stable("0.1.0").asset()), ("releases/latest", STABLE));
+        let appimage = Package::AppImage(PathBuf::new());
+        assert_eq!((Track::Nightly(OLD).release_path(), Track::Nightly(OLD).asset(&appimage)), ("releases/tags/nightly", NIGHTLY));
+        assert_eq!((Track::Stable("0.1.0").release_path(), Track::Stable("0.1.0").asset(&appimage)), ("releases/latest", STABLE));
+        assert_eq!(Track::Nightly(OLD).asset(&Package::Installer), "Kurobayomi-Nightly-Setup-x86_64.exe");
+        assert_eq!(Track::Stable("0.1.0").asset(&Package::Installer), "Kurobayomi-Setup-x86_64.exe");
     }
 
     /// Serves the files `files` builds from the base url (path, body) over HTTP on a local port, one request per
@@ -637,12 +699,17 @@ mod tests {
 
     /// A latest release `tag` with the AppImage `app` and a SHA256SUMS that gives `app_hash` for it.
     fn stable_release(tag: &'static str, app: Vec<u8>, app_hash: String) -> impl FnOnce(&str) -> Vec<(String, Vec<u8>)> {
+        stable_release_of(STABLE, tag, app, app_hash)
+    }
+
+    /// A stable release whose file is called `name`, with its line in SHA256SUMS.
+    fn stable_release_of(name: &'static str, tag: &'static str, app: Vec<u8>, app_hash: String) -> impl FnOnce(&str) -> Vec<(String, Vec<u8>)> {
         move |base| {
-            let sums = format!("{app_hash}  {STABLE}\n");
+            let sums = format!("{app_hash}  {name}\n");
             let release = serde_json::json!({
                 "tag_name": tag,
                 "assets": [
-                    { "name": STABLE, "browser_download_url": format!("{base}/dl/app"), "size": app.len() },
+                    { "name": name, "browser_download_url": format!("{base}/dl/app"), "size": app.len() },
                     { "name": "SHA256SUMS", "browser_download_url": format!("{base}/dl/sums"), "size": sums.len() }
                 ]
             });
@@ -655,7 +722,7 @@ mod tests {
     }
 
     fn update_quiet(file: &Path, track: Track, api: &str) -> Result<Option<String>, String> {
-        update(file, track, api, &|_| {}, &Control::default())
+        update(&Package::AppImage(file.to_path_buf()), file, track, api, &|_| {}, &Control::default())
     }
 
     #[test]
@@ -739,7 +806,7 @@ mod tests {
                         control.ask(Wish::Pause);
                     }
                 };
-                download(&client(), &newer_for(&base, &body), &target, &progress, &control)
+                download(&client(), &newer_for(&base, &body), &Package::AppImage(target.clone()), &target, &progress, &control)
             });
             while paused_at.load(std::sync::atomic::Ordering::SeqCst) == 0 {
                 std::thread::sleep(Duration::from_millis(5));
@@ -762,7 +829,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let target = dir.path().join("app.AppImage");
         let control = Control::default();
-        let result = download(&client(), &newer_for(&base, &body), &target, &|_| control.ask(Wish::Cancel), &control);
+        let result = download(&client(), &newer_for(&base, &body), &Package::AppImage(target.clone()), &target, &|_| control.ask(Wish::Cancel), &control);
         assert_eq!(result, Err(CANCELLED.to_owned()));
         assert!(!dir.path().join("app.AppImage.update").exists());
     }
@@ -859,6 +926,27 @@ mod tests {
 
         assert_eq!(update_quiet(&file, track, &serve(stable_release("v0.2.0", new.clone(), hex(&new)))), Ok(Some("0.2.0".to_owned())));
         assert_eq!(std::fs::read(&file).unwrap(), new);
+    }
+
+    /// A Windows copy: the setup is downloaded to its target, checked as a Windows program and kept for the quit.
+    #[test]
+    fn a_windows_copy_downloads_the_setup_and_keeps_it_for_the_quit() {
+        const SETUP: &str = "Kurobayomi-Setup-x86_64.exe";
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join(SETUP);
+        let track = Track::Stable("0.1.0");
+        let run = |body: Vec<u8>| {
+            let hash = hex(&body);
+            update(&Package::Installer, &target, track, &serve(stable_release_of(SETUP, "v0.2.0", body, hash)), &|_| {}, &Control::default())
+        };
+        let error = run(b"\x7fELF an AppImage".to_vec()).unwrap_err();
+        assert!(error.contains("not a Windows setup"), "{error}");
+        assert!(!target.exists());
+
+        assert_eq!(run(b"MZ new setup".to_vec()), Ok(Some("0.2.0".to_owned())));
+        assert_eq!(std::fs::read(&target).unwrap(), b"MZ new setup");
+        assert_eq!(take_pending_setup(), Some(target.clone()), "the setup waits for the quit");
+        assert_eq!(take_pending_setup(), None, "and runs once");
     }
 
     #[test]

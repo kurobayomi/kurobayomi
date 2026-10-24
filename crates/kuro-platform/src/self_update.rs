@@ -1,7 +1,41 @@
-//! Replacing the running AppImage with a newer file (the app's own update, `appimage_update` in the GTK crate).
+//! What the app's own update (`appimage_update` in the GTK crate) needs from the system: how this run was installed,
+//! replacing a running AppImage, and running the Windows setup that updates an installed copy.
 
 use std::io;
 use std::path::{Path, PathBuf};
+
+/// How this run was installed, when it can update itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Package {
+    /// An AppImage (Linux): its file. An update replaces it in place.
+    AppImage(PathBuf),
+    /// A copy the Windows setup installed. An update runs a newer setup over it.
+    Installer,
+}
+
+/// The package of this run, or `None` for any other build (a local one, a distribution package, an unpacked zip).
+pub fn package() -> Option<Package> {
+    appimage_file().map(Package::AppImage).or_else(|| installed_by_setup().then_some(Package::Installer))
+}
+
+/// Whether the Windows setup installed this copy: it puts its uninstaller (`unins000.exe`) in the folder above `bin`.
+fn installed_by_setup() -> bool {
+    cfg!(windows)
+        && std::env::current_exe()
+            .ok()
+            .and_then(|exe| Some(exe.parent()?.parent()?.join("unins000.exe")))
+            .is_some_and(|uninstaller| uninstaller.is_file())
+}
+
+/// Runs a downloaded Windows setup without its windows, over the installed copy. It closes a running Kurobayomi itself;
+/// `relaunch` starts the app again when it is done (the setup reads `/RELAUNCH=1`, `dist/windows/kurobayomi.iss`).
+pub fn run_installer(setup: &Path, relaunch: bool) -> io::Result<()> {
+    let mut args = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"].map(std::ffi::OsStr::new).to_vec();
+    if relaunch {
+        args.push("/RELAUNCH=1".as_ref());
+    }
+    crate::process::spawn_detached(setup, &args)
+}
 
 /// The AppImage file this process runs from: the AppImage runtime sets `APPIMAGE` to its path. `None` for any other build.
 pub fn appimage_file() -> Option<PathBuf> {

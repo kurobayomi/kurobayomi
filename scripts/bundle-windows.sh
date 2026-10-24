@@ -12,6 +12,8 @@ prefix=${MINGW_PREFIX:-/ucrt64}
 rm -rf "$out"
 mkdir -p "$out/bin" "$out/lib" "$out/share/glib-2.0/schemas" "$out/share/icons"
 cp "$exe" "$out/bin/"
+# without its debug info: a release build carries it in the exe (over 400 MB), the AppImage keeps it apart
+strip --strip-debug "$out/bin/$(basename "$exe")"
 # GLib's helper that starts a session bus, which GApplication's single instance uses on Windows
 cp "$prefix/bin/gdbus.exe" "$out/bin/"
 # the image loaders (librsvg's draws the SVG icons) with their cache, whose paths are relative to the prefix

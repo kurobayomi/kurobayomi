@@ -143,6 +143,8 @@ fn main() -> glib::ExitCode {
         if data::is_installed() {
             data::flush_on_shutdown(data::app().base.store());
         }
+        // a downloaded Windows setup installs the update now
+        appimage_update::on_quit();
     });
     app.connect_activate(|app| {
         // a later launch only raises the window; the first one builds it
