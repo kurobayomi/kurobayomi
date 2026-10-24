@@ -124,11 +124,9 @@ fn reveal_dump(path: &std::path::Path, text: &str) {
     if let Some(display) = gtk::gdk::Display::default() {
         display.clipboard().set_text(text);
     }
-    gtk::FileLauncher::new(Some(&gtk::gio::File::for_path(path))).open_containing_folder(None::<&gtk::Window>, None::<&gtk::gio::Cancellable>, |result| {
-        if let Err(err) = result {
-            tracing::warn!(%err, "the crash log folder did not open");
-        }
-    });
+    if let Err(err) = kuro_platform::opener::Opener::reveal(&kuro_platform::opener::SystemOpener, path) {
+        tracing::warn!(%err, "the crash log folder did not open");
+    }
 }
 
 /// Builds the dump off the GTK thread. The row is insensitive until it is done, then it shows `Crash logs copied to the

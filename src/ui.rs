@@ -481,19 +481,14 @@ pub fn web_link(url: &str) -> bool {
     url.split_once(':').is_some_and(|(scheme, _)| ["http", "https", "mailto"].iter().any(|s| scheme.eq_ignore_ascii_case(s)))
 }
 
-/// Opens a folder or file of the app's own (the Local folder) in its default program, through GIO: GTK's launcher hands
-/// a link to the desktop's portal, which refused folders on KDE ("The application launch failed"). `on_failed` gets the
-/// error text. Never for a path a source gave.
+/// Opens a folder or file of the app's own (the Local folder) in its default program, through the platform's opener:
+/// GIO's launcher found no program for folders on Windows ("inode/directory") and, inside the AppImage, missed its
+/// helper `gio-launch-desktop`. `on_failed` gets the error text. Never for a path a source gave.
 pub fn open_local(path: &std::path::Path, on_failed: impl FnOnce(String) + 'static) {
-    let uri = gtk::gio::File::for_path(path).uri();
-    let context = gtk::gdk::Display::default().map(|display| display.app_launch_context());
-    let shown = path.display().to_string();
-    gtk::gio::AppInfo::launch_default_for_uri_async(&uri, context.as_ref(), gtk::gio::Cancellable::NONE, move |result| {
-        if let Err(error) = result {
-            tracing::warn!(%error, path = %shown, "could not open a local folder");
-            on_failed(error.to_string());
-        }
-    });
+    if let Err(error) = kuro_platform::opener::Opener::open_target(&kuro_platform::opener::SystemOpener, &path.to_string_lossy()) {
+        tracing::warn!(%error, path = %path.display(), "could not open a local folder");
+        on_failed(error.to_string());
+    }
 }
 
 pub fn margins(w: &impl IsA<gtk::Widget>, m: i32) {

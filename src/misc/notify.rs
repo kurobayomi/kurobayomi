@@ -373,15 +373,9 @@ fn show(app: &gio::Application, post: &Post) {
 
 /// Shows the folder of `path` in the file manager.
 fn reveal(path: &Path) {
-    gtk::FileLauncher::new(Some(&gio::File::for_path(path))).open_containing_folder(
-        None::<&gtk::Window>,
-        None::<&gio::Cancellable>,
-        |result| {
-            if let Err(error) = result {
-                tracing::warn!(%error, "the update error log could not be shown");
-            }
-        },
-    );
+    if let Err(error) = kuro_platform::opener::Opener::reveal(&kuro_platform::opener::SystemOpener, path) {
+        tracing::warn!(%error, "the update error log could not be shown");
+    }
 }
 
 /// Both rows of an open-item action exist, and the item belongs to the entry.
