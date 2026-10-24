@@ -4,7 +4,7 @@
 
 <h1 align="center">Kurobayomi</h1>
 
-<p align="center">Watch anime and read manga on the Linux desktop.</p>
+<p align="center">Watch anime and read manga on Linux and Windows.</p>
 
 <p align="center">
   <a href="https://github.com/kurobayomi/kurobayomi/releases"><img src="https://img.shields.io/github/downloads/kurobayomi/kurobayomi/total?label=downloads" alt="Downloads"></a>
@@ -23,7 +23,8 @@ The name is *kurobako* (黒箱, "black box") plus *-yomi* ("reading").
 ![The welcome screen](docs/images/getting-started/01-welcome.png)
 
 > **Status: first stable releases.** The whole flow from adding a repository to watching or reading works; expect some
-> rough edges. The stable AppImage is the one to use, and a nightly is built from every change. See [Install](#install).
+> rough edges. The stable release is the one to use (an AppImage on Linux, an installer on Windows), and a nightly is
+> built from every change. See [Install](#install).
 
 ## What it does
 
@@ -45,8 +46,8 @@ The name is *kurobako* (黒箱, "black box") plus *-yomi* ("reading").
   score and dates from its Tracking page. Progress moves on by itself as you read and watch.
 - **Aniyomi and Tachiyomi backups** (`.tachibk`) restore into Kurobayomi. Their extension repositories do not work here:
   those extensions are Android apps.
-- **Keeps itself up to date.** The AppImage downloads a newer version in the background and runs it after a restart
-  (not on a metered connection); About shows the progress.
+- **Keeps itself up to date.** The AppImage and the Windows app download a newer version in the background and use it
+  after a restart (not on a metered connection); About shows the progress.
 - **Fits any window size**, from a full screen down to a phone-sized 360 px: the sidebar turns into a bar at the bottom.
 
 <table>
@@ -70,7 +71,8 @@ The step-by-step guide, with screenshots, is in **[docs/GETTING-STARTED.md](docs
 2. Paste the repository link.
 3. Click the search button 🔍 next to **Kurobayomi**, type a title and press **Enter**, open a title, click **Start**.
 
-Downloads and backups go to `~/Kurobayomi` unless you pick another folder in Settings.
+Downloads and backups go to `~/Kurobayomi` (on Windows, `Kurobayomi` in your user folder) unless you pick another folder in
+Settings.
 
 ## Sources and repositories
 
@@ -99,7 +101,21 @@ link to an `index.min.json` file that lists sources; anyone can publish one.
 
 ## Install
 
-### AppImage
+### Windows
+
+Windows 10 and 11, 64-bit. Download the installer and run it: it installs for your user account, without an
+administrator prompt, and adds Kurobayomi to the Start menu.
+
+- **Stable** (recommended, from version 0.2.0): [Kurobayomi-Setup-x86_64.exe](https://github.com/kurobayomi/kurobayomi/releases/latest/download/Kurobayomi-Setup-x86_64.exe)
+- **Nightly** (built from every change, may be unstable, installs beside the stable app with its own data):
+  [Kurobayomi-Nightly-Setup-x86_64.exe](https://github.com/kurobayomi/kurobayomi/releases/download/nightly/Kurobayomi-Nightly-Setup-x86_64.exe)
+
+The installer is not signed, so Windows SmartScreen may warn about it the first time: click **More info**, then **Run
+anyway**. The installed app updates itself like the AppImage below, except that the new version installs when you quit
+Kurobayomi (or at once with **Restart**). Uninstall it from **Settings → Apps**. Anime downloads need
+[ffmpeg](https://ffmpeg.org/download.html) on your `PATH`, as on Linux.
+
+### Linux (AppImage)
 
 Download the AppImage, make it executable and run it. It carries its own libraries and needs glibc 2.39 or newer
 (Ubuntu 24.04, Fedora 40, Debian 13, Arch and newer).
@@ -123,7 +139,9 @@ A Flatpak is planned.
 ### From source
 
 You need a recent stable Rust, GTK 4.14 or newer, and libmpv (on Arch: `pacman -S gtk4 mpv`; on Fedora:
-`dnf install gtk4-devel mpv-libs-devel`; on Ubuntu 24.04: `apt install libgtk-4-dev libmpv-dev`).
+`dnf install gtk4-devel mpv-libs-devel`; on Ubuntu 24.04: `apt install libgtk-4-dev libmpv-dev`). On Windows, build in
+the [MSYS2](https://www.msys2.org/) UCRT64 shell after
+`pacman -S git mingw-w64-ucrt-x86_64-{toolchain,rust,pkgconf,cmake,nasm,gtk4,mpv,dav1d,libarchive}`.
 
 ```bash
 git clone https://github.com/kurobayomi/kurobayomi.git
@@ -146,7 +164,7 @@ every open window as a PNG; used for the guide's screenshots).
 | Path | What it is |
 |---|---|
 | `src/` | the GTK4 app: screens, player and reader views |
-| `crates/kuro-platform` | all OS-specific code (paths, secrets), so a Windows port stays possible |
+| `crates/kuro-platform` | all OS-specific code (paths, secrets, opening files), with an engine for Linux and one for Windows |
 | `crates/kuro-prefs`, `kuro-db`, `kuro-data`, `kuro-domain` | settings, databases, repositories, domain rules |
 | `crates/kuro-extensions`, `kuro-source*`, `kuro-net` | repositories, the recipe engine, the WASM plug-in host, HTTP |
 | `crates/kuro-player`, `kuro-downloads`, `kuro-images`, `kuro-local`, `kuro-archive` | mpv player, downloads, images, local files, CBZ |
