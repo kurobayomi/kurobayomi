@@ -27,7 +27,9 @@ pub fn closes_on_incognito(now_on: bool) -> bool {
 /// The effects of a changed preference key. Keys that touch no open reader part give nothing.
 pub fn effects_for(key: &str) -> Vec<Effect> {
     match key {
+        // the default and any manga's own background: the reader reads the one that applies to its manga
         "pref_reader_theme_key" => vec![Effect::Theme],
+        key if key.starts_with("manga_reader_theme_") => vec![Effect::Theme],
         INCOGNITO_KEY => vec![Effect::Incognito],
         _ => Vec::new(),
     }
@@ -55,6 +57,7 @@ mod tests {
     #[test]
     fn the_live_settings_map_to_their_reader_parts() {
         assert_eq!(effects_for("pref_reader_theme_key"), [Effect::Theme]);
+        assert_eq!(effects_for("manga_reader_theme_42"), [Effect::Theme]);
         assert!(effects_for("pref_show_page_number_key").is_empty(), "cut from the settings");
         assert!(effects_for("reader_navigation_mode_pager").is_empty(), "cut from the settings");
     }

@@ -26,7 +26,7 @@ use kuro_data::item::Item;
 use kuro_db::Db;
 use kuro_platform::toast::{ToastLength, Toaster};
 use kuro_data::entry::{Entry, EntryRepo, EntryUpdate};
-use kuro_prefs::reader::{ReaderPrefs, ReadingMode};
+use kuro_prefs::reader::{MangaReaderPrefs, ReaderPrefs, ReadingMode};
 use tokio::sync::watch;
 
 use super::chapters::ListOptions;
@@ -204,7 +204,7 @@ impl ReaderCore {
 
     /// The settings a new viewer starts from, read from the preference store (T-44a-004).
     pub fn viewer_settings(&self) -> ViewerSettings {
-        ViewerSettings::from_prefs(&self.deps.prefs)
+        ViewerSettings::from_manga(&self.reader_prefs())
     }
 
     /// The chapter list rules, from the skip preferences of the reader.
@@ -234,8 +234,9 @@ impl ReaderCore {
     }
 
     /// The preference store handle a viewer follows for live changes (T-44a-005).
-    pub fn reader_prefs(&self) -> ReaderPrefs {
-        self.deps.prefs.clone()
+    /// The reader settings of the open manga: its own values, else the defaults of the Settings page.
+    pub fn reader_prefs(&self) -> MangaReaderPrefs {
+        MangaReaderPrefs::new(self.deps.prefs.clone(), self.deps.manga_id)
     }
 
     /// Loads the manga, builds the reader list and loads the requested chapter (T-43a-023). A failure leaves no
@@ -439,14 +440,15 @@ impl ReaderCore {
 
     /// The crop state for the current reading mode, for the button icon when the screen opens.
     pub fn crop_on(&self) -> bool {
-        self.deps.prefs.crop_borders.get()
+        self.reader_prefs().crop_borders().get()
     }
 
-    /// Flips the crop preference and stores it (T-43a-037). One switch serves every mode, the long strip follows it.
+    /// Flips the crop setting of the open manga and stores it (T-43a-037). One switch serves every mode, the long strip
+    /// follows it.
     pub fn toggle_crop(&self) -> CropView {
-        let prefs = &self.deps.prefs;
-        let toggle = flags::toggle_crop(self.mode(), prefs.crop_borders.get(), prefs.crop_borders.get());
-        if let Err(e) = prefs.crop_borders.set(toggle.value) {
+        let crop = self.reader_prefs().crop_borders();
+        let toggle = flags::toggle_crop(self.mode(), crop.get(), crop.get());
+        if let Err(e) = crop.set(toggle.value) {
             tracing::warn!(error = %e, "the crop preference could not be saved");
         }
         CropView { value: toggle.value, icon: crop_icon(toggle.value), toast: strings::on_off(toggle.value) }
@@ -465,18 +467,15 @@ impl ReaderCore {
         })
     }
 
-    /// Stores the picked reading mode for every manga (the global preference) and reloads the viewers.
+    /// Stores the picked reading mode for the open manga (its viewer flags) and reloads the viewers.
     pub fn apply_mode(&self, mode: ReadingMode) {
-        if let Err(error) = self.deps.prefs.default_reading_mode.set(mode.flag_value()) {
-            tracing::warn!(%error, "the reading mode could not be stored");
-        }
         if let Some(session) = self.session.borrow_mut().as_mut() {
             session.set_reading_mode(mode);
         }
     }
 
     pub fn theme_pref(&self) -> i32 {
-        self.deps.prefs.reader_theme.get()
+        self.reader_prefs().reader_theme().get()
     }
 
     /// `on_page_selected` for a page a viewer shows (T-043a-093). Download-ahead and the flash are the hooks the
@@ -527,7 +526,9 @@ impl ReaderCore {
     }
 
     fn mode(&self) -> kuro_prefs::reader::ReadingMode {
-        flags::global_reading_mode(self.deps.prefs.default_reading_mode.get())
+        // the manga's own mode, else the default of the Settings page
+        let viewer_flags = self.session.borrow().as_ref().map_or(0, |s| s.viewer_flags());
+        flags::resolve_reading_mode(viewer_flags, self.deps.prefs.default_reading_mode.get())
     }
 }
 
@@ -701,7 +702,7 @@ pub fn open_with(
     crate::reader::decode_guard::new_session();
     // and so are the pages the last reader kept decoded
     crate::reader::page_view::clear_decoded_cache();
-    let theme_value = deps.prefs.reader_theme.get();
+    let theme_value = MangaReaderPrefs::new(deps.prefs.clone(), deps.manga_id).reader_theme().get();
     let prefs_store = deps.prefs_store.clone();
     let core = Rc::new(ReaderCore::with_extras(deps, extras));
     // closing the reader first hands the delete-after-read queue over (T-43a-032)
@@ -1200,7 +1201,7 @@ fn open_settings(screen: &Rc<Screen>) {
             refresh(&s);
         }
     });
-    settings_window::open(&window, &screen.core.deps.prefs, screen.core.reading_mode(), on_mode);
+    settings_window::open(&window, &screen.core.reader_prefs(), screen.core.reading_mode(), on_mode);
 }
 
 /// The initial load. Clears a failure card, shows the spinner, waits for the source manager, then loads.
@@ -1806,7 +1807,7 @@ mod tests {
     }
 
     #[test]
-    fn the_crop_toggle_writes_the_preference_of_the_mode_and_reports_on_then_off() {
+    fn the_crop_toggle_writes_the_manga_setting_and_reports_on_then_off() {
         let f = fixture(1);
         let core = core(&f, 0, http_build("crop"));
         core.initial_load().unwrap();
@@ -1815,11 +1816,12 @@ mod tests {
         assert!(!core.crop_on());
         let on = core.toggle_crop();
         assert_eq!(on, CropView { value: true, icon: CROP_ICON_ON, toast: "On".to_string() });
-        assert!(core.deps.prefs.crop_borders.get());
+        assert!(core.reader_prefs().crop_borders().get());
         assert!(core.crop_on());
+        assert!(!core.deps.prefs.crop_borders.get(), "the default of the Settings page stays off");
         let off = core.toggle_crop();
         assert_eq!(off, CropView { value: false, icon: CROP_ICON_OFF, toast: "Off".to_string() });
-        assert!(!core.deps.prefs.crop_borders.get());
+        assert!(!core.crop_on());
     }
 
     #[test]
@@ -1829,7 +1831,7 @@ mod tests {
         let core = core(&f, 0, http_build("crop-webtoon"));
         core.initial_load().unwrap();
         assert_eq!(core.toggle_crop().toast, "On");
-        assert!(core.deps.prefs.crop_borders.get(), "the long strip follows the one crop switch");
+        assert!(core.reader_prefs().crop_borders().get(), "the long strip follows the one crop switch");
         assert!(core.crop_on());
     }
 

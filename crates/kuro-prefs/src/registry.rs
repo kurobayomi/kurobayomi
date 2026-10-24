@@ -286,6 +286,11 @@ define_prefs! {
     "__APP_STATE_source_keys", AppState, Set, &[], "sources", "source_keys";
     "cache_size_mb", Normal, Int, 500, "storage", "cache_size_mb";
     "library_cover_size", Normal, Int, 1, "library", "cover_size";
+    "manga_reader_theme_{id}", Normal, Int, 1, "reader.manga_reader_theme", "";
+    "manga_image_scale_type_{id}", Normal, Int, 1, "reader.manga_image_scale_type", "";
+    "manga_zoom_start_{id}", Normal, Int, 1, "reader.manga_zoom_start", "";
+    "manga_crop_borders_{id}", Normal, Bool, false, "reader.manga_crop_borders", "";
+    "manga_dual_page_split_{id}", Normal, Bool, false, "reader.manga_dual_page_split", "";
 }
 
 /// Keys of features this desktop app does not have, and of settings the settings diet cut (docs/design/settings-diet.md).
@@ -686,8 +691,9 @@ mod tests {
         // out of the applications menu), `auto_hide_bars` (the reader's and the player's bars hide by themselves) and
         // `pref_player_default_quality` (the height an episode starts at), `enabled_sources` (the sources that are on) and
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
-        // `library_cover_size` (Small, Medium or Large covers in the grids)
-        assert_eq!(REGISTRY.len(), rows.len() + 11);
+        // `library_cover_size` (Small, Medium or Large covers in the grids), and the five reader settings of one manga
+        // (`MangaReaderPrefs`)
+        assert_eq!(REGISTRY.len(), rows.len() + 16);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
         assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
         assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");
@@ -699,6 +705,8 @@ mod tests {
         assert_eq!(REGISTRY[rows.len() + 8].key, "__APP_STATE_source_keys");
         assert_eq!(REGISTRY[rows.len() + 9].key, "cache_size_mb");
         assert_eq!(REGISTRY[rows.len() + 10].key, "library_cover_size");
+        assert_eq!(REGISTRY[rows.len() + 11].key, "manga_reader_theme_{id}");
+        assert_eq!(REGISTRY[rows.len() + 15].key, "manga_dual_page_split_{id}");
         let mut pinned = 0;
         for (meta, (key, store, kind, default)) in REGISTRY.iter().zip(&rows) {
             assert_eq!(meta.key, key);

@@ -29,12 +29,6 @@ pub fn resolve_reading_mode(viewer_flags: i64, default_pref: i32) -> ReadingMode
     }
 }
 
-/// The reading mode of every manga: the global preference (user, 2026-10-15: a mode picked in the reader applies to all
-/// manga). A mode a manga carries in its viewer flags (an Aniyomi backup) stays stored but is not read.
-pub fn global_reading_mode(default_pref: i32) -> ReadingMode {
-    resolve_reading_mode(0, default_pref)
-}
-
 /// Writes a reading mode into the viewer flags, keeping every bit outside [`READING_MODE_MASK`].
 pub fn set_reading_mode(viewer_flags: i64, mode: ReadingMode) -> i64 {
     with_flag(viewer_flags, Flag::new(i64::from(mode.flag_value()), i64::from(READING_MODE_MASK)))

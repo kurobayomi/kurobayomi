@@ -31,7 +31,7 @@ use std::rc::Rc;
 use crate::reader::model::{ReaderPage, ViewerChapters};
 use crate::reader::viewer::ViewerEvent;
 use keys::KeyEvent;
-use kuro_prefs::reader::ReaderPrefs;
+use kuro_prefs::reader::MangaReaderPrefs;
 use settings::ViewerSettings;
 
 /// The five reading modes a viewer is built for (B§0, flag values 1..5).
@@ -129,7 +129,7 @@ pub struct ViewerContext {
     pub settings: ViewerSettings,
     /// The store the settings came from. With it the viewer follows later changes (T-44a-005); without it the
     /// settings stay as given.
-    pub prefs: Option<ReaderPrefs>,
+    pub prefs: Option<MangaReaderPrefs>,
     /// The download index, for the transition cards' downloaded flags (T-43b-032).
     pub downloads: downloads::DownloadCheck,
     /// Whether the reader menu is shown. The screen owns it and sets it on each toggle; the long tap and the volume

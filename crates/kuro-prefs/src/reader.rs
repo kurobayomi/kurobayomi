@@ -5,8 +5,10 @@
 //! type with `from_preference` for the stored number. The screen orientation and the cut reader keys are
 //! dropped, see `registry::DROPPED_KEYS`; the orientation bits of a stored viewer word are left as they are.
 
+use crate::pref::Pref;
 use crate::pref_enum;
 use crate::registry::define_prefs;
+use crate::values::PrefType;
 
 
 pref_enum! {
@@ -154,6 +156,46 @@ define_prefs! {
     }
 }
 
+/// The reader settings of one manga (user, 2026-10-24): the reader's own settings window writes these, the Settings page
+/// writes the [`ReaderPrefs`] defaults. A manga key that was never written reads as the default's current value, so a
+/// manga follows the default until a value is picked for it. The reading mode is kept in the manga's viewer flags.
+#[derive(Clone)]
+pub struct MangaReaderPrefs {
+    pub defaults: ReaderPrefs,
+    manga_id: i64,
+}
+
+impl MangaReaderPrefs {
+    pub fn new(defaults: ReaderPrefs, manga_id: i64) -> Self {
+        Self { defaults, manga_id }
+    }
+
+    pub fn reader_theme(&self) -> Pref<i32> {
+        self.own("manga_reader_theme", &self.defaults.reader_theme)
+    }
+
+    pub fn image_scale_type(&self) -> Pref<i32> {
+        self.own("manga_image_scale_type", &self.defaults.image_scale_type)
+    }
+
+    pub fn zoom_start(&self) -> Pref<i32> {
+        self.own("manga_zoom_start", &self.defaults.zoom_start)
+    }
+
+    pub fn crop_borders(&self) -> Pref<bool> {
+        self.own("manga_crop_borders", &self.defaults.crop_borders)
+    }
+
+    pub fn dual_page_split_paged(&self) -> Pref<bool> {
+        self.own("manga_dual_page_split", &self.defaults.dual_page_split_paged)
+    }
+
+    /// The manga's key `<prefix>_<id>`, read fresh each time so an unset key follows the default as it is now.
+    fn own<T: PrefType>(&self, prefix: &str, default: &Pref<T>) -> Pref<T> {
+        self.defaults.store().pref(format!("{prefix}_{}", self.manga_id), default.get())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +203,37 @@ mod tests {
     use crate::store::PrefStore;
     use crate::testutil::assert_section_registered;
     use crate::values::{Decoded, PrefType, PrefValue};
+
+    #[test]
+    fn a_manga_follows_the_default_until_its_own_value_is_picked() {
+        let reader = ReaderPrefs::new(PrefStore::in_memory());
+        let (one, two) = (MangaReaderPrefs::new(reader.clone(), 1), MangaReaderPrefs::new(reader.clone(), 2));
+        reader.crop_borders.set(true).unwrap();
+        assert!(one.crop_borders().get() && two.crop_borders().get(), "both follow the default");
+        one.crop_borders().set(false).unwrap();
+        assert!(!one.crop_borders().get(), "the manga's own value");
+        assert!(two.crop_borders().get() && reader.crop_borders.get(), "the other manga and the default are untouched");
+        reader.crop_borders.set(false).unwrap();
+        reader.crop_borders.set(true).unwrap();
+        assert!(!one.crop_borders().get(), "a picked value stays when the default changes");
+        reader.reader_theme.set(2).unwrap();
+        one.zoom_start().set(3).unwrap();
+        assert_eq!((one.reader_theme().get(), one.zoom_start().get(), two.zoom_start().get()), (2, 3, 1));
+    }
+
+    #[test]
+    fn the_manga_keys_are_registered_families() {
+        let one = MangaReaderPrefs::new(ReaderPrefs::new(PrefStore::in_memory()), 7);
+        for key in [
+            one.reader_theme().key().to_owned(),
+            one.image_scale_type().key().to_owned(),
+            one.zoom_start().key().to_owned(),
+            one.crop_borders().key().to_owned(),
+            one.dual_page_split_paged().key().to_owned(),
+        ] {
+            assert_eq!(lookup(&key).and_then(|(_, id)| id), Some("7"), "{key}");
+        }
+    }
 
     #[test]
     fn the_section_holds_every_reader_row() {

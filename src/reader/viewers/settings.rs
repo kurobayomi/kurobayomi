@@ -4,7 +4,9 @@
 
 use std::sync::mpsc::Receiver;
 
-use kuro_prefs::reader::{ReaderHideThreshold, ReaderPrefs, TappingInvertMode};
+use kuro_prefs::reader::{MangaReaderPrefs, ReaderHideThreshold, TappingInvertMode};
+#[cfg(test)]
+use kuro_prefs::reader::ReaderPrefs;
 use kuro_prefs::store::Changed;
 
 use super::nav::NavMode;
@@ -90,8 +92,15 @@ fn read_display_profile() -> String {
 }
 
 impl ViewerSettings {
-    /// Reads the kept values from the store; the cut ones are the hard-coded defaults. Unknown stored values fall back to their defaults (B§1.3).
+    /// The settings of the defaults alone: a manga with no values of its own.
+    #[cfg(test)]
     pub fn from_prefs(p: &ReaderPrefs) -> Self {
+        Self::from_manga(&MangaReaderPrefs::new(p.clone(), 0))
+    }
+
+    /// Reads the kept values of one manga (its own, else the defaults); the cut ones are the hard-coded defaults. Unknown
+    /// stored values fall back to their defaults (B§1.3).
+    pub fn from_manga(p: &MangaReaderPrefs) -> Self {
         Self {
             long_tap: diet::READER_LONG_TAP,
             page_transitions: diet::READER_PAGE_TRANSITIONS,
@@ -107,17 +116,17 @@ impl ViewerSettings {
             hide_threshold: ReaderHideThreshold::LOW.threshold(),
             navigate_pan: diet::READER_NAVIGATE_PAN,
             landscape_zoom: diet::READER_LANDSCAPE_ZOOM,
-            image_scale_type: p.image_scale_type.get(),
-            zoom_start: clamp_to(p.zoom_start.get(), ZOOM_START),
-            reader_theme: clamp_to(p.reader_theme.get(), READER_THEME),
-            crop_pager: p.crop_borders.get(),
-            crop_webtoon: p.crop_borders.get(),
+            image_scale_type: p.image_scale_type().get(),
+            zoom_start: clamp_to(p.zoom_start().get(), ZOOM_START),
+            reader_theme: clamp_to(p.reader_theme().get(), READER_THEME),
+            crop_pager: p.crop_borders().get(),
+            crop_webtoon: p.crop_borders().get(),
             side_padding: pref_rules::side_padding(diet::READER_WEBTOON_SIDE_PADDING),
             zoom_out_disabled: diet::READER_WEBTOON_DISABLE_ZOOM_OUT,
             double_tap_zoom: diet::READER_WEBTOON_DOUBLE_TAP_ZOOM,
             tile_threshold: read_tile_threshold(),
             display_profile: read_display_profile(),
-            dual_split_pager: p.dual_page_split_paged.get(),
+            dual_split_pager: p.dual_page_split_paged().get(),
             dual_invert_pager: diet::READER_DUAL_PAGE_INVERT,
             dual_rotate_pager: diet::READER_DUAL_PAGE_ROTATE,
             dual_rotate_invert_pager: diet::READER_DUAL_PAGE_ROTATE_INVERT,
@@ -187,15 +196,15 @@ pub fn diff(old: &ViewerSettings, new: &ViewerSettings, family: Family) -> Vec<R
 /// change, and reports a result only when it differs from what the viewer holds (`distinctUntilChanged`). The first
 /// read is the viewer's initial value and is never reported, so change-only reactions (`drop(1)`) do not fire on it.
 pub struct SettingsWatch {
-    prefs: ReaderPrefs,
+    prefs: MangaReaderPrefs,
     events: Receiver<Changed>,
     held: ViewerSettings,
 }
 
 impl SettingsWatch {
     /// Subscribes first and takes `held` as the initial value, so a write after this call is not missed.
-    pub fn new(prefs: ReaderPrefs, held: ViewerSettings) -> Self {
-        let events = prefs.store().subscribe();
+    pub fn new(prefs: MangaReaderPrefs, held: ViewerSettings) -> Self {
+        let events = prefs.defaults.store().subscribe();
         Self { prefs, events, held }
     }
 
@@ -208,7 +217,7 @@ impl SettingsWatch {
         if !changed {
             return None;
         }
-        let new = ViewerSettings::from_prefs(&self.prefs);
+        let new = ViewerSettings::from_manga(&self.prefs);
         (new != self.held).then(|| {
             self.held = new.clone();
             new
@@ -224,7 +233,7 @@ mod tests {
     #[test]
     fn the_watch_reports_a_changed_value_once_and_never_the_initial_one() {
         let p = prefs();
-        let mut watch = SettingsWatch::new(p.clone(), ViewerSettings::from_prefs(&p));
+        let mut watch = SettingsWatch::new(MangaReaderPrefs::new(p.clone(), 1), ViewerSettings::from_prefs(&p));
         assert_eq!(watch.poll(), None, "the initial value is not a change");
         p.reader_theme.set(2).unwrap();
         let new = watch.poll().expect("the write is reported");
@@ -235,7 +244,7 @@ mod tests {
     #[test]
     fn a_write_of_another_key_or_the_same_value_reports_nothing() {
         let p = prefs();
-        let mut watch = SettingsWatch::new(p.clone(), ViewerSettings::from_prefs(&p));
+        let mut watch = SettingsWatch::new(MangaReaderPrefs::new(p.clone(), 1), ViewerSettings::from_prefs(&p));
         p.reader_theme.set(1).unwrap();
         p.crop_borders.set(false).unwrap();
         assert_eq!(watch.poll(), None, "the viewer holds the same settings");
@@ -244,12 +253,23 @@ mod tests {
     #[test]
     fn several_writes_between_polls_give_the_latest_values_in_one_report() {
         let p = prefs();
-        let mut watch = SettingsWatch::new(p.clone(), ViewerSettings::from_prefs(&p));
+        let mut watch = SettingsWatch::new(MangaReaderPrefs::new(p.clone(), 1), ViewerSettings::from_prefs(&p));
         p.reader_theme.set(2).unwrap();
         p.reader_theme.set(0).unwrap();
         p.crop_borders.set(true).unwrap();
         let new = watch.poll().expect("reported");
         assert_eq!((new.reader_theme, new.crop_pager), (0, true));
+    }
+
+    #[test]
+    fn the_watch_follows_the_open_manga_and_not_another() {
+        let p = prefs();
+        let (open, other) = (MangaReaderPrefs::new(p.clone(), 1), MangaReaderPrefs::new(p.clone(), 2));
+        let mut watch = SettingsWatch::new(open.clone(), ViewerSettings::from_manga(&open));
+        other.crop_borders().set(true).unwrap();
+        assert_eq!(watch.poll(), None, "another manga's value");
+        open.crop_borders().set(true).unwrap();
+        assert!(watch.poll().expect("the open manga's value").crop_pager);
     }
 
     fn prefs() -> ReaderPrefs {

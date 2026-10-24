@@ -3,7 +3,8 @@
 //! crop borders and split wide pages. Every other reader setting is cut.
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::prefs::Prefs;
-use kuro_prefs::reader::ReaderPrefs;
+use kuro_prefs::pref::Pref;
+use kuro_prefs::reader::{MangaReaderPrefs, ReaderPrefs};
 
 use crate::pref_model::model::Preference;
 use crate::settings_ui::rows::{group, int_choice, item, switch};
@@ -38,9 +39,41 @@ pub fn zoom_starts() -> [(i32, String); 4] {
     [(1, tr(MsgKey::zoom_start_automatic)), (2, tr(MsgKey::zoom_start_left)), (3, tr(MsgKey::zoom_start_right)), (4, tr(MsgKey::zoom_start_center))]
 }
 
+/// The five layout settings the Display and Paged groups show: the defaults on the Settings page, the open manga's own
+/// values in the reader's settings window (user, 2026-10-24).
+pub struct LayoutPrefs {
+    pub reader_theme: Pref<i32>,
+    pub image_scale_type: Pref<i32>,
+    pub zoom_start: Pref<i32>,
+    pub crop_borders: Pref<bool>,
+    pub dual_page_split_paged: Pref<bool>,
+}
+
+impl LayoutPrefs {
+    pub fn defaults(r: &ReaderPrefs) -> Self {
+        Self {
+            reader_theme: r.reader_theme.clone(),
+            image_scale_type: r.image_scale_type.clone(),
+            zoom_start: r.zoom_start.clone(),
+            crop_borders: r.crop_borders.clone(),
+            dual_page_split_paged: r.dual_page_split_paged.clone(),
+        }
+    }
+
+    pub fn manga(m: &MangaReaderPrefs) -> Self {
+        Self {
+            reader_theme: m.reader_theme(),
+            image_scale_type: m.image_scale_type(),
+            zoom_start: m.zoom_start(),
+            crop_borders: m.crop_borders(),
+            dual_page_split_paged: m.dual_page_split_paged(),
+        }
+    }
+}
+
 /// The Display and Paged groups: the background colour and the paged layout. The Settings reader page and the reader's
 /// own settings window both show them, so the rows are built here once.
-pub fn layout_rows(r: &ReaderPrefs) -> Vec<Preference> {
+pub fn layout_rows(r: &LayoutPrefs) -> Vec<Preference> {
     vec![
         group(&tr(MsgKey::action_display), vec![int_choice(&tr(MsgKey::pref_reader_theme), &r.reader_theme, &backgrounds(), true)]),
         group(
@@ -61,7 +94,7 @@ pub fn rows_all(prefs: &Prefs) -> Vec<Preference> {
         item(int_choice(&tr(MsgKey::pref_viewer_type), &prefs.reader.default_reading_mode, &reading_modes(), true)),
         item(crate::settings_ui::rows::auto_hide_bars(&prefs.base)),
     ];
-    tree.extend(layout_rows(&prefs.reader));
+    tree.extend(layout_rows(&LayoutPrefs::defaults(&prefs.reader)));
     tree
 }
 

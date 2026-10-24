@@ -415,9 +415,13 @@ impl ReaderSession {
         }
     }
 
-    /// A new reading mode is in effect (the caller stored it for every manga): the requested page becomes the saved
-    /// page, and the viewers reload. Nothing is written to the manga.
-    pub fn set_reading_mode(&mut self, _mode: ReadingMode) {
+    /// A reading mode was picked for this manga: it is written to the manga's viewer flags (only the mode bits), the
+    /// requested page becomes the saved page, and the viewers reload.
+    pub fn set_reading_mode(&mut self, mode: ReadingMode) {
+        // the manga's own mode (user, 2026-10-24): the Settings page holds the default for manga without one
+        self.viewer_flags = crate::reader::flags::set_reading_mode(self.viewer_flags, mode);
+        let mask = i64::from(kuro_prefs::reader::READING_MODE_MASK);
+        self.store.set_viewer_flags(self.manga_id, self.viewer_flags & mask, mask);
         self.restore_saved_page();
         let _ = self.events.send(ReaderEvent::ReloadViewerChapters);
     }
@@ -826,13 +830,15 @@ mod tests {
     }
 
     #[test]
-    fn a_new_reading_mode_reloads_the_viewers_and_writes_nothing_to_the_manga() {
+    fn a_new_reading_mode_is_written_to_the_manga_and_reloads_the_viewers() {
         let rec = Rc::new(Recorder::default());
         let a = chapter(1, false);
         a.last_page_read.set(2);
         let (mut s, rx) = session(Rc::clone(&rec), vec![Rc::clone(&a)], 0, false);
         s.set_reading_mode(ReadingMode::Webtoon);
-        assert!(rec.flags.borrow().is_empty(), "the mode is global: nothing is written to the manga");
+        let mask = i64::from(kuro_prefs::reader::READING_MODE_MASK);
+        assert_eq!(*rec.flags.borrow(), [(s.manga_id, i64::from(ReadingMode::Webtoon.flag_value()), mask)], "only the mode bits of this manga");
+        assert_eq!(crate::reader::flags::reading_mode_of(s.viewer_flags()), ReadingMode::Webtoon);
         assert_eq!(a.requested_page.get(), 2);
         assert_eq!(rx.try_recv(), Ok(ReaderEvent::ReloadViewerChapters));
     }
