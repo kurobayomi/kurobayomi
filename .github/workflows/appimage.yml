@@ -1,9 +1,9 @@
-name: Nightly AppImage
+name: Nightly
 
-# Every push to main that passes the CI tests builds the AppImage and updates the one release called "nightly" (a rolling
-# prerelease: no version tags). The file name never changes, so one fixed download address always serves the newest build
-# (Shelly's StaticUrl update check watches that address); the commit hash is in the release title and notes. Stable builds
-# are tagged releases and have their own workflow.
+# Every push to main that passes the CI tests builds the AppImage and the Windows installer and updates the one release
+# called "nightly" (a rolling prerelease: no version tags). The file names never change, so one fixed download address
+# always serves the newest build (Shelly's StaticUrl update check watches the AppImage's); the commit hash is in the
+# release title and notes. Stable builds are tagged releases and have their own workflow.
 on:
   # runs after the CI workflow finished, and only when its tests passed
   workflow_run:
@@ -99,38 +99,17 @@ jobs:
           name: kurobayomi-nightly-debug-${{ env.SHA }}
           path: target/appimage/*.debug
 
-      - name: Update the nightly release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Once main has a newer commit that changed a workflow file, this token may make the tag only on main's newest
-          # commit, so tagging this one would fail, and only after the old tag was deleted, leaving the release a draft the
-          # app cannot see. Skip then: a newer run updates the nightly. A newer commit without a workflow change (docs,
-          # plans) starts no CI and so no nightly of its own; this run still publishes then.
-          git fetch -q --depth=1 origin main
-          if [ "$(git rev-parse FETCH_HEAD)" != "$SHA" ] && ! git diff --quiet "$SHA" FETCH_HEAD -- .github/workflows; then
-            echo "main has moved past $SHA with a workflow change; a newer run updates the nightly"
-            exit 0
-          fi
-          short="$(git rev-parse --short=8 HEAD)"
-          # the tag moves to this commit; the release itself stays, so there is never a moment without one. It is deleted
-          # and made again rather than moved: GitHub refuses to let this token move a tag across a commit that changed a
-          # workflow file, but making a tag on main's newest commit is allowed. Deleting the tag turns the release into a
-          # draft, which the app cannot see (it reads it as no update), so the edit below publishes it again
-          git push origin :refs/tags/nightly || true
-          git push origin "$SHA:refs/tags/nightly"
-          if gh release view nightly >/dev/null 2>&1; then
-            # files first, notes last: the app reads the commit from the notes, so it never sees a new commit with an old file
-            gh release upload nightly "$APPIMAGE" "$APPIMAGE.zsync" --clobber
-            gh release edit nightly --draft=false --prerelease --title "Nightly ($short)" --notes "Built from commit $SHA."
-          else
-            gh release create nightly "$APPIMAGE" "$APPIMAGE.zsync" --target "$SHA" --prerelease \
-              --title "Nightly ($short)" --notes "Built from commit $SHA."
-          fi
+      # the release is updated by the publish job, once the Windows installer is built too
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nightly-files-appimage
+          path: |
+            ${{ env.APPIMAGE }}
+            ${{ env.APPIMAGE }}.zsync
+          retention-days: 1
 
-  # A test build of the Windows nightly: the app with every DLL and the GTK data it needs (scripts/bundle-windows.sh), as
-  # a zip on this run's page, not on the release. For trying the app on Windows until the installer replaces it
-  # (plans/addenda/requirements-cross-platform.md, packaging).
+  # The Windows nightly: the app with every DLL and the GTK data it needs (scripts/bundle-windows.sh), packed as the
+  # installer (dist/windows/kurobayomi.iss), installed and tried on the runner, then handed to the publish job.
   windows:
     if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: windows-latest
@@ -184,8 +163,105 @@ jobs:
           Get-Content version.txt
           if ($run.ExitCode -ne 0) { throw "the bundled app exited with $($run.ExitCode)" }
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build the installer
+        run: scripts/build-windows-installer.sh nightly Kurobayomi-Nightly installer
+
+      # as a user would: the setup run silently (as the self-updater runs it), then the installed copy started
+      - name: Install it
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $setup = Start-Process installer\Kurobayomi-Nightly-Setup-x86_64.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "the setup exited with $($setup.ExitCode)" }
+          $app = "$env:LOCALAPPDATA\Programs\Kurobayomi Nightly"
+          foreach ($file in 'bin\kurobayomi.exe', 'bin\gdbus.exe', 'unins000.exe') {
+            if (-not (Test-Path "$app\$file")) { throw "the setup did not install $file" }
+          }
+          $run = Start-Process "$app\bin\kurobayomi.exe" -ArgumentList '--version' -NoNewWindow -Wait -PassThru -RedirectStandardOutput installed.txt
+          Get-Content installed.txt
+          if ($run.ExitCode -ne 0) { throw "the installed app exited with $($run.ExitCode)" }
+
+      # a second launch must hand its request (here a kurobayomi:// link) to the running app over GLib's session bus
+      # (gdbus.exe) and quit. Reported, not required: a window on a CI desktop is not a user's desktop
+      - name: Single instance
+        shell: pwsh
+        timeout-minutes: 3
+        continue-on-error: true
+        run: |
+          $exe = "$env:LOCALAPPDATA\Programs\Kurobayomi Nightly\bin\kurobayomi.exe"
+          $first = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 20
+          if ($first.HasExited) { throw "the app quit by itself (exit code $($first.ExitCode))" }
+          $second = Start-Process $exe -ArgumentList 'kurobayomi://library' -PassThru
+          if (-not $second.WaitForExit(20000)) { throw "the second launch kept running: it did not hand over to the first" }
+          if ($first.HasExited) { throw "the first app quit" }
+          "the second launch handed over and quit; the first app still runs"
+
+      - name: Uninstall it
+        shell: pwsh
+        if: always()
+        timeout-minutes: 3
+        run: |
+          Get-Process kurobayomi, gdbus -ErrorAction SilentlyContinue | Stop-Process -Force
+          $app = "$env:LOCALAPPDATA\Programs\Kurobayomi Nightly"
+          if (-not (Test-Path "$app\unins000.exe")) { exit 0 }
+          Start-Process "$app\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait
+          # the uninstaller finishes from a copy of itself, so wait for the folder to go
+          for ($i = 0; $i -lt 30 -and (Test-Path "$app\bin"); $i++) { Start-Sleep -Seconds 1 }
+          if (Test-Path "$app\bin") { throw "the uninstaller left $app\bin" }
+
       - uses: actions/upload-artifact@v4
         with:
-          name: Kurobayomi-Nightly-windows-x86_64
-          path: Kurobayomi-Nightly
+          name: nightly-files-windows
+          path: installer/Kurobayomi-Nightly-Setup-x86_64.exe
           retention-days: 14
+
+  # Both builds go out together, files first and notes last, so the notes never name a commit whose AppImage or
+  # installer is not up yet: the self-updaters of both read the commit from the notes.
+  publish:
+    needs: [appimage, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SHA }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: nightly-files-*
+          merge-multiple: true
+          path: files
+
+      - name: Update the nightly release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Once main has a newer commit that changed a workflow file, this token may make the tag only on main's newest
+          # commit, so tagging this one would fail, and only after the old tag was deleted, leaving the release a draft the
+          # app cannot see. Skip then: a newer run updates the nightly. A newer commit without a workflow change (docs,
+          # plans) starts no CI and so no nightly of its own; this run still publishes then.
+          git fetch -q --depth=1 origin main
+          if [ "$(git rev-parse FETCH_HEAD)" != "$SHA" ] && ! git diff --quiet "$SHA" FETCH_HEAD -- .github/workflows; then
+            echo "main has moved past $SHA with a workflow change; a newer run updates the nightly"
+            exit 0
+          fi
+          short="$(git rev-parse --short=8 HEAD)"
+          files=(files/Kurobayomi-nightly-x86_64.AppImage files/Kurobayomi-nightly-x86_64.AppImage.zsync files/Kurobayomi-Nightly-Setup-x86_64.exe)
+          # the tag moves to this commit; the release itself stays, so there is never a moment without one. It is deleted
+          # and made again rather than moved: GitHub refuses to let this token move a tag across a commit that changed a
+          # workflow file, but making a tag on main's newest commit is allowed. Deleting the tag turns the release into a
+          # draft, which the app cannot see (it reads it as no update), so the edit below publishes it again
+          git push origin :refs/tags/nightly || true
+          git push origin "$SHA:refs/tags/nightly"
+          if gh release view nightly >/dev/null 2>&1; then
+            # files first, notes last: the app reads the commit from the notes, so it never sees a new commit with an old file
+            gh release upload nightly "${files[@]}" --clobber
+            gh release edit nightly --draft=false --prerelease --title "Nightly ($short)" --notes "Built from commit $SHA."
+          else
+            gh release create nightly "${files[@]}" --target "$SHA" --prerelease \
+              --title "Nightly ($short)" --notes "Built from commit $SHA."
+          fi

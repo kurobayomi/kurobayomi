@@ -1,8 +1,8 @@
 name: Release
 
-# Pushing a tag like v0.1.0 builds the stable AppImage and publishes it as a normal release (GitHub shows it as "Latest").
-# Nothing is published for a manual run: it builds the same AppImage from the branch you pick and offers it as a download of
-# the run, to test this pipeline without a tag. How to cut a release: docs/RELEASING.md.
+# Pushing a tag like v0.1.0 builds the stable AppImage and the Windows installer and publishes them as a normal release
+# (GitHub shows it as "Latest"). Nothing is published for a manual run: it builds the same files from the branch you pick
+# and offers them as downloads of the run, to test this pipeline without a tag. How to cut a release: docs/RELEASING.md.
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
@@ -56,6 +56,14 @@ jobs:
           passed="$(gh run list --workflow CI --commit "$GITHUB_SHA" --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')"
           [ "$passed" -ge 1 ] || { echo "no successful CI run for $GITHUB_SHA: run the CI workflow on it first (it can be started by hand)" >&2; exit 1; }
           scripts/release-notes.sh "$VERSION" > release-notes.md
+
+      - name: Keep the release notes (tag runs only)
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+          retention-days: 1
 
       # The way back (see `container:` above): the packages installed on the plain runner, as before the build image.
       # - name: Cache the downloaded packages
@@ -129,15 +137,112 @@ jobs:
             target/appimage/SHA256SUMS
           retention-days: 7
 
-      - name: Publish the release (tag runs only)
+      - name: Hand the AppImage to the publish job (tag runs only)
         if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files-appimage
+          path: |
+            target/appimage/Kurobayomi-x86_64.AppImage
+            target/appimage/Kurobayomi-x86_64.AppImage.zsync
+          retention-days: 1
+
+  # The Windows installer (dist/windows/kurobayomi.iss) of the same commit, built like the nightly's
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          # git: kuro-core's build script reads the commit for `--version`
+          install: git
+          pacboy: >-
+            toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
+            gtk4:p mpv:p dav1d:p libarchive:p
+
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          # the nightly's Windows cache (same job name and key), read from main; a tag's own cache would serve no later run
+          key: release
+          save-if: false
+
+      - name: Build
+        # as the AppImage above: no KB_CHANNEL, the release checker on
+        env:
+          KB_UPDATE_REPOSITORY: ${{ github.repository }}
+        run: cargo build --release --locked --features updater
+
+      - name: Bundle
+        run: scripts/bundle-windows.sh target/release/kurobayomi.exe Kurobayomi
+
+      # every DLL loads: Windows' own folders only on PATH (see the nightly)
+      - name: Start the bundled app
+        shell: pwsh
+        timeout-minutes: 2
         run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          $run = Start-Process -FilePath Kurobayomi\bin\kurobayomi.exe -ArgumentList '--version' -NoNewWindow -Wait -PassThru -RedirectStandardOutput version.txt
+          Get-Content version.txt
+          if ($run.ExitCode -ne 0) { throw "the bundled app exited with $($run.ExitCode)" }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build the installer
+        run: scripts/build-windows-installer.sh stable Kurobayomi installer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          # the publish job's on a tag run; the run's download on a manual one
+          name: release-files-windows
+          path: installer/Kurobayomi-Setup-x86_64.exe
+          retention-days: 7
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [release, windows]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: files
+
+      - name: Read the version
+        run: |
+          version="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/^version = "(.*)"$/\1/')"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      # one line per file, in sha256sum's format: the self-updaters read it when GitHub gives no digest
+      - name: Sum the files
+        run: |
+          cd files
+          sha256sum Kurobayomi-x86_64.AppImage Kurobayomi-Setup-x86_64.exe > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish the release
+        run: |
+          cd files
           {
             printf '\n---\n\nBuilt from commit %s.\n\n```\n' "$GITHUB_SHA"
-            cat target/appimage/SHA256SUMS
+            cat SHA256SUMS
             printf '```\n'
           } >> release-notes.md
-          files=(target/appimage/Kurobayomi-x86_64.AppImage target/appimage/Kurobayomi-x86_64.AppImage.zsync target/appimage/SHA256SUMS)
+          files=(Kurobayomi-x86_64.AppImage Kurobayomi-x86_64.AppImage.zsync Kurobayomi-Setup-x86_64.exe SHA256SUMS)
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             # a re-run of the same tag: replace the files and the notes
             gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber

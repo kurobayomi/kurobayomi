@@ -120,6 +120,7 @@ How the nightly works:
 - GTK stays at 4.14 (`v4_14`). Lowering it to 4.6 gave 86 compile errors (file dialogs, launchers, accessibility API, picture content fit); older distros are a job for a Flatpak.
 - `scripts/build-appimage.sh` cannot run on Arch (linuxdeploy's GTK plugin expects the Ubuntu folder layout); test it in an Ubuntu 24.04 container.
 
+- **Windows ships one way: the Inno Setup installer** (`dist/windows/kurobayomi.iss`, built by `scripts/bundle-windows.sh` and `scripts/build-windows-installer.sh` on an MSYS2 UCRT64 runner). Files: `Kurobayomi-Setup-x86_64.exe` (stable, in `SHA256SUMS`) and `Kurobayomi-Nightly-Setup-x86_64.exe` (nightly); never rename them, the Windows self-updater looks for them. Only the stable installer registers `kurobayomi://` and `.tachibk`. Both workflows publish from a final `publish` job that waits for the AppImage and the installer, files first and notes last, so neither self-updater sees a commit whose file is not up yet.
 - **Licences ship inside every AppImage** (nightly and stable): `usr/share/licenses/kurobayomi/` has LICENSE, NOTICE, SOURCE-OFFER.txt and the copyright files of the bundled system libraries; `scripts/build-appimage.sh` fails the build when it cannot trace any library to a package. The libmpv/ffmpeg GPL question is open (see `docs/RELEASING.md`).
 - The stable `Release` workflow can be run by hand without a tag; it then only offers the AppImage as a run download.
 

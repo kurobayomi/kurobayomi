@@ -6,6 +6,27 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Added
+
+- Windows 10 and 11 (64-bit): `Kurobayomi-Setup-x86_64.exe` installs Kurobayomi for the current user, without an
+  administrator prompt, with a Start menu entry and an uninstaller. The installed copy updates itself like the AppImage:
+  it downloads the new setup and runs it when the app quits, or at once from the Restart button. The stable installer
+  takes `kurobayomi://` links (tracker sign-in comes back through one) and opens `.tachibk` backups.
+- A Windows nightly, `Kurobayomi-Nightly-Setup-x86_64.exe` on the nightly release. It installs beside the stable app with
+  its own name and data, and leaves `kurobayomi://` links and `.tachibk` files to the stable app.
+- The player's HW and HW+ decoding also use Direct3D 11 where mpv offers it.
+
+### Changed
+
+- Data and storage lists the same storage roots wherever it is opened: the mounted disks and the one that holds the app's
+  data (on Windows, the fixed and removable drives).
+
+### Fixed
+
+- A GTK theme written for a newer GTK (adw-gtk3 6 writes its stylesheet in CSS variables) no longer leaves the window
+  see-through: on a GTK older than 4.16 such a theme falls back to Adwaita, or Adwaita-dark for a dark one, for that run
+  (issue #5).
+
 ## [0.1.10] - 2026-10-24
 
 ### Changed

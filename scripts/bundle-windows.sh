@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Packs a Windows build into a folder that runs on a PC without MSYS2, in GTK's prefix layout (GLib finds its data next to
 # bin\): the exe and every DLL it loads from MSYS2's UCRT64 prefix in bin\, GDK's image loaders in lib\, and the GSettings
-# schemas, icon themes and font settings in share\ and etc\. Runs in the MSYS2 UCRT64 shell (ntldd, cygpath).
+# schemas, icon themes and font settings in share\ and etc\, and the licences of all of it in share\licenses\kurobayomi\. Runs in
+# the MSYS2 UCRT64 shell (ntldd, cygpath, pacman).
 # Usage: scripts/bundle-windows.sh <path to kurobayomi.exe> <output folder>
 set -euo pipefail
 
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exe=$1
 out=$2
 prefix=${MINGW_PREFIX:-/ucrt64}
@@ -38,4 +40,37 @@ if [ "${#dlls[@]}" -eq 0 ]; then
     exit 1
 fi
 cp "${dlls[@]}" "$out/bin/"
+
+# The licences that travel with the app, as in the AppImage (scripts/build-appimage.sh): ours (LICENSE, NOTICE) and, for
+# every bundled file from MSYS2, the licence files of the package it came from with that package's version, so its
+# source can be found (SOURCE-OFFER.txt). A bundle with no library traced to a package fails.
+lic="$out/share/licenses/kurobayomi"
+mkdir -p "$lic/libraries"
+cp "$root/LICENSE" "$root/NOTICE" "$lic/"
+{
+    head -n 2 "$root/src/shell/data/SOURCE-OFFER.txt"
+    cat <<'OFFER'
+
+This Windows build also carries libraries (GTK, libmpv, ffmpeg and the libraries they use) from MSYS2's UCRT64
+repository. Each one is the MSYS2 package listed in libraries/PACKAGES.txt (name and version), and its licence files are
+in libraries/<package>/. Many of them are LGPL or GPL. The source code of every one of them is available from MSYS2, at
+https://packages.msys2.org/ and https://github.com/msys2/MINGW-packages (the package's PKGBUILD names its source).
+If you cannot get a source you are entitled to, write to the project at https://github.com/kurobayomi/kurobayomi/issues.
+OFFER
+} > "$lic/SOURCE-OFFER.txt"
+{
+    for file in "${dlls[@]}" "$prefix/bin/gdbus.exe" "$prefix/lib/gdk-pixbuf-2.0/2.10.0/loaders/"*.dll "$prefix/share/icons/Adwaita/index.theme"; do
+        pacman -Qqo "$file" 2>/dev/null || true
+    done
+} | sort -u | while read -r package; do
+    name="${package#"${MINGW_PACKAGE_PREFIX:-mingw-w64-ucrt-x86_64}-"}"
+    if [ -d "$prefix/share/licenses/$name" ]; then
+        cp -r "$prefix/share/licenses/$name" "$lic/libraries/$name"
+    fi
+    pacman -Q "$package" >> "$lic/libraries/PACKAGES.txt"
+done
+if [ ! -s "$lic/libraries/PACKAGES.txt" ]; then
+    echo "bundle-windows: no bundled library could be traced to an MSYS2 package; the licences are missing" >&2
+    exit 1
+fi
 echo "bundle-windows: $(ls "$out/bin" | wc -l) files in bin, $(du -sh "$out" | cut -f1) in all"

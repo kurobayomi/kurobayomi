@@ -58,11 +58,11 @@ pub fn is_low_ram_from(meminfo: Option<&str>) -> bool {
 
 /// True when `MemTotal` is below 3 GiB. Read once per process; a missing or unparsable `/proc/meminfo` is false. On
 /// Windows the total comes from `windows::device`.
+#[allow(unreachable_code)]
 pub fn is_low_ram() -> bool {
     static LOW_RAM: OnceLock<bool> = OnceLock::new();
     #[cfg(all(target_os = "windows", feature = "platform-windows"))]
     return *LOW_RAM.get_or_init(|| crate::windows::device::total_memory().is_some_and(|bytes| bytes < LOW_RAM_BYTES));
-    #[allow(unreachable_code)]
     *LOW_RAM.get_or_init(|| is_low_ram_from(std::fs::read_to_string("/proc/meminfo").ok().as_deref()))
 }
 
