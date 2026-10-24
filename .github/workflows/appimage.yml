@@ -156,6 +156,9 @@ jobs:
       - name: Cache the build
         uses: Swatinem/rust-cache@v2
         with:
+          # its own cache: the CI job is also called "windows", and its debug test build would be restored here (a full
+          # match, so this release build would never be saved)
+          key: release
           cache-on-failure: true
 
       - name: Build
