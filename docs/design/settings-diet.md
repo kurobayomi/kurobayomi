@@ -374,7 +374,7 @@ Not a registry key but you asked for it: **player quality and server choice**. A
 
 ### Browse (settings_browse and the Sources tab)
 
-31 keys: 20 CUT, 11 KEEP.
+31 keys: 22 CUT, 9 KEEP.
 
 | Key | Where the user sees it | What it does | Verdict | If CUT: hard-code | Reason | Flags and import |
 |---|---|---|---|---|---|---|
