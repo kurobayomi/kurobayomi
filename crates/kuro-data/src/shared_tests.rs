@@ -73,6 +73,7 @@ fn lookups_and_lists_are_scoped_by_kind() {
     assert_eq!(repo.by_url_and_source(Kind::Anime, "same", 1).unwrap().unwrap().id, a);
     assert_eq!(repo.favorites(Kind::Manga).unwrap().iter().map(|e| e.id).collect::<Vec<_>>(), [m]);
     assert_eq!(repo.favorites_by_source(Kind::Anime, 1).unwrap().iter().map(|e| e.id).collect::<Vec<_>>(), [a]);
+    assert!(repo.by_source(Kind::Anime, 1).unwrap().iter().any(|e| e.id == a), "every entry of the source, favourites too");
     assert_eq!(repo.favorite_counts_by_source(Kind::Manga).unwrap(), [(1, 1)]);
     assert_eq!(repo.all_source_and_url(Kind::Anime).unwrap(), [(1, "same".to_owned())]);
     assert!(matches!(repo.lookup_or_insert(&entry(Kind::Anime, "same", true)).unwrap(), LookupOrInsert::Found(e) if e.id == a));

@@ -8,8 +8,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Added
 
-- Downloads lists every downloaded episode and chapter under the queue, each with a button that opens its folder, and
-  the header has a button that opens the downloads folder.
+- Downloads lists what is on disk under the queue, one group per title with its count and size: a click on the title
+  opens its page, a click on an episode or chapter plays or reads it, and each has a delete button. The title's folder
+  and the whole downloads folder each have a button that opens them.
 
 ### Changed
 

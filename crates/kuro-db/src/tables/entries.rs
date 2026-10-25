@@ -24,6 +24,7 @@ const BY_URL_AND_SOURCE: &str =
 const FAVORITES: &str = concat!("SELECT ", entry_cols!(""), " FROM entries WHERE kind = :kind AND favorite = 1");
 const FAVORITES_BY_SOURCE: &str =
     concat!("SELECT ", entry_cols!(""), " FROM entries WHERE kind = :kind AND favorite = 1 AND source = :source");
+const BY_SOURCE: &str = concat!("SELECT ", entry_cols!(""), " FROM entries WHERE kind = :kind AND source = :source");
 const WATCHED_NOT_IN_LIBRARY: &str = concat!(
     "SELECT ", entry_cols!(""), " FROM entries WHERE kind = :kind AND favorite = 0 AND _id IN (SELECT DISTINCT entry_id FROM items WHERE done = 1 OR progress != 0)"
 );
@@ -83,6 +84,11 @@ pub fn favorites(c: &Connection, kind: Kind) -> Result<Vec<EntryRow>> {
 
 pub fn favorites_by_source(c: &Connection, kind: Kind, source: i64) -> Result<Vec<EntryRow>> {
     query_all(c, FAVORITES_BY_SOURCE, &[(":kind", &kind.as_str()), (":source", &source)], EntryRow::from_row)
+}
+
+/// Every entry of a source, in the library or not (a title's downloads outlive its place in the library).
+pub fn by_source(c: &Connection, kind: Kind, source: i64) -> Result<Vec<EntryRow>> {
+    query_all(c, BY_SOURCE, &[(":kind", &kind.as_str()), (":source", &source)], EntryRow::from_row)
 }
 
 /// Non-favourites with at least one done item or some progress.

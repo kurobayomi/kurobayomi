@@ -476,6 +476,11 @@ impl EntryRepo {
         Ok(entries(self.db.read(|c| Ok(t::favorites_by_source(c, kind, source)?))?))
     }
 
+    /// Every entry of a source, in the library or not.
+    pub fn by_source(&self, kind: Kind, source: i64) -> DataResult<Vec<Entry>> {
+        Ok(entries(self.db.read(|c| Ok(t::by_source(c, kind, source)?))?))
+    }
+
     /// Non-favourites with a done item or some progress.
     pub fn watched_not_in_library(&self, kind: Kind) -> DataResult<Vec<Entry>> {
         Ok(entries(self.db.read(|c| Ok(t::watched_not_in_library(c, kind)?))?))

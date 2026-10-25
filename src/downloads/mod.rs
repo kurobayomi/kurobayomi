@@ -6,6 +6,7 @@ pub mod anime_io;
 pub mod directory;
 pub mod live;
 pub mod manga_io;
+pub mod on_disk;
 pub mod platform;
 pub mod queue_page;
 

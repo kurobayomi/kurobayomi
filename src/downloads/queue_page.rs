@@ -1,5 +1,6 @@
-//! The download queue page (lane D): one kind's queue as a list, then every downloaded episode or chapter on disk (the
-//! download index), each with a button that opens its folder. The page header has a Pause/Resume button and a Clear
+//! The download queue page (lane D): one kind's queue as a list, then what is on disk (the download index), one row per
+//! title (`on_disk`): its title, count and size on disk, a click opening its page and a button opening its folder, then
+//! its episodes or chapters, each played or read with a click and deleted with its button. The page header has a Pause/Resume button and a Clear
 //! queue button (both hidden while the queue is empty) and one that opens the kind's downloads folder. A queued row has
 //! the shared download button (a click cancels, or retries a failed row). The commands go to the one download service (`Downloads`), and the rows come from its snapshot. A unit whose source is not installed is an
 //! ordinary row that reads "Waiting for source". A row's right-click menu offers Cancel, Retry (a failed row), Move to
@@ -23,7 +24,7 @@ use kuro_downloads::state::RunState;
 use kuro_i18n::{MsgKey, tr};
 
 use crate::browse::look;
-use crate::downloads::live;
+use crate::downloads::{live, on_disk};
 use crate::widgets::context_menu::{self, Item};
 use crate::widgets::download_button::{DownloadButton, Request};
 
@@ -107,22 +108,16 @@ impl Page {
         }
         self.buttons.borrow_mut().clear();
         let index = self.downloads.index();
-        let done = downloaded(&index.tree(self.kind), index.root(self.kind));
+        let done = on_disk(self.kind, &index.tree(self.kind), index.root(self.kind));
         let empty = items.is_empty() && done.is_empty();
         self.empty.set_visible(empty);
         self.list.set_visible(!empty);
         for item in items {
             self.list.append(&self.row(item));
         }
-        // ponytail: one row per unit in a ListBox; a GtkListView if libraries of thousands make the page slow
-        for (label, folder) in done {
-            let open = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_containing_folder));
-            open.add_css_class("flat");
-            open.set_valign(gtk::Align::Center);
-            open.connect_clicked(move |_| open_folder(&folder));
-            let line = look::list_row(None, &label, Some("Downloaded"), Some(open.upcast()));
-            line.set_activatable(false);
-            self.list.append(&line);
+        // ponytail: every title and unit as widgets in a ListBox; a GtkListView if libraries of thousands make the page slow
+        for title in done {
+            self.list.append(&title_row(self.kind, title));
         }
     }
 
@@ -208,16 +203,93 @@ fn show_run(button: &gtk::Button, running: bool) {
     }
 }
 
-/// Every downloaded unit in `tree` as "title · unit" with the folder that holds it, by source, title and unit name.
-fn downloaded(tree: &Tree, root: &Path) -> Vec<(String, PathBuf)> {
-    tree.sources
-        .values()
-        .flat_map(|source| source.entries.values())
-        .flat_map(|entry| {
-            let folder = root.join(&entry.source_dir).join(&entry.dir_name);
-            entry.units.iter().map(move |unit| (format!("{} · {unit}", entry.dir_name), folder.clone()))
-        })
-        .collect()
+/// The titles on disk, matched to the library (`on_disk`). A read of the library that fails lists the folders as they are.
+fn on_disk(kind: Kind, tree: &Tree, root: &Path) -> Vec<on_disk::Title> {
+    let db = crate::data::app().db.clone();
+    let (entries, items) = (kuro_data::entry::EntryRepo::new(db.clone()), kuro_data::item::ItemRepo::new(db));
+    on_disk::titles(kind, tree, root, |source| entries.by_source(kind, source).unwrap_or_default(), |entry| items.by_entry_id(entry, false).unwrap_or_default())
+}
+
+/// One title on disk: a heading (title, count and size; a click opens the title's page, a button its folder), then a
+/// line per episode or chapter (a click plays or reads it, a button deletes it). One row, so a search by the title keeps
+/// the whole group.
+fn title_row(kind: Kind, title: on_disk::Title) -> gtk::ListBoxRow {
+    let count = kuro_i18n::tr_plural(crate::entry_core::wording::count(kind), title.units.len() as i64, &[]);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    text.set_hexpand(true);
+    text.append(&crate::ui::row_title(&title.label));
+    let subtitle = crate::ui::dim(&count);
+    subtitle.set_halign(gtk::Align::Start);
+    text.append(&subtitle);
+    show_size(&subtitle, count, title.folder.clone());
+    let heading = gtk::Button::builder().child(&text).css_classes(["flat"]).hexpand(true).build();
+    match title.entry_id {
+        Some(entry_id) => {
+            heading.connect_clicked(move |_| crate::screens::open_entry(kind, entry_id));
+        }
+        None => not_in_library(&heading),
+    }
+    let folder = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_containing_folder));
+    folder.add_css_class("flat");
+    folder.set_valign(gtk::Align::Center);
+    let path = title.folder.clone();
+    folder.connect_clicked(move |_| open_folder(&path));
+    let top = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    top.append(&heading);
+    top.append(&folder);
+    let group = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    group.set_margin_start(crate::ui::ROW_PAD_H);
+    group.set_margin_end(crate::ui::ROW_PAD_H);
+    group.set_margin_top(crate::ui::ROW_PAD_V);
+    group.set_margin_bottom(crate::ui::ROW_PAD_V);
+    group.append(&top);
+    for unit in title.units {
+        group.append(&unit_line(kind, title.entry_id, unit));
+    }
+    gtk::ListBoxRow::builder().child(&group).activatable(false).build()
+}
+
+/// One episode or chapter: a click plays or reads it, the button deletes it. A unit the library no longer knows only
+/// shows its name.
+fn unit_line(kind: Kind, entry_id: Option<i64>, unit: on_disk::Unit) -> gtk::Box {
+    let name = gtk::Label::builder().label(&unit.label).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).build();
+    let open = gtk::Button::builder().child(&name).css_classes(["flat"]).hexpand(true).build();
+    let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    line.set_margin_start(12);
+    line.append(&open);
+    let (Some(entry_id), Some(item_id)) = (entry_id, unit.item_id) else {
+        not_in_library(&open);
+        return line;
+    };
+    open.connect_clicked(move |_| crate::screens::open_unit(kind, entry_id, item_id));
+    let delete = crate::ui::icon_button("user-trash-symbolic", &tr(MsgKey::action_delete));
+    delete.add_css_class("flat");
+    delete.set_valign(gtk::Align::Center);
+    delete.connect_clicked(move |button| {
+        // the index changes once the folder is gone, and the page redraws without the line
+        button.set_sensitive(false);
+        let backend = crate::updates::download_host::current();
+        crate::updates::download_host::spawn_detached(move || backend.delete(kind, entry_id, &[item_id]));
+    });
+    line.append(&delete);
+    line
+}
+
+/// A heading or line the library no longer knows: nothing to open, and it says why.
+fn not_in_library(button: &gtk::Button) {
+    button.set_sensitive(false);
+    button.set_tooltip_text(Some(&tr(MsgKey::ui_download_not_in_library)));
+}
+
+/// Adds the size of `folder` on disk to the count in `label`, once it is known (it is summed off the GTK thread).
+fn show_size(label: &gtk::Label, count: String, folder: PathBuf) {
+    let label = label.downgrade();
+    glib::spawn_future_local(async move {
+        let Ok(bytes) = gtk::gio::spawn_blocking(move || kuro_core::storage::dir_size(&folder).unwrap_or(0)).await else { return };
+        if let Some(label) = label.upgrade() {
+            label.set_label(&format!("{count} · {}", glib::format_size(bytes)));
+        }
+    });
 }
 
 /// Opens `folder` in the file manager; a failure is a toast.
@@ -276,14 +348,26 @@ mod tests {
     }
 
     #[test]
-    fn every_downloaded_unit_is_a_row_with_its_title_folder() {
-        use kuro_downloads::index::{EntryDir, SourceDir};
-        let entry = EntryDir { source_dir: "Source (EN)".into(), dir_name: "Berserk".into(), units: ["Chapter 1".to_owned(), "Chapter 2".to_owned()].into() };
-        let mut tree = Tree::default();
-        tree.sources.insert(7, SourceDir { dir_name: "Source (EN)".into(), entries: [("Berserk".to_owned(), entry)].into() });
-        let folder = Path::new("/d/Source (EN)/Berserk").to_path_buf();
-        assert_eq!(downloaded(&tree, Path::new("/d")), [("Berserk · Chapter 1".to_owned(), folder.clone()), ("Berserk · Chapter 2".to_owned(), folder)]);
-        assert!(downloaded(&Tree::default(), Path::new("/d")).is_empty());
+    fn a_title_row_has_its_heading_then_a_line_per_unit_and_only_known_units_can_be_deleted() {
+        crate::testing::with_display(|| {
+            let units = vec![on_disk::Unit { item_id: Some(10), label: "Episode 1".into() }, on_disk::Unit { item_id: None, label: "Episode 9 (stray)".into() }];
+            let row = title_row(Kind::Anime, on_disk::Title { entry_id: Some(1), label: "Bleach".into(), folder: "/d/Src/Bleach".into(), units });
+            let mut all = Vec::new();
+            let mut stack = vec![row.clone().upcast::<gtk::Widget>()];
+            while let Some(w) = stack.pop() {
+                stack.extend(std::iter::successors(w.first_child(), |c| c.next_sibling()));
+                all.push(w);
+            }
+            let labels: Vec<String> = all.iter().filter_map(|w| w.downcast_ref::<gtk::Label>()).map(|l| l.label().to_string()).collect();
+            for want in ["Bleach", "2 episodes", "Episode 1", "Episode 9 (stray)"] {
+                assert!(labels.iter().any(|l| l == want), "{want} in {labels:?}");
+            }
+            assert!(!labels.iter().any(|l| l == "Downloaded"), "no per-row English word");
+            let trash = all.iter().filter_map(|w| w.downcast_ref::<gtk::Button>()).filter(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::action_delete).as_str())).count();
+            assert_eq!(trash, 1, "the unit the library knows has a delete button, the stray one none");
+            let stray = all.iter().filter_map(|w| w.downcast_ref::<gtk::Button>()).find(|b| b.child().and_downcast::<gtk::Label>().is_some_and(|l| l.label() == "Episode 9 (stray)")).expect("the stray line");
+            assert!(!stray.is_sensitive(), "a unit the library does not know cannot be opened");
+        });
     }
 
     #[test]
