@@ -7,7 +7,6 @@ use gtk::{Image, ListBoxRow};
 use super::model::PreferenceItem;
 use super::strings;
 use super::widgets::dialog;
-use crate::settings_ui::player::conf_edit;
 use super::widgets::{info, list, multi_select, edit_text, row, slider, switch, text, TRACKER_CHECK_SIZE};
 
 /// The dim end marker of a row that opens a chooser (choice and multi-select rows): the same `pan-down` arrow a drop
@@ -55,15 +54,6 @@ pub fn item_row(item: &PreferenceItem) -> Option<ListBoxRow> {
                 veto.clone(),
             )
             .row
-        }
-        // The MPV config row is the conf editor (T-47ba-044): two lines of subtitle, a multi-line dialog, veto-gated.
-        PreferenceItem::MpvConf { common, pref, can_be_blank, .. } => {
-            let editor = conf_edit::conf_row(&common.title, pref, *can_be_blank);
-            return item_row(&editor);
-        }
-        PreferenceItem::MultiLineEdit { common, pref, can_be_blank, .. } => {
-            let editor = conf_edit::multi_line_row(&common.title, pref, *can_be_blank);
-            return item_row(&editor);
         }
         PreferenceItem::EditTextInfo { common, pref, dialog_subtitle, can_be_blank, validate, error_message, veto } => {
             edit_text::row(

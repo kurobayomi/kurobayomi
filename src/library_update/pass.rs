@@ -755,19 +755,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hidden_content_removes_the_progress_list_and_the_summary_titles() {
-        // N-16
-        let mut registry = FakeRegistry::default();
-        registry.sources.insert(1, FakeSource::ok(vec![item(1.0, 0)]));
-        let runner = runner(FakeStore::with(vec![entry(1, 1, "Secret")]), registry);
-        let mut hidden = settings();
-        hidden.hide_content = true;
-        runner.run(hidden, Trigger::Manual).await;
-        assert!(runner.deps.host.progress_bodies.lock().unwrap().iter().all(Option::is_none));
-        assert_eq!(runner.deps.host.hidden_flags.lock().unwrap().as_slice(), &[true]);
-    }
-
-    #[tokio::test]
     async fn events_start_with_started_end_with_finished_and_done_only_grows() {
         // T-26a-007: PassEvent order; done is monotonic.
         let mut registry = FakeRegistry::default();

@@ -96,8 +96,6 @@ pub enum PreferenceItem {
     MultiSelect { common: ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry>, veto: Veto<BTreeSet<String>> },
     EditText { common: ItemCommon, pref: Pref<String>, dialog_subtitle: Option<String>, can_be_blank: bool,
                validate: Rc<dyn Fn(&str) -> bool>, error_message: Option<Rc<dyn Fn(&str) -> String>>, veto: Veto<String> },
-    MultiLineEdit { common: ItemCommon, pref: Pref<String>, can_be_blank: bool, veto: Veto<String> },
-    MpvConf { common: ItemCommon, pref: Pref<String>, file_name: Option<String>, can_be_blank: bool, veto: Veto<String> },
     EditTextInfo { common: ItemCommon, pref: Pref<String>, dialog_subtitle: Option<String>, can_be_blank: bool,
                    validate: Rc<dyn Fn(&str) -> bool>, error_message: Option<Rc<dyn Fn(&str) -> String>>, veto: Veto<String> },
     Tracker { name: String, logged_in: bool, on_login: Rc<dyn Fn()>, on_logout: Rc<dyn Fn()> },
@@ -118,8 +116,6 @@ impl PreferenceItem {
             | Self::BasicList { common, .. }
             | Self::MultiSelect { common, .. }
             | Self::EditText { common, .. }
-            | Self::MultiLineEdit { common, .. }
-            | Self::MpvConf { common, .. }
             | Self::EditTextInfo { common, .. } => &common.title,
             Self::Tracker { name, .. } => name,
             Self::Info { text, .. } => text,
@@ -137,8 +133,6 @@ impl PreferenceItem {
             | Self::BasicList { common, .. }
             | Self::MultiSelect { common, .. }
             | Self::EditText { common, .. }
-            | Self::MultiLineEdit { common, .. }
-            | Self::MpvConf { common, .. }
             | Self::EditTextInfo { common, .. } => common.enabled_flag.as_ref(),
             Self::Tracker { .. } | Self::Info { .. } | Self::Custom { .. } => None,
         }
@@ -154,8 +148,6 @@ impl PreferenceItem {
             | Self::BasicList { common, .. }
             | Self::MultiSelect { common, .. }
             | Self::EditText { common, .. }
-            | Self::MultiLineEdit { common, .. }
-            | Self::MpvConf { common, .. }
             | Self::EditTextInfo { common, .. } => common.enabled,
             Self::Info { enabled, .. } => *enabled,
             Self::Tracker { .. } | Self::Custom { .. } => true,
@@ -186,16 +178,6 @@ pub fn multi_select_labels(entries: &[Entry], selected: &BTreeSet<String>) -> St
     if labels.is_empty() { super::strings::none() } else { labels.join(", ") }
 }
 
-/// First two lines of an MPV config, plus `\n...` when there are more than two lines.
-pub fn mpv_subtitle(value: &str) -> String {
-    let lines: Vec<&str> = value.split('\n').collect();
-    if lines.len() > 2 {
-        format!("{}\n{}\n...", lines[0], lines[1])
-    } else {
-        value.to_owned()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,14 +205,6 @@ mod tests {
         assert_eq!(multi_select_labels(&entries, &BTreeSet::new()), "None");
         let unknown: BTreeSet<String> = ["zz"].iter().map(|s| s.to_string()).collect();
         assert_eq!(multi_select_labels(&entries, &unknown), "None");
-    }
-
-    #[test]
-    fn mpv_subtitle_shows_two_lines_and_an_ellipsis_past_two() {
-        assert_eq!(mpv_subtitle("a\nb"), "a\nb");
-        assert_eq!(mpv_subtitle("a\nb\nc"), "a\nb\n...");
-        assert_eq!(mpv_subtitle("a\nb\n"), "a\nb\n...");
-        assert_eq!(mpv_subtitle(""), "");
     }
 
     #[test]

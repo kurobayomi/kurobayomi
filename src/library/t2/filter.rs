@@ -59,44 +59,18 @@ fn t2_filter_04_unseen_uses_the_raw_count() {
 }
 
 #[test]
-fn t2_filter_05_completed_is_status_two() {
-    let is = with(|f| f.completed = TriState::ENABLED_IS);
-    let mut done = row(1, 0);
-    done.status = 2;
-    assert!(keep(&is, &done, 0, &[], &[]));
-    assert!(!keep(&is, &row(2, 0), 0, &[], &[]));
-}
-
-#[test]
-fn t2_filter_06_interval_needs_its_restriction() {
-    let mut custom = row(1, 0);
-    custom.fetch_interval = -3;
-    let plain = row(2, 0);
-    let off = with(|f| f.interval_custom = TriState::ENABLED_IS);
-    assert!(keep(&off, &plain, 0, &[], &[]), "restriction off: the filter is ignored even with Is set");
-    let on = with(|f| {
-        f.interval_custom = TriState::ENABLED_IS;
-        f.skip_outside_release_period = true;
-    });
-    assert!(keep(&on, &custom, 0, &[], &[]));
-    assert!(!keep(&on, &plain, 0, &[], &[]), "only a negative fetch interval passes");
-}
-
-#[test]
 fn t2_filter_07_filters_are_anded() {
     let both = with(|f| {
         f.unread = TriState::ENABLED_IS;
-        f.bookmarked = TriState::ENABLED_IS;
+        f.downloaded = TriState::ENABLED_IS;
     });
-    let mut a = row(1, 0);
-    a.bookmarks = 1;
+    let a = row(1, 0);
     let b = row(2, 0);
     let mut c = row(3, 0);
-    c.bookmarks = 1;
     c.done = c.total;
-    assert!(keep(&both, &a, 0, &[], &[]));
+    assert!(keep(&both, &a, 1, &[], &[]));
     assert!(!keep(&both, &b, 0, &[], &[]));
-    assert!(!keep(&both, &c, 0, &[], &[]));
+    assert!(!keep(&both, &c, 1, &[], &[]));
 }
 
 #[test]

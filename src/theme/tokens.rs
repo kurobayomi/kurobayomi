@@ -254,7 +254,6 @@ impl Tokens {
 // --- Spacing, alpha, duration and radius (T-49a-051) ---
 
 pub const RIPPLE_ALPHA: f32 = 0.10;
-pub const SHEET_ANIM_MS: u32 = 350;
 pub const SCROLLBAR_FADE_MS: u32 = 250;
 
 /// Window-size class breakpoints, dp (`WindowSize.kt`): medium from 600, expanded from 840.

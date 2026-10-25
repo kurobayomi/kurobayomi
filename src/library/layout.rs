@@ -199,13 +199,6 @@ mod tests {
     }
 
     #[test]
-    fn continue_button_is_large_in_cover_only_and_comfortable_grids() {
-        assert_eq!(continue_size(LibraryDisplayMode::CoverOnlyGrid), 32);
-        assert_eq!(continue_size(LibraryDisplayMode::ComfortableGrid), 32);
-        assert_eq!(continue_size(LibraryDisplayMode::CompactGrid), 28);
-    }
-
-    #[test]
     fn the_title_goes_under_the_cover_on_it_or_nowhere_by_mode() {
         assert_eq!(title_place(LibraryDisplayMode::ComfortableGrid), TitlePlace::Below);
         assert_eq!(title_place(LibraryDisplayMode::CompactGrid), TitlePlace::OnCover);
@@ -294,14 +287,5 @@ mod tests {
         assert_eq!(list_row_height(100.0, 10), 48.0);
         assert_eq!(list_row_height(100.0, 0), 76.0, "list size 0 is the fixed 76 px row");
         assert_eq!(list_row_height(0.0, 0), 76.0);
-    }
-
-    #[test]
-    fn the_list_size_follows_the_orientation_key_and_stays_in_range() {
-        assert_eq!(list_size(899, 3, 7), 3);
-        assert_eq!(list_size(900, 3, 7), 7);
-        assert_eq!(list_size(500, 0, 7), 0);
-        assert_eq!(list_size(500, 99, 7), 10);
-        assert_eq!(list_size(500, -4, 7), 0);
     }
 }

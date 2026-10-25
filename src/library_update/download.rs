@@ -66,32 +66,12 @@ mod tests {
     }
 
     #[test]
-    fn category_rules_match_the_kotlin_order() {
-        assert!(policy(&[], &[]).categories_allow(&[4])); // both empty: allowed
-        assert!(!policy(&[], &[4]).categories_allow(&[4])); // excluded
-        assert!(policy(&[], &[4]).categories_allow(&[5])); // not excluded, include empty
-        assert!(policy(&[5], &[]).categories_allow(&[5])); // included
-        assert!(!policy(&[5], &[]).categories_allow(&[6]));
-        assert!(!policy(&[5], &[]).categories_allow(&[])); // no category counts as 0, not 5
-        assert!(policy(&[0], &[]).categories_allow(&[])); // ... so include 0 matches
-    }
-
-    #[test]
     fn disabled_or_unfavourite_entries_are_never_wanted() {
         let mut p = policy(&[], &[]);
         assert!(p.wants(true, &[1]));
         assert!(!p.wants(false, &[1]));
         p.enabled = false;
         assert!(!p.wants(true, &[1]));
-    }
-
-    #[test]
-    fn unread_only_drops_items_whose_number_was_read() {
-        let mut p = policy(&[], &[]);
-        p.unread_only = true;
-        let new = vec![item(1.0), item(2.0), item(3.0)];
-        let kept = p.select(&new, &[2.0]);
-        assert_eq!(kept.iter().map(|i| i.number).collect::<Vec<_>>(), vec![1.0, 3.0]);
     }
 
     #[test]

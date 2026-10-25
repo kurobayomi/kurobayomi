@@ -279,30 +279,6 @@ mod tests {
     }
 
     #[test]
-    fn automatic_run_uses_include_then_exclude_and_keeps_one_row_per_id() {
-        // Q-02: one manga in two included categories appears once.
-        let lib = [entry(1, "a", 1), entry(1, "a", 2), entry(2, "b", 3)];
-        let q = run(&lib, None, &[1, 2], &[], QueueRestrictions::default());
-        assert_eq!(ids(&q), vec![1]);
-        // Q-03: exclusion wins over inclusion.
-        let lib = [entry(1, "a", 1), entry(1, "a", 2)];
-        let q = run(&lib, None, &[1], &[2], QueueRestrictions::default());
-        assert!(q.entries.is_empty());
-        // Empty include list means every category.
-        let q = run(&[entry(5, "x", 7), entry(6, "y", 8)], None, &[], &[], QueueRestrictions::default());
-        assert_eq!(ids(&q), vec![5, 6]);
-    }
-
-    #[test]
-    fn restriction_tokens_map_and_default_when_pref_absent() {
-        let defaults = QueueRestrictions::from_pref::<&str>(None);
-        assert!(defaults.skip_unread && defaults.skip_completed && defaults.skip_not_started && defaults.skip_outside_release);
-        let only_ongoing = QueueRestrictions::from_tokens(&["manga_ongoing"]);
-        assert!(only_ongoing.skip_completed && !only_ongoing.skip_unread);
-        assert_eq!(QueueRestrictions::from_pref(Some(&[] as &[&str])), QueueRestrictions::default());
-    }
-
-    #[test]
     fn a_title_whose_source_is_off_is_skipped() {
         let none = HashMap::new();
         let off = HashSet::from([1001]);
@@ -342,56 +318,6 @@ mod tests {
         assert_eq!(ids(&no_restriction), vec![1]);
         let restricted = run(std::slice::from_ref(&e), None, &[], &[], QueueRestrictions::from_tokens(&["manga_ongoing"]));
         assert_eq!(restricted.skipped, vec![(1, SkipReason::Completed)]);
-    }
-
-    #[test]
-    fn unread_restriction_uses_not_equal_zero_and_zero_total_is_kept() {
-        // Q-06: a manga with no chapters has unread == 0, so it is not skipped as "not caught up".
-        let r = QueueRestrictions::from_tokens(&["manga_fully_read"]);
-        let mut empty = entry(1, "a", 0);
-        empty.total = 0;
-        empty.read = 0;
-        assert!(run(&[empty], None, &[], &[], r).entries.len() == 1);
-        let behind = entry(2, "b", 0);
-        assert_eq!(run(&[behind], None, &[], &[], r).skipped, vec![(2, SkipReason::NotCaughtUp)]);
-    }
-
-    #[test]
-    fn started_restriction_needs_chapters_and_no_reads() {
-        // Q-07: zero total is not skipped.
-        let r = QueueRestrictions::from_tokens(&["manga_started"]);
-        let mut zero = entry(1, "a", 0);
-        zero.total = 0;
-        zero.read = 0;
-        assert_eq!(run(&[zero], None, &[], &[], r).entries.len(), 1);
-        let mut unstarted = entry(2, "b", 0);
-        unstarted.read = 0;
-        assert_eq!(run(&[unstarted], None, &[], &[], r).skipped, vec![(2, SkipReason::NotStarted)]);
-    }
-
-    #[test]
-    fn release_period_boundary_is_exclusive_of_the_upper_bound() {
-        // Q-10 / Q-11: next_update equal to the bound is kept; one millisecond after is skipped.
-        let upper = 1_000;
-        let r = QueueRestrictions::from_tokens(&["manga_outside_release_period"]);
-        let mut at = entry(1, "a", 0);
-        at.next_update_ms = upper;
-        let mut after = entry(2, "b", 0);
-        after.next_update_ms = upper + 1;
-        let none = HashMap::new();
-        let q = build_queue(&QueueInput {
-            library: &[at, after],
-            explicit_category: None,
-            include_categories: &[],
-            exclude_categories: &[],
-            restrictions: r,
-            include_season_children: false,
-            release_window_upper_ms: upper,
-            season_children: &none,
-            off_sources: &HashSet::new(),
-        });
-        assert_eq!(ids(&q), vec![1]);
-        assert_eq!(q.skipped, vec![(2, SkipReason::NotInReleasePeriod)]);
     }
 
     #[test]

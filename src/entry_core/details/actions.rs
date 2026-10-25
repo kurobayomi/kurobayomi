@@ -95,18 +95,10 @@ mod tests {
     }
 
     #[test]
-    fn a_tap_plan_inverts_the_setting_with_alt_and_starts_the_server_only_for_torrents() {
+    fn a_tap_plan_opens_externally_with_alt_and_starts_the_server_only_for_torrents() {
         assert_eq!(tap_plan(false, false, true, false), OpenPlan { external: false, torrent_server: false });
         assert_eq!(tap_plan(false, true, false, true), OpenPlan { external: true, torrent_server: false }, "the setting is off");
-        assert_eq!(tap_plan(true, true, true, true), OpenPlan { external: false, torrent_server: true });
-        assert_eq!(tap_plan(true, false, true, true).external, true);
-    }
-
-    #[test]
-    fn a_continue_plan_never_inverts() {
-        assert!(continue_plan(true, false, false).external);
-        assert!(!continue_plan(false, false, false).external);
-        assert!(continue_plan(false, true, true).torrent_server);
+        assert_eq!(tap_plan(false, false, true, true), OpenPlan { external: false, torrent_server: true });
     }
 
     fn ep(id: i64, bookmark: bool, fillermark: bool) -> Item {
@@ -138,17 +130,9 @@ mod tests {
     }
 
     #[test]
-    fn tap_inverts_the_default_with_alt() {
+    fn tap_opens_internal_by_default_and_external_with_alt() {
         assert!(!tap_opens_external(false, false), "internal by default");
         assert!(tap_opens_external(false, true), "alt opens external");
-        assert!(tap_opens_external(true, false), "external by default");
-        assert!(!tap_opens_external(true, true), "alt opens internal");
-    }
-
-    #[test]
-    fn continue_never_inverts() {
-        assert!(continue_opens_external(true));
-        assert!(!continue_opens_external(false));
     }
 
     #[test]

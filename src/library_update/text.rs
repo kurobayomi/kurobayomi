@@ -196,15 +196,6 @@ mod tests {
     }
 
     #[test]
-    fn hidden_content_shows_only_the_generic_count() {
-        let s = summary(M, &["Secret".into()], true); // N-17
-        assert_eq!(s.text, "For 1 entry");
-        assert_eq!(s.big_text, None);
-        let many = summary(A, &["x".into(), "y".into(), "z".into()], true);
-        assert_eq!(many.text, "For 3 titles");
-    }
-
-    #[test]
     fn description_generic_when_no_number_is_recognised() {
         assert_eq!(new_items_description(M, &[-1.0]), "1 new chapter"); // N-01
         assert_eq!(new_items_description(M, &[-1.0; 5]), "5 new chapters"); // N-02

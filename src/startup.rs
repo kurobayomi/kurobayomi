@@ -251,15 +251,4 @@ mod tests {
     fn the_desktop_file_is_the_application_id() {
         assert_eq!(desktop_file_name("io.github.anas1412.Kurobayomi"), "io.github.anas1412.Kurobayomi.desktop");
     }
-
-    #[test]
-    fn the_chapter_cache_is_emptied_in_the_background_only_when_the_setting_is_on() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("page.jpg"), b"x").unwrap();
-        assert!(clear_chapter_cache_on_launch(false, dir.path().to_path_buf()).is_none());
-        assert!(dir.path().join("page.jpg").exists());
-        clear_chapter_cache_on_launch(true, dir.path().to_path_buf()).unwrap().join().unwrap();
-        assert!(dir.path().is_dir());
-        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
-    }
 }

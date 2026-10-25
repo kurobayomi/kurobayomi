@@ -235,7 +235,6 @@ mod tests {
             let mut text = vec![];
             labels(&bare.root, &mut text);
             assert!(!text.iter().any(|t| t == "Core Concepts"));
-            assert!(bare.continue_button.is_some());
             let compact = build(&local_anime(), LibraryDisplayMode::CompactGrid, true, false, &extras);
             assert!(compact.root.has_css_class("kb-card-selected"));
             assert!(compact.root.first_child().and_then(|c| c.next_sibling()).is_none(), "nothing under the cover");

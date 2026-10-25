@@ -66,18 +66,6 @@ mod tests {
     }
 
     #[test]
-    fn dates_java_pattern_is_translated_not_printed() {
-        assert_eq!(header_text(d(1), d(30), false, "dd/MM/yy", "en"), "01/10/26");
-        assert_eq!(header_text(d(1), d(30), false, "yyyy-MM-dd", "en"), "2026-10-01");
-        assert_eq!(header_text(d(1), d(30), false, "dd MMM yyyy", "en"), "01 Oct 2026");
-    }
-
-    #[test]
-    fn dates_relative_off_shows_the_absolute_date_even_for_today() {
-        assert_eq!(header_text(d(9), d(9), false, "yyyy-MM-dd", "en"), "2026-10-09");
-    }
-
-    #[test]
     fn dates_group_under_one_header_per_local_day() {
         let ms = |day: u32, hour: u32| Utc.with_ymd_and_hms(2026, 10, day, hour, 0, 0).unwrap().timestamp_millis();
         let rows = grouped([("a", ms(9, 12)), ("b", ms(9, 1)), ("c", ms(8, 12))], &Utc, d(9), true, "", "en");

@@ -366,20 +366,6 @@ mod tests {
     }
 
     #[test]
-    fn calendar_view_home_returns_to_the_current_month_only_when_on() {
-        crate::testing::with_display(|| {
-            let view = CalendarView::new(Weekday::Mon, d(2026, 10, 8), |_| {});
-            view.step_month(3);
-            assert!(!view.home(), "off by default: Home is not taken");
-            assert_eq!(view.month(), (2027, 1));
-            view.set_home_returns_today(true);
-            assert!(view.home());
-            assert_eq!(view.month(), (2026, 10), "back to the month of today");
-            assert_eq!(view.focus.get(), d(2026, 10, 8), "today is focused");
-        });
-    }
-
-    #[test]
     fn calendar_view_maps_the_arrow_and_page_keys() {
         assert_eq!(cal_key(gdk::Key::Left), Some(CalKey::Left));
         assert_eq!(cal_key(gdk::Key::Page_Down), Some(CalKey::PageDown));

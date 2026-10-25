@@ -28,13 +28,6 @@ impl Dialog {
         }
     }
 
-    /// Presses the confirm button when it is enabled (Ctrl+Enter in a multi-line field).
-    pub fn submit(&self) {
-        if let Some(confirm) = self.confirm.as_ref().filter(|c| c.is_sensitive()) {
-            confirm.emit_clicked();
-        }
-    }
-
     /// Shows `message` under the body (a failed or vetoed-with-error write), or hides it for `None`.
     pub fn set_error(&self, message: Option<&str>) {
         self.error.set_text(message.unwrap_or(""));
@@ -51,11 +44,6 @@ impl Dialog {
 /// Return on the main block or the keypad.
 pub fn is_enter(key: gtk::gdk::Key) -> bool {
     matches!(key, gtk::gdk::Key::Return | gtk::gdk::Key::KP_Enter | gtk::gdk::Key::ISO_Enter)
-}
-
-/// Ctrl+Enter, the submit chord of a multi-line field where a bare Enter adds a line.
-pub fn is_ctrl_enter(key: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> bool {
-    is_enter(key) && state.contains(gtk::gdk::ModifierType::CONTROL_MASK)
 }
 
 /// Builds and shows a dialog. `confirm` is the confirm label, or `None` for a Cancel-only dialog.
@@ -168,14 +156,5 @@ mod tests {
         use gtk::gdk::Key;
         assert!(is_enter(Key::Return) && is_enter(Key::KP_Enter) && is_enter(Key::ISO_Enter));
         assert!(!is_enter(Key::Escape) && !is_enter(Key::space) && !is_enter(Key::n));
-    }
-
-    #[test]
-    fn ctrl_enter_is_the_multi_line_submit_chord_and_bare_enter_is_not() {
-        use gtk::gdk::{Key, ModifierType};
-        assert!(is_ctrl_enter(Key::Return, ModifierType::CONTROL_MASK));
-        assert!(is_ctrl_enter(Key::KP_Enter, ModifierType::CONTROL_MASK | ModifierType::SHIFT_MASK));
-        assert!(!is_ctrl_enter(Key::Return, ModifierType::empty()));
-        assert!(!is_ctrl_enter(Key::a, ModifierType::CONTROL_MASK));
     }
 }

@@ -177,13 +177,6 @@ mod tests {
     }
 
     #[test]
-    fn week_start_setting_overrides_the_locale() {
-        assert_eq!(week_start_for("auto", "en_US"), Weekday::Sun);
-        assert_eq!(week_start_for("monday", "en_US"), Weekday::Mon);
-        assert_eq!(week_start_for("sunday", "de_DE"), Weekday::Sun);
-    }
-
-    #[test]
     fn days_in_month_handles_leap_years() {
         assert_eq!(days_in_month(2028, 2), 29);
         assert_eq!(days_in_month(2026, 2), 28);

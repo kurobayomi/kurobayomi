@@ -61,8 +61,6 @@ fn subtitle_of(item: &PreferenceItem) -> Option<String> {
         | PreferenceItem::BasicList { common, .. }
         | PreferenceItem::MultiSelect { common, .. }
         | PreferenceItem::EditText { common, .. }
-        | PreferenceItem::MultiLineEdit { common, .. }
-        | PreferenceItem::MpvConf { common, .. }
         | PreferenceItem::EditTextInfo { common, .. } => common.subtitle.clone(),
         _ => None,
     }

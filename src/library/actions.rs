@@ -414,21 +414,6 @@ mod tests {
         assert_eq!(next_membership(&[2], &[0], &[]), vec![2], "Default is never added");
     }
 
-    #[test]
-    fn continue_follows_the_raw_unseen_count_not_the_badge() {
-        assert!(continue_visible(true, &row(3, 1)));
-        assert!(!continue_visible(true, &row(3, 3)));
-        assert!(!continue_visible(false, &row(3, 1)));
-    }
-
-    #[test]
-    fn continue_clicks_within_300_ms_of_each_other_are_dropped() {
-        let t0 = Instant::now();
-        assert!(continue_click_allowed(None, t0));
-        assert!(!continue_click_allowed(Some(t0), t0 + Duration::from_millis(299)));
-        assert!(continue_click_allowed(Some(t0), t0 + Duration::from_millis(300)));
-    }
-
     fn manga_with_chapters(db: &Arc<Db>, flags: i64, chapters: &[(i64, bool, bool)]) -> LibraryRow {
         let id = EntryRepo::new(db.clone())
             .insert(&Entry {
@@ -452,55 +437,6 @@ mod tests {
         })
         .expect("chapters");
         LibraryRow { id, ..row(0, 0) }
-    }
-
-    fn chapter_number_of(db: &Arc<Db>, manga: i64, chapter: i64) -> f64 {
-        let list = ItemRepo::new(db.clone()).by_entry_id(manga, false).expect("chapters");
-        list.iter().find(|c| c.id == chapter).expect("chapter").number
-    }
-
-    #[test]
-    fn t2_cont_01_continue_opens_the_first_unread_ascending_and_the_last_unread_descending() {
-        use kuro_db::flags::item::{SORTING_NUMBER, SORT_ASC, SORT_DESC};
-        let chapters = [(1, true, false), (2, false, false), (3, false, false)];
-        for (dir, want) in [(SORT_ASC, 2.0), (SORT_DESC, 2.0)] {
-            let (_dir, db) = db();
-            let row = manga_with_chapters(&db, SORTING_NUMBER | dir, &chapters);
-            let id = next_item(&db, &row, false, |_| false).expect("target").expect("some");
-            assert_eq!(chapter_number_of(&db, row.id, id), want);
-        }
-    }
-
-    #[test]
-    fn t2_cont_02_continue_applies_the_entry_filters_and_is_none_when_nothing_is_left() {
-        use kuro_db::flags::item::{SHOW_BOOKMARKED, SORTING_NUMBER, SORT_ASC};
-        let (_dir, db1) = db();
-        let row = manga_with_chapters(
-            &db1,
-            SORTING_NUMBER | SORT_ASC | SHOW_BOOKMARKED,
-            &[(1, true, false), (2, false, false), (3, false, true)],
-        );
-        let id = next_item(&db1, &row, false, |_| false).expect("target").expect("some");
-        assert_eq!(chapter_number_of(&db1, row.id, id), 3.0, "the unbookmarked chapter 2 is filtered out");
-        let (_dir2, db2) = db();
-        let row = manga_with_chapters(&db2, SORTING_NUMBER | SORT_ASC, &[(1, true, false)]);
-        assert_eq!(next_item(&db2, &row, false, |_| false).expect("target"), None);
-        assert_eq!(no_next_item(), "Next chapter not found", "the toast text of E-25");
-    }
-
-    #[test]
-    fn t2_cont_03_a_chapter_of_an_excluded_scanlator_is_never_chosen() {
-        use kuro_db::flags::item::{SORTING_NUMBER, SORT_ASC};
-        let (_dir, db) = db();
-        let row = manga_with_chapters(&db, SORTING_NUMBER | SORT_ASC, &[(1, true, false), (2, false, false), (3, false, false)]);
-        db.write(|tx| {
-            tx.execute("UPDATE items SET scanlator = 'Bad' WHERE entry_id = ?1 AND number = 2", [row.id])?;
-            tx.execute("INSERT INTO excluded_scanlators(entry_id, scanlator) VALUES (?1, 'Bad')", [row.id])?;
-            Ok(())
-        })
-        .expect("exclude a scanlator");
-        let id = next_item(&db, &row, false, |_| false).expect("target").expect("some");
-        assert_eq!(chapter_number_of(&db, row.id, id), 3.0);
     }
 
     #[test]

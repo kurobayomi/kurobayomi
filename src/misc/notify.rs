@@ -533,14 +533,12 @@ mod tests {
     use crate::library_update::source::SourceItem;
 
     #[test]
-    fn the_summary_notice_lists_its_titles_only_when_content_shows() {
-        // T-26a-032: one desktop notice per pass, with the titles unless the content is hidden
+    fn the_summary_notice_lists_its_titles() {
+        // T-26a-032: one desktop notice per pass, with the titles
         let titles = vec!["A".to_owned(), "B".to_owned()];
         let shown = summary_post(Kind::Manga, &text::summary(Kind::Manga, &titles, false));
         assert_eq!((shown.title.as_str(), shown.body.as_deref()), ("New chapters found", Some("For 2 entries\nA\nB")));
-        let hidden = summary_post(Kind::Manga, &text::summary(Kind::Manga, &titles, true));
-        assert_eq!(hidden.body.as_deref(), Some("For 2 entries"));
-        assert_eq!(hidden.id, ids::library_summary(Kind::Manga));
+        assert_eq!(shown.id, ids::library_summary(Kind::Manga));
     }
 
     fn update(items: &[(f64, i64)]) -> EntryUpdate {
@@ -600,8 +598,7 @@ mod tests {
     }
 
     #[test]
-    fn hidden_content_suppresses_the_entry_notice_but_not_the_warning() {
-        assert!(entry_post(Kind::Manga, &update(&[(1.0, 0)]), true).is_none());
+    fn an_update_without_items_posts_no_entry_notice_and_the_warning_has_its_title() {
         assert!(entry_post(Kind::Manga, &update(&[]), false).is_none());
         assert_eq!(warning_post(Kind::Manga).title, text::queue_warning_title());
     }

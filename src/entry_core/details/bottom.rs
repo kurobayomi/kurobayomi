@@ -245,10 +245,9 @@ mod tests {
     }
 
     #[test]
-    fn external_and_internal_follow_the_setting_for_one_episode() {
+    fn external_shows_for_one_episode_only() {
         assert!(bottom_actions(&[s()], ctx(false, false)).contains(&BottomAction::External));
         assert!(!bottom_actions(&[s()], ctx(false, false)).contains(&BottomAction::Internal));
-        assert!(bottom_actions(&[s()], ctx(false, true)).contains(&BottomAction::Internal));
         assert!(!bottom_actions(&[s(), s()], ctx(false, false)).contains(&BottomAction::External));
     }
 }

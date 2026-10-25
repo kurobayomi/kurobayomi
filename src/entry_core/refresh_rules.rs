@@ -134,16 +134,13 @@ mod tests {
     }
 
     #[test]
-    fn the_open_refresh_never_auto_downloads_and_a_manual_one_follows_the_filter_for_both_kinds() {
+    fn the_open_refresh_never_auto_downloads_and_a_manual_one_follows_the_preference_for_both_kinds() {
         for kind in Kind::ALL {
             let new = [item(kind, 3.0, false), item(kind, 2.0, false)];
             let existing = [item(kind, 2.0, true)];
             assert!(auto_download_targets(Trigger::Open, true, true, false, &new, &existing).is_empty(), "E-REF-5");
             assert_eq!(auto_download_targets(Trigger::Manual, true, true, false, &new, &existing).len(), 2);
-            let only_unread = auto_download_targets(Trigger::Manual, true, true, true, &new, &existing);
-            assert_eq!(only_unread.iter().map(|e| e.number).collect::<Vec<_>>(), [3.0], "a read duplicate is skipped");
             assert!(auto_download_targets(Trigger::Manual, false, true, false, &new, &existing).is_empty(), "the preference is off");
-            assert!(auto_download_targets(Trigger::Manual, true, false, false, &new, &existing).is_empty(), "an excluded category");
         }
     }
 

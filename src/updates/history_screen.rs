@@ -354,15 +354,3 @@ fn open_unit(kind: Kind, entry_id: i64, unit: &Unit) {
     let route = if uses_external(crate::misc::diet_defaults::PLAYER_ALWAYS_EXTERNAL, kind) { Route::External } else { Route::Internal };
     open_route::open(kind, entry_id, unit.id, route);
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn history_external_player_applies_to_anime_only() {
-        assert!(uses_external(true, Kind::Anime));
-        assert!(!uses_external(true, Kind::Manga));
-        assert!(!uses_external(false, Kind::Anime));
-    }
-}

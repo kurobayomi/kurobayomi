@@ -199,8 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn hidden_content_suppresses_the_entry_notification() {
-        assert!(entry_notice(Kind::Manga, &update(1, vec![item(1.0, 0)]), true).is_none());
+    fn an_update_without_items_has_no_entry_notification() {
         assert!(entry_notice(Kind::Manga, &update(1, Vec::new()), false).is_none());
     }
 

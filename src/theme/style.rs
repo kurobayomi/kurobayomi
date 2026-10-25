@@ -2,7 +2,7 @@
 //! stylesheet, and the pure alpha and padding helpers of T-49b-028 and T-49b-029.
 
 
-use super::tokens::{self as tk, Tokens};
+use super::tokens::Tokens;
 
 /// The base stylesheet: GTK named colours and static rules, loaded before the palette.
 pub const BASE_CSS: &str = include_str!("style.css");
@@ -24,8 +24,6 @@ pub mod class {
     pub const BUTTON_FILLED: &str = "kb-button-filled";
     pub const BUTTON_TEXT: &str = "kb-button-text";
     pub const SHEET: &str = "kb-sheet";
-    pub const SHEET_TABLET: &str = "kb-sheet-tablet";
-    pub const SHEET_SHOWN: &str = "kb-sheet-shown";
     /// A glyph in the primary colour (the info screen icon).
     pub const PRIMARY_ICON: &str = "kb-primary-icon";
     /// The app bar's count pill (shell/appbar.rs); its geometry is in style.css, its alpha in `system_rules`.
@@ -93,8 +91,6 @@ pub fn widget_static_rules() -> String {
 .{text} {{ background: none; color: @accent_color; padding: 0 12px; }}
 .{text}:disabled {{ color: alpha(@window_fg_color, 0.38); }}
 .{sheet} {{ background-color: @popover_bg_color; border-radius: 28px 28px 0 0; padding: 24px; }}
-.{sheet_tablet} {{ border-radius: 28px; opacity: 0; transition: opacity {sheet_ms}ms linear; }}
-.{sheet_tablet}.{sheet_shown} {{ opacity: 1; }}
 .{pill} {{ padding: 1px 6px; border-radius: 999px; }}
 .{hit} {{ min-width: 48px; min-height: 48px; }}
 .{noind}:hover, .{noind}:active {{ background-image: none; background-color: transparent; }}
@@ -103,9 +99,6 @@ pub fn widget_static_rules() -> String {
         filled = class::BUTTON_FILLED,
         text = class::BUTTON_TEXT,
         sheet = class::SHEET,
-        sheet_tablet = class::SHEET_TABLET,
-        sheet_shown = class::SHEET_SHOWN,
-        sheet_ms = tk::SHEET_ANIM_MS,
         pill = class::PILL,
         hit = class::HIT_TARGET,
         noind = class::NOINDICATION,
@@ -169,14 +162,6 @@ mod tests {
     #[test]
     fn primary_icon_class_uses_the_primary_role() {
         assert!(system_rules(true).contains(".kb-primary-icon { color: @accent_color; }"));
-    }
-
-    // T-49a-023: the tablet sheet fades in and out over the sheet duration.
-    #[test]
-    fn tablet_sheet_fades_over_350_ms() {
-        let css = widget_static_rules();
-        assert!(css.contains(".kb-sheet-tablet { border-radius: 28px; opacity: 0; transition: opacity 350ms linear; }"));
-        assert!(css.contains(".kb-sheet-tablet.kb-sheet-shown { opacity: 1; }"));
     }
 
     #[test]

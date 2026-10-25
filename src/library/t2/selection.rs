@@ -1,8 +1,7 @@
-//! T2-SEL-01 to T2-SEL-09: the selection set.
+//! T2-SEL-01 to T2-SEL-08: the selection set.
 
 use kuro_domain::library::page::LibraryItem;
 
-use crate::library::actions::continue_visible;
 use crate::library::fixtures::{item, row};
 use crate::library::select::Selection;
 
@@ -91,15 +90,4 @@ fn t2_sel_08_rows_of_another_library_do_not_survive_a_refresh() {
     sel.toggle(&row(500, 5)); // an id that belongs to the other kind's database
     sel.refresh(&[row(1, 5), row(2, 5)]);
     assert_eq!(ids(&sel), vec![1]);
-}
-
-#[test]
-fn t2_sel_09_continue_follows_the_raw_unseen_count_not_the_badge() {
-    let mut pending = row(1, 5);
-    pending.total = 4;
-    pending.done = 1;
-    assert!(continue_visible(true, &pending));
-    assert!(!continue_visible(false, &pending));
-    pending.done = 4;
-    assert!(!continue_visible(true, &pending));
 }

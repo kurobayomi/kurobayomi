@@ -574,9 +574,7 @@ mod tests {
             PreferenceItem::List { pref, .. } => Some(pref.key()),
             PreferenceItem::MultiSelect { pref, .. } => Some(pref.key()),
             PreferenceItem::EditText { pref, .. }
-            | PreferenceItem::EditTextInfo { pref, .. }
-            | PreferenceItem::MultiLineEdit { pref, .. }
-            | PreferenceItem::MpvConf { pref, .. } => Some(pref.key()),
+            | PreferenceItem::EditTextInfo { pref, .. } => Some(pref.key()),
             _ => None,
         }
     }
