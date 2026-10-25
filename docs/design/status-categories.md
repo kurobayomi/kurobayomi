@@ -19,7 +19,7 @@ The library's view options menu shows: **Downloaded, Watching (Reading for manga
 
 ## Auto-track
 
-- One switch in Settings > Tracking: **Track new titles automatically**, off by default. It can be turned on only
+- One switch in Settings > Tracking: **Track new titles automatically**, on by default (user, 2026-10-25; it binds nothing without a logged-in tracker, and nothing while Incognito is on). It can be turned on only
   while AniList is logged in. Stored as `auto_track_library` (not an Aniyomi key, so it lives in `[extra]`).
 - When on, a title that joins the library (title page or History) is searched on AniList. It is bound only when
   exactly one result has a name equal to the title after tidying (case, punctuation, a trailing Dub / Sub, "2nd

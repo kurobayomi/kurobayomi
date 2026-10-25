@@ -6,6 +6,16 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Changed
+
+- Track new titles automatically is on by default. It only binds on trackers you are logged in to, so without one it
+  does nothing.
+
+### Fixed
+
+- A title added to the library while Incognito is on is no longer tracked automatically: Incognito sends nothing to
+  the trackers, and auto-track put the title on your AniList or MyAnimeList list.
+
 ## [0.2.3] - 2026-10-25
 
 ### Added

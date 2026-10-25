@@ -39,10 +39,15 @@ fn current() -> Option<Arc<TrackCtx>> {
 
 /// The binder of one kind: every logged-in enhanced tracker that accepts the entry's source is matched and bound, then
 /// auto-track binds the switched-on trackers when it is on and the match is certain (`kuro_track::auto_bind`), on the shell's runtime and
-/// detached, so the add does not wait (B§5.2). Built on the GTK thread, where the shell is found.
+/// detached, so the add does not wait (B§5.2). Built on the GTK thread, where the shell is found. Nothing is bound while
+/// Incognito is on: it promises that nothing reaches the trackers, and binding puts the title on the tracker's list.
 pub fn binder(kind: Kind) -> TrackerBinder {
     let runtime = crate::shell::host::Shell::get().map(|shell| shell.runtime().clone()).or_else(|| tokio::runtime::Handle::try_current().ok());
+    let incognito = crate::data::is_installed().then(|| crate::data::app().base.incognito_mode.clone());
     Arc::new(move |id, title, source| {
+        if incognito.as_ref().is_some_and(|on| on.get()) {
+            return;
+        }
         let (Some(ctx), Some(runtime)) = (current(), runtime.as_ref()) else { return };
         let (title, source) = (title.to_owned(), source.to_string());
         runtime.spawn(async move {
