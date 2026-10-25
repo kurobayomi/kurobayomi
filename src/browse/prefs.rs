@@ -1,9 +1,10 @@
 //! Browse preferences (T-40a-032, T-40b-005, T-41b-043). The keys live in the one settings file with the other
 //! preferences: `[sources]` for the source keys and the library key of the entry kind for the default category, so each
-//! kind's pages read their own. The display mode, the migrate flags, the grid columns and the hide-in-library switch are
-//! cut from the settings and hard-coded (see `misc::diet_defaults`).
+//! kind's pages read their own. The look of the source listings is `sources.display_mode`, one key for every source and
+//! apart from the library's. The migrate flags, the grid columns and the hide-in-library switch are cut from the
+//! settings and hard-coded (see `misc::diet_defaults`).
 
-use kuro_prefs::library::{LibraryDisplayMode, LibraryPrefs};
+use kuro_prefs::library::LibraryPrefs;
 use kuro_prefs::pref::Pref;
 use kuro_prefs::source::SourcePrefs;
 use kuro_prefs::store::PrefStore;
@@ -32,11 +33,6 @@ impl BrowsePrefs {
         Self { sources: SourcePrefs::new(store), default_category, cover_size: library.cover_size.clone() }
     }
 
-    /// The display mode of the source grids: the compact grid, since the setting is cut.
-    pub fn display_mode(&self) -> LibraryDisplayMode {
-        LibraryDisplayMode::CompactGrid
-    }
-
     /// `browse_hide_in_library_items`: cut from the settings, so a browse page never leaves the library's entries out.
     pub fn hide_in_library(&self) -> bool {
         crate::misc::diet_defaults::BROWSE_HIDE_IN_LIBRARY
@@ -46,6 +42,7 @@ impl BrowsePrefs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kuro_prefs::library::LibraryDisplayMode;
     use kuro_prefs::source::default_enabled_languages;
     use kuro_prefs::toml_backend::TomlBackend;
 
@@ -56,7 +53,7 @@ mod tests {
     #[test]
     fn defaults_match_the_upstream_settings() {
         let p = prefs();
-        assert_eq!(p.display_mode(), LibraryDisplayMode::CompactGrid);
+        assert_eq!(p.sources.display_mode.get(), LibraryDisplayMode::CompactGrid);
         assert!(!p.sources.show_nsfw_source.get(), "adult titles are hidden by default");
         assert!(p.sources.enabled_languages.get().contains("all"));
         assert_eq!(p.default_category.get(), -1);

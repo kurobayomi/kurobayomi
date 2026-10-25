@@ -374,11 +374,11 @@ Not a registry key but you asked for it: **player quality and server choice**. A
 
 ### Browse (settings_browse and the Sources tab)
 
-31 keys: 21 CUT, 10 KEEP.
+31 keys: 20 CUT, 11 KEEP.
 
 | Key | Where the user sees it | What it does | Verdict | If CUT: hard-code | Reason | Flags and import |
 |---|---|---|---|---|---|---|
-| `pref_display_mode_catalogue` | Browse > source results (grid or list toggle) | Grid or list look of a source's results. | **CUT** | COMPACT_GRID | Micro option. | import: keep accepting on import |
+| `pref_display_mode_catalogue` | Browse > source results (view options: View, Grid style) | Look of every source's results, apart from the Library's. | **KEEP** |  | Restored 2026-10-25: the source page shares the Library's look options and remembers them. | - |
 | `source_languages` | Browse > Sources > language filter | Languages whose sources and extensions show. | **KEEP** |  | Without it a new user drowns in 40 languages. | - |
 | `show_nsfw_source` | Browse > NSFW (18+) sources > Show in sources and extensions lists | Shows or hides 18+ sources. | **KEEP** |  | Content-safety switch, not a micro option. | - |
 | `pref_migration_sorting` | Browse > Migrate sources list | Sort field of the migrate list. | **CUT** | ALPHABETICAL | Micro option. | import: keep accepting on import |

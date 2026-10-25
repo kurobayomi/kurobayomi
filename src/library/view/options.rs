@@ -1,7 +1,7 @@
 //! The library's view options (user decision 2026-10-12), on the shared menu button of `widgets::view_options`:
-//! "Show only" checks, "Sort by" radios with "Reverse order", and "View" radios Grid / List. Every change is written at
-//! once; the button shows a dot while a Show only filter is on. A filter is include-or-off: there is no exclude state
-//! (`load::include_only`).
+//! "Show only" checks, "Sort by" radios with "Reverse order", then the look sections shared with a source's page
+//! (`widgets::view_look`). Every change is written at once; the button shows a dot while a Show only filter is on. A
+//! filter is include-or-off: there is no exclude state (`load::include_only`).
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeSet;
@@ -11,12 +11,13 @@ use gtk::glib;
 use kuro_platform::kind::Kind;
 use kuro_platform::sort::{Direction, LibrarySort, SortType};
 use kuro_i18n::{MsgKey, tr};
-use kuro_prefs::library::{LibraryDisplayMode, LibraryPrefs};
+use kuro_prefs::library::LibraryPrefs;
 use kuro_prefs::pref::Pref;
 use kuro_prefs::tristate::TriState;
 
 use crate::library::load::include_only;
 use crate::misc::diet_defaults as diet;
+use crate::widgets::view_look;
 use crate::widgets::view_options::{Item, Pick, Section, ViewOptions};
 
 use super::{Inner, active_index, submit};
@@ -131,38 +132,6 @@ pub fn reverse(sort: LibrarySort, on: bool) -> LibrarySort {
     LibrarySort { dir: if on { Direction::Descending } else { Direction::Ascending }, ..sort }
 }
 
-/// The display mode the Grid / List radios write. Grid keeps a stored grid style and turns List into the default grid.
-pub fn mode(list: bool, current: LibraryDisplayMode) -> LibraryDisplayMode {
-    match (list, current) {
-        (true, _) => LibraryDisplayMode::List,
-        (false, LibraryDisplayMode::List) => LibraryDisplayMode::DEFAULT,
-        (false, grid) => grid,
-    }
-}
-
-fn mode_target(mode: LibraryDisplayMode) -> &'static str {
-    if mode == LibraryDisplayMode::List { "list" } else { "grid" }
-}
-
-/// The three grid styles of the Grid style radios: the title on the cover, under it, or no title.
-fn grid_styles() -> [(&'static str, String, LibraryDisplayMode); 3] {
-    [
-        ("compact", tr(MsgKey::ui_compact), LibraryDisplayMode::CompactGrid),
-        ("comfortable", tr(MsgKey::ui_comfortable), LibraryDisplayMode::ComfortableGrid),
-        ("cover", tr(MsgKey::ui_cover_only), LibraryDisplayMode::CoverOnlyGrid),
-    ]
-}
-
-/// The Grid style radio of `mode`; none in the list view.
-fn style_target(mode: LibraryDisplayMode) -> &'static str {
-    grid_styles().into_iter().find(|(_, _, m)| *m == mode).map_or("", |(token, _, _)| token)
-}
-
-/// The grid a Grid style radio picks (from the list view too).
-fn style_mode(token: &str) -> Option<LibraryDisplayMode> {
-    grid_styles().into_iter().find(|(t, _, _)| *t == token).map(|(_, _, m)| m)
-}
-
 /// The sort of the active page and the category it is stored on (`None`: the global sort).
 fn current_sort(st: &Inner) -> (Option<i64>, LibrarySort) {
     let page = st.built.as_ref().and_then(|b| b.pages.get(active_index(st)));
@@ -185,8 +154,8 @@ pub(super) struct Options {
     has_tracker: Rc<Cell<bool>>,
 }
 
-/// The menu: four titled sections (Grid style picks how the grid shows titles). The Show only checks are named by `Show::action`, the sort radios carry their
-/// token, and the View radios "grid" or "list".
+/// The menu: Show only and Sort by, then the shared look sections (`widgets::view_look`). The Show only checks are named
+/// by `Show::action` and the sort radios carry their token.
 fn sections(kind: Kind, has_tracker: bool) -> Vec<Section> {
     let show = Show::ALL.into_iter().filter(|s| has_tracker || *s != Show::Tracked).map(|s| Item::toggle(s.action(), s.label(kind))).collect();
     let mut sort: Vec<Item> =
@@ -194,44 +163,9 @@ fn sections(kind: Kind, has_tracker: bool) -> Vec<Section> {
     if OFFER_REVERSE {
         sort.push(Item::toggle("reverse", tr(MsgKey::ui_reverse_order)));
     }
-    vec![
-        Section::filter(tr(MsgKey::ui_show_only), show),
-        Section::new(tr(MsgKey::ui_sort_by), sort),
-        Section::new("View", vec![Item::radio("mode", "grid", "Grid"), Item::radio("mode", "list", tr(MsgKey::action_display_list))]),
-        Section::new(tr(MsgKey::ui_grid_style), grid_styles().iter().map(|(token, label, _)| Item::radio("style", *token, label)).collect()),
-        Section::new(tr(MsgKey::pref_cover_size), vec![Item::custom(COVER_SIZE)]),
-    ]
-}
-
-/// The custom slot of the cover size slider.
-const COVER_SIZE: &str = "cover_size";
-
-/// The cover size slider: the column width of the Library and Browse grids. A move is stored at once, and the grids
-/// follow the stored value, so the covers resize while it moves.
-fn cover_size_slider(pref: &Pref<i32>) -> gtk::Widget {
-    use gtk::prelude::*;
-    use kuro_domain::library::columns::{COVER_WIDTH_MAX_PX, COVER_WIDTH_MIN_PX, COVER_WIDTH_STEP_PX, column_width, snap_cover_width};
-    let scale = gtk::Scale::with_range(
-        gtk::Orientation::Horizontal,
-        f64::from(COVER_WIDTH_MIN_PX),
-        f64::from(COVER_WIDTH_MAX_PX),
-        f64::from(COVER_WIDTH_STEP_PX),
-    );
-    scale.set_value(f64::from(column_width(pref.get())));
-    scale.set_draw_value(false);
-    scale.set_hexpand(true);
-    scale.set_size_request(200, -1);
-    scale.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::pref_cover_size))]);
-    let pref = pref.clone();
-    scale.connect_value_changed(move |scale| {
-        let width = snap_cover_width(scale.value());
-        if width != pref.get()
-            && let Err(e) = pref.set(width)
-        {
-            tracing::warn!(error = %e, "the cover size could not be saved");
-        }
-    });
-    scale.upcast()
+    let mut sections = vec![Section::filter(tr(MsgKey::ui_show_only), show), Section::new(tr(MsgKey::ui_sort_by), sort)];
+    sections.extend(view_look::sections());
+    sections
 }
 
 impl Options {
@@ -245,12 +179,16 @@ impl Options {
     /// through `CategoryService::set_sort_mode` (which draws a new Random seed) and reloads when it is done.
     pub fn wire(&self, weak: &Weak<RefCell<Inner>>) {
         if let Some(inner) = weak.upgrade() {
-            let pref = inner.borrow().deps.prefs.cover_size.clone();
-            self.menu.set_custom(COVER_SIZE, move || cover_size_slider(&pref));
+            view_look::install(&self.menu, &inner.borrow().deps.prefs.cover_size);
         }
         let weak = weak.clone();
         self.menu.connect(move |choice| {
             let Some(inner) = weak.upgrade() else { return };
+            let prefs = inner.borrow().deps.prefs.clone();
+            if let Some(next) = view_look::picked(&choice, prefs.display_mode.get()) {
+                kuro_domain::category::service::set_display_mode(&prefs, next);
+                return;
+            }
             match choice {
                 Pick::Toggle("reverse", on) => {
                     let (category, current) = current_sort(&inner.borrow());
@@ -271,16 +209,6 @@ impl Options {
                     let Some(ty) = SortType::from_token(kind, &token) else { return };
                     let (category, current) = current_sort(&inner.borrow());
                     write_sort(&inner, category, pick(current, ty));
-                }
-                Pick::Radio("mode", target) => {
-                    let prefs = inner.borrow().deps.prefs.clone();
-                    let next = mode(target == "list", prefs.display_mode.get());
-                    kuro_domain::category::service::set_display_mode(&prefs, next);
-                }
-                Pick::Radio("style", token) => {
-                    let Some(next) = style_mode(&token) else { return };
-                    let prefs = inner.borrow().deps.prefs.clone();
-                    kuro_domain::category::service::set_display_mode(&prefs, next);
                 }
                 Pick::Radio(..) | Pick::Action(_) => {}
             }
@@ -307,8 +235,7 @@ impl Options {
         menu.set_radio("sort", sort.ty.token(kind).unwrap_or_default());
         menu.set_toggle("reverse", reversed(sort));
         menu.set_enabled("reverse", sort.ty != SortType::Random);
-        menu.set_radio("mode", mode_target(prefs.display_mode.get()));
-        menu.set_radio("style", style_target(prefs.display_mode.get()));
+        view_look::sync(menu, prefs.display_mode.get());
     }
 
     #[cfg(test)]
@@ -339,16 +266,6 @@ mod tests {
     use kuro_prefs::store::PrefStore;
 
     use super::*;
-
-    #[test]
-    fn each_grid_style_picks_its_grid_and_the_list_view_marks_none() {
-        for (token, _, mode) in grid_styles() {
-            assert_eq!(style_mode(token), Some(mode));
-            assert_eq!(style_target(mode), token);
-        }
-        assert_eq!(style_target(LibraryDisplayMode::List), "", "no style is marked in the list view");
-        assert_eq!(style_mode("list"), None);
-    }
 
     fn prefs() -> LibraryPrefs {
         LibraryPrefs::new(PrefStore::in_memory())
@@ -425,14 +342,5 @@ mod tests {
         assert_eq!(reverse(LibrarySort::DEFAULT, true).dir, Direction::Descending);
         assert_eq!(reverse(desc, false).dir, Direction::Ascending);
         assert!(!reversed(LibrarySort::DEFAULT));
-    }
-
-    #[test]
-    fn grid_keeps_a_grid_style_and_list_is_list() {
-        assert_eq!(mode(true, LibraryDisplayMode::ComfortableGrid), LibraryDisplayMode::List);
-        assert_eq!(mode(false, LibraryDisplayMode::List), LibraryDisplayMode::DEFAULT);
-        assert_eq!(mode(false, LibraryDisplayMode::CoverOnlyGrid), LibraryDisplayMode::CoverOnlyGrid);
-        assert_eq!(mode_target(LibraryDisplayMode::CoverOnlyGrid), "grid");
-        assert_eq!(mode_target(LibraryDisplayMode::List), "list");
     }
 }

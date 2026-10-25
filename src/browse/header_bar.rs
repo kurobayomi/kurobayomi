@@ -1,6 +1,6 @@
-//! The header bar of a source listing: back, the source name, the shared search toggle, the display-mode button with its
-//! two radio items (grid and list), and the overflow menu (T-40a-002). The rules (menu items, icon, overflow entries) are in
-//! `header`. The display mode is cut from the settings: a radio selection changes the grid for this session only.
+//! The header bar of a source listing: back, the source name, the shared search toggle, the view options (the look
+//! sections shared with the Library, `widgets::view_look`) and the overflow menu (T-40a-002). The overflow entries are
+//! in `header`. A picked look is stored in `sources.display_mode`, one key for every source.
 
 use std::rc::Rc;
 
@@ -8,12 +8,10 @@ use gtk::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::library::LibraryDisplayMode;
 
-use super::header::{DISPLAY_MENU, OverflowItem, display_label, overflow_items, overflow_label};
+use super::header::{OverflowItem, overflow_items, overflow_label};
 use super::prefs::BrowsePrefs;
-use crate::widgets::view_options::{Item, Pick, Section, ViewOptions};
-
-/// The action name of the display-mode radio group.
-const DISPLAY: &str = "display";
+use crate::widgets::view_look;
+use crate::widgets::view_options::ViewOptions;
 
 pub struct HeaderDeps {
     pub source_name: String,
@@ -24,7 +22,7 @@ pub struct HeaderDeps {
     pub on_back: Rc<dyn Fn()>,
     /// The page's search toggle (`ui::search_row`); it goes at the end of the row, left of the other actions.
     pub search: gtk::ToggleButton,
-    /// A display mode was chosen and already stored.
+    /// A look was picked and already stored.
     pub on_display_mode: Rc<dyn Fn(LibraryDisplayMode)>,
     pub on_overflow: Rc<dyn Fn(OverflowItem)>,
     /// The refresh button: loads the listing again from its first page.
@@ -96,19 +94,23 @@ fn back_button(on_back: Rc<dyn Fn()>) -> gtk::Button {
     back
 }
 
-/// The display-mode button: the app's one view-options menu with a single radio group, grid or list. Choosing one stores
-/// it and calls `on_display_mode`.
+/// The view options: the look sections shared with the Library. A pick is stored, shown, and passed to
+/// `on_display_mode`.
 fn display_menu(deps: &HeaderDeps) -> ViewOptions {
-    let items = DISPLAY_MENU.iter().map(|mode| Item::radio(DISPLAY, format!("{mode:?}"), display_label(*mode))).collect();
-    let menu = ViewOptions::new(&tr(MsgKey::action_display_mode), &[Section::new("View", items)]);
-    menu.set_radio(DISPLAY, &format!("{:?}", deps.prefs.display_mode()));
-    let on_mode = Rc::clone(&deps.on_display_mode);
+    let menu = ViewOptions::new(&tr(MsgKey::action_display_mode), &view_look::sections());
+    let pref = deps.prefs.sources.display_mode.clone();
+    view_look::sync(&menu, pref.get());
+    view_look::install(&menu, &deps.prefs.cover_size);
+    let (on_mode, shown) = (Rc::clone(&deps.on_display_mode), menu.downgrade());
     menu.connect(move |pick| {
-        if let Pick::Radio(_, value) = pick
-            && let Some(mode) = DISPLAY_MENU.into_iter().find(|m| format!("{m:?}") == value)
-        {
-            on_mode(mode);
+        let Some(mode) = view_look::picked(&pick, pref.get()) else { return };
+        if let Err(e) = pref.set(mode) {
+            tracing::warn!(error = %e, "the source view could not be saved");
         }
+        if let Some(menu) = shown() {
+            view_look::sync(&menu, mode);
+        }
+        on_mode(mode);
     });
     menu
 }
@@ -148,19 +150,28 @@ pub(crate) mod tests {
         }
     }
 
-    fn header_shows_the_two_radios_and_writes_the_chosen_mode() {
+    fn header_shows_the_stored_look_and_stores_a_pick() {
         let log = Rc::new(RefCell::new(Vec::new()));
-        let prefs = Rc::new(BrowsePrefs::new(PrefStore::in_memory(), Kind::Manga));
+        let store = PrefStore::in_memory();
+        let prefs = Rc::new(BrowsePrefs::new(store.clone(), Kind::Manga));
         let header = build(deps(Rc::clone(&prefs), &log, false, true));
-        assert_eq!(header.display.radio(DISPLAY).as_deref(), Some("CompactGrid"), "compact grid is selected by default");
+        assert_eq!(header.display.radio("mode").as_deref(), Some("grid"), "the compact grid is the default");
+        assert_eq!(header.display.radio("style").as_deref(), Some("compact"));
 
-        header.display.group().activate_action(DISPLAY, Some(&"List".to_variant()));
-        assert_eq!(*log.borrow(), ["mode List"]);
+        header.display.group().activate_action("style", Some(&"comfortable".to_variant()));
+        header.display.group().activate_action("mode", Some(&"list".to_variant()));
+        assert_eq!(*log.borrow(), ["mode ComfortableGrid", "mode List"]);
+        assert_eq!(prefs.sources.display_mode.get(), LibraryDisplayMode::List, "the pick is stored");
+        assert_eq!(header.display.radio("style").as_deref(), Some(""), "no grid style is marked in the list view");
+        let library = kuro_prefs::library::LibraryPrefs::new(store);
+        assert_eq!(library.display_mode.get(), LibraryDisplayMode::CompactGrid, "the library's view is its own");
 
+        let reopened = build(deps(Rc::clone(&prefs), &log, false, true));
+        assert_eq!(reopened.display.radio("mode").as_deref(), Some("list"), "the stored look is shown again");
         assert!(header.search.is_ancestor(&header.bar), "the search toggle is in the header");
     }
 
     pub(crate) fn smoke() {
-        header_shows_the_two_radios_and_writes_the_chosen_mode();
+        header_shows_the_stored_look_and_stores_a_pick();
     }
 }

@@ -991,3 +991,9 @@ whats_new_nightly_ready = Nightly { $commit } is ready: install it now, or it in
 
 # source: kurobayomi
 whats_new_stable_ready = Kurobayomi { $version } is ready: install it now, or it installs when you close the app
+
+# source: kurobayomi
+ui_view = View
+
+# source: kurobayomi
+ui_grid = Grid

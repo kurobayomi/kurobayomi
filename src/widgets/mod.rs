@@ -9,4 +9,5 @@ pub mod int_slider;
 pub mod rail;
 pub mod row_activate;
 pub mod tabs;
+pub mod view_look;
 pub mod view_options;

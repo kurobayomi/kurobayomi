@@ -4,6 +4,7 @@
 
 use std::collections::BTreeSet;
 
+use crate::library::LibraryDisplayMode;
 use crate::pref_enum;
 use crate::registry::define_prefs;
 
@@ -31,6 +32,8 @@ pub fn source_setting_key(source_id: i64, key: &str) -> String {
 define_prefs! {
     /// `[sources]` section: the keys of Aniyomi `SourcePreferences`, minus the derived `animeext_updates_count` (T-19a-064).
     pub struct SourcePrefs in "sources" {
+        // the look of every source's listing, kept apart from the library's as in Aniyomi
+        display_mode: LibraryDisplayMode = "pref_display_mode_catalogue" => LibraryDisplayMode::CompactGrid;
         enabled_languages: BTreeSet<String> = "source_languages" => kuro_i18n::source_names::default_enabled_languages(&system_locale());
         // off by default (Aniyomi: on): adult titles stay hidden until the user turns them on
         show_nsfw_source: bool = "show_nsfw_source" => false;
@@ -65,7 +68,7 @@ mod tests {
     #[test]
     fn every_field_is_a_registered_sources_key_with_the_same_name() {
         assert_eq!(SourcePrefs::TABLE, "sources");
-        assert_eq!(SourcePrefs::FIELDS.len(), 9, "the settings diet kept nine keys");
+        assert_eq!(SourcePrefs::FIELDS.len(), 10, "the settings diet kept nine keys, and the source view came back");
         for (field, key) in SourcePrefs::FIELDS {
             let row = REGISTRY.iter().find(|m| m.key == *key).unwrap_or_else(|| panic!("{field}: {key} not registered"));
             assert_eq!(row.table, "sources", "{key}");
@@ -84,6 +87,8 @@ mod tests {
         let store = PrefStore::in_memory();
         let prefs = SourcePrefs::new(store);
         assert!(!prefs.show_nsfw_source.get(), "adult titles are hidden by default");
+        assert_eq!(prefs.display_mode.key(), "pref_display_mode_catalogue");
+        assert_eq!(prefs.display_mode.get(), LibraryDisplayMode::CompactGrid);
         assert!(prefs.disabled_manga_sources.get().is_empty());
         assert!(prefs.enabled_languages.get().contains("en"));
         assert!(prefs.enabled_languages.get().contains("all"));

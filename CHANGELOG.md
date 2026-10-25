@@ -11,6 +11,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Windows: a downloaded update says it is ready ("install it now, or it installs when you close the app") instead of
   installed, and its button is Install now instead of Restart, as installing takes a few seconds there. Install now
   shows the setup's progress window until the new version starts; a plain quit still installs without a window.
+- A source's view options match the Library's: View (Grid or List), Grid style (Compact, Comfortable, Cover only) and
+  Cover size. The look is remembered for every source, separately from the Library's.
 
 ## [0.2.2] - 2026-10-25
 

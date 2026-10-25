@@ -283,6 +283,12 @@ impl ViewOptions {
         self.inner.actions.borrow().get(name).cloned()
     }
 
+    /// A handle that does not keep the menu alive, for a closure the menu itself holds (its pick handler).
+    pub fn downgrade(&self) -> impl Fn() -> Option<ViewOptions> + 'static {
+        let (widget, button, group, inner) = (self.widget.downgrade(), self.button.downgrade(), self.group.downgrade(), Rc::downgrade(&self.inner));
+        move || Some(ViewOptions { widget: widget.upgrade()?, button: button.upgrade()?, group: group.upgrade()?, inner: inner.upgrade()? })
+    }
+
     /// Shows a stored toggle state (no pick is reported).
     pub fn set_toggle(&self, name: &str, on: bool) {
         if let Some(action) = self.action(name) {

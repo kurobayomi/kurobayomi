@@ -176,7 +176,7 @@ impl ListingView {
         let root = gtk::Overlay::new();
         root.set_child(Some(&stack));
 
-        let display = deps.prefs.display_mode();
+        let display = deps.prefs.sources.display_mode.get();
         let ready = *deps.ready.borrow();
         let inner = Rc::new(Inner {
             ready: Cell::new(ready),
@@ -236,7 +236,7 @@ impl ListingView {
         self.inner.store.n_items()
     }
 
-    /// The display-mode button was used.
+    /// A look was picked in the view options (and already stored).
     pub fn set_display_mode(&self, mode: LibraryDisplayMode) {
         self.inner.display.set(mode);
         self.inner.apply_display();

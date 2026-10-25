@@ -220,6 +220,7 @@ define_prefs! {
     "__APP_STATE_incognito_mode", AppState, Bool, false, "base", "incognito_mode";
     "pref_theme_mode_key", Normal, Str, "SYSTEM", "ui", "theme_mode";
     "start_screen", Normal, Str, "ANIME", "ui", "start_screen";
+    "pref_display_mode_catalogue", Normal, Str, "COMPACT_GRID", "sources", "display_mode";
     "source_languages", Normal, Set, &["all", "en"], "sources", "enabled_languages";
     "show_nsfw_source", Normal, Bool, false, "sources", "show_nsfw_source";
     "anime_extension_repos", Normal, Set, &[], "sources", "anime_extension_repos";
@@ -297,7 +298,7 @@ define_prefs! {
 /// The registry holds no row for them, a restore skips them ([`is_dropped`]) and nothing reads them, so an old
 /// `config.toml` or an Aniyomi backup that still carries one loads and restores without it. Each key and its reason
 /// is recorded in `docs/drop-decisions.md`.
-pub const DROPPED_KEYS: [&str; 278] = [
+pub const DROPPED_KEYS: [&str; 277] = [
     "extension_installer",
     "pref_hardware_bitmap_threshold",
     "eh_enable_source_blacklist",
@@ -526,7 +527,6 @@ pub const DROPPED_KEYS: [&str; 278] = [
     "download_speed_limit",
     "download_new_unread_chapters_only",
     "download_new_unread_episodes_only",
-    "pref_display_mode_catalogue",
     "pref_migration_sorting",
     "pref_migration_direction",
     "__APP_STATE_has_filters_toggle_state",
@@ -682,9 +682,9 @@ mod tests {
     ];
 
     #[test]
-    fn registry_has_the_59_plan_rows_in_order() {
+    fn registry_has_the_60_plan_rows_in_order() {
         let rows = plan_rows();
-        assert_eq!(rows.len(), 59, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
+        assert_eq!(rows.len(), 60, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
         // four Kurobayomi rows after the plan's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
         // (T-req-platform-004), `check_app_updates` (the update toggle, back from the settings diet, on by default) and
         // `last_kind` (the Anime | Manga choice every page shares), `appimage_menu_removed` (the user took the AppImage

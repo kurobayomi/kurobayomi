@@ -200,7 +200,6 @@ Note: `pref_mpv_conf` and `pref_mpv_input` are kept for now with their Script an
 | `pref_custom_brightness_key` | src/reader/overlay.rs, src/reader/settings_window.rs |
 | `pref_default_intro_length` | src/entry_core/anime/route.rs, src/settings_ui/route.rs |
 | `pref_disabled_ani_skip_chapters` | src/settings_ui/player/controls.rs |
-| `pref_display_mode_catalogue` | src/browse/fixtures_tests.rs, src/browse/anime/prefs.rs |
 | `pref_display_profile_key` | crates/kuro-images/src/fetch.rs, crates/kuro-images/src/decode/mod.rs |
 | `pref_display_vol_as_per` | src/settings_ui/player/controls.rs |
 | `pref_double_tap_anim_speed` | src/reader/viewers/page_opts.rs, src/reader/viewers/settings.rs |
@@ -513,7 +512,6 @@ Source: `docs/design/settings-diet.md`, section 6 tables ("If CUT: hard-code"). 
 | `download_speed_limit` | 0 (no limit) | Downloads (settings_downloads). The app has no live download manager yet, so only the library-update download rule reads these |
 | `download_new_unread_chapters_only` | false | Downloads (settings_downloads). The app has no live download manager yet, so only the library-update download rule reads these |
 | `download_new_unread_episodes_only` | false | Downloads (settings_downloads). The app has no live download manager yet, so only the library-update download rule reads these |
-| `pref_display_mode_catalogue` | COMPACT_GRID | Browse (settings_browse and the Sources tab) |
 | `pref_migration_sorting` | ALPHABETICAL | Browse (settings_browse and the Sources tab) |
 | `pref_migration_direction` | ASCENDING | Browse (settings_browse and the Sources tab) |
 | `__APP_STATE_has_filters_toggle_state` | false | Browse (settings_browse and the Sources tab) |
@@ -566,3 +564,8 @@ The translated strings of the removed settings (`data_saver_*`, `bandwidth_hero`
 (`crates/kuro-i18n/src/import.rs`), so a regenerated catalog leaves them out. The moko fixture keeps them, because it is
 the unchanged importer input.
 
+## Source view restored (2026-10-25)
+
+`pref_display_mode_catalogue` is registered again (`sources.display_mode`, default COMPACT_GRID) and left `DROPPED_KEYS`:
+a source's page has the same View, Grid style and Cover size options as the Library (`src/widgets/view_look.rs`), and
+its look is remembered for every source, apart from the Library's, as in Aniyomi. An Aniyomi backup's value now restores.
