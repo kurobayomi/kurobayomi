@@ -6,10 +6,15 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-25
+
 ### Changed
 
 - Track new titles automatically is on by default. It only binds on trackers you are logged in to, so without one it
   does nothing.
+- Cover cards answer the pointer: a thin accent ring and a slightly brighter cover. The top-bar buttons' hover fill is
+  easier to see on a dark theme.
+- A source's switch shows a spinner while the source turns on, and stays put while the turn-off question is open.
 
 ### Fixed
 
