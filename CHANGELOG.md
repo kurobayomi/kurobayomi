@@ -6,8 +6,16 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-25
+
 ### Added
 
+- Track new titles automatically (Settings > Sources and tracking, off by default): a title added to the library is bound on every
+  tracker you are logged in to (AniList, MyAnimeList), but only when its name matches for certain.
+- Opening a library title's page marks its episodes or chapters as watched or read up to the progress your trackers
+  have ("Marked 5 episodes as watched from AniList"); it only ever marks forward.
+- The Library's Show only has Watching (Reading for manga) and Completed, which follow your own progress: started with
+  episodes or chapters left, or started with none left.
 - Downloads lists what is on disk under the queue, one group per title with its count and size: a click on the title
   opens its page, a click on an episode or chapter plays or reads it, and each has a delete button. The title's folder
   and the whole downloads folder each have a button that opens them.
@@ -40,6 +48,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Sources behind Cloudflare's browser check (AnimePahe) answered "HTTP error 403" on a system that is not in English:
   Cloudflare titled its check page in the system's language, and the app took the page for cleared while the check
   still ran. The hidden pages that pass the check now browse in English on Windows and Linux.
+- A GTK theme forced with `GTK_THEME` (for example `GTK_THEME=adw-gtk3`) that the AppImage's GTK cannot read falls back
+  to the built-in Adwaita too, keeping its dark variant, instead of leaving the window see-through (issue #6).
 
 ## [0.2.2] - 2026-10-25
 
