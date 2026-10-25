@@ -83,7 +83,23 @@ pub struct Index {
     /// one, and a saved link follows it ([`moved_to`]). Optional.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// The sources of a kind this app knows. An entry of another kind (a later app's "movie" or "novel") is left out,
+    /// so a repository can list new kinds without breaking the apps that cannot show them.
+    #[serde(deserialize_with = "known_kinds")]
     pub sources: Vec<Entry>,
+}
+
+/// Reads the `sources` list, leaving out an entry whose `kind` is a word this app does not know. Any other entry is
+/// read as before, so a missing or malformed field still fails the index.
+fn known_kinds<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Vec<Entry>, D::Error> {
+    let raw = Vec::<serde_json::Value>::deserialize(deserializer)?;
+    raw.into_iter()
+        .filter(|entry| match &entry["kind"] {
+            serde_json::Value::String(kind) => serde_json::from_value::<Kind>(serde_json::Value::String(kind.clone())).is_ok(),
+            _ => true,
+        })
+        .map(|entry| serde_json::from_value(entry).map_err(serde::de::Error::custom))
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
@@ -381,6 +397,18 @@ mod tests {
 
     fn index_of(entries: &[String]) -> String {
         format!(r#"{{"version":1,"sources":[{}]}}"#, entries.join(","))
+    }
+
+    #[test]
+    fn a_source_of_an_unknown_kind_is_left_out_and_the_rest_are_read() {
+        let index = parse_index(&index_of(&[entry("m", "manga", "en"), entry("film", "movie", "en"), entry("a", "anime", "ja"), entry("book", "novel", "en")])).expect("a new kind does not break the index");
+        let ids: Vec<&str> = index.sources.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["m", "a"]);
+        // a missing or malformed kind is still an error, as before
+        let missing = entry("x", "manga", "en").replace(r#""kind":"manga","#, "");
+        assert!(matches!(parse_index(&index_of(&[missing])), Err(RepoError::Parse(_))));
+        let number = entry("x", "manga", "en").replace(r#""kind":"manga""#, r#""kind":3"#);
+        assert!(matches!(parse_index(&index_of(&[number])), Err(RepoError::Parse(_))));
     }
 
     #[test]
