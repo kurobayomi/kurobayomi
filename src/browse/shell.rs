@@ -79,7 +79,7 @@ impl BrowseShell {
             stack.add_titled(widget, Some(&page.index().to_string()), &title);
         }
 
-        let options = ViewOptions::new(&tr(MsgKey::action_display_mode), &[]);
+        let options = ViewOptions::new(&tr(MsgKey::ui_view_options), &[]);
         let inner = Rc::new(Inner { stack, search: gtk::SearchEntry::new(), options, deps });
         // the shared header row: the Anime | Manga switch at the start, the search toggle and the actions at the end, the bar under it
         let (options, menu) = inner.header_actions();
@@ -358,7 +358,7 @@ pub(crate) mod tests {
         let (shell, log) = shell();
         let mut all = Vec::new();
         walk(shell.root.upcast_ref(), &mut all);
-        let menus = all.iter().filter_map(|w| w.downcast_ref::<gtk::MenuButton>()).filter(|b| b.tooltip_text().as_deref() != Some(tr(MsgKey::action_display_mode).as_str())).count();
+        let menus = all.iter().filter_map(|w| w.downcast_ref::<gtk::MenuButton>()).filter(|b| b.tooltip_text().as_deref() != Some(tr(MsgKey::ui_view_options).as_str())).count();
         assert_eq!(menus, 0, "no more menu");
         let repos = all
             .iter()
@@ -381,7 +381,7 @@ pub(crate) mod tests {
         let options = all
             .iter()
             .filter_map(|w| w.downcast_ref::<gtk::MenuButton>().cloned())
-            .find(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::action_display_mode).as_str()))
+            .find(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::ui_view_options).as_str()))
             .expect("the shared view-options button, where the Filter button was");
         let labels = crate::widgets::view_options::menu_labels(&options.menu_model().expect("the menu"));
         assert!(labels.contains(&"English".to_owned()) && labels.contains(&"French".to_owned()), "{labels:?}");

@@ -97,7 +97,7 @@ fn back_button(on_back: Rc<dyn Fn()>) -> gtk::Button {
 /// The view options: the look sections shared with the Library. A pick is stored, shown, and passed to
 /// `on_display_mode`.
 fn display_menu(deps: &HeaderDeps) -> ViewOptions {
-    let menu = ViewOptions::new(&tr(MsgKey::action_display_mode), &view_look::sections());
+    let menu = ViewOptions::new(&tr(MsgKey::ui_view_options), &view_look::sections());
     let pref = deps.prefs.sources.display_mode.clone();
     view_look::sync(&menu, pref.get());
     view_look::install(&menu, &deps.prefs.cover_size);
