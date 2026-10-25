@@ -13,6 +13,8 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'scripts/**'
+      # the Windows installer's script: a change to it must reach a nightly, which only builds after CI
+      - 'dist/**'
       - 'ci/**'
       - '.github/workflows/ci.yml'
   # a manual run, so a commit that no push run covers (a docs-only commit under a release tag) can still get its CI result

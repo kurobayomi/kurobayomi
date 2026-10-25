@@ -37,8 +37,11 @@ WizardStyle=modern
 SetupIconFile={#Icon}
 UninstallDisplayIcon={app}\bin\kurobayomi.exe
 UninstallDisplayName={#AppName}
-; a running Kurobayomi is closed for the update (the self-updater runs the installer silently), and started again after
-CloseApplications=yes
+; a running Kurobayomi is closed for the update (the self-updater runs the installer silently), and started again after.
+; force: GLib's session bus helper (bin\gdbus.exe, started for the single instance) outlives the app and keeps gdbus.exe
+; and the GLib DLLs open. It has no window to close politely, so a silent update could not replace them and left the old
+; version in place. Only programs that use this install's files are closed
+CloseApplications=force
 RestartApplications=no
 #if Channel != "nightly"
 ChangesAssociations=yes
