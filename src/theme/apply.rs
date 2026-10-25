@@ -163,15 +163,27 @@ pub fn builtin_theme_for(name: &str) -> &'static str {
     }
 }
 
+/// The `GTK_THEME` value as (name, variant): GTK loads it in place of the theme setting. `None` when unset or empty.
+fn env_theme(value: Option<&str>) -> Option<(&str, Option<&str>)> {
+    let value = value.filter(|v| !v.is_empty())?;
+    Some(match value.split_once(':') {
+        Some((name, variant)) => (name, Some(variant)),
+        None => (value, None),
+    })
+}
+
 /// A theme written for GTK 4.16 or newer (CSS variables, as in adw-gtk3 6) barely parses on an older GTK such as the
 /// AppImage's 4.14: every background is lost and the window is see-through (issue #5). Such a theme is swapped for the
-/// built-in one for this run.
+/// built-in one for this run. A theme forced with `GTK_THEME` wins over the setting, so that one is checked and
+/// rewritten instead (issue #6).
 fn drop_unreadable_theme(display: &gdk::Display) {
     if gtk::minor_version() >= 16 {
         return;
     }
     let settings = gtk::Settings::for_display(display);
-    let Some(name) = settings.gtk_theme_name() else {
+    let env = std::env::var("GTK_THEME").ok();
+    let forced = env_theme(env.as_deref());
+    let Some(name) = forced.map(|(name, _)| name.into()).or_else(|| settings.gtk_theme_name()) else {
         return;
     };
     let errors = Rc::new(Cell::new(0u32));
@@ -182,6 +194,13 @@ fn drop_unreadable_theme(display: &gdk::Display) {
     if errors.get() > UNREADABLE_THEME_ERRORS {
         let builtin = builtin_theme_for(&name);
         tracing::warn!(theme = %name, errors = errors.get(), gtk = gtk::minor_version(), builtin, "GTK theme needs a newer GTK; using the built-in theme");
+        if let Some((_, variant)) = forced {
+            let value = variant.map_or(builtin.to_owned(), |v| format!("{builtin}:{v}"));
+            // GTK reads GTK_THEME again on the theme-name change below.
+            // SAFETY: runs once at startup on the main thread, before any screen starts work that reads the environment.
+            // ponytail: a race with a getenv on another thread stays possible; check before GTK init if one ever shows up
+            unsafe { std::env::set_var("GTK_THEME", value) };
+        }
         settings.set_gtk_theme_name(Some(builtin));
     }
 }
@@ -308,6 +327,14 @@ mod tests {
         assert_eq!(builtin_theme_for("adw-gtk3-dark"), "Adwaita-dark");
         assert_eq!(builtin_theme_for("Adw-Gtk3-Dark"), "Adwaita-dark");
         assert_eq!(builtin_theme_for("adw-gtk3"), "Adwaita");
+    }
+
+    #[test]
+    fn a_forced_gtk_theme_is_split_into_name_and_variant() {
+        assert_eq!(env_theme(None), None);
+        assert_eq!(env_theme(Some("")), None);
+        assert_eq!(env_theme(Some("adw-gtk3")), Some(("adw-gtk3", None)));
+        assert_eq!(env_theme(Some("adw-gtk3:dark")), Some(("adw-gtk3", Some("dark"))));
     }
 
     // T-01a-021: Light and Dark force the GTK preference, System puts back the startup value.
