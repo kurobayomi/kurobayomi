@@ -161,8 +161,13 @@ struct View {
     refresh_button: Button,
     /// "Download all", in the head of the list (not a menu): queues every unseen or unread item.
     download_all: Button,
-    /// The "more" menu of the top bar; hidden while it has nothing to offer.
+    /// The page actions in the top bar; each hidden while the entry on show does not offer it, and all of them in the
+    /// phone layout, where the ⋮ menu below stands in for them.
+    overflow_buttons: Vec<(OverflowItem, Button)>,
+    /// The ⋮ menu of the phone layout; hidden in a wide window or while it has nothing to offer.
     overflow_button: Option<gtk::MenuButton>,
+    /// The window is in the phone layout (narrower than `shell::layout::WIDE_MIN_WIDTH_PX`).
+    actions_narrow: Cell<bool>,
     bottom: gtk::Revealer,
     bottom_row: GBox,
     stack: gtk::Stack,
@@ -227,7 +232,43 @@ fn torrent_enabled(prefs: &PrefStore) -> bool {
     prefs.pref::<bool>("pref_torrserver_enable", false).get()
 }
 
-/// The "more" menu of the top bar: its entries read the entry on show each time the menu opens, so the items follow it.
+/// The page actions in the order the top bar shows them (user, 2026-10-25): Edit categories first, Change intro length
+/// last, next to the list options.
+const ACTIONS: [OverflowItem; 6] = [
+    OverflowItem::EditCategories,
+    OverflowItem::Migrate,
+    OverflowItem::Share,
+    OverflowItem::OpenInBrowser,
+    OverflowItem::Settings,
+    OverflowItem::ChangeIntro,
+];
+
+/// The page actions as header buttons (user, 2026-10-25), in [`ACTIONS`] order. Each shows only while
+/// `overflow_menu::items` offers it for the entry on show, and only in a wide window (`View::sync_actions`).
+/// Whether the main window is in the phone layout now (a page built before its first frame lays out for it).
+fn narrow_window() -> bool {
+    ui::window_width().is_some_and(|w| w < crate::shell::layout::WIDE_MIN_WIDTH_PX)
+}
+
+fn overflow_buttons(late: &Rc<RefCell<Weak<View>>>) -> Vec<(OverflowItem, Button)> {
+    ACTIONS
+        .into_iter()
+        .map(|item| {
+            let button = crate::ui::icon_button(overflow_menu::icon(item), &overflow_menu::label(item));
+            button.set_visible(false);
+            let run = Rc::clone(late);
+            button.connect_clicked(move |_| {
+                if let Some(view) = run.borrow().upgrade() {
+                    view.run_overflow(item);
+                }
+            });
+            (item, button)
+        })
+        .collect()
+}
+
+/// The same page actions as a ⋮ menu, for the phone layout, where the buttons do not fit (user, 2026-10-25). Its entries
+/// read the entry on show each time the menu opens, so the items follow it.
 fn overflow_sections(late: &Rc<RefCell<Weak<View>>>) -> Vec<Vec<crate::ui::MenuEntry>> {
     let entry = |item: OverflowItem| {
         let (run, shown) = (Rc::clone(late), Rc::clone(late));
@@ -238,11 +279,7 @@ fn overflow_sections(late: &Rc<RefCell<Weak<View>>>) -> Vec<Vec<crate::ui::MenuE
         })
         .when(move || shown.borrow().upgrade().is_some_and(|view| view.overflow_items().contains(&item)))
     };
-    vec![
-        vec![entry(OverflowItem::ChangeIntro), entry(OverflowItem::EditCategories), entry(OverflowItem::Migrate)],
-        vec![entry(OverflowItem::Share), entry(OverflowItem::OpenInBrowser)],
-        vec![entry(OverflowItem::Settings)],
-    ]
+    vec![ACTIONS.into_iter().map(entry).collect()]
 }
 
 fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
@@ -428,16 +465,18 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let (episode_spec, season_spec) = (list_options::item_spec(kind), list_options::season_spec());
     let options = ViewOptions::new(&list_options::tooltip(), &episode_spec.sections());
     let refresh_button = crate::ui::refresh_button(&tr(MsgKey::action_webview_refresh));
-    // the header row every page shares (`ui::HeaderActions`); the "more" menu holds the items `overflow_menu::items` gives
-    // for this entry and its source (T-39a-075), and Download all is in the head of the list
+    // the header row every page shares (`ui::HeaderActions`); the page actions are buttons showing the items
+    // `overflow_menu::items` gives for this entry and its source (T-39a-075), and Download all is in the head of the list
+    let overflow_buttons = overflow_buttons(&late);
     let toolbar = crate::ui::HeaderActions {
         refresh: Some(refresh_button.clone().upcast()),
+        extra: overflow_buttons.iter().map(|(_, button)| button.clone().upcast()).collect(),
         options: Some(options.widget.clone().upcast()),
         menu: overflow_sections(&late),
         ..Default::default()
     }
     .widgets();
-    let overflow_button = toolbar.iter().find_map(|w| w.downcast_ref::<gtk::MenuButton>().cloned());
+    let overflow_button = toolbar.iter().find_map(|w| w.downcast_ref::<gtk::MenuButton>().filter(|b| b.has_css_class(ui::MORE_MENU)).cloned());
     let page = ui::page("", &stack, toolbar.clone(), false);
     ui::tag(&page, if kind.is_anime() { "anime_entry_details" } else { "manga_entry_details" });
     let (header, title, back) = page_shell::header_with_back(&page);
@@ -450,7 +489,9 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
         show_airing,
         refresh_button: refresh_button.clone(),
         download_all: download_all.clone(),
+        overflow_buttons,
         overflow_button,
+        actions_narrow: Cell::new(narrow_window()),
         bottom,
         bottom_row,
         stack,
@@ -532,6 +573,20 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     );
     download_all.connect_clicked(on_view(|v| v.run_download(DownloadAmount::AllUnread)));
     *late.borrow_mut() = weak.clone();
+    // the page actions follow the window between buttons and the ⋮ menu (`View::sync_actions`)
+    page.add_tick_callback({
+        let weak = weak.clone();
+        move |page, _| {
+            let width = page.root().map(|root| root.width()).filter(|w| *w > 0);
+            if let (Some(view), Some(width)) = (weak.upgrade(), width) {
+                let narrow = width < crate::shell::layout::WIDE_MIN_WIDTH_PX;
+                if view.actions_narrow.replace(narrow) != narrow {
+                    view.sync_actions();
+                }
+            }
+            glib::ControlFlow::Continue
+        }
+    });
     fab.connect_clicked(on_view(View::open_next));
     back.connect_clicked(on_view(|v| {
         if !v.back_pressed() {
@@ -837,9 +892,7 @@ impl View {
         // a local or stub source has no downloads to queue (`isLocalOrStub`, T-39b-059)
         let local_or_stub = m.is_local() || self.env.backend.source_info(m.entry.source).stub;
         self.download_all.set_visible(menu_visible(local_or_stub, self.env.backend.has_download_handler()));
-        if let Some(button) = &self.overflow_button {
-            button.set_visible(!self.overflow_items().is_empty());
-        }
+        self.sync_actions();
         // the button stays while nothing is selected, and is disabled when no episode is unseen (T-EPS-NEXT-1)
         let fab = m.fab();
         self.fab.set_visible(!m.selection.is_active());
@@ -1218,17 +1271,29 @@ impl View {
         *self.seasons_shown.borrow_mut() = Some(key);
     }
 
-    /// The items the "more" menu offers for the entry on show (`overflow_menu::items`); none before the entry loads.
+    /// The page actions offered for the entry on show (`overflow_menu::items`); none before the entry loads.
     fn overflow_items(&self) -> Vec<OverflowItem> {
         let model = self.model.borrow();
         let Some(m) = model.as_ref().filter(|m| m.accepts_dispatch()) else { return Vec::new() };
         let source = m.entry.source;
         overflow_menu::items(OverflowEntry {
             favorite: m.entry.favorite,
-            has_intro_length: m.entry.fetch_type() == FetchType::Episodes,
+            // a manga has no intro: its fetch type reads as episodes too
+            has_intro_length: self.env.kind.is_anime() && m.entry.fetch_type() == FetchType::Episodes,
             http_source: self.env.backend.is_http_source(source),
             configurable_source: self.env.backend.is_configurable_source(source),
         })
+    }
+
+    /// Shows the page actions the entry on show offers: as buttons in a wide window, in the ⋮ menu in the phone layout.
+    fn sync_actions(&self) {
+        let (offered, narrow) = (self.overflow_items(), self.actions_narrow.get());
+        for (item, button) in &self.overflow_buttons {
+            button.set_visible(!narrow && offered.contains(item));
+        }
+        if let Some(menu) = &self.overflow_button {
+            menu.set_visible(narrow && !offered.is_empty());
+        }
     }
 
     fn run_overflow(self: &Rc<Self>, item: OverflowItem) {

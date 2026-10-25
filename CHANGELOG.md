@@ -18,6 +18,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   shows the setup's progress window until the new version starts; a plain quit still installs without a window.
 - Every page's search button is the first of the buttons on the right of its top bar, instead of at the start of the
   bar (or beside the app name over the sidebar). In the phone layout it sits at the start of the bar.
+- A title's page shows its actions as top-bar buttons instead of a ⋮ menu: Edit categories, Migrate, Share, Open in
+  browser, Settings and Change intro length, each only when it applies. In the phone layout they fold back into the ⋮
+  menu, where they would not fit. A manga no longer offers Change intro length.
 - A source's view options match the Library's: View (Grid or List), Grid style (Compact, Comfortable, Cover only) and
   Cover size. The look is remembered for every source, separately from the Library's.
 - The ⋮ menu beside the app name is gone: Library, Updates, History and Downloads show its actions as buttons in the

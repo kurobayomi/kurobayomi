@@ -5,7 +5,8 @@
 #[cfg(test)]
 mod tests {
     /// A tab page has no ⋮ menu (user, 2026-10-25): its actions are buttons in its header. Only pages pushed over the
-    /// tabs fill `HeaderActions::menu`: a title's page and the Upcoming page's guide.
+    /// tabs fill `HeaderActions::menu`: a title's page (its ⋮ menu stands in for its buttons in the phone layout) and the
+    /// Upcoming page's guide.
     #[test]
     fn no_tab_page_has_a_more_menu() {
         const PUSHED: [&str; 2] = ["src/entry_core/details/route.rs", "src/updates/upcoming/page.rs"];

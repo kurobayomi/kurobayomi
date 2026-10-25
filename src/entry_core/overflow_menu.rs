@@ -1,4 +1,5 @@
-//! The overflow menu ("⋮") of the manga page and the anime page, one for both (T-39a-075, T-39a-057). Upstream:
+//! The page actions of the manga page and the anime page, one set for both (T-39a-075, T-39a-057): header buttons, once
+//! the overflow menu ("⋮"; user, 2026-10-25). Upstream:
 //! `EntryToolbar.kt` (the order: change intro length, edit categories, Migrate, Share, Open in browser, Settings; Refresh
 //! is the header button, not a menu item) and the screens' conditions: a favorite for the category item, Migrate and the
 //! intro length; episodes for the intro length; an HTTP source for Share and Open in browser; a configurable source for
@@ -66,6 +67,18 @@ pub fn label(item: Item) -> String {
         Item::OpenInBrowser => MsgKey::action_open_in_browser,
         Item::Settings => MsgKey::action_settings,
     })
+}
+
+/// The header button icon of an item.
+pub fn icon(item: Item) -> &'static str {
+    match item {
+        Item::ChangeIntro => "media-skip-forward-symbolic",
+        Item::EditCategories => "tag-symbolic",
+        Item::Migrate => "kb-swap-symbolic",
+        Item::Share => "kb-share-symbolic",
+        Item::OpenInBrowser => "external-link-symbolic",
+        Item::Settings => "emblem-system-symbolic",
+    }
 }
 
 /// Share: copies the entry's address to the clipboard and returns the notice to show ("Copied to clipboard: …"), or

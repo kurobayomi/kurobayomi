@@ -68,6 +68,8 @@ ICONS = {
     "help-browser": "help_outline",
     "image-crop": "crop",
     "image-x-generic": "image",
+    "kb-share": "share",
+    "kb-swap": "swap_horiz",
     "input-keyboard": "keyboard",
     "list-add": "add",
     "list-drag-handle": "drag_handle",
