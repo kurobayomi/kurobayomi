@@ -44,11 +44,6 @@ impl ReaderSettingsModel {
         self.manga_id == other.manga_id && self.viewer_flags == other.viewer_flags
     }
 
-    /// Linux has no display cutout, so the cutout setting is never offered.
-    pub fn has_display_cutout(&self) -> bool {
-        false
-    }
-
     /// The reading mode in effect, falling back to the global preference when the manga has none.
     pub fn reading_mode(&self, default_pref: i32) -> ReadingMode {
         flags::resolve_reading_mode(self.viewer_flags, default_pref)
@@ -96,10 +91,5 @@ mod tests {
     fn the_reading_mode_resolves_from_the_flags_or_the_preference() {
         assert_eq!(ReaderSettingsModel::new(1, 0x2).reading_mode(1), ReadingMode::RightToLeft);
         assert_eq!(ReaderSettingsModel::new(1, 0).reading_mode(1), ReadingMode::LeftToRight);
-    }
-
-    #[test]
-    fn there_is_never_a_display_cutout_on_linux() {
-        assert!(!ReaderSettingsModel::new(1, 0).has_display_cutout());
     }
 }

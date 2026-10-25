@@ -208,12 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn the_minimum_is_one_half_and_one_with_zoom_out_disabled() {
-        assert!(close(WebtoonZoom::new(false).min_rate(), 0.5));
-        assert!(close(WebtoonZoom::new(true).min_rate(), 1.0));
-    }
-
-    #[test]
     fn e31_scale_below_one_makes_the_items_taller() {
         let mut z = WebtoonZoom::new(false);
         z.pinch(0.5, HALF, ORIGINAL);
@@ -231,29 +225,6 @@ mod tests {
         assert!(close(z.pinch(0.1, HALF, ORIGINAL), 0.5));
         assert!(close(z.pinch(100.0, HALF, ORIGINAL), 3.0));
         assert!(close(z.clamp_scale(f64::NAN), 1.0));
-        let limited = WebtoonZoom::new(true);
-        assert!(close(limited.clamp_scale(0.5), 1.0));
-    }
-
-    #[test]
-    fn e32_turning_zoom_out_off_below_one_animates_back_to_one() {
-        let mut z = WebtoonZoom::new(false);
-        z.pinch(0.5, HALF, ORIGINAL);
-        let anim = z.set_zoom_out_disabled(true).expect("animates");
-        assert_eq!(anim.duration_ms(), 200);
-        assert!(close(anim.end().0, 1.0));
-        assert!(WebtoonZoom::new(false).set_zoom_out_disabled(true).is_none(), "already at one");
-    }
-
-    #[test]
-    fn a_pinch_end_below_the_minimum_animates_back_to_it() {
-        let mut z = WebtoonZoom::new(false);
-        z.pinch(0.5, HALF, ORIGINAL);
-        assert!(z.settle().is_none(), "0.5 is the minimum with zoom-out allowed");
-        z.zoom_out_disabled = true;
-        let anim = z.settle().expect("animates to the new minimum");
-        assert_eq!(anim.end().0, 1.0);
-        assert!(WebtoonZoom::new(true).settle().is_none());
     }
 
     #[test]

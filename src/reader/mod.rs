@@ -5,7 +5,7 @@
 //! machine. `chapters` builds the reader list. `session` runs the reader state. `launch` opens the reader for the app. `screen` is the reader page: open, failure card, chapter buttons, crop. `writer` is the database writer.
 //!
 //! Android items with no Linux port (T-43b-050 to T-43b-052, T-44a-017, T-44a-061, T-44a-072, T-44a-073):
-//! - The display cutout setting is never offered (`settings_model::has_display_cutout`). Its key stays in the store, and the
+//! - The display cutout setting is never offered. Its key stays in the store, and the
 //!   general tab says it is not used on Linux.
 //! - Hardware bitmap config, `BitmapRegionDecoder` and the SDK gates: none. `pref_hardware_bitmap_threshold` is the tile
 //!   threshold (`tiles`).

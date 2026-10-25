@@ -560,11 +560,6 @@ pub fn pages(count: i32) -> String {
     tr_plural(MsgKey::pref_pages, i64::from(count), &[])
 }
 
-/// `pref_flash_duration_summary`: "%1$s ms".
-pub fn flash_duration_summary(millis: i32) -> String {
-    trf(MsgKey::pref_flash_duration_summary, &[("arg1", Arg::Int(i64::from(millis)))])
-}
-
 /// `share_page_info`: "manga: chapter, page n".
 pub fn share_page_info(manga: &str, chapter: &str, page: i32) -> String {
     trf(MsgKey::share_page_info, &[("arg1", Arg::Str(manga)), ("arg2", Arg::Str(chapter)), ("arg3", Arg::Int(i64::from(page)))])
@@ -595,7 +590,6 @@ mod tests {
     fn proposal_messages_match_the_spec_text() {
         assert_eq!(chapter_not_downloaded(), "The chapter is not downloaded. Turn off downloaded-only mode or download it first.");
         assert_eq!(unknown_error(), "Unknown error");
-        assert_eq!(custom_brightness_unavailable(), "Custom brightness is not available on this display");
         assert_eq!(name_collision_suffix(2), " (2)");
         assert_eq!(name_collision_suffix(10), " (10)");
     }
@@ -618,7 +612,6 @@ mod tests {
     fn plural_and_format_strings_follow_the_spec() {
         assert_eq!(pages(1), "1 page");
         assert_eq!(pages(4), "4 pages");
-        assert_eq!(flash_duration_summary(300), "300 ms");
         assert_eq!(share_page_info("M", "C 1", 2), "M: C 1, page 2");
     }
 

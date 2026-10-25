@@ -288,49 +288,6 @@ pub fn pager_split_side(left_to_right_viewer: bool, is_insert_page: bool, dual_p
     if dual_page_invert { side.swapped() } else { side }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Rotation {
-    Cw90,
-    Ccw90,
-}
-
-impl Rotation {
-    /// The signed angle the Kotlin caller passes (positive is clockwise).
-    pub fn degrees(self) -> i32 {
-        match self {
-            Rotation::Cw90 => 90,
-            Rotation::Ccw90 => -90,
-        }
-    }
-}
-
-/// `rotateImage` for the two angles any caller uses: exact quarter turns, no resampling.
-pub fn rotate_quarter(img: &RgbaImage, rotation: Rotation) -> RgbaImage {
-    match rotation {
-        Rotation::Cw90 => imageops::rotate90(img),
-        Rotation::Ccw90 => imageops::rotate270(img),
-    }
-}
-
-/// The sign rule of dual-page rotate-to-fit: `-90` when `dualPageRotateToFitInvert`, else `90`.
-pub fn rotation_for_fit(invert: bool) -> Rotation {
-    if invert { Rotation::Ccw90 } else { Rotation::Cw90 }
-}
-
-/// `splitAndMerge`: a `W/2 x 2H` page with the `upper` half on top and the other half below.
-pub fn split_and_merge(img: &RgbaImage, upper: Side) -> RgbaImage {
-    let (w, h) = (img.width() / 2, img.height());
-    let mut out = RgbaImage::new(w, h * 2);
-    imageops::replace(&mut out, &split_in_half(img, upper), 0, 0);
-    imageops::replace(&mut out, &split_in_half(img, upper.swapped()), 0, i64::from(h));
-    out
-}
-
-/// The webtoon side rule: `upper = Left` when `dualPageInvert`, else `Right`.
-pub fn webtoon_upper_side(dual_page_invert: bool) -> Side {
-    if dual_page_invert { Side::Left } else { Side::Right }
-}
-
 /// One part of a tall image: rows `top..bottom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TallPart {
@@ -420,20 +377,6 @@ fn write_parts(bytes: &[u8], dst_dir: &Path, prefix: &str, plan: &[TallPart]) ->
         paths.push(path);
     }
     Ok(paths)
-}
-
-/// `split_tall` behind the `split_tall_images` download preference: when it is off nothing is read or changed.
-pub fn split_tall_if_enabled(
-    enabled: bool,
-    src: &Path,
-    dst_dir: &Path,
-    prefix: &str,
-    optimal_height: u32,
-) -> Result<Vec<PathBuf>, ImageError> {
-    if !enabled {
-        return Ok(Vec::new());
-    }
-    split_tall(src, dst_dir, prefix, optimal_height)
 }
 
 #[cfg(test)]
@@ -712,45 +655,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn rotate_quarter_swaps_dimensions_and_ccw_reverses_cw() {
-        let img = columns(300, 200);
-        let cw = rotate_quarter(&img, Rotation::Cw90);
-        assert_eq!((cw.width(), cw.height()), (200, 300));
-        assert_eq!(rotate_quarter(&cw, Rotation::Ccw90), img);
-        // Clockwise: the top-left pixel moves to the top-right corner.
-        assert_eq!(cw.get_pixel(199, 0), img.get_pixel(0, 0));
-        let ccw = rotate_quarter(&img, Rotation::Ccw90);
-        assert_eq!(ccw.get_pixel(0, 299), img.get_pixel(0, 0));
-    }
-
-    #[test]
-    fn rotation_sign_rule() {
-        assert_eq!(rotation_for_fit(false), Rotation::Cw90);
-        assert_eq!(rotation_for_fit(true), Rotation::Ccw90);
-        assert_eq!(rotation_for_fit(false).degrees(), 90);
-        assert_eq!(rotation_for_fit(true).degrees(), -90);
-    }
-
-    #[test]
-    fn split_and_merge_puts_the_named_half_on_top() {
-        let img = RgbaImage::from_fn(1000, 600, |x, _| if x < 500 { Rgba([255, 0, 0, 255]) } else { Rgba([0, 0, 255, 255]) });
-        let right_top = split_and_merge(&img, Side::Right);
-        assert_eq!((right_top.width(), right_top.height()), (500, 1200));
-        assert_eq!(right_top.get_pixel(0, 0), &Rgba([0, 0, 255, 255]));
-        assert_eq!(right_top.get_pixel(499, 599), &Rgba([0, 0, 255, 255]));
-        assert_eq!(right_top.get_pixel(0, 600), &Rgba([255, 0, 0, 255]));
-        let left_top = split_and_merge(&img, Side::Left);
-        assert_eq!(left_top.get_pixel(0, 0), &Rgba([255, 0, 0, 255]));
-        assert_eq!(left_top.get_pixel(0, 1199), &Rgba([0, 0, 255, 255]));
-    }
-
-    #[test]
-    fn webtoon_side_rule() {
-        assert_eq!(webtoon_upper_side(false), Side::Right);
-        assert_eq!(webtoon_upper_side(true), Side::Left);
-    }
-
     fn plan(h: u32, optimal: u32) -> Vec<(u32, u32, u32)> {
         tall_split_plan(h, optimal).iter().map(|p| (p.index, p.top, p.bottom)).collect()
     }
@@ -828,14 +732,5 @@ mod tests {
         assert!(split_tall(&src, dir.path(), "007", 40).is_err());
         assert!(src.exists());
         assert!(!dir.path().join("007__001.jpg").exists());
-    }
-
-    #[test]
-    fn split_tall_setting_off_does_nothing() {
-        let dir = tempfile::tempdir().unwrap();
-        let src = write_png(dir.path(), "007.png", 10, 100);
-        assert!(split_tall_if_enabled(false, &src, dir.path(), "007", 40).unwrap().is_empty());
-        assert!(src.exists());
-        assert_eq!(split_tall_if_enabled(true, &src, dir.path(), "007", 40).unwrap().len(), 3);
     }
 }

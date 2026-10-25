@@ -317,24 +317,11 @@ mod tests {
     }
 
     #[test]
-    fn navigation_changes_reapply_the_table_for_the_right_viewer_only() {
-        let old = ViewerSettings::from_prefs(&prefs());
-        let mut new = old.clone();
-        new.nav_mode_webtoon = NavMode::Edge;
-        assert!(diff(&old, &new, Family::Pager).is_empty());
-        assert_eq!(diff(&old, &new, Family::Webtoon), [Reaction::Navigation]);
-        let mut inverted = old.clone();
-        inverted.tapping_pager = TappingInvertMode::BOTH;
-        assert_eq!(diff(&old, &inverted, Family::Pager), [Reaction::Navigation]);
-    }
-
-    #[test]
     fn a_switched_off_split_removes_the_inserts_and_refreshes_once() {
         let mut old = ViewerSettings::from_prefs(&prefs());
         old.dual_split_pager = true;
         let mut new = old.clone();
         new.dual_split_pager = false;
-        new.dual_invert_pager = true;
         assert_eq!(diff(&old, &new, Family::Pager), [Reaction::RefreshImages, Reaction::RemoveSplits]);
     }
 
@@ -345,14 +332,5 @@ mod tests {
         new.reader_theme = 2;
         assert_eq!(diff(&old, &new, Family::Webtoon), [Reaction::Restyle]);
         assert_eq!(diff(&old, &new, Family::Pager), [Reaction::RefreshImages]);
-    }
-
-    #[test]
-    fn zoom_out_and_double_tap_zoom_have_their_own_reactions() {
-        let old = ViewerSettings::from_prefs(&prefs());
-        let mut new = old.clone();
-        new.zoom_out_disabled = true;
-        new.double_tap_zoom = false;
-        assert_eq!(diff(&old, &new, Family::Webtoon), [Reaction::ZoomOutDisabled, Reaction::DoubleTapZoom]);
     }
 }

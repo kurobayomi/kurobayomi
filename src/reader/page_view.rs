@@ -1240,8 +1240,8 @@ mod tests {
             assert!(second.show_cached(source.clone(), config, DecodeIntent::NONE));
             assert_eq!(second.state(), LoadState::Ready, "shown at once, with no decode");
             assert_eq!(second.imp().src.get(), Size { w: 30.0, h: 20.0 });
-            let rotated = DecodeIntent { transform: page_transform::PageTransform::RotateWide { invert: false }, only_if_wide: false };
-            assert!(!PageView::new().show_cached(source, config, rotated), "another transform is another entry");
+            let split = DecodeIntent { transform: page_transform::PageTransform::SplitLeft, only_if_wide: true };
+            assert!(!PageView::new().show_cached(source, config, split), "another transform is another entry");
         });
     }
 
@@ -1283,17 +1283,6 @@ mod tests {
             again.connect_page_split(move || seen.set(seen.get() + 1));
             assert!(again.show_cached(file("wide.png"), PageConfig::default(), split));
             assert_eq!(splits.get(), 2);
-        });
-    }
-
-    #[test]
-    fn a_rotated_page_swaps_its_edges() {
-        crate::testing::with_display(|| {
-            let page = PageView::new();
-            let rotate = DecodeIntent { transform: page_transform::PageTransform::RotateWide { invert: true }, only_if_wide: false };
-            page.set_image_from(file("rotate.png"), wide_png(), PageConfig::default(), rotate);
-            settle(&page);
-            assert_eq!(page.imp().src.get(), Size { w: 200.0, h: 400.0 });
         });
     }
 

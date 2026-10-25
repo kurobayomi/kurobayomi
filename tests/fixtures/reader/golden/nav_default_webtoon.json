@@ -28,62 +28,18 @@
     0.9,
     1.0
   ],
-  "inversions": {
-    "none": [
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "MMMMMMMMMMMM"
-    ],
-    "horizontal": [
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "MMMMMMMMMMMM"
-    ],
-    "vertical": [
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPMMMMNNNNM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "MMMMMMMMMMMM"
-    ],
-    "both": [
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNNNNNNNNM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "NNNNMMMMPPPM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "PPPPPPPPPPPM",
-      "MMMMMMMMMMMM"
-    ]
-  }
+  "rows": [
+    "PPPPPPPPPPPM",
+    "PPPPPPPPPPPM",
+    "PPPPPPPPPPPM",
+    "PPPMMMMNNNNM",
+    "PPPMMMMNNNNM",
+    "PPPMMMMNNNNM",
+    "PPPMMMMNNNNM",
+    "NNNNNNNNNNNM",
+    "NNNNNNNNNNNM",
+    "NNNNNNNNNNNM",
+    "NNNNNNNNNNNM",
+    "MMMMMMMMMMMM"
+  ]
 }

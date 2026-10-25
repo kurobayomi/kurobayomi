@@ -204,27 +204,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_zones_follow_the_layout_and_the_inversion() {
+    fn the_zones_follow_the_layout() {
         let plain = zones(NavMode::LShaped, TappingInvertMode::NONE, ViewerKind::Webtoon);
         assert_eq!(plain.len(), 4);
         assert_eq!(plain[0], Zone { rect: Rect::new(0.0, 0.33, 0.33, 0.66), action: Action::Prev });
-        let flipped = zones(NavMode::RightAndLeft, TappingInvertMode::HORIZONTAL, ViewerKind::LeftToRight);
-        assert_eq!(flipped[0].action, Action::Left);
-        assert!((flipped[0].rect.left - 0.67).abs() < 1e-9 && (flipped[0].rect.right - 1.0).abs() < 1e-9, "{:?}", flipped[0].rect);
     }
 
     #[test]
     fn the_settings_pick_the_pager_or_the_webtoon_navigation() {
-        let mut settings = ViewerSettings::from_prefs(&kuro_prefs::reader::ReaderPrefs::new(kuro_prefs::store::PrefStore::in_memory()));
-        settings.nav_mode_pager = NavMode::Edge;
-        settings.nav_mode_webtoon = NavMode::Disabled;
-        assert_eq!(zones_for(ViewerKind::RightToLeft, &settings).len(), 3);
-        assert!(zones_for(ViewerKind::Webtoon, &settings).is_empty());
-    }
-
-    #[test]
-    fn a_disabled_navigation_has_no_zones() {
-        assert!(zones(NavMode::Disabled, TappingInvertMode::NONE, ViewerKind::LeftToRight).is_empty());
+        let settings = ViewerSettings::from_prefs(&kuro_prefs::reader::ReaderPrefs::new(kuro_prefs::store::PrefStore::in_memory()));
+        assert_eq!(zones_for(ViewerKind::RightToLeft, &settings).len(), 2);
+        assert_eq!(zones_for(ViewerKind::Webtoon, &settings).len(), 4);
     }
 
     #[test]

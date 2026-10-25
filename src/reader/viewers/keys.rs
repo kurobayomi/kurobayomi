@@ -141,7 +141,6 @@ mod tests {
     use super::*;
 
     const OFF: KeyContext = KeyContext { volume_enabled: false, volume_inverted: false, menu_visible: false };
-    const ON: KeyContext = KeyContext { volume_enabled: true, volume_inverted: false, menu_visible: false };
 
     fn press(key: InputKey) -> KeyEvent {
         KeyEvent { key, ctrl: false, released: false }

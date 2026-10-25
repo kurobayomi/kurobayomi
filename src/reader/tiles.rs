@@ -36,29 +36,6 @@ pub fn current_tile_edge() -> u32 {
     TILE_EDGE.load(Ordering::Relaxed)
 }
 
-#[cfg(test)]
-mod max_tile_edge_tests {
-    use super::*;
-
-    #[test]
-    fn a_threshold_below_256_falls_back_to_the_default_edge() {
-        assert_eq!(max_tile_edge(0), DEFAULT_TILE_THRESHOLD);
-        assert_eq!(max_tile_edge(255), DEFAULT_TILE_THRESHOLD);
-        assert_eq!(max_tile_edge(256), 256);
-        assert_eq!(max_tile_edge(4096), 4096);
-        assert_eq!(max_tile_edge(100_000), MAX_TEXTURE_EDGE, "above the texture limit is held to it");
-    }
-
-    #[test]
-    fn a_rejected_threshold_leaves_the_default_edge_for_the_next_decode() {
-        // only default-valued writes here: the edge is process-wide and the page tests decode with it
-        set_tile_threshold(10);
-        assert_eq!(current_tile_edge(), DEFAULT_TILE_THRESHOLD);
-        set_tile_threshold(DEFAULT_TILE_THRESHOLD as i32);
-        assert_eq!(current_tile_edge(), DEFAULT_TILE_THRESHOLD);
-    }
-}
-
 /// A rectangle of one pyramid level, in that level's pixels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Tile {

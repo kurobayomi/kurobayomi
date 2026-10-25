@@ -2003,27 +2003,6 @@ mod tests {
     }
 
     #[test]
-    fn double_tap_zoom_follows_its_setting_and_zoom_out_off_pulls_the_strip_back_to_one() {
-        crate::testing::with_display(|| {
-            let chapter = chapter(1, &[image("setting-a", 40, 60)]);
-            let mut settings = ViewerSettings::from_prefs(&prefs());
-            settings.double_tap_zoom = false;
-            let engine = WebtoonEngine::new(false, context(settings.clone()));
-            let window = show(engine.widget());
-            engine.set_chapters(handed(&chapter));
-            let inner = Rc::clone(&engine.0);
-            assert!(pump_until(|| inner.frame.height() > 0 && inner.frame.is_mapped()));
-            inner.double_tap(100.0, 100.0);
-            assert!(!inner.animating.get() && close(inner.frame.view().0, 1.0), "the setting is off");
-            inner.pinch(0.5);
-            engine.apply_settings(ViewerSettings { zoom_out_disabled: true, ..settings });
-            assert!(inner.animating.get(), "turning zoom-out off below 1 animates back (E-32)");
-            assert!(pump_until(|| !inner.animating.get() && close(inner.frame.view().0, 1.0)));
-            window.destroy();
-        });
-    }
-
-    #[test]
     fn t058_the_plus_minus_and_zero_keys_map_to_the_zoom_keys() {
         crate::testing::with_display(|| {
             use gtk::gdk::Key;

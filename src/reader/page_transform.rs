@@ -184,40 +184,13 @@ mod tests {
     }
 
     #[test]
-    fn split_and_merge_stacks_the_halves_with_the_chosen_one_on_top() {
-        let page = grid(4, 2);
-        let merged = split_and_merge(&page, true);
-        assert_eq!((merged.width, merged.height), (2, 4));
-        // rows 0..2 are the right half, rows 2..4 the left half
-        assert_eq!(merged.rgba[0], 2);
-        assert_eq!(merged.rgba[2 * 2 * 4], 0);
-        let merged = split_and_merge(&page, false);
-        assert_eq!(merged.rgba[0], 0);
-        assert_eq!(merged.rgba[2 * 2 * 4], 2);
-    }
-
-    #[test]
-    fn a_2000_by_1000_page_splits_into_two_squares_and_rotates_to_a_tall_page() {
+    fn a_2000_by_1000_page_splits_into_two_squares() {
         let page = grid(2000, 1000);
         assert!(is_wide(page.width, page.height));
         let left = split_in_half(&page, false);
         let right = split_in_half(&page, true);
         assert_eq!((left.width, left.height), (1000, 1000));
         assert_eq!((right.width, right.height), (1000, 1000));
-        let rotated = rotate(&page, false);
-        assert_eq!((rotated.width, rotated.height), (1000, 2000));
-    }
-
-    #[test]
-    fn rotating_a_wide_page_turns_it_a_quarter_either_way() {
-        let page = grid(3, 2);
-        let cw = rotate(&page, false);
-        assert_eq!((cw.width, cw.height), (2, 3));
-        // clockwise: the top-left pixel (x 0, y 0) lands top-right
-        assert_eq!(&cw.rgba[(2 - 1) * 4..(2 - 1) * 4 + 2], &[0, 0]);
-        let ccw = rotate(&page, true);
-        // counter-clockwise: the top-left pixel lands bottom-left
-        assert_eq!(&ccw.rgba[(2 * 3 - 2) * 4..(2 * 3 - 2) * 4 + 2], &[0, 0]);
     }
 
     #[test]
@@ -229,22 +202,7 @@ mod tests {
         let (out, changed) = apply(tall.clone(), DecodeIntent { transform: PageTransform::SplitLeft, only_if_wide: false });
         assert!(changed, "an insert page splits whatever it is given");
         assert_eq!(out.width, 1);
-        let (_, changed) = apply(tall.clone(), DecodeIntent { transform: PageTransform::RotateWide { invert: false }, only_if_wide: false });
-        assert!(!changed, "only a wide page rotates");
-        let (_, changed) = apply(tall.clone(), DecodeIntent { transform: PageTransform::SplitAndMerge { upper_right: true }, only_if_wide: true });
-        assert!(!changed);
         assert_eq!(apply(tall.clone(), DecodeIntent::NONE), (tall, false));
-    }
-
-    #[test]
-    fn apply_rotates_and_splits_a_wide_page() {
-        let wide = grid(4, 2);
-        let (rotated, changed) = apply(wide.clone(), DecodeIntent { transform: PageTransform::RotateWide { invert: true }, only_if_wide: false });
-        assert!(changed);
-        assert_eq!((rotated.width, rotated.height), (2, 4));
-        let (merged, changed) = apply(wide, DecodeIntent { transform: PageTransform::SplitAndMerge { upper_right: false }, only_if_wide: true });
-        assert!(changed);
-        assert_eq!((merged.width, merged.height), (2, 4));
     }
 
     #[test]
@@ -258,41 +216,13 @@ mod tests {
     }
 
     #[test]
-    fn inverting_swaps_the_sides() {
-        let side = |l2r, is_insert| intent(settings(|s| {
-            s.l2r = l2r;
-            s.invert = true;
-        }), is_insert)
-        .transform;
-        assert_eq!(side(true, false), PageTransform::SplitRight);
-        assert_eq!(side(true, true), PageTransform::SplitLeft);
-        assert_eq!(side(false, false), PageTransform::SplitLeft);
-    }
-
-    #[test]
     fn only_a_normal_pager_page_checks_for_width() {
         assert!(intent(settings(|_| {}), false).only_if_wide);
         assert!(!intent(settings(|_| {}), true).only_if_wide);
     }
 
     #[test]
-    fn rotate_has_priority_over_split_and_off_means_none() {
-        let rotate_on = settings(|s| {
-            s.rotate = true;
-            s.rotate_invert = true;
-        });
-        assert_eq!(intent(rotate_on, false).transform, PageTransform::RotateWide { invert: true });
-        assert_eq!(intent(rotate_on, true).transform, PageTransform::RotateWide { invert: true });
+    fn split_off_means_no_transform() {
         assert_eq!(intent(settings(|s| s.split = false), false), DecodeIntent::NONE);
-    }
-
-    #[test]
-    fn the_webtoon_merges_with_the_right_half_up_unless_inverted() {
-        let web = |invert| intent(settings(|s| {
-            s.webtoon = true;
-            s.invert = invert;
-        }), false);
-        assert_eq!(web(false), DecodeIntent { transform: PageTransform::SplitAndMerge { upper_right: true }, only_if_wide: true });
-        assert_eq!(web(true).transform, PageTransform::SplitAndMerge { upper_right: false });
     }
 }

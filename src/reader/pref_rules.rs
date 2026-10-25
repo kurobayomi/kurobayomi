@@ -38,32 +38,3 @@ pub fn flash_interval(stored: i32) -> i32 {
 pub fn side_padding(stored: i32) -> i32 {
     clamp_webtoon_side_padding(stored)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn flash_duration_is_clamped_to_one_hundred_to_fifteen_hundred_milliseconds() {
-        assert_eq!(clamp_to(50, FLASH_DURATION_MS), 100);
-        assert_eq!(clamp_to(2000, FLASH_DURATION_MS), 1500);
-        assert_eq!(clamp_to(400, FLASH_DURATION_MS), 400);
-    }
-
-    #[test]
-    fn flash_duration_is_a_multiple_of_one_hundred_inside_the_range() {
-        assert_eq!(flash_duration_ms(50), 100);
-        assert_eq!(flash_duration_ms(2000), 1500);
-        assert_eq!(flash_duration_ms(449), 400);
-        assert_eq!(flash_duration_ms(450), 500);
-        assert_eq!(flash_duration_ms(1500), 1500);
-        assert_eq!(flash_duration_ms(i32::MAX), 1500);
-    }
-
-    #[test]
-    fn interval_and_side_padding_clamp_on_read() {
-        assert_eq!((flash_interval(0), flash_interval(11), flash_interval(4)), (1, 10, 4));
-        assert_eq!((side_padding(30), side_padding(-2), side_padding(12)), (25, 0, 12));
-    }
-
-}

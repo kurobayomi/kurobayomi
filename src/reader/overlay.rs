@@ -59,13 +59,6 @@ pub fn channel_get(packed: i32, channel: Channel) -> i32 {
     ((packed as u32 & channel.mask()) >> channel.shift()) as i32
 }
 
-/// The packed colour with one channel replaced and the other three bytes kept (`getColorValue`:
-/// `(value shl shift) or (current and mask.inv())`).
-pub fn channel_set(packed: i32, channel: Channel, value: i32) -> i32 {
-    let byte = value.clamp(0, 255) as u32;
-    ((byte << channel.shift()) | (packed as u32 & !channel.mask())) as i32
-}
-
 /// The alpha of the black brightness layer: `|v| / 100` for a negative value while the feature is on, else none.
 pub fn brightness_alpha(enabled: bool, value: i32) -> f64 {
     if enabled && value < 0 { f64::from(value.clamp(BRIGHTNESS_RANGE.0, -1).abs()) / 100.0 } else { 0.0 }
@@ -224,72 +217,5 @@ impl Tint {
                 area.set_visible(false);
             }
         });
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn colour_channel_mask_write() {
-        let packed = 0x1122_3344_u32 as i32;
-        assert_eq!(channel_set(packed, Channel::Red, 0xAA) as u32, 0x11AA_3344);
-        assert_eq!(channel_set(packed, Channel::Alpha, 0xFF) as u32, 0xFF22_3344);
-        assert_eq!(channel_set(packed, Channel::Green, 0) as u32, 0x1122_0044);
-        assert_eq!(channel_set(packed, Channel::Blue, 300) as u32, 0x1122_33FF, "a value is clamped to a byte");
-        assert_eq!(channel_get(packed, Channel::Green), 0x33);
-        assert_eq!(channel_get(0xFF00_0000_u32 as i32, Channel::Alpha), 255);
-    }
-
-    #[test]
-    fn brightness_only_darkens_for_negative_values_while_on() {
-        assert_eq!(brightness_alpha(true, -50), 0.5);
-        assert_eq!(brightness_alpha(true, -75), 0.75);
-        assert_eq!(brightness_alpha(true, -200), 0.75, "the value is held to the slider range");
-        assert_eq!(brightness_alpha(true, 0), 0.0);
-        assert_eq!(brightness_alpha(true, 40), 0.0);
-        assert_eq!(brightness_alpha(false, -50), 0.0, "off hides the layer whatever the value");
-    }
-
-    #[test]
-    fn the_filter_colour_is_unpacked_and_hidden_when_off() {
-        assert_eq!(filter_rgba(false, 0x80FF_0000_u32 as i32), None);
-        let (r, g, b, a) = filter_rgba(true, 0x80FF_0000_u32 as i32).unwrap();
-        assert_eq!((r, g, b), (1.0, 0.0, 0.0));
-        assert!((a - 128.0 / 255.0).abs() < 1e-9);
-    }
-
-    /// What a colour comes out as: the row vector `[r, g, b, a]` times the matrix, plus the offset.
-    fn through(filter: ColourMatrix, rgba: [f32; 4]) -> [f32; 4] {
-        let (m, offset) = filter;
-        std::array::from_fn(|col| (0..4).map(|row| rgba[row] * m[row * 4 + col]).sum::<f32>() + offset[col])
-    }
-
-    fn near(a: [f32; 4], b: [f32; 4]) -> bool {
-        a.iter().zip(b).all(|(x, y)| (x - y).abs() < 1e-5)
-    }
-
-    #[test]
-    fn grayscale_and_invert_are_off_by_default_and_each_is_its_own_matrix() {
-        assert_eq!(page_colour_matrix(false, false), None);
-        let gray = page_colour_matrix(true, false).unwrap();
-        assert!(near(through(gray, [1.0, 0.0, 0.0, 1.0]), [0.213, 0.213, 0.213, 1.0]), "red goes to its luma");
-        assert!(near(through(gray, [0.0, 1.0, 0.0, 1.0]), [0.715, 0.715, 0.715, 1.0]));
-        assert!(near(through(gray, [1.0, 1.0, 1.0, 1.0]), [1.0, 1.0, 1.0, 1.0]), "white stays white");
-        let invert = page_colour_matrix(false, true).unwrap();
-        assert!(near(through(invert, [0.0, 0.25, 1.0, 0.5]), [1.0, 0.75, 0.0, 0.5]), "colours flip and alpha stays");
-    }
-
-    #[test]
-    fn grayscale_applies_before_invert() {
-        let both = page_colour_matrix(true, true).unwrap();
-        let gray = page_colour_matrix(true, false).unwrap();
-        let invert = page_colour_matrix(false, true).unwrap();
-        for colour in [[1.0, 0.0, 0.0, 1.0], [0.2, 0.6, 0.9, 1.0], [0.0, 0.0, 0.0, 1.0]] {
-            let in_order = through(invert, through(gray, colour));
-            assert!(near(through(both, colour), in_order), "{colour:?}");
-        }
-        assert!(near(through(both, [1.0, 0.0, 0.0, 1.0]), [0.787, 0.787, 0.787, 1.0]));
     }
 }

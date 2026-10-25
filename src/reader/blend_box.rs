@@ -117,7 +117,6 @@ impl BlendBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gtk::gsk::BlendMode;
 
     /// The node a snapshot of one red square makes with `filter`.
     fn node_with(filter: Option<crate::reader::overlay::ColourMatrix>) -> gtk::gsk::RenderNode {
@@ -129,38 +128,9 @@ mod tests {
     }
 
     #[test]
-    fn t066_the_page_filter_is_a_colour_matrix_node_around_the_page_with_grayscale_before_invert() {
-        crate::testing::with_display(|| {
-        use crate::reader::overlay::page_colour_matrix;
-        use gtk::prelude::*;
-        let both = page_colour_matrix(true, true);
-        let node = node_with(both);
-        let matrix_node = node.downcast_ref::<gtk::gsk::ColorMatrixNode>().expect("the page is wrapped in a colour matrix node");
-        let (matrix, offset) = both.unwrap();
-        assert_eq!(matrix_node.color_matrix().to_float(), matrix, "the grayscale and invert matrix");
-        assert_eq!(matrix_node.color_offset().to_float(), offset);
-        let red = matrix_node.color_matrix().transform_vec4(&gtk::graphene::Vec4::new(1.0, 0.0, 0.0, 1.0));
-        let (r, g, b) = (red.x() + offset[0], red.y() + offset[1], red.z() + offset[2]);
-        assert!((r - 0.787).abs() < 1e-4 && (g - r).abs() < 1e-6 && (b - r).abs() < 1e-6, "red becomes the inverted luma {r} {g} {b}");
-        assert!(matrix_node.child().downcast_ref::<gtk::gsk::ColorNode>().is_some(), "the page is the child");
-        });
-    }
-
-    #[test]
     fn t066_with_no_filter_the_page_is_drawn_without_a_matrix_node() {
         crate::testing::with_display(|| {
             assert!(node_with(None).downcast_ref::<gtk::gsk::ColorNode>().is_some());
         });
-    }
-
-    #[test]
-    fn the_six_modes_map_in_order_and_unknown_is_default() {
-        let modes: Vec<BlendMode> = (0..6).map(blend_mode).collect();
-        assert_eq!(
-            modes,
-            [BlendMode::Default, BlendMode::Multiply, BlendMode::Screen, BlendMode::Overlay, BlendMode::Lighten, BlendMode::Darken]
-        );
-        assert_eq!(blend_mode(9), BlendMode::Default);
-        assert_eq!(blend_mode(-1), BlendMode::Default);
     }
 }

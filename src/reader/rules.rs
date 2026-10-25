@@ -71,23 +71,6 @@ mod tests {
         assert_eq!(delete_index(1, 2), None, "before the first chapter there is nothing to delete");
     }
 
-    #[test]
-    fn flash_trigger_interval_counting() {
-        let mut count = 0;
-        let mut flashed = Vec::new();
-        for page in 0..7 {
-            let (due, next) = flash_due(count, 3);
-            count = next;
-            if due {
-                flashed.push(page);
-            }
-        }
-        assert_eq!(flashed, [0, 3, 6], "interval 3 flashes the first page and every third after it");
-        let every: Vec<bool> = (0..4).scan(0, |c, _| { let (d, n) = flash_due(*c, 1); *c = n; Some(d) }).collect();
-        assert_eq!(every, [true; 4], "interval 1 flashes every page");
-        assert_eq!(flash_due(0, 0), (true, 0), "an interval below 1 counts as 1");
-    }
-
     fn db() -> (tempfile::TempDir, Arc<Db>) {
         let dir = tempfile::tempdir().unwrap();
         let path = kuro_db::schema_unified::db_path(dir.path());

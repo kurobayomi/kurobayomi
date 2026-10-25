@@ -54,16 +54,4 @@ mod tests {
         set_display_profile("");
         assert_eq!(apply(page()), page());
     }
-
-    #[test]
-    fn a_missing_or_unreadable_file_falls_back_to_no_transform() {
-        let dir = tempfile::tempdir().unwrap();
-        set_display_profile(&dir.path().join("missing.icc").to_string_lossy());
-        assert_eq!(apply(page()), page());
-        let junk = dir.path().join("junk.icc");
-        std::fs::write(&junk, b"not a profile").unwrap();
-        set_display_profile(&junk.to_string_lossy());
-        assert_eq!(apply(page()), page());
-        set_display_profile("");
-    }
 }

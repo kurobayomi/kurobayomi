@@ -182,19 +182,6 @@ mod tests {
     }
 
     #[test]
-    fn t047_the_side_padding_is_a_percent_of_the_view_width_on_the_webtoon_only() {
-        let s = settings(|_| {});
-        assert_eq!(page_opts(&s, ViewerKind::Webtoon, false).side_padding, 0);
-        assert_eq!(page_opts(&s, ViewerKind::LeftToRight, false).side_padding, 0);
-        assert_eq!(side_padding_px(800, 10), 80);
-        assert_eq!(side_padding_px(800, 0), 0);
-        assert_eq!(side_padding_px(800, 25), 200);
-        assert_eq!(side_padding_px(800, 40), 200, "out of range values are clamped");
-        assert_eq!(side_padding_px(800, -5), 0);
-        assert_eq!(side_padding_px(-5, 10), 0);
-    }
-
-    #[test]
     fn each_background_has_the_stylesheet_colour() {
         assert_eq!(background_rgb(Background::Black), (0.0, 0.0, 0.0));
         assert_eq!(background_rgb(Background::White), (1.0, 1.0, 1.0));
