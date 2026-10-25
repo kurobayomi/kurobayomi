@@ -35,6 +35,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Fixed
 
+- Downloading an HLS episode (any source's `.m3u8` stream) failed with "403 Forbidden" when the video server refuses
+  HTTP/1.1, as AnimePahe's does: the download now fetches through the same local relay the player uses.
 - Sources behind Cloudflare's browser check (AnimePahe) answered "HTTP error 403" on a system that is not in English:
   Cloudflare titled its check page in the system's language, and the app took the page for cleared while the check
   still ran. The hidden pages that pass the check now browse in English on Windows and Linux.

@@ -37,12 +37,20 @@ fn to_track(track: kuro_source::anime::Track) -> Track {
     Track { url: track.url, lang: track.lang }
 }
 
-/// The source's video in the download queue's shape: the stream, its headers and side tracks.
+/// The source's video in the download queue's shape: the stream, its headers and side tracks. A remote HLS stream goes
+/// through the player's relay (`player_view::hls_proxy`), as it does when played: ffmpeg speaks HTTP/1.1 only, and some
+/// video servers refuse that (AnimePahe's answer 403). The relay then holds the headers and sends them upstream.
 fn to_download_video(video: kuro_source::anime::Video) -> Video {
+    let headers = video.headers.map(|h| h.0);
+    let (url, headers) = if crate::player_view::hls_proxy::wants_relay(&video.video_url) {
+        (crate::player_view::hls_proxy::local_url(&video.video_url, headers.as_deref().unwrap_or_default()), None)
+    } else {
+        (video.video_url, headers)
+    };
     Video {
-        url: video.video_url,
+        url,
         title: video.video_title,
-        headers: video.headers.map(|h| h.0),
+        headers,
         subtitle_tracks: video.subtitle_tracks.into_iter().map(to_track).collect(),
         audio_tracks: video.audio_tracks.into_iter().map(to_track).collect(),
         stream_args: video.ffmpeg_stream_args,
@@ -130,6 +138,21 @@ impl VideoFetch for HttpVideoFetch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_hls_stream_downloads_through_the_players_relay_and_a_file_does_not() {
+        let headers = Some(kuro_source::anime::Headers(vec![("Referer".into(), "https://site.test/".into())]));
+        let video = |url: &str| kuro_source::anime::Video { video_url: url.into(), headers: headers.clone(), ..Default::default() };
+        let hls = to_download_video(video("https://cdn.test/stream/uwu.m3u8?t=1"));
+        if hls.url != "https://cdn.test/stream/uwu.m3u8?t=1" {
+            // the relay started: ffmpeg asks it on this machine, and it holds the headers
+            assert!(hls.url.starts_with("http://127.0.0.1:"), "{}", hls.url);
+            assert_eq!(crate::player_view::hls_proxy::upstream_of(&hls.url).as_deref(), Some("https://cdn.test/stream/uwu.m3u8?t=1"));
+            assert_eq!(hls.headers, None);
+        }
+        let file = to_download_video(video("https://cdn.test/episode.mp4"));
+        assert_eq!((file.url.as_str(), file.headers), ("https://cdn.test/episode.mp4", headers.map(|h| h.0)), "a plain file goes as it is");
+    }
 
     #[test]
     fn the_queued_episode_maps_to_the_source_episode() {

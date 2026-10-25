@@ -8,7 +8,7 @@ use kuro_i18n::{MsgKey, tr};
 mod after_seen;
 mod auto_hide;
 mod controls;
-mod hls_proxy;
+pub(crate) mod hls_proxy;
 mod menu;
 mod neighbours;
 mod playback;
