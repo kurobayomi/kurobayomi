@@ -118,10 +118,16 @@ window.kb-narrow headerbar menubutton > button.image-button {
   padding-left: 4px;
   padding-right: 4px;
 }
+/* the hover fill is strong enough to see on a dark theme (8% was not), and eases in */
+headerbar button.image-button:not(.suggested-action):not(.destructive-action),
+headerbar menubutton > button.image-button,
+.kb-bottom-bar button {
+  transition: background 120ms ease;
+}
 headerbar button.image-button:not(.suggested-action):not(.destructive-action):hover,
 headerbar menubutton > button.image-button:hover,
 .kb-bottom-bar button:hover {
-  background: alpha(currentColor, 0.08);
+  background: alpha(currentColor, 0.14);
 }
 headerbar button.image-button:not(.suggested-action):not(.destructive-action):active,
 headerbar button.image-button:not(.suggested-action):not(.destructive-action):checked,
@@ -129,7 +135,7 @@ headerbar menubutton > button.image-button:active,
 headerbar menubutton > button.image-button:checked,
 .kb-bottom-bar button:active,
 .kb-bottom-bar button:checked {
-  background: alpha(currentColor, 0.16);
+  background: alpha(currentColor, 0.22);
 }
 /* A refresh button at work: its arrow turns until the work ends (`ui::set_refreshing`), or once for a refresh that is done
    at once (`ui::spin_once`, 700 ms). Every page's refresh button uses it. */
@@ -159,7 +165,17 @@ button.kb-spin-once image {
   border-radius: 8px;
   background-color: alpha(@theme_fg_color, 0.06);
 }
-.kb-card-selected .kb-card-cover {
+/* A cover card under the pointer (Library, Browse and every other cover grid): a thin ring in the accent colour and a
+   slightly brighter cover, easing in, so the card that a click opens is clear. A selected card keeps its thicker ring. */
+gridview > child .kb-card-cover {
+  transition: box-shadow 150ms ease, filter 150ms ease;
+}
+gridview > child:hover .kb-card-cover {
+  box-shadow: 0 0 0 2px alpha(@theme_selected_bg_color, 0.75);
+  filter: brightness(1.08);
+}
+.kb-card-selected .kb-card-cover,
+gridview > child:hover .kb-card-selected .kb-card-cover {
   box-shadow: 0 0 0 3px @theme_selected_bg_color;
 }
 .kb-cover-initials {
