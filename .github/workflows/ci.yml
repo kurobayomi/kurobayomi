@@ -44,7 +44,8 @@ defaults:
     shell: bash
 
 jobs:
-  test:
+  linux:
+    name: Tests (Linux)
     runs-on: ubuntu-latest
     # Ubuntu 24.04 with every system package already in it (ci/Dockerfile, built by build-image.yml): nothing is
     # installed from Ubuntu's mirror here, which once held a run for over an hour
@@ -76,7 +77,8 @@ jobs:
           CARGO_INCREMENTAL: "0"
           CARGO_PROFILE_DEV_DEBUG: "0"
           CARGO_PROFILE_TEST_DEBUG: "0"
-        run: cargo test --workspace
+        # every crate's tests even after a failure, so one run shows all of them (as on Windows)
+        run: cargo test --workspace --no-fail-fast
 
       - name: Disk space left
         if: always()
@@ -86,6 +88,7 @@ jobs:
   # with the MSYS2 UCRT64 toolchain whose GTK, mpv, dav1d and libarchive the installer bundles. Tests that need a Unix
   # shell, Unix file modes or Linux desktop tools are #[cfg(unix)].
   windows:
+    name: Tests (Windows)
     runs-on: windows-latest
     # a GTK test that waits for a window event that never comes would otherwise hold the runner for 6 hours
     timeout-minutes: 60
