@@ -32,6 +32,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   page header (link a folder, open the Local folder, Upcoming, Clear history, Pause or Resume and Clear queue, the last
   two only while something is queued). Update category is F5 or a category tab's right-click menu.
 
+### Fixed
+
+- Sources behind Cloudflare's browser check (AnimePahe) answered "HTTP error 403" on a system that is not in English:
+  Cloudflare titled its check page in the system's language, and the app took the page for cleared while the check
+  still ran. The hidden pages that pass the check now browse in English on Windows and Linux.
+
 ## [0.2.2] - 2026-10-25
 
 ### Fixed

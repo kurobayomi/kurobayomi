@@ -98,7 +98,12 @@ pub fn still_challenged(answer: &str) -> bool {
     })
 }
 
-/// Whether a page titled `title` is the check rather than the site.
+/// The language the hidden pages browse in, whatever the system's. Cloudflare's check retitles its page in the browser's
+/// language ("Un instant…" on a French system), and [`is_check_page`] knows the English title only: a page in another
+/// language passed for cleared while the check still ran, and the site answered its requests with 403.
+pub const PAGE_LANGUAGE: &str = "en-US";
+
+/// Whether a page titled `title` is the check rather than the site. The pages browse in [`PAGE_LANGUAGE`].
 pub fn is_check_page(title: &str) -> bool {
     title.to_lowercase().contains("just a moment")
 }

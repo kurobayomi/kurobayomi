@@ -37,7 +37,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     TranslateMessage, WM_APP, WM_TIMER, WS_POPUP,
 };
 
-use crate::hidden_pages::{ANSWER_TIMEOUT, FETCH_JS, HiddenPages, IDLE_CLOSE, READY_TIMEOUT, is_check_page, origin_of, still_challenged, url_of};
+use crate::hidden_pages::{ANSWER_TIMEOUT, FETCH_JS, HiddenPages, IDLE_CLOSE, PAGE_LANGUAGE, READY_TIMEOUT, is_check_page, origin_of, still_challenged, url_of};
 
 /// How often the loop looks at the pages that load and at the idle ones.
 const TICK: Duration = Duration::from_millis(250);
@@ -158,6 +158,8 @@ fn environment(data: &Path) -> Result<ICoreWebView2Environment, String> {
     let options = CoreWebView2EnvironmentOptions::default();
     // SAFETY: a plain setter of the options object made above
     unsafe { options.set_additional_browser_arguments(BROWSER_ARGUMENTS.to_owned()) };
+    // SAFETY: as above; the check's page then has its English title on any system (`PAGE_LANGUAGE`)
+    unsafe { options.set_language(PAGE_LANGUAGE.to_owned()) };
     let options: ICoreWebView2EnvironmentOptions = options.into();
     let folder = data.to_string_lossy().into_owned();
     let (tx, rx) = mpsc::channel();

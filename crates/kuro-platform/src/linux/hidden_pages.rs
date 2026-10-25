@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use webkit6::glib;
 use webkit6::prelude::*;
 
-use crate::hidden_pages::{ANSWER_TIMEOUT, FETCH_JS, HiddenPages, IDLE_CLOSE, READY_TIMEOUT, idle_sites, is_check_page, origin_of, still_challenged, url_of};
+use crate::hidden_pages::{ANSWER_TIMEOUT, FETCH_JS, HiddenPages, IDLE_CLOSE, PAGE_LANGUAGE, READY_TIMEOUT, idle_sites, is_check_page, origin_of, still_challenged, url_of};
 
 /// The pages, with the folders their cookies and cache are kept in.
 pub struct WebKitPages {
@@ -44,6 +44,12 @@ thread_local! {
     /// sweep that closes idle pages runs.
     static VIEWS: RefCell<HashMap<String, webkit6::WebView>> = RefCell::new(HashMap::new());
     static SESSION: RefCell<Option<webkit6::NetworkSession>> = const { RefCell::new(None) };
+    /// The pages' own web context, in [`PAGE_LANGUAGE`] whatever the system's: the check's page then keeps its English title.
+    static CONTEXT: webkit6::WebContext = {
+        let context = webkit6::WebContext::new();
+        context.set_preferred_languages(&[PAGE_LANGUAGE]);
+        context
+    };
     static USED: RefCell<HashMap<String, Instant>> = RefCell::new(HashMap::new());
     static SWEEPING: Cell<bool> = const { Cell::new(false) };
     /// One turn at a time to load each site's page.
@@ -129,7 +135,8 @@ async fn page_for(origin: &str, target: &str, data: &Path, cache: &Path, reload:
                 .get_or_insert_with(|| webkit6::NetworkSession::new(data.to_str(), cache.to_str()))
                 .clone()
         });
-        let view = webkit6::WebView::builder().network_session(&session).settings(&quiet_settings()).build();
+        let context = CONTEXT.with(webkit6::WebContext::clone);
+        let view = webkit6::WebView::builder().web_context(&context).network_session(&session).settings(&quiet_settings()).build();
         // a hidden page never gets to ask for anything (camera, microphone, location, notifications...)
         view.connect_permission_request(|_, request| {
             request.deny();
