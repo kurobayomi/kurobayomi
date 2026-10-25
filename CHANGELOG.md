@@ -6,6 +6,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Changed
+
+- Windows: a downloaded update says it is ready ("install it now, or it installs when you close the app") instead of
+  installed, and its button is Install now instead of Restart, as installing takes a few seconds there. Install now
+  shows the setup's progress window until the new version starts; a plain quit still installs without a window.
+
 ## [0.2.2] - 2026-10-25
 
 ### Fixed

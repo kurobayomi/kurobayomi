@@ -973,3 +973,21 @@ player_link_refused = This source gave a video address that is not allowed: sour
 
 # source: kurobayomi
 pref_cover_size = Cover size
+
+# source: kurobayomi
+ui_install_now = Install now
+
+# source: kurobayomi
+ui_update_ready = Update ready
+
+# source: kurobayomi
+ui_nightly_update_ready = Nightly update ready
+
+# source: kurobayomi
+update_ready_install = { $build } is ready: install it now, or it installs when you close the app
+
+# source: kurobayomi
+whats_new_nightly_ready = Nightly { $commit } is ready: install it now, or it installs when you close the app
+
+# source: kurobayomi
+whats_new_stable_ready = Kurobayomi { $version } is ready: install it now, or it installs when you close the app

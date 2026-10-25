@@ -423,6 +423,12 @@ pub fn restart_into_update() -> bool {
     }
 }
 
+/// Whether a downloaded update installs when the app closes (the Windows setup) rather than being in place already (the
+/// AppImage): its notice then offers Install now instead of Restart, as installing takes a while.
+pub fn installs_on_quit() -> bool {
+    matches!(kuro_platform::self_update::package(), Some(Package::Installer))
+}
+
 /// Whether this run can update itself: an AppImage or an installed Windows copy, of a build that follows releases.
 pub fn can_update() -> bool {
     kuro_platform::self_update::package().is_some() && Track::current().is_some()
@@ -470,7 +476,10 @@ impl Status {
                 let percent = (*done * 100).checked_div(*total).unwrap_or(0);
                 Some(trf(MsgKey::update_paused, &[("build", Arg::Str(&short(build))), ("percent", Arg::Int(i64::try_from(percent).unwrap_or(0)))]))
             }
-            Self::Installed(build) => Some(trf(MsgKey::update_installed_restart, &[("build", Arg::Str(&short(build)))])),
+            Self::Installed(build) => {
+                let key = if installs_on_quit() { MsgKey::update_ready_install } else { MsgKey::update_installed_restart };
+                Some(trf(key, &[("build", Arg::Str(&short(build)))]))
+            }
             Self::Failed(error) => Some(trf(MsgKey::update_failed, &[("error", Arg::Str(error))])),
         }
     }

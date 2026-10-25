@@ -103,8 +103,8 @@ pub fn row_subtitle() -> Option<String> {
     NOTICE.with(|n| {
         n.borrow().as_ref().map(|(notice, _)| match notice {
             Notice::Stable(release) => trf(MsgKey::whats_new_stable_available, &[("version", Arg::Str(&release.version))]),
-            Notice::Nightly(commit) => trf(MsgKey::whats_new_nightly_restart, &[("commit", Arg::Str(short(commit)))]),
-            Notice::StableInstalled(version) => trf(MsgKey::whats_new_stable_restart, &[("version", Arg::Str(version))]),
+            Notice::Nightly(commit) => trf(pick(MsgKey::whats_new_nightly_ready, MsgKey::whats_new_nightly_restart), &[("commit", Arg::Str(short(commit)))]),
+            Notice::StableInstalled(version) => trf(pick(MsgKey::whats_new_stable_ready, MsgKey::whats_new_stable_restart), &[("version", Arg::Str(version))]),
         })
     })
 }
@@ -122,16 +122,16 @@ pub fn stable_available(release: Release) {
 
 /// The nightly AppImage was replaced by a newer build.
 pub fn nightly_installed(commit: String) {
-    let text = trf(MsgKey::whats_new_nightly_installed, &[("commit", Arg::Str(short(&commit)))]);
+    let text = trf(pick(MsgKey::whats_new_nightly_ready, MsgKey::whats_new_nightly_installed), &[("commit", Arg::Str(short(&commit)))]);
     set_notice(Notice::Nightly(commit));
-    crate::toast::notify_action(&text, &tr(MsgKey::ui_restart), Some(Duration::from_secs(10)), restart);
+    crate::toast::notify_action(&text, &action_label(), Some(Duration::from_secs(10)), restart);
 }
 
 /// The stable AppImage was replaced by a newer release.
 pub fn stable_installed(version: String) {
-    let text = trf(MsgKey::whats_new_stable_installed, &[("version", Arg::Str(&version))]);
+    let text = trf(pick(MsgKey::whats_new_stable_ready, MsgKey::whats_new_stable_installed), &[("version", Arg::Str(&version))]);
     set_notice(Notice::StableInstalled(version));
-    crate::toast::notify_action(&text, &tr(MsgKey::ui_restart), Some(Duration::from_secs(10)), restart);
+    crate::toast::notify_action(&text, &action_label(), Some(Duration::from_secs(10)), restart);
 }
 
 /// What's new: the waiting update when there is one, else the notes of the running build.
@@ -140,15 +140,15 @@ pub fn open() {
         Some(Notice::Stable(release)) => crate::settings_ui::about::show_update(&release),
         Some(Notice::Nightly(new)) => {
             let Some(Build::Nightly(running)) = Build::current() else { return };
-            let restart_button = DialogButton::new(&tr(MsgKey::ui_restart), Role::Suggested, restart);
+            let restart_button = DialogButton::new(&action_label(), Role::Suggested, restart);
             fetch(move || commits_between(&running, &new).map(|c| (commits_markdown(&c), new)), move |(notes, new)| {
-                notes_dialog(&tr(MsgKey::ui_nightly_update_installed), &format!("Nightly {}", short(&new)), &notes, None, Some(restart_button));
+                notes_dialog(&tr(pick(MsgKey::ui_nightly_update_ready, MsgKey::ui_nightly_update_installed)), &format!("Nightly {}", short(&new)), &notes, None, Some(restart_button));
             });
         }
         Some(Notice::StableInstalled(version)) => {
-            let restart_button = DialogButton::new(&tr(MsgKey::ui_restart), Role::Suggested, restart);
+            let restart_button = DialogButton::new(&action_label(), Role::Suggested, restart);
             fetch(move || stable_notes(&version).map(|notes| (notes, version)), move |((body, url), version)| {
-                notes_dialog(&tr(MsgKey::ui_update_installed), &format!("Kurobayomi {version}"), &body, Some(&url), Some(restart_button));
+                notes_dialog(&tr(pick(MsgKey::ui_update_ready, MsgKey::ui_update_installed)), &format!("Kurobayomi {version}"), &body, Some(&url), Some(restart_button));
             });
         }
         None => show_current(None),
@@ -203,6 +203,17 @@ pub fn startup() {
 }
 
 /// Starts the new build once the app has quit (`appimage_update::restart_into_update`), then closes the window.
+/// `on_quit` where a downloaded update installs when the app closes (Windows), else `in_place` (the AppImage, already
+/// replaced): installing takes a while, so it is offered as Install now, not as an instant Restart.
+fn pick(on_quit: MsgKey, in_place: MsgKey) -> MsgKey {
+    if crate::appimage_update::installs_on_quit() { on_quit } else { in_place }
+}
+
+/// The update's button: Install now or Restart (see [`pick`]).
+pub fn action_label() -> String {
+    tr(pick(MsgKey::ui_install_now, MsgKey::ui_restart))
+}
+
 pub fn restart() {
     if crate::appimage_update::restart_into_update() {
         crate::ui::window().close();

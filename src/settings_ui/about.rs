@@ -143,7 +143,7 @@ fn update_center_row() -> PreferenceItem {
                 let installed = matches!(status, Status::Installed(_));
                 if installed {
                     button.set_icon_name("");
-                    button.set_label(&tr(MsgKey::ui_restart));
+                    button.set_label(&crate::whats_new::action_label());
                     button.set_tooltip_text(None);
                     button.remove_css_class("flat");
                     button.add_css_class("suggested-action");

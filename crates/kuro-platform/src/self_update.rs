@@ -27,13 +27,15 @@ fn installed_by_setup() -> bool {
             .is_some_and(|uninstaller| uninstaller.is_file())
 }
 
-/// Runs a downloaded Windows setup without its windows, over the installed copy. It closes a running Kurobayomi itself;
-/// `relaunch` starts the app again when it is done (the setup reads `/RELAUNCH=1`, `dist/windows/kurobayomi.iss`). The
-/// setup writes its log next to itself (`<setup>.log`), the one trace of a silent install that failed.
+/// Runs a downloaded Windows setup over the installed copy, asking nothing. It closes a running Kurobayomi itself;
+/// `relaunch` (Install now) shows the setup's progress window, as the person waits for the app to come back, and starts
+/// the app again when it is done (the setup reads `/RELAUNCH=1`, `dist/windows/kurobayomi.iss`); at a plain quit it shows
+/// nothing. The setup writes its log next to itself (`<setup>.log`), the one trace of a silent install that failed.
 pub fn run_installer(setup: &Path, relaunch: bool) -> io::Result<()> {
     let mut log = std::ffi::OsString::from("/LOG=");
     log.push(setup.with_extension("log"));
-    let mut args = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"].map(std::ffi::OsStr::new).to_vec();
+    let quiet = if relaunch { "/SILENT" } else { "/VERYSILENT" };
+    let mut args = [quiet, "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"].map(std::ffi::OsStr::new).to_vec();
     args.push(&log);
     if relaunch {
         args.push("/RELAUNCH=1".as_ref());
