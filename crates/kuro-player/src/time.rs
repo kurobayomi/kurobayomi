@@ -31,17 +31,6 @@ pub fn format_episode_number(value: f64) -> String {
     }
 }
 
-/// `"1 second"`, `"-1 second"`, `"10 seconds"`, `"-20 seconds"`: the unit is singular only for a
-/// magnitude of one (T-46a-040).
-pub fn format_seconds_plural(amount: i64) -> String {
-    let unit = if amount.abs() == 1 {
-        "second"
-    } else {
-        "seconds"
-    };
-    format!("{amount} {unit}")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,14 +63,5 @@ mod tests {
         assert_eq!(format_episode_number(0.5), "0.5");
         assert_eq!(format_episode_number(0.0), "0");
         assert_eq!(format_episode_number(-2.25), "-2.25");
-    }
-
-    #[test]
-    fn seconds_plural_follows_the_magnitude() {
-        assert_eq!(format_seconds_plural(1), "1 second");
-        assert_eq!(format_seconds_plural(-1), "-1 second");
-        assert_eq!(format_seconds_plural(10), "10 seconds");
-        assert_eq!(format_seconds_plural(-20), "-20 seconds");
-        assert_eq!(format_seconds_plural(0), "0 seconds");
     }
 }

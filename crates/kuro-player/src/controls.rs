@@ -1,8 +1,7 @@
-//! Window-level key bindings and custom key codes (area 46, `PlayerActivity.kt` key handling,
+//! Window-level key bindings (area 46, `PlayerActivity.kt` key handling,
 //! T-45a-025). Pure: the GTK window maps its key event to a keyval and acts on the result.
 //! Keys that are not listed here are forwarded to `keys::map_key`.
 
-use crate::enums::CustomKeyCode;
 use crate::keys::Modifiers;
 use crate::shortcuts::{Action, ShortcutMap};
 
@@ -10,24 +9,16 @@ use crate::shortcuts::{Action, ShortcutMap};
 pub enum WindowKey {
     /// A key of the shortcut table (`shortcuts`): Space, the arrows, letters and so on.
     Shortcut(Action),
-    /// The rewind media key: the left double-tap action.
-    DoubleTapLeft,
-    /// The fast-forward media key: the right double-tap action.
-    DoubleTapRight,
     /// Media stop: closes the window.
     CloseWindow,
-    /// Custom gesture code (`0x10001`..`0x10006`), sent through `keypress`.
-    Custom(CustomKeyCode),
     /// Not bound here; the event goes to `keys::map_key` and is consumed.
     Forward,
 }
 
 // X11 keysyms (`X11/XF86keysym.h`).
 const KS_XF86_AUDIO_STOP: u32 = 0x1008ff15;
-const KS_XF86_AUDIO_REWIND: u32 = 0x1008ff3e;
-const KS_XF86_AUDIO_FORWARD: u32 = 0x1008ff97;
 
-/// The window answers from one table: the shortcut map, then the media keys and custom codes.
+/// The window answers from one table: the shortcut map, then the stop media key.
 pub fn window_key(
     map: &ShortcutMap,
     keyval: u32,
@@ -38,27 +29,8 @@ pub fn window_key(
         return WindowKey::Shortcut(action);
     }
     match keyval {
-        KS_XF86_AUDIO_REWIND => WindowKey::DoubleTapLeft,
-        KS_XF86_AUDIO_FORWARD => WindowKey::DoubleTapRight,
         KS_XF86_AUDIO_STOP => WindowKey::CloseWindow,
-        code => CustomKeyCode::from_code(code).map_or(WindowKey::Forward, WindowKey::Custom),
-    }
-}
-
-/// The double-tap zone a gesture came from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Zone {
-    Left,
-    Center,
-    Right,
-}
-
-/// The custom key code a zone sends when its action is `Custom` (`keypress`, behaviour 8.3).
-pub fn zone_key_code(zone: Zone) -> CustomKeyCode {
-    match zone {
-        Zone::Left => CustomKeyCode::DoubleTapLeft,
-        Zone::Center => CustomKeyCode::DoubleTapCenter,
-        Zone::Right => CustomKeyCode::DoubleTapRight,
+        _ => WindowKey::Forward,
     }
 }
 
@@ -155,23 +127,8 @@ mod tests {
     }
 
     #[test]
-    fn media_keys_run_double_taps_and_stop_closes() {
-        assert_eq!(key(KS_XF86_AUDIO_REWIND, NONE), WindowKey::DoubleTapLeft);
-        assert_eq!(key(KS_XF86_AUDIO_FORWARD, NONE), WindowKey::DoubleTapRight);
+    fn media_stop_closes() {
         assert_eq!(key(KS_XF86_AUDIO_STOP, NONE), WindowKey::CloseWindow);
-    }
-
-    #[test]
-    fn custom_codes_are_sent() {
-        assert_eq!(
-            key(0x10001, NONE),
-            WindowKey::Custom(CustomKeyCode::DoubleTapLeft)
-        );
-        assert_eq!(
-            key(0x10006, NONE),
-            WindowKey::Custom(CustomKeyCode::MediaNext)
-        );
-        assert_eq!(key(0x10007, NONE), WindowKey::Forward);
     }
 
     #[test]
@@ -203,8 +160,8 @@ mod tests {
         assert_eq!(look(&bindings), WindowKey::Shortcut(Action::TogglePause));
         bindings.bind(KS_SPACE, WindowKey::CloseWindow);
         assert_eq!(look(&bindings), WindowKey::CloseWindow);
-        bindings.bind(KS_SPACE, WindowKey::DoubleTapLeft);
-        assert_eq!(look(&bindings), WindowKey::DoubleTapLeft);
+        bindings.bind(KS_SPACE, WindowKey::Forward);
+        assert_eq!(look(&bindings), WindowKey::Forward);
         bindings.reset(KS_SPACE);
         assert_eq!(look(&bindings), WindowKey::Shortcut(Action::TogglePause));
     }
@@ -213,21 +170,14 @@ mod tests {
     fn a_new_binding_can_use_any_key() {
         let map = ShortcutMap::default();
         let mut bindings = KeyBindings::default();
-        bindings.bind(u32::from('x'), WindowKey::Custom(CustomKeyCode::MediaPlay));
+        bindings.bind(u32::from('x'), WindowKey::CloseWindow);
         assert_eq!(
             bindings.lookup(&map, u32::from('x'), NONE, false),
-            WindowKey::Custom(CustomKeyCode::MediaPlay)
+            WindowKey::CloseWindow
         );
         assert_eq!(
             bindings.lookup(&map, u32::from('y'), NONE, false),
             WindowKey::Forward
         );
-    }
-
-    #[test]
-    fn zones_send_their_custom_codes() {
-        assert_eq!(zone_key_code(Zone::Left), CustomKeyCode::DoubleTapLeft);
-        assert_eq!(zone_key_code(Zone::Center), CustomKeyCode::DoubleTapCenter);
-        assert_eq!(zone_key_code(Zone::Right), CustomKeyCode::DoubleTapRight);
     }
 }

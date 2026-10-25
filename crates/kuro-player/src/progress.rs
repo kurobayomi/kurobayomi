@@ -450,15 +450,13 @@ mod tests {
     }
 
     #[test]
-    fn resume_follows_the_preserve_preference_for_seen_episodes_only() {
+    fn a_seen_episode_restarts_and_an_unseen_one_resumes() {
         // an explicit position always wins
         assert_eq!(resume_position_ms(Some(9000), true, false, 5000), 9000);
-        // seen: restart at 0 unless the preference (default off) is on
+        // seen: restart at 0 (the preference is cut and off)
         assert_eq!(resume_position_ms(None, true, false, 5000), 0);
-        assert_eq!(resume_position_ms(None, true, true, 5000), 5000);
-        // unseen: resume either way
+        // unseen: resume
         assert_eq!(resume_position_ms(None, false, false, 5000), 5000);
-        assert_eq!(resume_position_ms(None, false, true, 5000), 5000);
     }
 
     fn tracker(id: i64, logged_in: bool, seen: f64) -> TrackerEntry {

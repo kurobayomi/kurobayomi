@@ -212,24 +212,15 @@ mod tests {
     }
 
     #[test]
-    fn resume_rule_covers_four_combinations() {
+    fn resume_rule_covers_seen_and_unseen() {
         // New episode, seen and not preserved: starts at 0.
         assert_eq!(
             start_position_ms(true, None, true, false, 60_000, None),
             Some(0)
         );
-        // New episode, seen and preserved: the saved second.
-        assert_eq!(
-            start_position_ms(true, None, true, true, 60_000, None),
-            Some(60_000)
-        );
-        // New episode, not seen: the saved second, whatever the preference.
+        // New episode, not seen: the saved second.
         assert_eq!(
             start_position_ms(true, None, false, false, 60_000, None),
-            Some(60_000)
-        );
-        assert_eq!(
-            start_position_ms(true, None, false, true, 60_000, None),
             Some(60_000)
         );
     }

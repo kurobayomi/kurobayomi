@@ -25,7 +25,6 @@ const fn fixed(key: &'static str, text: &'static str) -> Entry {
 /// Every key of section 14 that the player reads, plus the English fallbacks of the messages in
 /// `errors.rs`. `%s` and `%d` slots are filled by the caller.
 pub const TABLE: &[Entry] = &[
-    fixed("player_gesture_seek_indicator", "%c%s\n[%s]"),
     fixed("player_speed", "%.2fx"),
     Entry {
         key: "seconds",
@@ -54,11 +53,6 @@ pub const TABLE: &[Entry] = &[
     fixed("player_chapter_type_mixedop", "Mixed opening"),
     fixed("no_prev_episode", "Previous Episode not found!"),
     fixed("no_next_episode", "Next Episode not found!"),
-    fixed("single_action_none", "None"),
-    fixed("single_action_seek", "Seek"),
-    fixed("single_action_playpause", "Play/Pause"),
-    fixed("single_action_switch", "Change episode"),
-    fixed("single_action_custom", "Custom"),
     fixed("player_sheets_filters_brightness", "Brightness"),
     fixed("player_sheets_sub_delay_title", "Subtitle delay"),
     fixed("player_sheets_sub_delay_delay", "Delay"),

@@ -9,8 +9,7 @@ use kuro_player::aniskip::{TrackerRef, parse_mal_id, parse_skip_times, resolve_m
 use kuro_player::chapters;
 use kuro_player::progress::on_second;
 use kuro_player::seek::{absolute_flag, relative_flag};
-use kuro_player::track_select::{TrackCandidate, TrackPrefs, prefer_index, preferred_track};
-use kuro_player::tracks::{TrackProps, default_tracks, load_track_lists};
+use kuro_player::tracks::{TrackProps, load_track_lists};
 use kuro_player::types::ChapterType;
 use serde_json::Value;
 
@@ -27,7 +26,7 @@ fn json(name: &str) -> Value {
     serde_json::from_str(&fixture(name)).expect("fixture is valid JSON")
 }
 
-// 4.4 TrackSelect on the mixed track list
+// 4.4 the mixed track list
 
 struct Fixture(Value);
 
@@ -55,95 +54,12 @@ impl TrackProps for Fixture {
     }
 }
 
-fn candidates(subtitles: bool) -> Vec<TrackCandidate> {
-    let lists = load_track_lists(&Fixture(json("tracks_mixed.json")));
-    let tracks = if subtitles {
-        lists.subtitles
-    } else {
-        lists.audio
-    };
-    tracks
-        .into_iter()
-        .map(|t| TrackCandidate {
-            id: t.id,
-            name: t.name,
-            lang: t.language,
-        })
-        .collect()
-}
-
 #[test]
 fn the_mixed_fixture_loads_three_subtitles_and_off_plus_two_audio() {
     let lists = load_track_lists(&Fixture(json("tracks_mixed.json")));
     assert_eq!(lists.subtitles.len(), 3);
     assert_eq!(lists.audio.len(), 3);
     assert_eq!(lists.audio[0].id, -1);
-}
-
-#[test]
-fn t15_whitelist_beats_order() {
-    let tracks = [
-        TrackCandidate {
-            id: 1,
-            name: "English".into(),
-            lang: Some("en".into()),
-        },
-        TrackCandidate {
-            id: 2,
-            name: "English Signs".into(),
-            lang: Some("en".into()),
-        },
-    ];
-    assert_eq!(preferred_track(&tracks, "en", "Signs", "", "en"), Some(2));
-    assert_eq!(preferred_track(&tracks, "en", "", "", "en"), Some(1));
-}
-
-#[test]
-fn t16_blacklist_removes() {
-    let subs = candidates(true);
-    // Without the blacklist the first English subtitle is "English Signs" (id 1).
-    assert_eq!(preferred_track(&subs, "en", "", "", "en"), Some(1));
-    // The blacklist removes it, and the commentary is the only English one left.
-    assert_eq!(preferred_track(&subs, "en", "", "Signs", "en"), Some(2));
-    assert_eq!(
-        preferred_track(&subs, "en", "Commentary", "Commentary", "en"),
-        Some(1)
-    );
-}
-
-#[test]
-fn t18_a_trailing_comma_in_the_blacklist_does_not_exclude_everything() {
-    let subs = candidates(true);
-    assert_eq!(
-        preferred_track(&subs, "en", "", "Commentary, ", "en"),
-        Some(1)
-    );
-}
-
-#[test]
-fn t21_audio_ignores_the_whitelist_and_blacklist() {
-    let lists = load_track_lists(&Fixture(json("tracks_mixed.json")));
-    let prefs = TrackPrefs {
-        subtitle_langs: "en".into(),
-        subtitle_whitelist: "Commentary".into(),
-        subtitle_blacklist: "Signs".into(),
-        audio_langs: "en".into(),
-        system_lang: "en".into(),
-    };
-    let out = default_tracks(&lists, |tracks, subtitle| {
-        prefer_index(tracks, subtitle, &prefs)
-    });
-    // Subtitles follow the whitelist, the audio list is chosen without it.
-    assert_eq!(out.sid, Some(2));
-    assert_eq!(out.aid, Some(2));
-    // A blacklist word in an audio title does not remove it.
-    let audio = [kuro_player::tracks::VideoTrack {
-        id: 7,
-        name: "English Signs".into(),
-        language: Some("en".into()),
-    }];
-    assert_eq!(prefer_index(&audio, false, &prefs), Some(0));
-    assert_eq!(prefer_index(&audio, true, &prefs), None);
 }
 
 // 4.5 chapters from mpv

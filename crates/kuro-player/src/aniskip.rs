@@ -289,17 +289,6 @@ impl SkipApi for NetworkClient {
     }
 }
 
-/// Whether the lookup runs after `FILE_LOADED`: intro skip and AniSkip are on, and the video has
-/// no chapters of its own unless `pref_disabled_ani_skip_chapters` is off (`PlayerActivity.fileLoaded`).
-pub fn lookup_wanted(
-    intro_skip: bool,
-    aniskip: bool,
-    disable_on_chapters: bool,
-    has_chapters: bool,
-) -> bool {
-    intro_skip && aniskip && !(disable_on_chapters && has_chapters)
-}
-
 /// The AniSkip lookup of one episode (T-45b-021): the skip intervals for the first track only, from one skip-times
 /// request. Like the Kotlin (`PlayerViewModel.kt:2044`, `return` inside `map`), the first track's answer is the whole
 /// answer, so a non-MAL first track makes no AniSkip call even when a MAL track follows (T-29a-033). Nothing is
@@ -543,14 +532,5 @@ mod tests {
     fn title_search_body_sends_the_title_as_a_variable() {
         let body: Value = serde_json::from_str(&title_search_body("A \"b\"")).unwrap();
         assert_eq!(body["variables"]["t"], "A \"b\"");
-    }
-
-    #[test]
-    fn lookup_runs_only_with_intro_skip_and_aniskip_on_and_no_blocking_chapters() {
-        assert!(lookup_wanted(true, true, true, false));
-        assert!(lookup_wanted(true, true, false, true));
-        assert!(!lookup_wanted(true, true, true, true));
-        assert!(!lookup_wanted(false, true, false, false));
-        assert!(!lookup_wanted(true, false, false, false));
     }
 }

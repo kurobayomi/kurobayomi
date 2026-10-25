@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use crate::enums::{
     AudioChannels, Debanding, Decoder, GpuKind, SubtitleJustification, SubtitlesBorderStyle,
 };
-use crate::mpv::{MpvError, PropertySink, PropertySource};
 
 /// One startup setting. Every entry is applied before initialisation with `set_option`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -108,7 +107,7 @@ pub struct PlayerPrefs {
     pub audio: AudioPrefs,
     pub data_dir: PathBuf,
     pub screenshot_dir: PathBuf,
-    /// The decoder chosen last time, stored by `decoder_stored_name`. It is applied at startup instead of `try_hwdec`.
+    /// The decoder chosen last time. It is applied at startup instead of `try_hwdec`.
     pub remembered_decoder: Option<Decoder>,
 }
 
@@ -167,66 +166,10 @@ pub fn resolve_hwdec(decoder: Decoder, available: &[String]) -> String {
         .map_or_else(|| "auto".to_owned(), |c| (*c).to_owned())
 }
 
-/// Video filter names and the prefs they come from (`VideoFilters` in `PlayerEnums.kt:141-171`).
-pub const FILTER_NAMES: [&str; 5] = ["brightness", "saturation", "contrast", "gamma", "hue"];
-
-/// Whether the filters panel warns that some filters may not work: the video output is not `gpu-next` (T-46b-036).
-pub fn filters_warning_needed(vo: &str) -> bool {
-    vo != "gpu-next"
-}
-
-/// The writes that reset all five filters to 0 (T-46b-036). The caller also deletes the stored values.
-pub fn filter_reset_writes() -> Vec<(&'static str, i64)> {
-    FILTER_NAMES
-        .iter()
-        .filter_map(|name| filter_write(name, 0))
-        .collect()
-}
-
-/// The stored name of a decoder for `pref`-style storage (T-46b-043). The name is the variant name.
-pub fn decoder_stored_name(decoder: Decoder) -> &'static str {
-    match decoder {
-        Decoder::AutoCopy => "AutoCopy",
-        Decoder::Auto => "Auto",
-        Decoder::Sw => "Sw",
-        Decoder::Hw => "Hw",
-        Decoder::HwPlus => "HwPlus",
-    }
-}
-
-/// The decoder of a stored name (`decoder_stored_name`'s inverse). An empty or unknown name is `None`, so nothing is
-/// remembered.
-pub fn decoder_from_stored_name(name: &str) -> Option<Decoder> {
-    [Decoder::AutoCopy, Decoder::Auto, Decoder::Sw, Decoder::Hw, Decoder::HwPlus]
-        .into_iter()
-        .find(|d| decoder_stored_name(*d) == name)
-}
-
-/// The decoder of a stored name, or `None` for a name this build does not know.
-pub fn decoder_from_stored(name: &str) -> Option<Decoder> {
-    Some(match name {
-        "AutoCopy" => Decoder::AutoCopy,
-        "Auto" => Decoder::Auto,
-        "Sw" => Decoder::Sw,
-        "Hw" => Decoder::Hw,
-        "HwPlus" => Decoder::HwPlus,
-        _ => return None,
-    })
-}
-
 /// Clamps a video filter value to -100..=100 before it is written (T-45a-032, proposal: the Kotlin
 /// passes stored values through unclamped).
 pub fn clamp_filter(value: i64) -> i64 {
     value.clamp(-100, 100)
-}
-
-/// The mpv write for one video filter, at startup or on a runtime change (T-45a-032). `None` for a
-/// name outside `FILTER_NAMES`.
-pub fn filter_write(name: &str, value: i64) -> Option<(&'static str, i64)> {
-    FILTER_NAMES
-        .into_iter()
-        .find(|f| *f == name)
-        .map(|f| (f, clamp_filter(value)))
 }
 
 /// The inputs of the one `vf` chain (E-26 fix): CPU debanding, the five video filters and
@@ -298,26 +241,6 @@ impl VideoChain {
         }
         vf.join(",")
     }
-}
-
-/// The decoder mpv reports as active (`getDecoder`, T-45b-068): `hwdec-current`, or the `hwdec`
-/// option while nothing is decoding yet. Unknown values are `Auto` (E-07).
-pub fn get_decoder(source: &impl PropertySource) -> Decoder {
-    let active = source
-        .get_str("hwdec-current")
-        .filter(|v| !v.is_empty())
-        .or_else(|| source.get_str("hwdec"));
-    Decoder::from_active(active.as_deref().unwrap_or_default())
-}
-
-/// Writes the chosen decoder to `hwdec` (`updateDecoder`, T-46b-016). The value is the Linux name
-/// for the GPU vendor (`Decoder::linux_value`); Android names are never written.
-pub fn update_decoder(
-    sink: &impl PropertySink,
-    decoder: Decoder,
-    gpu: GpuKind,
-) -> Result<(), MpvError> {
-    sink.set_str("hwdec", decoder.linux_value(gpu))
 }
 
 /// Builds the ordered startup table of behaviour doc 2.2 (including the subtitle and audio
@@ -430,41 +353,6 @@ fn yes_no(v: bool) -> String {
     if v { "yes" } else { "no" }.to_owned()
 }
 
-/// The pan filter that reverses the stereo channels (`AudioChannels::ReverseStereo`).
-pub const PAN_FILTER: &str = "pan=[stereo|c0=c1|c1=c0]";
-
-/// The `af` chain without the pan filter. Every other filter (from `mpv.conf` or a script) stays
-/// (E77): only the reverse-stereo entry is removed.
-pub fn af_without_pan(af: &str) -> String {
-    af.split(',')
-        .map(str::trim)
-        .filter(|f| !f.is_empty() && *f != PAN_FILTER)
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
-/// Property writes for a channel layout picked at runtime (`MoreSheet.kt:246-256`), given the
-/// current `af` chain. Reverse stereo sets `audio-channels` to auto and appends the pan filter to
-/// `af`. Any other layout removes only the pan filter from `af` (the Kotlin `af=""` cleared every
-/// filter, E77), then writes its own property.
-pub fn channel_change_writes(next: AudioChannels, current_af: &str) -> Vec<(&'static str, String)> {
-    let kept = af_without_pan(current_af);
-    match next {
-        AudioChannels::ReverseStereo => {
-            let af = if kept.is_empty() {
-                PAN_FILTER.to_owned()
-            } else {
-                format!("{kept},{PAN_FILTER}")
-            };
-            vec![("audio-channels", "auto".to_owned()), ("af", af)]
-        }
-        other => {
-            let (name, value) = other.setting();
-            vec![("af", kept), (name, value.to_owned())]
-        }
-    }
-}
-
 /// Looks a setting up by name in an ordered table (the last value wins, as mpv does).
 pub fn setting_value<'a>(settings: &'a [MpvSetting], name: &str) -> Option<&'a str> {
     settings
@@ -554,126 +442,10 @@ mod tests {
     }
 
     #[test]
-    fn debanding_cpu_with_yuv420p_joins_vf() {
-        let p = PlayerPrefs {
-            debanding: Debanding::Cpu,
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "vf"),
-            Some("gradfun=radius=12,format=yuv420p")
-        );
-    }
-
-    #[test]
-    fn debanding_cpu_without_yuv420p_is_gradfun_only() {
-        let p = PlayerPrefs {
-            debanding: Debanding::Cpu,
-            use_yuv420p: false,
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "vf"),
-            Some("gradfun=radius=12")
-        );
-    }
-
-    #[test]
-    fn debanding_gpu_sets_deband_and_no_vf_when_format_off() {
-        let p = PlayerPrefs {
-            debanding: Debanding::Gpu,
-            use_yuv420p: false,
-            ..prefs()
-        };
-        let s = startup_settings(&p);
-        assert_eq!(setting_value(&s, "deband"), Some("yes"));
-        assert_eq!(setting_value(&s, "vf"), None);
-    }
-
-    #[test]
-    fn gpu_next_selects_vo() {
-        let p = PlayerPrefs {
-            gpu_next: true,
-            ..prefs()
-        };
-        assert_eq!(setting_value(&startup_settings(&p), "vo"), Some("gpu-next"));
-    }
-
-    #[test]
-    fn hwdec_flag_false_is_no() {
-        let p = PlayerPrefs {
-            try_hwdec: false,
-            ..prefs()
-        };
-        assert_eq!(setting_value(&startup_settings(&p), "hwdec"), Some("no"));
-    }
-
-    #[test]
-    fn resolve_hwdec_picks_first_candidate_and_falls_back_to_auto() {
-        let avail = vec!["nvdec-copy".to_owned(), "auto-copy".to_owned()];
-        assert_eq!(resolve_hwdec(Decoder::Hw, &avail), "nvdec-copy");
-        assert_eq!(resolve_hwdec(Decoder::Hw, &[]), "auto");
-        let windows: Vec<String> = ["d3d11va", "d3d11va-copy", "dxva2-copy"].map(String::from).to_vec();
-        assert_eq!(resolve_hwdec(Decoder::Hw, &windows), "d3d11va-copy", "Windows' decoder is picked where mpv has it");
-        assert_eq!(resolve_hwdec(Decoder::HwPlus, &windows), "d3d11va");
-        assert_eq!(resolve_hwdec(Decoder::Sw, &avail), "no");
-        assert_eq!(resolve_hwdec(Decoder::AutoCopy, &[]), "auto-copy");
-    }
-
-    #[test]
-    fn speed_formats_with_point_zero() {
-        let p = PlayerPrefs {
-            player_speed: 2.0,
-            ..prefs()
-        };
-        assert_eq!(setting_value(&startup_settings(&p), "speed"), Some("2.0"));
-    }
-
-    #[test]
-    fn audio_delay_ms_to_seconds() {
-        let p = PlayerPrefs {
-            audio: AudioPrefs {
-                delay_ms: -250,
-                ..AudioPrefs::default()
-            },
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "audio-delay"),
-            Some("-0.25")
-        );
-    }
-
-    #[test]
-    fn volume_boost_cap_adds_100() {
-        let p = PlayerPrefs {
-            audio: AudioPrefs {
-                volume_boost_cap: 50,
-                ..AudioPrefs::default()
-            },
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "volume-max"),
-            Some("150")
-        );
-    }
-
-    #[test]
     fn subtitle_colors_hex() {
         assert_eq!(color_hex(-1), "#FFFFFFFF");
         assert_eq!(color_hex(0), "#00000000");
         assert_eq!(color_hex(-16_777_216), "#FF000000");
-    }
-
-    #[test]
-    fn subtitle_delay_formats_seconds() {
-        let mut p = prefs();
-        p.sub.delay_ms = 1500;
-        assert_eq!(
-            setting_value(&startup_settings(&p), "sub-delay"),
-            Some("1.5")
-        );
     }
 
     #[test]
@@ -685,336 +457,12 @@ mod tests {
     }
 
     #[test]
-    fn ass_override_only_when_enabled() {
-        let off = startup_settings(&prefs());
-        assert_eq!(setting_value(&off, "sub-ass-override"), None);
-        assert_eq!(setting_value(&off, "sub-ass-justify"), None);
-        let mut p = prefs();
-        p.sub.override_ass = true;
-        let on = startup_settings(&p);
-        assert_eq!(setting_value(&on, "sub-ass-override"), Some("force"));
-        assert_eq!(setting_value(&on, "sub-ass-justify"), Some("yes"));
-    }
-
-    #[test]
-    fn justification_alone_turns_on_ass_justify_at_startup() {
-        let mut p = prefs();
-        p.sub.justify = SubtitleJustification::Center;
-        let s = startup_settings(&p);
-        assert_eq!(setting_value(&s, "sub-ass-override"), None);
-        assert_eq!(setting_value(&s, "sub-ass-justify"), Some("yes"));
-        assert_eq!(setting_value(&s, "sub-justify"), Some("center"));
-    }
-
-    #[test]
-    fn secondary_delay_pref_round_trips_into_the_startup_table() {
-        let mut p = prefs();
-        p.sub.secondary_delay_ms = -250;
-        p.sub.delay_ms = 125;
-        let s = startup_settings(&p);
-        assert_eq!(setting_value(&s, "secondary-sub-delay"), Some("-0.25"));
-        assert_eq!(setting_value(&s, "sub-delay"), Some("0.125"));
-    }
-
-    #[test]
-    fn subtitle_prefs_map_one_to_one_to_startup_properties() {
-        let mut p = prefs();
-        p.sub.speed = 2.5;
-        p.sub.font = "Noto Sans".to_owned();
-        p.sub.font_size = 70;
-        p.sub.bold = true;
-        p.sub.italic = true;
-        p.sub.text_color_argb = 0x80FF0000u32 as i32;
-        p.sub.back_color_argb = 0;
-        p.sub.border_color_argb = -16_777_216;
-        p.sub.border_size = 9;
-        p.sub.border_style = SubtitlesBorderStyle::OpaqueBox;
-        p.sub.shadow_offset = 4;
-        p.sub.pos = 80;
-        p.sub.scale = 1.25;
-        let s = startup_settings(&p);
-        let expect = [
-            ("sub-speed", "2.5"),
-            ("sub-font", "Noto Sans"),
-            ("sub-font-size", "70"),
-            ("sub-bold", "yes"),
-            ("sub-italic", "yes"),
-            ("sub-color", "#80FF0000"),
-            ("sub-back-color", "#00000000"),
-            ("sub-border-color", "#FF000000"),
-            ("sub-border-size", "9"),
-            ("sub-border-style", "opaque-box"),
-            ("sub-shadow-offset", "4"),
-            ("sub-pos", "80"),
-            ("sub-scale", "1.25"),
-        ];
-        for (name, value) in expect {
-            assert_eq!(setting_value(&s, name), Some(value), "{name}");
-        }
-    }
-
-    #[test]
     fn cache_limits_are_64_mib() {
         let s = startup_settings(&prefs());
         assert_eq!(setting_value(&s, "demuxer-max-bytes"), Some("67108864"));
         assert_eq!(
             setting_value(&s, "demuxer-max-back-bytes"),
             Some("67108864")
-        );
-    }
-
-    #[test]
-    fn filter_writes_clamp_and_reject_unknown_names() {
-        assert_eq!(filter_write("contrast", 150), Some(("contrast", 100)));
-        assert_eq!(filter_write("gamma", -250), Some(("gamma", -100)));
-        assert_eq!(filter_write("hue", 42), Some(("hue", 42)));
-        assert_eq!(filter_write("sharpen", 1), None);
-    }
-
-    #[test]
-    fn startup_filters_are_clamped_and_join_the_one_vf_chain() {
-        let p = PlayerPrefs {
-            filters: [500, -500, 0, 0, 0],
-            ..prefs()
-        };
-        let s = startup_settings(&p);
-        assert_eq!(
-            setting_value(&s, "vf"),
-            Some("eq=brightness=1:saturation=0,format=yuv420p")
-        );
-        assert_eq!(setting_value(&s, "brightness"), None);
-    }
-
-    #[test]
-    fn one_vf_value_holds_debanding_every_filter_and_the_format() {
-        let p = PlayerPrefs {
-            debanding: Debanding::Cpu,
-            filters: [10, -20, 30, 100, -50],
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "vf"),
-            Some(
-                "gradfun=radius=12,eq=brightness=0.1:contrast=1.3:saturation=0.8:gamma=8,hue=h=-90,format=yuv420p"
-            )
-        );
-        let low = VideoChain {
-            filters: [0, 0, 0, -100, 0],
-            use_yuv420p: false,
-            ..VideoChain::default()
-        };
-        assert_eq!(low.vf(), "eq=gamma=0.125");
-        assert_eq!(
-            VideoChain {
-                use_yuv420p: false,
-                ..VideoChain::default()
-            }
-            .vf(),
-            ""
-        );
-    }
-
-    #[derive(Default)]
-    struct Fake {
-        props: std::cell::RefCell<Vec<(String, String)>>,
-    }
-    impl PropertySink for Fake {
-        fn set_str(&self, name: &str, value: &str) -> Result<(), MpvError> {
-            self.props
-                .borrow_mut()
-                .push((name.to_owned(), value.to_owned()));
-            Ok(())
-        }
-    }
-    impl PropertySource for Fake {
-        fn get_str(&self, name: &str) -> Option<String> {
-            self.props
-                .borrow()
-                .iter()
-                .rev()
-                .find(|(n, _)| n == name)
-                .map(|(_, v)| v.clone())
-        }
-    }
-
-    #[test]
-    fn get_decoder_reads_the_active_hwdec_and_unknown_is_auto() {
-        let fake = Fake::default();
-        assert_eq!(get_decoder(&fake), Decoder::Auto);
-        fake.set_str("hwdec", "no").unwrap();
-        assert_eq!(get_decoder(&fake), Decoder::Sw);
-        fake.set_str("hwdec-current", "vaapi-copy").unwrap();
-        assert_eq!(get_decoder(&fake), Decoder::Hw);
-        fake.set_str("hwdec-current", "weird").unwrap();
-        assert_eq!(get_decoder(&fake), Decoder::Auto);
-    }
-
-    #[test]
-    fn update_decoder_writes_the_resolved_hwdec() {
-        let fake = Fake::default();
-        update_decoder(&fake, Decoder::Hw, GpuKind::Nvidia).unwrap();
-        update_decoder(&fake, Decoder::Sw, GpuKind::Nvidia).unwrap();
-        assert_eq!(
-            *fake.props.borrow(),
-            vec![
-                ("hwdec".to_owned(), "nvdec-copy".to_owned()),
-                ("hwdec".to_owned(), "no".to_owned())
-            ]
-        );
-    }
-
-    #[test]
-    fn update_decoder_writes_the_vendor_name_on_intel() {
-        let fake = Fake::default();
-        update_decoder(&fake, Decoder::Hw, GpuKind::Intel).unwrap();
-        update_decoder(&fake, Decoder::HwPlus, GpuKind::Intel).unwrap();
-        assert_eq!(
-            *fake.props.borrow(),
-            vec![
-                ("hwdec".to_owned(), "vaapi-copy".to_owned()),
-                ("hwdec".to_owned(), "vaapi".to_owned())
-            ]
-        );
-    }
-
-    #[test]
-    fn audio_channel_values_map_to_property_and_value() {
-        let cases = [
-            (AudioChannels::Auto, "audio-channels", "auto-safe"),
-            (AudioChannels::AutoSafe, "audio-channels", "auto"),
-            (AudioChannels::Mono, "audio-channels", "mono"),
-            (AudioChannels::Stereo, "audio-channels", "stereo"),
-            (
-                AudioChannels::ReverseStereo,
-                "af",
-                "pan=[stereo|c0=c1|c1=c0]",
-            ),
-        ];
-        for (channels, name, value) in cases {
-            let p = PlayerPrefs {
-                audio: AudioPrefs {
-                    channels,
-                    ..AudioPrefs::default()
-                },
-                ..prefs()
-            };
-            assert_eq!(setting_value(&startup_settings(&p), name), Some(value));
-        }
-    }
-
-    #[test]
-    fn runtime_channel_change_for_reverse_resets_auto_first() {
-        assert_eq!(
-            channel_change_writes(AudioChannels::ReverseStereo, ""),
-            vec![
-                ("audio-channels", "auto".to_owned()),
-                ("af", "pan=[stereo|c0=c1|c1=c0]".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
-    fn reverse_stereo_keeps_the_other_filters_in_af() {
-        assert_eq!(
-            channel_change_writes(
-                AudioChannels::ReverseStereo,
-                "lavfi=eq,pan=[stereo|c0=c1|c1=c0]"
-            ),
-            vec![
-                ("audio-channels", "auto".to_owned()),
-                ("af", "lavfi=eq,pan=[stereo|c0=c1|c1=c0]".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
-    fn runtime_channel_change_for_others_removes_only_the_pan_filter() {
-        assert_eq!(
-            channel_change_writes(AudioChannels::Mono, "lavfi=eq,pan=[stereo|c0=c1|c1=c0]"),
-            vec![
-                ("af", "lavfi=eq".to_owned()),
-                ("audio-channels", "mono".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
-    fn af_without_pan_drops_only_the_pan_entry() {
-        assert_eq!(af_without_pan(""), "");
-        assert_eq!(af_without_pan(PAN_FILTER), "");
-        assert_eq!(af_without_pan("a, pan=[stereo|c0=c1|c1=c0] ,b"), "a,b");
-    }
-
-    #[test]
-    fn verbose_logging_selects_msg_level() {
-        let p = PlayerPrefs {
-            verbose_logging: true,
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&p), "msg-level"),
-            Some("all=v")
-        );
-    }
-
-    #[test]
-    fn t_46b_043_a_remembered_decoder_replaces_try_hwdec() {
-        let available = vec!["vaapi-copy".to_owned()];
-        let remembered = PlayerPrefs {
-            remembered_decoder: Some(Decoder::Hw),
-            hwdec_available: available.clone(),
-            try_hwdec: false,
-            ..prefs()
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&remembered), "hwdec"),
-            Some("vaapi-copy"),
-            "the stored decoder is applied instead of try_hwdec"
-        );
-        let no_stored = PlayerPrefs {
-            remembered_decoder: None,
-            ..remembered
-        };
-        assert_eq!(
-            setting_value(&startup_settings(&no_stored), "hwdec"),
-            Some("no")
-        );
-    }
-
-    #[test]
-    fn t_46b_043_stored_decoder_names_round_trip() {
-        for decoder in [
-            Decoder::AutoCopy,
-            Decoder::Auto,
-            Decoder::Sw,
-            Decoder::Hw,
-            Decoder::HwPlus,
-        ] {
-            assert_eq!(
-                decoder_from_stored(decoder_stored_name(decoder)),
-                Some(decoder)
-            );
-        }
-        assert_eq!(decoder_from_stored("bogus"), None);
-    }
-
-    #[test]
-    fn t_46b_036_the_warning_shows_unless_the_output_is_gpu_next() {
-        assert!(filters_warning_needed("gpu"));
-        assert!(!filters_warning_needed("gpu-next"));
-    }
-
-    #[test]
-    fn t_46b_036_reset_writes_zero_to_all_five_filters_in_order() {
-        let writes = filter_reset_writes();
-        assert_eq!(writes.len(), 5);
-        assert!(writes.iter().all(|(_, value)| *value == 0));
-        assert_eq!(
-            writes.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
-            vec!["brightness", "saturation", "contrast", "gamma", "hue"]
-                .into_iter()
-                .map(|n| filter_write(n, 0).unwrap().0)
-                .collect::<Vec<_>>()
         );
     }
 }

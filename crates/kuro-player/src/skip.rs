@@ -216,95 +216,6 @@ mod tests {
         ]
     }
 
-    fn netflix() -> SkipIntro {
-        SkipIntro::new(SkipConfig {
-            netflix: true,
-            ..SkipConfig::default()
-        })
-    }
-
-    fn dont_skip() -> Label {
-        Label::Set(Some(PlayerMessage::AniskipDontSkip.text()))
-    }
-
-    /// T29: waits 5..0, the label says "don't skip" for 5..1, the toast comes once, and the seek
-    /// comes on the sixth call.
-    #[test]
-    fn t29_netflix_countdown_five_then_seek() {
-        let mut machine = netflix();
-        let list = chapters();
-        let mut waits = Vec::new();
-        for second in 0..6 {
-            let tick = machine.on_tick(&list, 10.0 + second as f32);
-            waits.push(tick.waiting.unwrap());
-            if second == 0 {
-                assert_eq!(
-                    tick.toast,
-                    Some(aniskip_countdown_toast("Opening", 5)),
-                    "the toast shows on the first call"
-                );
-            } else {
-                assert_eq!(tick.toast, None);
-            }
-            if second < 5 {
-                assert_eq!(tick.label, dont_skip());
-                assert_eq!(tick.seek, None);
-            } else {
-                assert_eq!(
-                    tick.seek,
-                    Some(SkipSeek {
-                        position: 100,
-                        text: aniskip_skip_text("Opening")
-                    })
-                );
-            }
-        }
-        assert_eq!(waits, vec![5, 4, 3, 2, 1, 0]);
-    }
-
-    /// T30: tapping the button during the countdown cancels it.
-    #[test]
-    fn t30_cancel_during_the_countdown() {
-        let mut machine = netflix();
-        let list = chapters();
-        machine.on_tick(&list, 10.0);
-        machine.on_tick(&list, 11.0);
-        assert_eq!(machine.on_skip(&list, 11.0), Tap::Cancelled);
-        assert_eq!(machine.waiting(), -1);
-        let tick = machine.on_tick(&list, 12.0);
-        assert_eq!(tick.label, Label::Set(skip_label(ChapterType::Opening)));
-        assert_eq!(tick.seek, None);
-        assert_eq!(tick.toast, None);
-    }
-
-    /// T31: the sync call between ticks does not advance the countdown (E-10).
-    #[test]
-    fn t31_per_second_not_per_call() {
-        let mut machine = netflix();
-        let list = chapters();
-        let sync = machine.sync(&list, 10.0);
-        assert_eq!(sync.toast, None);
-        assert_eq!(sync.seek, None);
-        assert_eq!(machine.waiting(), 5);
-        assert_eq!(machine.on_tick(&list, 10.0).waiting, Some(5));
-        machine.sync(&list, 10.0);
-        assert_eq!(machine.on_tick(&list, 11.0).waiting, Some(4));
-    }
-
-    /// T32: after the countdown is cancelled in one chapter, the next intro starts at 5 (E-09).
-    #[test]
-    fn t32_a_new_chapter_resets_the_countdown() {
-        let mut machine = netflix();
-        let list = chapters();
-        machine.on_tick(&list, 10.0);
-        machine.on_skip(&list, 10.0);
-        assert_eq!(machine.waiting(), -1);
-        // Jump straight from the opening to the ending, with no `Other` chapter between the ticks.
-        let tick = machine.on_tick(&list, 200.0);
-        assert_eq!(tick.waiting, Some(5));
-        assert_eq!(tick.toast, Some(aniskip_countdown_toast("Ending", 5)));
-    }
-
     /// T33: without netflix style and auto skip the label is the type's skip text.
     #[test]
     fn t33_manual_mode_shows_the_skip_label() {
@@ -327,44 +238,9 @@ mod tests {
         );
     }
 
-    /// T34: auto skip seeks at once, to the next chapter start.
     #[test]
-    fn t34_auto_skip_seeks_immediately() {
-        let mut machine = SkipIntro::new(SkipConfig {
-            auto_skip: true,
-            ..SkipConfig::default()
-        });
-        let tick = machine.on_tick(&chapters(), 12.0);
-        assert_eq!(
-            tick.seek,
-            Some(SkipSeek {
-                position: 100,
-                text: intro_skipped_text("Opening")
-            })
-        );
-    }
-
-    /// T35: a chapter of another type clears the label and resets the countdown.
-    #[test]
-    fn t35_another_chapter_clears_the_label() {
-        let mut machine = netflix();
-        let list = chapters();
-        machine.on_tick(&list, 10.0);
-        machine.on_tick(&list, 11.0);
-        assert_eq!(machine.waiting(), 3);
-        let tick = machine.on_tick(&list, 150.0);
-        assert_eq!(tick.label, Label::Set(None));
-        assert_eq!(machine.waiting(), 5);
-    }
-
-    #[test]
-    fn disabled_does_nothing_and_no_chapter_does_nothing() {
-        let mut off = SkipIntro::new(SkipConfig {
-            enabled: false,
-            ..SkipConfig::default()
-        });
-        assert_eq!(off.on_tick(&chapters(), 50.0), Tick::NONE);
-        let mut machine = netflix();
+    fn no_chapter_does_nothing() {
+        let mut machine = SkipIntro::new(SkipConfig::default());
         assert_eq!(machine.on_tick(&[], 50.0), Tick::NONE);
         assert_eq!(machine.on_skip(&[], 50.0), Tap::Nothing);
         // before the first chapter

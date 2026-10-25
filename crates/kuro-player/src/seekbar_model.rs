@@ -2,9 +2,6 @@
 //! `PlayerControls.kt`, T-46a-010, T-46a-011). Pure: the GTK widget draws the fractions and the
 //! labels returned here. Times are seconds. A duration of zero means unknown.
 
-use crate::player_prefs::keys::INVERT_DURATION;
-use crate::pref_write::Write;
-use crate::seek::absolute_flag;
 use crate::time::{pretty_time, pretty_time_signed};
 
 /// Tick positions in seconds: one per chapter start within `0..=duration`, each once. A synthetic
@@ -57,24 +54,12 @@ pub fn drags_enabled(duration: f32) -> bool {
     duration > 0.0
 }
 
-/// The flag of the seek sent on release: exact when smooth seek is on, keyframes otherwise.
-pub fn commit_flag(smooth_seek: bool) -> &'static str {
-    absolute_flag(smooth_seek)
-}
-
 /// Width of the position label in logical pixels (T-46a-011); the GTK label sets it as its width.
 pub const POSITION_LABEL_WIDTH_PX: i32 = 92;
 
 /// The position label, `POSITION_LABEL_WIDTH_PX` wide in the GTK layer.
 pub fn position_label(position: f32) -> String {
     pretty_time(position as i64)
-}
-
-/// A click on the duration label flips `invert_duration`. Returns the new value and the write that
-/// stores it (the preference is written through at once, default false).
-pub fn toggle_duration_inverted(inverted: bool) -> (bool, Write) {
-    let next = !inverted;
-    (next, Write::pref(INVERT_DURATION, next.to_string()))
 }
 
 /// The duration label. Total time, or `position - duration` with a sign once inverted. Unknown
@@ -138,24 +123,9 @@ mod tests {
     }
 
     #[test]
-    fn commit_uses_exact_only_with_smooth_seek() {
-        assert_eq!(commit_flag(true), "absolute");
-        assert_eq!(commit_flag(false), "absolute+keyframes");
-    }
-
-    #[test]
-    fn clicking_the_duration_label_flips_and_stores_the_flag() {
-        let (on, write) = toggle_duration_inverted(false);
-        assert!(on);
-        assert_eq!(write, Write::pref(INVERT_DURATION, "true"));
-        assert!(!toggle_duration_inverted(on).0);
-    }
-
-    #[test]
-    fn duration_label_toggles_between_total_and_remaining() {
+    fn duration_label_shows_the_total_or_unknown() {
         assert_eq!(duration_label(85.0, 1420.0, false), "23:40");
-        assert_eq!(duration_label(85.0, 1420.0, true), "-22:15");
-        assert_eq!(duration_label(0.0, 0.0, true), "--:--");
+        assert_eq!(duration_label(0.0, 0.0, false), "--:--");
         assert_eq!(position_label(85.0), "01:25");
     }
 }

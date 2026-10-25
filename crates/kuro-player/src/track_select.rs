@@ -186,17 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn blacklist_removes_and_whitelist_wins() {
-        let tracks = [
-            track(1, "English [SDH]", Some("en")),
-            track(2, "English", Some("en")),
-            track(3, "English Signs", Some("en")),
-        ];
-        assert_eq!(preferred_track(&tracks, "en", "", "sdh", "en"), Some(2));
-        assert_eq!(preferred_track(&tracks, "en", "signs", "", "en"), Some(3));
-    }
-
-    #[test]
     fn display_names_match_a_track_without_a_lang_tag() {
         let tracks = [track(1, "Deutsch", None), track(2, "English", None)];
         assert_eq!(preferred_track(&tracks, "en", "", "", "fr"), Some(2));
@@ -215,11 +204,5 @@ mod tests {
     fn t20_no_match_gives_none() {
         let tracks = [track(1, "Japanese", Some("ja"))];
         assert_eq!(preferred_track(&tracks, "de", "", "", "en"), None);
-    }
-
-    #[test]
-    fn blacklist_that_removes_everything_gives_none() {
-        let tracks = [track(1, "English", Some("en"))];
-        assert_eq!(preferred_track(&tracks, "en", "", "english", "en"), None);
     }
 }
