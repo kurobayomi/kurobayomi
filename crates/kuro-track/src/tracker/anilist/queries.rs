@@ -30,7 +30,11 @@ pub const SEARCH_MANGA: &str = "query Search($query: String) {
       }
       title {
         userPreferred
+        romaji
+        english
+        native
       }
+      synonyms
       coverImage {
         large
       }
@@ -62,7 +66,11 @@ pub const SEARCH_ANIME: &str = "query Search($query: String) {
       }
       title {
         userPreferred
+        romaji
+        english
+        native
       }
+      synonyms
       coverImage {
         large
       }

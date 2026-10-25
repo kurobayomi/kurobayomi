@@ -34,6 +34,16 @@ fn title_of(m: &Media) -> String {
         .unwrap_or_default()
 }
 
+/// Every name of the media besides the display title, for the auto-track match.
+fn alt_titles_of(m: &Media) -> Vec<String> {
+    let t = m.title.as_ref();
+    [t.and_then(|t| t.romaji.clone()), t.and_then(|t| t.english.clone()), t.and_then(|t| t.native.clone())]
+        .into_iter()
+        .flatten()
+        .chain(m.synonyms.iter().flatten().cloned())
+        .collect()
+}
+
 fn cover_of(m: &Media) -> String {
     m.cover_image
         .as_ref()
@@ -125,6 +135,7 @@ pub fn manga_search(m: &Media) -> MangaTrackSearch {
         .unwrap_or_default();
     out.publishing_type = publishing_type_of(m);
     out.publishing_status = m.status.clone().unwrap_or_default();
+    out.alt_titles = alt_titles_of(m);
     out
 }
 
@@ -145,6 +156,7 @@ pub fn anime_search(m: &Media) -> AnimeTrackSearch {
         .unwrap_or_default();
     out.publishing_type = publishing_type_of(m);
     out.publishing_status = m.status.clone().unwrap_or_default();
+    out.alt_titles = alt_titles_of(m);
     out
 }
 

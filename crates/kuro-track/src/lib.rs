@@ -2,6 +2,7 @@
 //!
 //! Layout follows `plans/27-tracking-core/p1-rust-design.md` section 1. No GTK, `gio` or `keyring` here.
 
+pub mod auto_bind;
 pub mod bangumi;
 pub mod base;
 pub mod bind;

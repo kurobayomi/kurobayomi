@@ -26,20 +26,21 @@ use super::{Inner, active_index, submit};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Show {
     Downloaded,
-    /// Unread for manga, Unwatched for anime.
-    Unseen,
+    /// Started with items left: Reading for manga, Watching for anime. Stored under the old unread key.
+    Watching,
+    /// Started with nothing left: the user finished it, whatever the series status.
     Completed,
     /// On any logged-in tracker; listed only while one is logged in.
     Tracked,
 }
 
 impl Show {
-    pub const ALL: [Show; 4] = [Show::Downloaded, Show::Unseen, Show::Completed, Show::Tracked];
+    pub const ALL: [Show; 4] = [Show::Downloaded, Show::Watching, Show::Completed, Show::Tracked];
 
     fn action(self) -> &'static str {
         match self {
             Show::Downloaded => "downloaded",
-            Show::Unseen => "unseen",
+            Show::Watching => "watching",
             Show::Completed => "completed",
             Show::Tracked => "tracked",
         }
@@ -48,8 +49,8 @@ impl Show {
     pub fn label(self, kind: Kind) -> String {
         match (self, kind) {
             (Show::Downloaded, _) => tr(MsgKey::label_downloaded),
-            (Show::Unseen, Kind::Manga) => tr(MsgKey::action_filter_unread),
-            (Show::Unseen, Kind::Anime) => tr(MsgKey::action_filter_unwatched),
+            (Show::Watching, Kind::Manga) => tr(MsgKey::reading),
+            (Show::Watching, Kind::Anime) => tr(MsgKey::watching),
             (Show::Completed, _) => tr(MsgKey::completed),
             (Show::Tracked, _) => tr(MsgKey::action_filter_tracked),
         }
@@ -60,7 +61,7 @@ impl Show {
 fn keys(prefs: &LibraryPrefs, kind: Kind, show: Show, logged_in: &BTreeSet<i64>) -> Vec<Pref<TriState>> {
     match show {
         Show::Downloaded => vec![prefs.filter_downloaded(kind).clone()],
-        Show::Unseen => vec![prefs.filter_unread(kind).clone()],
+        Show::Watching => vec![prefs.filter_unread(kind).clone()],
         Show::Completed => vec![prefs.filter_completed(kind).clone()],
         Show::Tracked => logged_in.iter().map(|id| prefs.filter_tracked(kind, *id as i32)).collect(),
     }
@@ -275,12 +276,12 @@ mod tests {
     fn a_check_writes_include_or_off_and_reads_an_old_exclude_as_off() {
         let p = prefs();
         let none = BTreeSet::new();
-        assert!(!is_on(&p, Kind::Manga, Show::Unseen, &none, false));
-        set(&p, Kind::Manga, Show::Unseen, true, &none).expect("write");
+        assert!(!is_on(&p, Kind::Manga, Show::Watching, &none, false));
+        set(&p, Kind::Manga, Show::Watching, true, &none).expect("write");
         assert_eq!(p.filter_unread.get(), TriState::ENABLED_IS);
-        assert!(is_on(&p, Kind::Manga, Show::Unseen, &none, false));
-        assert!(!is_on(&p, Kind::Anime, Show::Unseen, &none, false), "anime and manga keep separate keys");
-        set(&p, Kind::Manga, Show::Unseen, false, &none).expect("write");
+        assert!(is_on(&p, Kind::Manga, Show::Watching, &none, false));
+        assert!(!is_on(&p, Kind::Anime, Show::Watching, &none, false), "anime and manga keep separate keys");
+        set(&p, Kind::Manga, Show::Watching, false, &none).expect("write");
         assert_eq!(p.filter_unread.get(), TriState::DISABLED);
         p.filter_completed_anime.set(TriState::ENABLED_NOT).expect("write");
         assert!(!is_on(&p, Kind::Anime, Show::Completed, &none, false));
@@ -308,8 +309,8 @@ mod tests {
 
     #[test]
     fn the_labels_follow_the_kind() {
-        assert_eq!(Show::Unseen.label(Kind::Manga), "Unread");
-        assert_eq!(Show::Unseen.label(Kind::Anime), "Unwatched");
+        assert_eq!(Show::Watching.label(Kind::Manga), "Reading");
+        assert_eq!(Show::Watching.label(Kind::Anime), "Watching");
         assert_eq!(Show::Tracked.label(Kind::Anime), "Tracked");
         for kind in [Kind::Manga, Kind::Anime] {
             for ty in sort_rows(kind, true) {

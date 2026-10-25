@@ -1003,3 +1003,12 @@ ui_open_downloads_folder = Open the downloads folder
 
 # source: kurobayomi
 ui_open_containing_folder = Open its folder
+
+# source: kurobayomi
+track_auto_title = Track new titles automatically
+
+# source: kurobayomi
+track_auto_summary = Titles you add are tracked on AniList when the match is certain
+
+# source: kurobayomi
+track_auto_bound = Tracking { $title } on AniList

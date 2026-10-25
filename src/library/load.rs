@@ -50,11 +50,19 @@ pub fn filters(
     downloaded_only: bool,
     logged_in: &BTreeSet<i64>,
 ) -> LibraryFilters {
-    // The Started, Bookmarked and interval filters are cut from the settings: they stay off.
+    // The menu's Watching (old unread key) and Completed (old completed key) are the user's own progress (user,
+    // 2026-10-25): both need a started entry; Watching has items left, Completed has none. Both on is every started
+    // entry. The series-status, Bookmarked and interval filters are cut: they stay off.
     let downloaded = include_only(prefs.filter_downloaded(kind).get());
-    let unread = include_only(prefs.filter_unread(kind).get());
-    let completed = include_only(prefs.filter_completed(kind).get());
-    let (started, bookmarked, interval_custom) = (TriState::DISABLED, TriState::DISABLED, TriState::DISABLED);
+    let watching = include_only(prefs.filter_unread(kind).get()) == TriState::ENABLED_IS;
+    let finished = include_only(prefs.filter_completed(kind).get()) == TriState::ENABLED_IS;
+    let started = if watching || finished { TriState::ENABLED_IS } else { TriState::DISABLED };
+    let unread = match (watching, finished) {
+        (true, false) => TriState::ENABLED_IS,
+        (false, true) => TriState::ENABLED_NOT,
+        _ => TriState::DISABLED,
+    };
+    let (completed, bookmarked, interval_custom) = (TriState::DISABLED, TriState::DISABLED, TriState::DISABLED);
     let tracking = logged_in
         .iter()
         .map(|id| (*id, include_only(prefs.filter_tracked(kind, *id as i32).get())))
@@ -196,6 +204,29 @@ mod tests {
         assert_eq!(f.unread, TriState::DISABLED);
         assert_eq!(f.tracking.get(&2), Some(&TriState::DISABLED));
         assert!(!f.has_active(), "an old exclude value is no active filter");
+    }
+
+    #[test]
+    fn watching_and_completed_are_the_users_progress() {
+        let prefs = LibraryPrefs::new(kuro_prefs::store::PrefStore::in_memory());
+        // 10 episodes each, seen: none, four, all
+        let rows: Vec<LibraryRow> = [0, 4, 10]
+            .into_iter()
+            .enumerate()
+            .map(|(i, done)| LibraryRow { done, ..crate::library::fixtures::row(i as i64, 0) })
+            .collect();
+        let kept = |p: &LibraryPrefs| -> Vec<i64> {
+            let f = filters(p, Kind::Anime, false, &BTreeSet::new());
+            let facts = kuro_domain::library::filter::EntryFacts { downloads: 0, tracker_ids: &[] };
+            rows.iter().filter(|r| f.keep(r, facts, &BTreeSet::new())).map(|r| r.id).collect()
+        };
+        assert_eq!(kept(&prefs), vec![0, 1, 2]);
+        prefs.filter_unseen.set(TriState::ENABLED_IS).expect("write");
+        assert_eq!(kept(&prefs), vec![1], "Watching: started with episodes left");
+        prefs.filter_completed_anime.set(TriState::ENABLED_IS).expect("write");
+        assert_eq!(kept(&prefs), vec![1, 2], "both: every started entry");
+        prefs.filter_unseen.set(TriState::DISABLED).expect("write");
+        assert_eq!(kept(&prefs), vec![2], "Completed: nothing left, whatever the series status");
     }
 
     #[test]

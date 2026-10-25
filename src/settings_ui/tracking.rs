@@ -1,5 +1,5 @@
-//! The Tracking rows this module binds (tasks T-47a-053 to T-47a-059), now on the Sources and tracking page: the one
-//! progress switch and the MyAnimeList and AniList rows with their login and logout dialogs. Those two are the only
+//! The Tracking rows this module binds (tasks T-47a-053 to T-47a-059), now on the Sources and tracking page: the
+//! progress switch, the auto-track switch (on only while AniList is logged in) and the MyAnimeList and AniList rows with their login and logout dialogs. Those two are the only
 //! trackers with a row; the other trackers keep their code and their token keys but are not shown (settings diet). The three cut switches
 //! (open the track menu, next airing time, progress on mark) are not shown either.
 //!
@@ -24,7 +24,7 @@ use kuro_track::tracker::Tracker;
 
 use crate::pref_model::model::{Preference, PreferenceItem};
 use crate::pref_model::widgets::dialog;
-use crate::settings_ui::rows::{group, info, item, switch, tap_item, TapRow};
+use crate::settings_ui::rows::{group, info, item, switch, switch_with, tap_item, TapRow};
 use crate::settings_ui::tracker_host::{self, now_ms, Host};
 
 /// Shown when a row is tapped before the tracker services are built, or when they could not be.
@@ -242,9 +242,13 @@ pub fn page_rows(prefs: &Prefs, changed: Rc<dyn Fn()>) -> Vec<Preference> {
         .map(|(index, view)| tracker_item(index, *view, host.as_deref(), &changed))
         .collect();
     trackers.push(info(&tracking_info()));
+    // auto-track binds on AniList only, so its switch works once AniList is logged in (`kuro_track::auto_bind`)
+    let anilist = views.iter().any(|view| view.row.tracker == kuro_track::auto_bind::TRACKER && view.logged_in);
+    let auto_track = kuro_track::prefs::TrackPrefs::new(prefs.store().clone()).auto_track;
     let mut rows = warning_rows(host.as_ref().is_some_and(|host| host.fallback));
     rows.extend([
         item(switch(&tr(MsgKey::pref_auto_update_manga_sync), &tracking.auto_update_track, true)),
+        item(switch_with(&tr(MsgKey::track_auto_title), Some(&tr(MsgKey::track_auto_summary)), &auto_track, anilist, crate::pref_model::bind::accept())),
         group(&tr(MsgKey::services), trackers),
     ]);
     rows
@@ -284,14 +288,14 @@ mod tests {
     }
 
     #[test]
-    fn the_page_holds_the_progress_switch_and_a_tracker_group_with_myanimelist_and_anilist() {
+    fn the_page_holds_the_progress_and_auto_track_switches_and_a_tracker_group_with_myanimelist_and_anilist() {
         let prefs = Prefs::in_memory();
         let rows = page_rows(&prefs, Rc::new(|| {}));
         let titles: Vec<&str> = rows.iter().filter_map(|entry| match entry {
             Preference::Item(item) => Some(item.title()),
             Preference::Group(_) => None,
         }).collect();
-        assert_eq!(titles, ["Update progress after reading/watching"]);
+        assert_eq!(titles, ["Update progress after reading/watching", "Track new titles automatically"]);
         let Some(Preference::Group(trackers)) = rows.iter().find(|entry| matches!(entry, Preference::Group(g) if g.title == "Trackers")) else {
             panic!("the Trackers group")
         };

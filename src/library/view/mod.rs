@@ -1409,10 +1409,10 @@ mod tests {
 
             // the view options write at once and the dot follows the filter
             let options = inner.borrow().options.clone();
-            options.group().activate_action("unseen", None);
+            options.group().activate_action("watching", None);
             assert_eq!(inner.borrow().deps.prefs.filter_unread.get(), kuro_prefs::tristate::TriState::ENABLED_IS);
             assert!(pump_until(|| options.dot_visible()), "the dot shows while a Show only filter is on");
-            options.group().activate_action("unseen", None);
+            options.group().activate_action("watching", None);
             assert_eq!(inner.borrow().deps.prefs.filter_unread.get(), kuro_prefs::tristate::TriState::DISABLED);
             assert!(pump_until(|| !options.dot_visible()), "and hides once it is off");
             options.group().activate_action("mode", Some(&"list".to_variant()));

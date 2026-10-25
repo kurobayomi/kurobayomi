@@ -47,6 +47,8 @@ when it is turned on and refreshed by the daily update check. A source that is o
 
 - AniList only for now (the other trackers stay switched off). The user logs in once, optionally.
 - Watching and reading progress is sent to AniList automatically; the details page can set status and score.
+- Optional auto-track (off by default): a title added to the library is bound on AniList when the match is certain
+  (`docs/design/status-categories.md`).
 
 ## Rarely
 

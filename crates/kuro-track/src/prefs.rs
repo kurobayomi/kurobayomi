@@ -56,6 +56,9 @@ pub const TOP_ROWS: [PrefRow; 4] = [
 /// The key of [`TrackPrefs::bangumi_episode_progress`].
 pub const BANGUMI_EPISODE_PROGRESS_KEY: &str = "bangumi_episode_progress";
 
+/// The key of [`TrackPrefs::auto_track`].
+pub const AUTO_TRACK_KEY: &str = "auto_track_library";
+
 /// Typed handles over the tracking keys.
 pub struct TrackPrefs {
     /// `pref_auto_update_manga_sync_key`, shared by anime and manga.
@@ -67,6 +70,9 @@ pub struct TrackPrefs {
     /// Bangumi anime progress through the episode endpoints (T-31a-044, D7). Default off. Not an Aniyomi key, so it
     /// is stored under `[extra]` and exported with the `kuro_` prefix.
     pub bangumi_episode_progress: Pref<bool>,
+    /// Auto-track: a title that joins the library is bound on AniList when its match is certain (`auto_bind`). Default
+    /// off. Not an Aniyomi key, so it is stored under `[extra]` and exported with the `kuro_` prefix.
+    pub auto_track: Pref<bool>,
 }
 
 impl TrackPrefs {
@@ -93,7 +99,8 @@ impl TrackPrefs {
                 "anilist_score_type",
                 AniListScoreType::POINT_10,
             ),
-            bangumi_episode_progress: Pref::new(store, BANGUMI_EPISODE_PROGRESS_KEY, false),
+            bangumi_episode_progress: Pref::new(store.clone(), BANGUMI_EPISODE_PROGRESS_KEY, false),
+            auto_track: Pref::new(store, AUTO_TRACK_KEY, false),
         }
     }
 }
@@ -117,6 +124,7 @@ mod tests {
             !p.bangumi_episode_progress.get(),
             "T-31a-044: off by default"
         );
+        assert!(!p.auto_track.get(), "auto-track is off until the user turns it on");
     }
 
     #[test]

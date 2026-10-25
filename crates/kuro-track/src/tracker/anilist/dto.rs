@@ -54,6 +54,13 @@ pub struct FuzzyDate {
 pub struct MediaTitle {
     #[serde(rename = "userPreferred")]
     pub user_preferred: Option<String>,
+    /// Only the search queries ask for these three; the list queries leave them out.
+    #[serde(default)]
+    pub romaji: Option<String>,
+    #[serde(default)]
+    pub english: Option<String>,
+    #[serde(default)]
+    pub native: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,6 +126,9 @@ pub struct Media {
     pub start_date: Option<FuzzyDate>,
     pub staff: Option<Staff>,
     pub studios: Option<Studios>,
+    /// Alternative names, asked for by the search queries only.
+    #[serde(default)]
+    pub synonyms: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize)]

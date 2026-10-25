@@ -33,6 +33,9 @@ pub struct AnimeTrackSearch {
     /// True for a row of the `my:` search: it comes from the user's own list, so the card shows no status and
     /// offers Refresh (T-29a-049).
     pub from_my_list: bool,
+    /// Other names of the result (AniList: romaji, English, native, synonyms), for the auto-track match. Empty for
+    /// trackers that do not send them.
+    pub alt_titles: Vec<String>,
 }
 
 impl AnimeTrackSearch {
@@ -66,6 +69,7 @@ impl AnimeTrackSearch {
             publishing_type: String::new(),
             start_date: String::new(),
             from_my_list: false,
+            alt_titles: Vec::new(),
         }
     }
 
@@ -163,6 +167,9 @@ pub struct MangaTrackSearch {
     /// True for a row of the `my:` search: it comes from the user's own list, so the card shows no status and
     /// offers Refresh (T-29a-049).
     pub from_my_list: bool,
+    /// Other names of the result (AniList: romaji, English, native, synonyms), for the auto-track match. Empty for
+    /// trackers that do not send them.
+    pub alt_titles: Vec<String>,
 }
 
 impl MangaTrackSearch {
@@ -195,6 +202,7 @@ impl MangaTrackSearch {
             publishing_type: String::new(),
             start_date: String::new(),
             from_my_list: false,
+            alt_titles: Vec::new(),
         }
     }
 
