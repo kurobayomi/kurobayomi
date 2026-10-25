@@ -6,6 +6,11 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Added
+
+- Downloads lists every downloaded episode and chapter under the queue, each with a button that opens its folder, and
+  the header has a button that opens the downloads folder.
+
 ### Changed
 
 - Windows: a downloaded update says it is ready ("install it now, or it installs when you close the app") instead of

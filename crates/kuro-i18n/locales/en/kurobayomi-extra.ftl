@@ -997,3 +997,9 @@ ui_view = View
 
 # source: kurobayomi
 ui_grid = Grid
+
+# source: kurobayomi
+ui_open_downloads_folder = Open the downloads folder
+
+# source: kurobayomi
+ui_open_containing_folder = Open its folder

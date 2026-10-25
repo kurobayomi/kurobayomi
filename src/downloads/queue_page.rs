@@ -1,12 +1,14 @@
-//! The download queue page (lane D): one kind's queue as a list, with a Pause/Resume button and a Clear queue button
-//! in the page header (both hidden while the queue is empty), and the shared download button on each row (a click cancels, or retries a failed row). The commands go to the
-//! one download service (`Downloads`), and the rows come from its snapshot. A unit whose source is not installed is an
+//! The download queue page (lane D): one kind's queue as a list, then every downloaded episode or chapter on disk (the
+//! download index), each with a button that opens its folder. The page header has a Pause/Resume button and a Clear
+//! queue button (both hidden while the queue is empty) and one that opens the kind's downloads folder. A queued row has
+//! the shared download button (a click cancels, or retries a failed row). The commands go to the one download service (`Downloads`), and the rows come from its snapshot. A unit whose source is not installed is an
 //! ordinary row that reads "Waiting for source". A row's right-click menu offers Cancel, Retry (a failed row), Move to
 //! top and Move to bottom. The list is rebuilt once a second, only when its rows or their states changed; the buttons
 //! follow the progress live (`downloads::live`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -14,6 +16,7 @@ use gtk::glib::{self, prelude::*};
 use gtk::prelude::*;
 use kuro_platform::kind::Kind;
 use kuro_downloads::DownloadState;
+use kuro_downloads::index::Tree;
 use kuro_downloads::queue_model::{QueueItem, QueueModel};
 use kuro_downloads::service::Downloads;
 use kuro_downloads::state::RunState;
@@ -27,7 +30,8 @@ use crate::widgets::download_button::{DownloadButton, Request};
 /// How often the page checks the queue.
 const REFRESH: Duration = Duration::from_secs(1);
 
-/// The queue page of one kind, its title search and its header buttons (Pause or Resume, Clear queue), or `None` when
+/// The queue page of one kind, its title search and its header buttons (Pause or Resume, Clear queue, the downloads
+/// folder), or `None` when
 /// the app runs no download service (the Download tab then shows its empty state).
 pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<gtk::Widget>)> {
     let downloads = live::downloads()?;
@@ -61,7 +65,10 @@ pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<gtk::Widge
         refresh.draw();
         glib::ControlFlow::Continue
     });
-    Some((column.upcast(), search, vec![run.upcast(), clear.upcast()]))
+    let folder = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_downloads_folder));
+    let root = downloads.index().root(kind).to_path_buf();
+    folder.connect_clicked(move |_| open_folder(&root));
+    Some((column.upcast(), search, vec![run.upcast(), clear.upcast(), folder.upcast()]))
 }
 
 /// The state the page draws: the service and the widgets that change.
@@ -88,7 +95,9 @@ impl Page {
         self.run.set_visible(!items.is_empty());
         self.clear.set_visible(!items.is_empty());
         show_run(&self.run, running(&self.downloads, self.kind));
-        let key: String = items.iter().map(row_key).collect::<Vec<_>>().join("|");
+        // the index counts its changes, so a download that lands or a folder deleted on disk redraws the list
+        let changes = *self.downloads.index().changes().borrow();
+        let key = format!("{}#{changes}", items.iter().map(row_key).collect::<Vec<_>>().join("|"));
         if self.shown.borrow().as_deref() == Some(key.as_str()) {
             return;
         }
@@ -97,11 +106,23 @@ impl Page {
             self.list.remove(&child);
         }
         self.buttons.borrow_mut().clear();
-        let empty = items.is_empty();
+        let index = self.downloads.index();
+        let done = downloaded(&index.tree(self.kind), index.root(self.kind));
+        let empty = items.is_empty() && done.is_empty();
         self.empty.set_visible(empty);
         self.list.set_visible(!empty);
         for item in items {
             self.list.append(&self.row(item));
+        }
+        // ponytail: one row per unit in a ListBox; a GtkListView if libraries of thousands make the page slow
+        for (label, folder) in done {
+            let open = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_containing_folder));
+            open.add_css_class("flat");
+            open.set_valign(gtk::Align::Center);
+            open.connect_clicked(move |_| open_folder(&folder));
+            let line = look::list_row(None, &label, Some("Downloaded"), Some(open.upcast()));
+            line.set_activatable(false);
+            self.list.append(&line);
         }
     }
 
@@ -187,6 +208,23 @@ fn show_run(button: &gtk::Button, running: bool) {
     }
 }
 
+/// Every downloaded unit in `tree` as "title · unit" with the folder that holds it, by source, title and unit name.
+fn downloaded(tree: &Tree, root: &Path) -> Vec<(String, PathBuf)> {
+    tree.sources
+        .values()
+        .flat_map(|source| source.entries.values())
+        .flat_map(|entry| {
+            let folder = root.join(&entry.source_dir).join(&entry.dir_name);
+            entry.units.iter().map(move |unit| (format!("{} · {unit}", entry.dir_name), folder.clone()))
+        })
+        .collect()
+}
+
+/// Opens `folder` in the file manager; a failure is a toast.
+fn open_folder(folder: &Path) {
+    crate::ui::open_local(folder, |error| crate::toast::notify(&error));
+}
+
 /// What one row shows, as a key: a change of any of these rebuilds the list.
 fn row_key(item: &QueueItem) -> String {
     format!("{:?}:{}:{}:{}:{}", item.kind, item.item_id, item.state as u8, item.progress, item.waiting)
@@ -235,6 +273,17 @@ mod tests {
             progress,
             waiting: false,
         }
+    }
+
+    #[test]
+    fn every_downloaded_unit_is_a_row_with_its_title_folder() {
+        use kuro_downloads::index::{EntryDir, SourceDir};
+        let entry = EntryDir { source_dir: "Source (EN)".into(), dir_name: "Berserk".into(), units: ["Chapter 1".to_owned(), "Chapter 2".to_owned()].into() };
+        let mut tree = Tree::default();
+        tree.sources.insert(7, SourceDir { dir_name: "Source (EN)".into(), entries: [("Berserk".to_owned(), entry)].into() });
+        let folder = Path::new("/d/Source (EN)/Berserk").to_path_buf();
+        assert_eq!(downloaded(&tree, Path::new("/d")), [("Berserk · Chapter 1".to_owned(), folder.clone()), ("Berserk · Chapter 2".to_owned(), folder)]);
+        assert!(downloaded(&Tree::default(), Path::new("/d")).is_empty());
     }
 
     #[test]
