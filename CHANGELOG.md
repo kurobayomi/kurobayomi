@@ -6,6 +6,15 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-25
+
+### Fixed
+
+- Windows: an update left the old version in place, after Restart and after a plain quit. GLib's session bus helper
+  (`gdbus.exe`) outlives the app and keeps some of its files open, and the silent setup gave up when it could not close
+  it; the setup now closes whatever still uses the app's files. An installed 0.2.0 or 0.2.1 gets this from the 0.2.2
+  setup it downloads, so it updates without a reinstall.
+
 ## [0.2.1] - 2026-10-25
 
 ### Added
