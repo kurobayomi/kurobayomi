@@ -21,6 +21,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Open in WebView opened an empty page whose Back and Forward did nothing: the in-app WebView was never built. A
   source's page now has Open in browser, and a title's page a Browser button (and W), which open the site in your
   browser.
+- A description a source sends as HTML (Mangakakalot's) showed its tags (`<b>`, `<br>`, `<a href=...>`) as text. It now
+  shows its lines, bold, italic and web links, and drops the other tags; the text is escaped as before, so a source still
+  cannot put markup of its own on screen.
 - A title added to the library while Incognito is on is no longer tracked automatically: Incognito sends nothing to
   the trackers, and auto-track put the title on your AniList or MyAnimeList list.
 
