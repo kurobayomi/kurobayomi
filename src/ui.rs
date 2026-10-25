@@ -878,17 +878,20 @@ pub fn pack_lead(header: &gtk::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
     lead
 }
 
-/// Moves `toggle` first into `lead` when `narrow`, else first into `end`, and hides whichever box is left empty.
+/// Moves `toggle` first into `lead` when `narrow`, else first into `end`, and hides whichever box has nothing showing
+/// (a ⋮ menu hidden in a wide window leaves its lead box empty too).
 fn put_search(toggle: &gtk::Widget, lead: &GBox, end: &GBox, narrow: bool) {
     let target = if narrow { lead } else { end };
     if toggle.parent().as_ref() != Some(target.upcast_ref()) {
         if let Some(parent) = toggle.parent().and_downcast::<GBox>() {
             parent.remove(toggle);
         }
+        // shown first: a child added to a hidden box can come out hidden itself
+        target.set_visible(true);
         target.prepend(toggle);
     }
     for side in [lead, end] {
-        side.set_visible(side.first_child().is_some());
+        side.set_visible(std::iter::successors(side.first_child(), |w| w.next_sibling()).any(|w| w.is_visible()));
     }
 }
 
@@ -1370,12 +1373,14 @@ mod tests {
     fn the_search_leads_the_row_in_the_phone_layout_and_is_first_of_the_actions_otherwise() {
         crate::testing::with_display(|| {
             let (lead, end) = (GBox::new(O::Horizontal, 4), GBox::new(O::Horizontal, 4));
-            let (toggle, refresh) = (gtk::ToggleButton::new(), Button::new());
+            let (toggle, refresh) = (gtk::ToggleButton::builder().visible(true).build(), Button::builder().visible(true).build());
             end.append(&refresh);
+            // a pushed page's ⋮ menu, hidden in a wide window: it leaves the lead box with nothing showing
+            lead.append(&gtk::MenuButton::builder().visible(false).build());
             let toggle = toggle.upcast::<gtk::Widget>();
             put_search(&toggle, &lead, &end, false);
             assert_eq!(end.first_child().as_ref(), Some(&toggle), "first of the actions in a wide window");
-            assert!(!lead.is_visible(), "the empty lead box takes no spacing");
+            assert!(!lead.is_visible(), "a lead box with nothing showing takes no spacing");
             put_search(&toggle, &lead, &end, true);
             assert_eq!(lead.first_child().as_ref(), Some(&toggle), "at the start of the row on a phone");
             assert!(lead.is_visible() && end.is_visible(), "the actions keep their other buttons");

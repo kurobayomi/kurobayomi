@@ -8,7 +8,7 @@ use gtk::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::library::LibraryDisplayMode;
 
-use super::header::{OverflowItem, overflow_items, overflow_label};
+use super::header::{OverflowItem, overflow_icon, overflow_items, overflow_label};
 use super::prefs::BrowsePrefs;
 use crate::widgets::view_look;
 use crate::widgets::view_options::ViewOptions;
@@ -56,14 +56,21 @@ pub fn build(deps: HeaderDeps) -> SourceHeader {
 
     bar.pack_start(&back_button(Rc::clone(&deps.on_back)));
 
-    // the ⋮ menu leads the row after Back, as on every pushed page (`ui::pack_lead`)
+    // the page actions are buttons at the end; in the phone layout, where they do not fit, the ⋮ menu after Back stands
+    // in for them (`ui::pack_lead`), as on a title's page (user, 2026-10-25)
     let overflow = overflow_menu(&deps);
+    let actions = overflow_buttons(&deps);
     let lead = crate::ui::pack_lead(&bar, overflow.as_ref().map(|menu| menu.upcast_ref()));
 
     let display = display_menu(&deps);
     bar.pack_end(&display.widget);
+    for button in actions.iter().rev() {
+        bar.pack_end(button);
+    }
+    fold_actions(&bar, actions, overflow.clone());
 
-    // the actions at the end, left to right: search (at the start in the phone layout), refresh, then the view options
+    // the actions at the end, left to right: search (at the start in the phone layout), refresh, the page actions, then
+    // the view options
     let on_refresh = Rc::clone(&deps.on_refresh);
     let refresh = crate::ui::refresh_button(&tr(MsgKey::action_webview_refresh));
     refresh.connect_clicked(move |button| {
@@ -118,6 +125,37 @@ fn display_menu(deps: &HeaderDeps) -> ViewOptions {
     menu
 }
 
+fn overflow_buttons(deps: &HeaderDeps) -> Vec<gtk::Button> {
+    overflow_items(deps.is_local, deps.configurable)
+        .into_iter()
+        .map(|item| {
+            let button = crate::ui::icon_button(overflow_icon(item), &overflow_label(item));
+            let on_overflow = Rc::clone(&deps.on_overflow);
+            button.connect_clicked(move |_| on_overflow(item));
+            button
+        })
+        .collect()
+}
+
+/// Shows the page actions as buttons in a wide window and as the ⋮ menu in the phone layout.
+fn fold_actions(bar: &gtk::HeaderBar, buttons: Vec<gtk::Button>, menu: Option<gtk::MenuButton>) {
+    let show = move |narrow: bool| {
+        for button in &buttons {
+            button.set_visible(!narrow);
+        }
+        if let Some(menu) = &menu {
+            menu.set_visible(narrow);
+        }
+    };
+    show(crate::ui::window_width().is_some_and(|w| w < crate::shell::layout::WIDE_MIN_WIDTH_PX));
+    bar.add_tick_callback(move |bar, _| {
+        if let Some(width) = bar.root().map(|root| root.width()).filter(|w| *w > 0) {
+            show(width < crate::shell::layout::WIDE_MIN_WIDTH_PX);
+        }
+        gtk::glib::ControlFlow::Continue
+    });
+}
+
 fn overflow_menu(deps: &HeaderDeps) -> Option<gtk::MenuButton> {
     let entries = overflow_items(deps.is_local, deps.configurable)
         .into_iter()
@@ -153,6 +191,17 @@ pub(crate) mod tests {
         }
     }
 
+    fn descendants(root: &gtk::Widget) -> Vec<gtk::Widget> {
+        let mut out = Vec::new();
+        let mut child = root.first_child();
+        while let Some(w) = child {
+            out.extend(descendants(&w));
+            child = w.next_sibling();
+            out.push(w);
+        }
+        out
+    }
+
     fn header_shows_the_stored_look_and_stores_a_pick() {
         let log = Rc::new(RefCell::new(Vec::new()));
         let store = PrefStore::in_memory();
@@ -172,6 +221,15 @@ pub(crate) mod tests {
         let reopened = build(deps(Rc::clone(&prefs), &log, false, true));
         assert_eq!(reopened.display.radio("mode").as_deref(), Some("list"), "the stored look is shown again");
         assert!(header.search.is_ancestor(&header.bar), "the search toggle is in the header");
+        // a wide window: the page actions are buttons and the ⋮ menu is hidden
+        let webview = descendants(header.bar.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Button>().ok())
+            .find(|b| b.tooltip_text().as_deref() == Some(overflow_label(OverflowItem::OpenInWebView).as_str()))
+            .expect("the Open in WebView button");
+        assert!(webview.is_visible() && !header.overflow.as_ref().expect("the ⋮ menu").is_visible());
+        webview.emit_clicked();
+        assert_eq!(log.borrow().last().map(String::as_str), Some("overflow OpenInWebView"));
         let slot = header.search.parent().expect("the search's slot");
         let next = slot.next_sibling().and_downcast::<gtk::Button>().expect("a button after the search");
         assert_eq!(next.tooltip_text().as_deref(), Some(tr(MsgKey::action_webview_refresh).as_str()), "the search is first of the actions, before Refresh");

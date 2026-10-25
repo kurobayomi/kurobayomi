@@ -1,4 +1,4 @@
-//! The overflow entries of the source header bar (T-40a-002). Its view options are the look sections shared with the
+//! The page actions of the source header bar (T-40a-002): buttons in a wide window, a ⋮ menu in the phone layout. Its view options are the look sections shared with the
 //! Library (`widgets::view_look`).
 
 use kuro_i18n::{MsgKey, tr};
@@ -30,6 +30,15 @@ fn overflow_items_with(is_local: bool, configurable: bool, has_help: bool) -> Ve
         items.push(OverflowItem::Settings);
     }
     items
+}
+
+/// The header button icon of an overflow entry.
+pub fn overflow_icon(item: OverflowItem) -> &'static str {
+    match item {
+        OverflowItem::Help => "help-browser-symbolic",
+        OverflowItem::OpenInWebView => "web-browser-symbolic",
+        OverflowItem::Settings => "emblem-system-symbolic",
+    }
 }
 
 /// The label of an overflow entry.

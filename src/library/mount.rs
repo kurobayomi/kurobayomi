@@ -395,14 +395,13 @@ pub fn build(kind: Kind) -> Option<Built> {
     }
     // the view options button carries its own dot while a filter is on (T-37a-056)
     let (search, refresh, options) = view.controls();
-    let mut end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.clone().upcast()), extra: local_folder_buttons(kind).map(|b| b.upcast::<gtk::Widget>()).into(), options: Some(options), ..Default::default() }.widgets();
-    // Categories sits just before Refresh (user, 2026-10-24)
-    let at = end.iter().position(|w| *w == refresh.clone().upcast::<gtk::Widget>()).unwrap_or(end.len());
-    end.insert(at, categories_button().upcast());
+    // search, Refresh, then the page's own buttons, as on every page (user, 2026-10-25): Categories first of them
+    let extra = std::iter::once(categories_button().upcast()).chain(local_folder_buttons(kind).map(|b| b.upcast::<gtk::Widget>())).collect();
+    let end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.upcast()), extra, options: Some(options), ..Default::default() }.widgets();
     Some(Built { content: view.widget(), end })
 }
 
-/// The Categories button, before Refresh: opens the categories page.
+/// The Categories button, after Refresh: opens the categories page.
 fn categories_button() -> gtk::Button {
     let button = crate::ui::icon_button("tag-symbolic", &tr(MsgKey::categories));
     button.connect_clicked(|_| crate::ui::open("categories"));

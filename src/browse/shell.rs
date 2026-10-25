@@ -86,17 +86,15 @@ impl BrowseShell {
         let on_refresh = Rc::clone(&inner.deps.on_refresh);
         let refresh = crate::ui::refresh_button(&tr(MsgKey::browse_check_sources));
         refresh.connect_clicked(move |button| on_refresh(button));
-        let mut end = crate::ui::HeaderActions {
+        // search, Refresh, then the page's own buttons, as on every page (user, 2026-10-25): Repositories first of them
+        let end = crate::ui::HeaderActions {
             search: Some(inner.search.clone()),
             refresh: Some(refresh.clone().upcast()),
-            extra: vec![gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
+            extra: vec![inner.repos_button().upcast(), gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
             options: Some(options),
             ..Default::default()
         }
         .widgets();
-        // Repositories sits just before Refresh (user, 2026-10-24)
-        let at = end.iter().position(|w| *w == refresh.clone().upcast::<gtk::Widget>()).unwrap_or(end.len());
-        end.insert(at, inner.repos_button().upcast());
         let root = crate::ui::page("", &inner.stack, end, false);
         keep_alive(&root, &inner);
 
@@ -229,7 +227,7 @@ impl Inner {
         self.options.widget.clone().upcast()
     }
 
-    /// The Repositories button, before Refresh: opens the repository list for the visible kind.
+    /// The Repositories button, after Refresh: opens the repository list for the visible kind.
     fn repos_button(self: &Rc<Self>) -> gtk::Button {
         let button = crate::ui::icon_button("package-x-generic-symbolic", &tr(MsgKey::label_extension_repos));
         let weak = Rc::downgrade(self);
@@ -351,9 +349,9 @@ pub(crate) mod tests {
         assert_eq!(*log.left.borrow(), 1, "the second Escape leaves");
     }
 
-    /// No "more" menu (the search button is the global search), and the Repositories button just before Refresh opens
+    /// No "more" menu (the search button is the global search), and the Repositories button just after Refresh opens
     /// the repositories of the visible kind.
-    fn the_repositories_button_sits_before_refresh_and_follows_the_visible_kind() {
+    fn the_repositories_button_follows_refresh_and_the_visible_kind() {
         let (shell, log) = shell();
         let mut all = Vec::new();
         walk(shell.root.upcast_ref(), &mut all);
@@ -364,7 +362,7 @@ pub(crate) mod tests {
             .filter_map(|w| w.downcast_ref::<gtk::Button>().cloned())
             .find(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::label_extension_repos).as_str()))
             .expect("the Repositories button");
-        let refresh = repos.next_sibling().and_downcast::<gtk::Button>().expect("Refresh follows it");
+        let refresh = repos.prev_sibling().and_downcast::<gtk::Button>().expect("Refresh comes before it");
         assert_eq!(refresh.tooltip_text().as_deref(), Some(tr(MsgKey::browse_check_sources).as_str()));
         shell.inner.select(BrowsePage::MangaSources);
         repos.emit_clicked();
@@ -394,6 +392,6 @@ pub(crate) mod tests {
         enter_runs_a_global_search_of_the_visible_kind();
         the_switch_follows_the_page_and_ctrl_digits_pick_only_the_two_pages();
         escape_closes_the_search_then_leaves();
-        the_repositories_button_sits_before_refresh_and_follows_the_visible_kind();
+        the_repositories_button_follows_refresh_and_the_visible_kind();
     }
 }
