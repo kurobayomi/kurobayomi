@@ -5,6 +5,9 @@
 pub const LEFT_PANE_WIDTH: i32 = 360;
 /// The share of the page width the left info pane takes, so the pane and its cover grow with the window.
 pub const LEFT_PANE_SHARE: f64 = 0.3;
+/// The widest the chapter and episode rows (and the count row above them) get: wider than a page's column (`ui::PAGE_WIDTH`)
+/// so a big window is not mostly margin, narrower than a whole screen so a row's download button stays near its title.
+pub const LIST_MAX_WIDTH: i32 = 960;
 /// The window width from which the entry screens show two panes (info on the left, list on the right).
 pub const TWO_PANE_MIN_WIDTH: i32 = 900;
 /// The window size assumed before the page has a real one: the app's default size.

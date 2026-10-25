@@ -55,7 +55,7 @@ pub fn item_header_row() -> ItemHeaderRow {
     row.append(&count);
     row.append(&missing);
     row.append(&download_all);
-    ItemHeaderRow { row: crate::clamp::clamp(&row, crate::ui::PAGE_WIDTH).upcast(), count, missing, download_all }
+    ItemHeaderRow { row: crate::clamp::clamp(&row, crate::entry_core::constants::LIST_MAX_WIDTH).upcast(), count, missing, download_all }
 }
 
 /// The Start or Resume button: the play icon and its label. The page places it over the list.

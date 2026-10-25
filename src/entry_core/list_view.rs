@@ -1,6 +1,6 @@
 //! The chapter and episode list, one widget for both kinds: a `gio::ListStore` behind a `gtk::ListView`, so only the
 //! rows on screen exist (3000 rows cost the same as 30). The rows are drawn as one card, centred and at most
-//! `ui::PAGE_WIDTH` wide: the unread dot (or the selection check), the title over a dim second line, an optional
+//! `constants::LIST_MAX_WIDTH` wide: the unread dot (or the selection check), the title over a dim second line, an optional
 //! summary, the bookmark and filler marks, and the download button. The store may hold leading slots before the rows
 //! (widgets that scroll with the list, such as the info block of the narrow anime layout).
 //!
@@ -139,7 +139,7 @@ fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     // a row is as tall as what it shows: a stack is as tall as its tallest child by default, which padded a leading
     // slot (the "11 episodes" line) to the height of an episode card
     let stack = gtk::Stack::builder().vhomogeneous(false).hhomogeneous(false).build();
-    stack.add_named(&crate::clamp::clamp(&card, crate::ui::PAGE_WIDTH), Some("row"));
+    stack.add_named(&crate::clamp::clamp(&card, crate::entry_core::constants::LIST_MAX_WIDTH), Some("row"));
     stack.add_named(&slot, Some("slot"));
     RowWidgets { stack, card, lead, text, title, subtitle, summary, marker, bookmark, filler, download, slot }
 }

@@ -27,7 +27,7 @@ use kuro_downloads::DownloadState;
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::store::PrefStore;
 
-use crate::entry_core::constants::{FALLBACK_WIDTH, left_pane_width};
+use crate::entry_core::constants::{FALLBACK_WIDTH, LIST_MAX_WIDTH, left_pane_width};
 
 /// The width the page is laid out for before it has one: the window's, so a narrow window never gets the two-pane layout
 /// for a frame (its minimum width would push the window wider); the app's default size before there is a window.
@@ -743,10 +743,14 @@ impl View {
     fn on_event(self: &Rc<Self>, event: EntryEvent) {
         match event {
             EntryEvent::Loaded(loaded) => {
-                self.loaded.set(true);
+                let first = !self.loaded.replace(true);
                 if let Some(m) = &loaded {
                     let large = self.two_pane.get().unwrap_or(false);
                     self.expansion.set(Expansion::new(large, m.from_source));
+                    // progress made in another app reaches the trackers first: pull it once per open of a library entry
+                    if first && m.entry.favorite {
+                        crate::entry_core::tracking::actions::pull_progress(self.env.kind, m.entry.id);
+                    }
                 }
                 *self.model.borrow_mut() = loaded.map(|b| *b);
             }
@@ -828,6 +832,10 @@ impl View {
         let two = two_pane(width);
         // the left pane is a share of the page, so it and the header's cover in it grow with the window
         let pane_resized = two && self.panes.set_width(left_pane_width(width));
+        // beside the pane the list starts at the pane's edge instead of floating centred in a wide right side (user,
+        // 2026-10-25): the room past its widest goes to the right
+        let spare = if two { (width - self.panes.width() - 1 - LIST_MAX_WIDTH).max(0) } else { 0 };
+        self.list.widget.set_margin_end(spare);
         if self.two_pane.get() == Some(two) {
             // the layout is the same, but the automatic columns of the season grid follow the width (T-39a-034), and so does
             // the header's cover in either layout
@@ -1962,6 +1970,11 @@ mod tests {
             window.set_default_size(1000, 700);
             assert!(pump(&ctx, || list.model().is_some_and(|m| m.n_items() == 4)), "one leading row and three episodes");
             assert!(left.is_visible() && left.first_child().is_some(), "the left pane shows the info block");
+            assert_eq!(list.margin_end(), 0, "a right side narrower than the list's widest leaves no spare room");
+            // a big window: the list sits at the pane's edge at its widest, and the room past it goes to the right
+            window.set_default_size(1900, 700);
+            let spare = |page: i32| page - left.width_request() - 1 - crate::entry_core::constants::LIST_MAX_WIDTH;
+            assert!(pump(&ctx, || page.width() >= 1800 && list.margin_end() == spare(page.width()) && list.margin_end() > 0), "spare room at the right, got {} at {}", list.margin_end(), page.width());
             window.set_child(None::<&gtk::Widget>);
             window.close();
 
