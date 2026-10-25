@@ -4,7 +4,8 @@
 //! calls return `None`, which is what a user with no logged-in tracker gets.
 //!
 //! Callers: the reader calls [`chapter_read`] and the player calls [`episode_seen`] when a chapter or episode completes
-//! (the reader's `ReaderExtras::track_update` sink); the track sheet and the tracker search call the rest.
+//! (the reader's `ReaderExtras::track_update` sink); an entry page calls [`pull_progress`] when it opens; the track sheet
+//! and the tracker search call the rest.
 
 use std::sync::Arc;
 
@@ -40,6 +41,32 @@ pub fn chapter_read(manga_id: i64, chapter: f64) -> Option<Outcomes> {
 /// An episode was seen: its number goes to every logged-in anime tracker behind it, as [`chapter_read`] does for manga.
 pub fn episode_seen(anime_id: i64, episode: f64) -> Option<Outcomes> {
     start(|ctx| spawn_track_episode(ctx, anime_id, episode))
+}
+
+/// Pulls every tracker's progress for an entry whose page opened (user, 2026-10-25: progress made in another app reaches
+/// the tracker, then this one): the episodes or chapters up to each tracker's number are marked, the page follows
+/// through its live subscription, and a toast names the tracker and the count. An entry with no binding reads only its
+/// own rows.
+pub fn pull_progress(kind: kuro_platform::kind::Kind, entry_id: i64) {
+    use kuro_platform::kind::Kind;
+    let Some(ctx) = tracker_host::ctx() else { return };
+    crate::source_bridge::call_on_main(
+        async move {
+            let refreshed = match kind {
+                Kind::Anime => kuro_track::sync::refresh_anime(&ctx, entry_id).await,
+                Kind::Manga => kuro_track::sync::refresh_manga(&ctx, entry_id).await,
+            };
+            let marked = refreshed.map(|r| r.marked).unwrap_or_default();
+            marked.into_iter().filter_map(|(id, n)| ctx.trackers.get(id).map(|t| (t.name().to_owned(), n))).collect::<Vec<_>>()
+        },
+        move |marked| {
+            for (tracker, count) in marked {
+                let key = if kind.is_anime() { kuro_i18n::MsgKey::track_pulled_episodes } else { kuro_i18n::MsgKey::track_pulled_chapters };
+                let args = [("count", kuro_i18n::Arg::Int(count as i64)), ("tracker", kuro_i18n::Arg::Str(&tracker))];
+                crate::toast::notify(kuro_i18n::trf(key, &args));
+            }
+        },
+    );
 }
 
 /// One remote edit of an anime binding (status, progress, score, dates, private), written detached.

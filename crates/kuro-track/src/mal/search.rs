@@ -65,6 +65,7 @@ pub fn manga_hit(id: i64, d: &MangaDetails) -> MangaTrackSearch {
     hit.publishing_status = publishing_text(&d.status);
     hit.publishing_type = publishing_text(&d.media_type);
     hit.start_date = d.start_date.clone().unwrap_or_default();
+    hit.alt_titles = d.alternative_titles.all();
     hit
 }
 
@@ -86,6 +87,7 @@ pub fn anime_hit(id: i64, d: &AnimeDetails) -> AnimeTrackSearch {
     hit.publishing_status = publishing_text(&d.status);
     hit.publishing_type = publishing_text(&d.media_type);
     hit.start_date = d.start_date.clone().unwrap_or_default();
+    hit.alt_titles = d.alternative_titles.all();
     hit
 }
 

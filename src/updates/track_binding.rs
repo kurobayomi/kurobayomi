@@ -38,7 +38,7 @@ fn current() -> Option<Arc<TrackCtx>> {
 }
 
 /// The binder of one kind: every logged-in enhanced tracker that accepts the entry's source is matched and bound, then
-/// auto-track binds AniList when it is on and the match is certain (`kuro_track::auto_bind`), on the shell's runtime and
+/// auto-track binds the switched-on trackers when it is on and the match is certain (`kuro_track::auto_bind`), on the shell's runtime and
 /// detached, so the add does not wait (B§5.2). Built on the GTK thread, where the shell is found.
 pub fn binder(kind: Kind) -> TrackerBinder {
     let runtime = crate::shell::host::Shell::get().map(|shell| shell.runtime().clone()).or_else(|| tokio::runtime::Handle::try_current().ok());
@@ -53,20 +53,23 @@ pub fn binder(kind: Kind) -> TrackerBinder {
             for (tracker, error) in failures {
                 tracing::warn!(entry = id, tracker = tracker.0, %error, "an enhanced tracker could not be bound");
             }
-            let auto = match kind {
+            let (bound_on, failed) = match kind {
                 Kind::Anime => kuro_track::auto_bind::auto_bind_anime(&ctx, id, &title).await,
                 Kind::Manga => kuro_track::auto_bind::auto_bind_manga(&ctx, id, &title).await,
             };
-            match auto {
-                Ok(true) => {
-                    let text = kuro_i18n::trf(kuro_i18n::MsgKey::track_auto_bound, &[("title", kuro_i18n::Arg::Str(&title))]);
-                    gtk::glib::MainContext::default().invoke(move || {
-                        crate::toast::notify(text);
-                        bound(id);
-                    });
-                }
-                Ok(false) => {}
-                Err(error) => tracing::warn!(entry = id, %error, "auto-track could not bind the title"),
+            for (tracker, error) in failed {
+                tracing::warn!(entry = id, tracker = tracker.0, %error, "auto-track could not bind the title");
+            }
+            let names: Vec<String> = bound_on.iter().filter_map(|t| ctx.trackers.get(*t)).map(|t| t.name().to_owned()).collect();
+            if !names.is_empty() {
+                let text = kuro_i18n::trf(
+                    kuro_i18n::MsgKey::track_auto_bound,
+                    &[("title", kuro_i18n::Arg::Str(&title)), ("trackers", kuro_i18n::Arg::Str(&names.join(", ")))],
+                );
+                gtk::glib::MainContext::default().invoke(move || {
+                    crate::toast::notify(text);
+                    bound(id);
+                });
             }
         });
     })

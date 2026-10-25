@@ -63,6 +63,25 @@ pub struct MangaDetails {
     pub media_type: String,
     #[serde(default)]
     pub start_date: Option<String>,
+    #[serde(default)]
+    pub alternative_titles: AltTitles,
+}
+
+/// `alternative_titles` of a detail response: the other names, used by the auto-track match.
+#[derive(Debug, Default, Deserialize)]
+pub struct AltTitles {
+    #[serde(default)]
+    pub synonyms: Vec<String>,
+    #[serde(default)]
+    pub en: Option<String>,
+    #[serde(default)]
+    pub ja: Option<String>,
+}
+
+impl AltTitles {
+    pub fn all(&self) -> Vec<String> {
+        self.en.iter().chain(self.ja.iter()).chain(self.synonyms.iter()).filter(|t| !t.is_empty()).cloned().collect()
+    }
 }
 
 /// `GET anime/{id}` (`MALAnime`).
@@ -81,6 +100,8 @@ pub struct AnimeDetails {
     pub media_type: String,
     #[serde(default)]
     pub start_date: Option<String>,
+    #[serde(default)]
+    pub alternative_titles: AltTitles,
 }
 
 /// `GET manga/{id}?fields=num_chapters,my_list_status{...}` (`MALListMangaItem`).

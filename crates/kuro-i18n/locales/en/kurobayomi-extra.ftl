@@ -1008,7 +1008,13 @@ ui_open_containing_folder = Open its folder
 track_auto_title = Track new titles automatically
 
 # source: kurobayomi
-track_auto_summary = Titles you add are tracked on AniList when the match is certain
+track_auto_summary = Titles you add are tracked on your trackers when the match is certain
 
 # source: kurobayomi
-track_auto_bound = Tracking { $title } on AniList
+track_auto_bound = Tracking { $title } on { $trackers }
+
+# source: kurobayomi
+track_pulled_episodes = Marked { $count } episodes as watched from { $tracker }
+
+# source: kurobayomi
+track_pulled_chapters = Marked { $count } chapters as read from { $tracker }

@@ -1,5 +1,7 @@
-//! Refresh (pull remote state) and progress sync for enhanced trackers (`RefreshAnimeTracks.kt`,
-//! `RefreshMangaTracks.kt`, `SyncEpisodeProgressWithTrack.kt`, `SyncChapterProgressWithTrack.kt`).
+//! Refresh (pull remote state) and progress sync (`RefreshAnimeTracks.kt`, `RefreshMangaTracks.kt`,
+//! `SyncEpisodeProgressWithTrack.kt`, `SyncChapterProgressWithTrack.kt`). Unlike the source, every tracker pulls (user,
+//! 2026-10-25: progress made in another app reaches the tracker, then this app): the units up to the tracker's number
+//! are marked seen. Only an enhanced (self-hosted) tracker also gets the local number written back, as upstream.
 
 use kuro_platform::kind::Kind;
 use futures::future::join_all;
@@ -22,20 +24,38 @@ pub(crate) fn continuous_last(sorted: &[UnitRef], default: f64) -> f64 {
         .map_or(default, |u| u.number)
 }
 
-/// Pushes the remote state to the local episodes, then the other way round (`SyncEpisodeProgressWithTrack`).
-/// Does nothing for trackers that are not enhanced. Failures are logged, not returned, as the source does.
+/// The ids of the units at or below `last` that are not seen yet. Nothing when `last` is 0 (nothing watched there), so
+/// an episode 0 is not marked by an empty remote.
+fn unseen_up_to(units: &[UnitRef], last: f64) -> Vec<i64> {
+    if last <= 0.0 {
+        return Vec::new();
+    }
+    units.iter().filter(|u| u.number >= 0.0 && u.number <= last && !u.seen).map(|u| u.id).collect()
+}
+
+/// Marks the local episodes up to the remote number seen; an enhanced tracker then also takes the local number
+/// (`SyncEpisodeProgressWithTrack`). Returns how many episodes it marked. Failures are logged, not returned, as the
+/// source does.
 pub async fn sync_anime_progress(
     ctx: &TrackCtx,
     entry_id: i64,
     remote: &AnimeTrack,
     api: &dyn AnimeTracker,
-) {
-    if api.as_enhanced_anime().is_none() {
-        return;
-    }
-    if let Err(e) = sync_anime_inner(ctx, entry_id, remote, api).await {
+) -> usize {
+    let result = if api.as_enhanced_anime().is_some() {
+        sync_anime_inner(ctx, entry_id, remote, api).await
+    } else {
+        async {
+            let marked = unseen_up_to(&ctx.anime_episodes.list(entry_id).await?, remote.last_episode_seen);
+            ctx.anime_episodes.mark_seen(&marked).await?;
+            Ok(marked.len())
+        }
+        .await
+    };
+    result.unwrap_or_else(|e: TrackError| {
         tracing::warn!(entry = entry_id, tracker = remote.tracker_id.0, error = %redact(&e.to_string()), "episode progress sync failed");
-    }
+        0
+    })
 }
 
 async fn sync_anime_inner(
@@ -43,7 +63,7 @@ async fn sync_anime_inner(
     entry_id: i64,
     remote: &AnimeTrack,
     api: &dyn AnimeTracker,
-) -> Result<(), TrackError> {
+) -> Result<usize, TrackError> {
     let mut episodes = ctx.anime_episodes.list(entry_id).await?;
     episodes.retain(|e| e.number >= 0.0);
     episodes.sort_by(|a, b| a.number.total_cmp(&b.number));
@@ -65,7 +85,7 @@ async fn sync_anime_inner(
     ctx.anime_episodes.mark_seen(&newly_seen).await?;
     ctx.save_anime(&with_server_anime(&updated, &server))
         .await?;
-    Ok(())
+    Ok(newly_seen.len())
 }
 
 /// Manga form of [`sync_anime_progress`] over chapters (`SyncChapterProgressWithTrack`).
@@ -74,13 +94,21 @@ pub async fn sync_manga_progress(
     manga_id: i64,
     remote: &MangaTrack,
     api: &dyn MangaTracker,
-) {
-    if api.as_enhanced_manga().is_none() {
-        return;
-    }
-    if let Err(e) = sync_manga_inner(ctx, manga_id, remote, api).await {
+) -> usize {
+    let result = if api.as_enhanced_manga().is_some() {
+        sync_manga_inner(ctx, manga_id, remote, api).await
+    } else {
+        async {
+            let marked = unseen_up_to(&ctx.manga_chapters.list(manga_id).await?, remote.last_chapter_read);
+            ctx.manga_chapters.mark_read(&marked).await?;
+            Ok(marked.len())
+        }
+        .await
+    };
+    result.unwrap_or_else(|e: TrackError| {
         tracing::warn!(entry = manga_id, tracker = remote.tracker_id.0, error = %redact(&e.to_string()), "chapter progress sync failed");
-    }
+        0
+    })
 }
 
 async fn sync_manga_inner(
@@ -88,7 +116,7 @@ async fn sync_manga_inner(
     manga_id: i64,
     remote: &MangaTrack,
     api: &dyn MangaTracker,
-) -> Result<(), TrackError> {
+) -> Result<usize, TrackError> {
     let mut chapters = ctx.manga_chapters.list(manga_id).await?;
     chapters.retain(|c| c.number >= 0.0);
     chapters.sort_by(|a, b| a.number.total_cmp(&b.number));
@@ -110,7 +138,7 @@ async fn sync_manga_inner(
     ctx.manga_chapters.mark_read(&newly_read).await?;
     ctx.save_manga(&with_server_manga(&updated, &server))
         .await?;
-    Ok(())
+    Ok(newly_read.len())
 }
 
 /// The log line of a failed refresh (T-27b-034, D-5). It names the entry as `animeId=` or `mangaId=`, then the tracker
@@ -123,12 +151,18 @@ pub fn refresh_failure_log(kind: Kind, entry_id: i64, tracker: TrackerId, name: 
     format!("Failed to refresh track data {key}={entry_id} for service {} ({name})", tracker.0)
 }
 
-/// Refreshes every logged-in anime binding of the entry, concurrently. Returns the `(tracker, error)` failures.
-/// A failure does not stop the others. Logged-out bindings are skipped without a failure.
-pub async fn refresh_anime(
-    ctx: &TrackCtx,
-    entry_id: i64,
-) -> Result<Vec<(TrackerId, TrackError)>, TrackError> {
+/// What a refresh of one entry did.
+#[derive(Debug, Default)]
+pub struct Refreshed {
+    /// The trackers that failed, with their error.
+    pub failures: Vec<(TrackerId, TrackError)>,
+    /// The trackers that marked local units seen, with how many.
+    pub marked: Vec<(TrackerId, usize)>,
+}
+
+/// Refreshes every logged-in anime binding of the entry, concurrently, and pulls each tracker's progress. A failure
+/// does not stop the others. Logged-out bindings are skipped without a failure.
+pub async fn refresh_anime(ctx: &TrackCtx, entry_id: i64) -> Result<Refreshed, TrackError> {
     let bindings = ctx.anime_tracks.list_for_entry(entry_id).await?;
     let work: Vec<_> = bindings
         .iter()
@@ -136,16 +170,21 @@ pub async fn refresh_anime(
         .filter(|(id, t)| t.is_logged_in() && ctx.trackers.is_enabled(*id))
         .collect();
     let results = join_all(work.iter().map(|(id, t)| async move {
-        refresh_one_anime(ctx, entry_id, *id, &**t)
-            .await
-            .err()
-            .map(|e| {
-                tracing::error!("{}", refresh_failure_log(Kind::Anime, entry_id, *id, t.name()));
-                (*id, e)
-            })
+        (refresh_one_anime(ctx, entry_id, *id, &**t).await, *id, t.name())
     }))
     .await;
-    Ok(results.into_iter().flatten().collect())
+    let mut out = Refreshed::default();
+    for (result, id, name) in results {
+        match result {
+            Ok(0) => {}
+            Ok(n) => out.marked.push((id, n)),
+            Err(e) => {
+                tracing::error!("{}", refresh_failure_log(Kind::Anime, entry_id, id, name));
+                out.failures.push((id, e));
+            }
+        }
+    }
+    Ok(out)
 }
 
 async fn refresh_one_anime(
@@ -153,14 +192,14 @@ async fn refresh_one_anime(
     entry_id: i64,
     id: TrackerId,
     tracker: &dyn Tracker,
-) -> Result<(), TrackError> {
+) -> Result<usize, TrackError> {
     let Some(api) = tracker.as_anime() else {
-        return Ok(());
+        return Ok(0);
     };
     let lock = ctx.locks.for_binding(Kind::Anime, entry_id, id);
     let _guard = lock.lock().await;
     let Some(binding) = ctx.anime_binding(entry_id, id).await? else {
-        return Ok(());
+        return Ok(0);
     };
     let fresh = {
         let _permit = ctx.refresh_limit.acquire(id).await;
@@ -173,15 +212,11 @@ async fn refresh_one_anime(
         ..fresh
     };
     ctx.save_anime(&updated).await?;
-    sync_anime_progress(ctx, entry_id, &updated, api).await;
-    Ok(())
+    Ok(sync_anime_progress(ctx, entry_id, &updated, api).await)
 }
 
 /// Manga form of [`refresh_anime`].
-pub async fn refresh_manga(
-    ctx: &TrackCtx,
-    manga_id: i64,
-) -> Result<Vec<(TrackerId, TrackError)>, TrackError> {
+pub async fn refresh_manga(ctx: &TrackCtx, manga_id: i64) -> Result<Refreshed, TrackError> {
     let bindings = ctx.manga_tracks.list_for_entry(manga_id).await?;
     let work: Vec<_> = bindings
         .iter()
@@ -189,16 +224,21 @@ pub async fn refresh_manga(
         .filter(|(id, t)| t.is_logged_in() && ctx.trackers.is_enabled(*id))
         .collect();
     let results = join_all(work.iter().map(|(id, t)| async move {
-        refresh_one_manga(ctx, manga_id, *id, &**t)
-            .await
-            .err()
-            .map(|e| {
-                tracing::error!("{}", refresh_failure_log(Kind::Manga, manga_id, *id, t.name()));
-                (*id, e)
-            })
+        (refresh_one_manga(ctx, manga_id, *id, &**t).await, *id, t.name())
     }))
     .await;
-    Ok(results.into_iter().flatten().collect())
+    let mut out = Refreshed::default();
+    for (result, id, name) in results {
+        match result {
+            Ok(0) => {}
+            Ok(n) => out.marked.push((id, n)),
+            Err(e) => {
+                tracing::error!("{}", refresh_failure_log(Kind::Manga, manga_id, id, name));
+                out.failures.push((id, e));
+            }
+        }
+    }
+    Ok(out)
 }
 
 async fn refresh_one_manga(
@@ -206,14 +246,14 @@ async fn refresh_one_manga(
     manga_id: i64,
     id: TrackerId,
     tracker: &dyn Tracker,
-) -> Result<(), TrackError> {
+) -> Result<usize, TrackError> {
     let Some(api) = tracker.as_manga() else {
-        return Ok(());
+        return Ok(0);
     };
     let lock = ctx.locks.for_binding(Kind::Manga, manga_id, id);
     let _guard = lock.lock().await;
     let Some(binding) = ctx.manga_binding(manga_id, id).await? else {
-        return Ok(());
+        return Ok(0);
     };
     let fresh = {
         let _permit = ctx.refresh_limit.acquire(id).await;
@@ -226,8 +266,7 @@ async fn refresh_one_manga(
         ..fresh
     };
     ctx.save_manga(&updated).await?;
-    sync_manga_progress(ctx, manga_id, &updated, api).await;
-    Ok(())
+    Ok(sync_manga_progress(ctx, manga_id, &updated, api).await)
 }
 
 #[cfg(test)]
@@ -249,21 +288,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tr_27_107_non_enhanced_tracker_sync_is_a_no_op() {
+    async fn a_non_enhanced_tracker_marks_episodes_up_to_its_number_and_writes_nothing_back() {
         let h = Harness::new();
         h.login(TrackerId::KITSU);
         h.episodes.add(1, 1.0, true);
         let ep2 = h.episodes.add(1, 2.0, false);
+        let ep6 = h.episodes.add(1, 6.0, false);
         let remote = anime_binding(1, TrackerId::KITSU, 5.0);
-        sync_anime_progress(&h.ctx, 1, &remote, &*h.anime_tracker(TrackerId::KITSU)).await;
-        assert!(
-            !h.log
-                .lock()
-                .unwrap()
-                .iter()
-                .any(|l| l.starts_with("update"))
-        );
-        assert!(!h.episodes.seen_ids().contains(&ep2), "no episode writes");
+        let marked = sync_anime_progress(&h.ctx, 1, &remote, &*h.anime_tracker(TrackerId::KITSU)).await;
+        assert_eq!(marked, 1, "only episode 2: 1 was seen already and 6 is past the tracker's 5");
+        assert!(!h.log.lock().unwrap().iter().any(|l| l.starts_with("update")), "the tracker is not written");
+        let seen = h.episodes.seen_ids();
+        assert!(seen.contains(&ep2) && !seen.contains(&ep6));
+    }
+
+    #[tokio::test]
+    async fn an_empty_remote_marks_nothing_not_even_an_episode_zero() {
+        let h = Harness::new();
+        h.login(TrackerId::KITSU);
+        let ep0 = h.episodes.add(1, 0.0, false);
+        let remote = anime_binding(1, TrackerId::KITSU, 0.0);
+        assert_eq!(sync_anime_progress(&h.ctx, 1, &remote, &*h.anime_tracker(TrackerId::KITSU)).await, 0);
+        assert!(!h.episodes.seen_ids().contains(&ep0));
     }
 
     #[tokio::test]
@@ -356,7 +402,7 @@ mod tests {
         *h.anime_tracker(TrackerId::SIMKL).fail.lock().unwrap() = Some("never".into());
         *h.anime_tracker(TrackerId::KITSU).fail.lock().unwrap() = Some("kitsu down".into());
 
-        let failures = refresh_anime(&h.ctx, 4).await.unwrap();
+        let failures = refresh_anime(&h.ctx, 4).await.unwrap().failures;
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].0, TrackerId::KITSU);
         assert_eq!(failures[0].1.to_string(), "kitsu down");
@@ -420,7 +466,7 @@ mod tests {
             .await
             .unwrap();
         *h.manga_tracker(TrackerId::KAVITA).fail.lock().unwrap() = Some("kavita".into());
-        let failures = refresh_manga(&h.ctx, 5).await.unwrap();
+        let failures = refresh_manga(&h.ctx, 5).await.unwrap().failures;
         assert_eq!(failures.len(), 1);
         assert_eq!(failures[0].0, TrackerId::KAVITA);
     }

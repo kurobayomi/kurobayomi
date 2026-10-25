@@ -205,8 +205,8 @@ pub async fn refresh_toasts(
     entry_id: i64,
 ) -> Result<Vec<MsgKey>, TrackError> {
     let failures = match kind {
-        Kind::Anime => sync::refresh_anime(ctx, entry_id).await?,
-        Kind::Manga => sync::refresh_manga(ctx, entry_id).await?,
+        Kind::Anime => sync::refresh_anime(ctx, entry_id).await?.failures,
+        Kind::Manga => sync::refresh_manga(ctx, entry_id).await?.failures,
     };
     Ok(failures
         .into_iter()

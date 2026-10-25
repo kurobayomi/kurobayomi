@@ -17,11 +17,12 @@ use super::dto::{
 use super::error::MalError;
 use super::token::MalToken;
 
-/// The `fields` values of the detail and list requests, exactly as `MyAnimeListApi.kt` sends them.
+/// The `fields` values of the detail and list requests, as `MyAnimeListApi.kt` sends them, plus `alternative_titles` for
+/// the auto-track match.
 pub const MANGA_FIELDS: &str =
-    "id,title,synopsis,num_chapters,mean,main_picture,status,media_type,start_date";
+    "id,title,synopsis,num_chapters,mean,main_picture,status,media_type,start_date,alternative_titles";
 pub const ANIME_FIELDS: &str =
-    "id,title,synopsis,num_episodes,mean,main_picture,status,media_type,start_date";
+    "id,title,synopsis,num_episodes,mean,main_picture,status,media_type,start_date,alternative_titles";
 pub const MANGA_LIST_ENTRY_FIELDS: &str = "num_chapters,my_list_status{start_date,finish_date}";
 pub const ANIME_LIST_ENTRY_FIELDS: &str = "num_episodes,my_list_status{start_date,finish_date}";
 pub const USER_LIST_FIELDS: &str = "list_status{start_date,finish_date}";

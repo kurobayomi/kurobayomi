@@ -1,5 +1,5 @@
 //! The Tracking rows this module binds (tasks T-47a-053 to T-47a-059), now on the Sources and tracking page: the
-//! progress switch, the auto-track switch (on only while AniList is logged in) and the MyAnimeList and AniList rows with their login and logout dialogs. Those two are the only
+//! progress switch, the auto-track switch (on only while a tracker is logged in) and the MyAnimeList and AniList rows with their login and logout dialogs. Those two are the only
 //! trackers with a row; the other trackers keep their code and their token keys but are not shown (settings diet). The three cut switches
 //! (open the track menu, next airing time, progress on mark) are not shown either.
 //!
@@ -242,13 +242,13 @@ pub fn page_rows(prefs: &Prefs, changed: Rc<dyn Fn()>) -> Vec<Preference> {
         .map(|(index, view)| tracker_item(index, *view, host.as_deref(), &changed))
         .collect();
     trackers.push(info(&tracking_info()));
-    // auto-track binds on AniList only, so its switch works once AniList is logged in (`kuro_track::auto_bind`)
-    let anilist = views.iter().any(|view| view.row.tracker == kuro_track::auto_bind::TRACKER && view.logged_in);
+    // auto-track binds on the switched-on trackers, so its switch works once one of them is logged in
+    let any_tracker = views.iter().any(|view| tracker_enabled(view.row.tracker) && view.logged_in);
     let auto_track = kuro_track::prefs::TrackPrefs::new(prefs.store().clone()).auto_track;
     let mut rows = warning_rows(host.as_ref().is_some_and(|host| host.fallback));
     rows.extend([
         item(switch(&tr(MsgKey::pref_auto_update_manga_sync), &tracking.auto_update_track, true)),
-        item(switch_with(&tr(MsgKey::track_auto_title), Some(&tr(MsgKey::track_auto_summary)), &auto_track, anilist, crate::pref_model::bind::accept())),
+        item(switch_with(&tr(MsgKey::track_auto_title), Some(&tr(MsgKey::track_auto_summary)), &auto_track, any_tracker, crate::pref_model::bind::accept())),
         group(&tr(MsgKey::services), trackers),
     ]);
     rows

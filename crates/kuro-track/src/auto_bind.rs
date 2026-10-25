@@ -1,14 +1,13 @@
-//! Auto-track (user, 2026-10-25): a title that joins the library is bound on AniList when the search finds exactly one
-//! result with a name equal to the title. A title with no such result, or with several, stays unbound and the user picks
-//! on the tracking page as before. Off by default (`TrackPrefs::auto_track`).
+//! Auto-track (user, 2026-10-25): a title that joins the library is bound on each switched-on tracker the user is logged
+//! in to (AniList and MyAnimeList today), when that tracker's search finds exactly one result with a name equal to the
+//! title. A title with no such result, or with several, stays unbound there and the user picks on the tracking page as
+//! before. Off by default (`TrackPrefs::auto_track`). Self-hosted trackers bind on their own (`bind_enhanced_*`).
 
 use crate::ctx::{TrackCtx, now_ms};
 use crate::bind::{bind_anime, bind_manga};
 use crate::error::TrackError;
 use crate::model::TrackerId;
-
-/// The tracker auto-track binds on.
-pub const TRACKER: TrackerId = TrackerId::ANILIST;
+use crate::tracker::Tracker;
 
 /// A title as the match compares it: lower case, words of letters and digits only, a trailing Dub / Sub tag dropped,
 /// and "2nd Season" read as "Season 2".
@@ -56,41 +55,69 @@ pub fn pick<'a>(title: &str, hits: impl IntoIterator<Item = (&'a str, &'a [Strin
     found
 }
 
-/// Binds a library anime on AniList when the switch is on, AniList is logged in and switched on, the anime is not bound
-/// there yet, and [`pick`] finds its one match. `Ok(true)` when it bound.
-pub async fn auto_bind_anime(ctx: &TrackCtx, entry_id: i64, title: &str) -> Result<bool, TrackError> {
-    if !ctx.prefs.auto_track.get() || !ctx.trackers.is_enabled(TRACKER) {
-        return Ok(false);
+/// The trackers auto-track binds on: switched on, logged in, and not self-hosted.
+fn targets(ctx: &TrackCtx) -> Vec<std::sync::Arc<dyn Tracker>> {
+    if !ctx.prefs.auto_track.get() {
+        return Vec::new();
     }
-    let Some(tracker) = ctx.trackers.get(TRACKER).filter(|t| t.is_logged_in()) else { return Ok(false) };
-    let Some(api) = tracker.as_anime() else { return Ok(false) };
-    if ctx.anime_binding(entry_id, TRACKER).await?.is_some() {
-        return Ok(false);
+    ctx.trackers
+        .logged_in()
+        .into_iter()
+        .filter(|t| ctx.trackers.is_enabled(t.id()) && t.as_enhanced_anime().is_none() && t.as_enhanced_manga().is_none())
+        .collect()
+}
+
+/// Binds a library anime on every [`targets`] tracker it is not bound on yet and [`pick`] finds its one match. Returns
+/// the trackers it bound on, and the failures; one tracker failing does not stop the others.
+pub async fn auto_bind_anime(ctx: &TrackCtx, entry_id: i64, title: &str) -> (Vec<TrackerId>, Vec<(TrackerId, TrackError)>) {
+    let (mut bound, mut failed) = (Vec::new(), Vec::new());
+    for tracker in targets(ctx) {
+        let Some(api) = tracker.as_anime() else { continue };
+        let id = tracker.id();
+        let result = async {
+            if ctx.anime_binding(entry_id, id).await?.is_some() {
+                return Ok(false);
+            }
+            let hits = api.search(title).await?;
+            let Some(i) = pick(title, hits.iter().map(|h| (h.title.as_str(), h.alt_titles.as_slice()))) else { return Ok(false) };
+            let mut hit = hits[i].clone();
+            hit.anime_id = entry_id;
+            bind_anime(ctx, entry_id, api, hit.to_track(), now_ms()).await?;
+            Ok::<bool, TrackError>(true)
+        };
+        match result.await {
+            Ok(true) => bound.push(id),
+            Ok(false) => {}
+            Err(e) => failed.push((id, e)),
+        }
     }
-    let hits = api.search(title).await?;
-    let Some(i) = pick(title, hits.iter().map(|h| (h.title.as_str(), h.alt_titles.as_slice()))) else { return Ok(false) };
-    let mut hit = hits[i].clone();
-    hit.anime_id = entry_id;
-    bind_anime(ctx, entry_id, api, hit.to_track(), now_ms()).await?;
-    Ok(true)
+    (bound, failed)
 }
 
 /// Manga form of [`auto_bind_anime`].
-pub async fn auto_bind_manga(ctx: &TrackCtx, entry_id: i64, title: &str) -> Result<bool, TrackError> {
-    if !ctx.prefs.auto_track.get() || !ctx.trackers.is_enabled(TRACKER) {
-        return Ok(false);
+pub async fn auto_bind_manga(ctx: &TrackCtx, entry_id: i64, title: &str) -> (Vec<TrackerId>, Vec<(TrackerId, TrackError)>) {
+    let (mut bound, mut failed) = (Vec::new(), Vec::new());
+    for tracker in targets(ctx) {
+        let Some(api) = tracker.as_manga() else { continue };
+        let id = tracker.id();
+        let result = async {
+            if ctx.manga_binding(entry_id, id).await?.is_some() {
+                return Ok(false);
+            }
+            let hits = api.search(title).await?;
+            let Some(i) = pick(title, hits.iter().map(|h| (h.title.as_str(), h.alt_titles.as_slice()))) else { return Ok(false) };
+            let mut hit = hits[i].clone();
+            hit.manga_id = entry_id;
+            bind_manga(ctx, entry_id, api, hit.to_track(), now_ms()).await?;
+            Ok::<bool, TrackError>(true)
+        };
+        match result.await {
+            Ok(true) => bound.push(id),
+            Ok(false) => {}
+            Err(e) => failed.push((id, e)),
+        }
     }
-    let Some(tracker) = ctx.trackers.get(TRACKER).filter(|t| t.is_logged_in()) else { return Ok(false) };
-    let Some(api) = tracker.as_manga() else { return Ok(false) };
-    if ctx.manga_binding(entry_id, TRACKER).await?.is_some() {
-        return Ok(false);
-    }
-    let hits = api.search(title).await?;
-    let Some(i) = pick(title, hits.iter().map(|h| (h.title.as_str(), h.alt_titles.as_slice()))) else { return Ok(false) };
-    let mut hit = hits[i].clone();
-    hit.manga_id = entry_id;
-    bind_manga(ctx, entry_id, api, hit.to_track(), now_ms()).await?;
-    Ok(true)
+    (bound, failed)
 }
 
 #[cfg(test)]
