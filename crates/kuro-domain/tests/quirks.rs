@@ -14,7 +14,7 @@ use kuro_domain::entries::flag_setters::clamp_grid_size;
 use kuro_domain::items::facades::get_item_by_url_and_entry_id;
 use kuro_domain::items::missing::missing_items_count;
 use kuro_domain::items::recognition::{parse_episode_number, parse_season_number};
-use kuro_domain::items::should_update::{should_update_db_item, should_update_db_season};
+use kuro_domain::items::should_update::should_update_db_item;
 use kuro_domain::items::sorter::sort_seasons;
 use kuro_domain::release::version::is_newer;
 use kuro_prefs::store::PrefStore;
@@ -175,15 +175,6 @@ fn q14_only_a_completed_manga_hides_the_predicted_next_release() {
     }
     let done = Entry { status: 2, next_update: 42, ..Entry::create(Kind::Manga) };
     assert_eq!(done.expected_next_update(), None);
-}
-
-/// Q15: a changed season memo alone does not count as a change.
-#[test]
-fn q15_a_season_memo_change_alone_is_not_an_update() {
-    let db = Entry::create(Kind::Anime);
-    let mut src = db.clone();
-    src.memo = Some(kuro_db::codec::Memo(serde_json::json!({"note": "changed"}).as_object().cloned().unwrap()));
-    assert!(!should_update_db_season(&db, &src));
 }
 
 /// Q16: the library query retries a transient lock a bounded number of times, then reports the error.

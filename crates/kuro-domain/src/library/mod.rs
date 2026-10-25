@@ -4,12 +4,10 @@
 pub mod active;
 pub mod columns;
 pub mod display_mode;
-pub mod duplicate;
 pub mod filter;
 pub mod flags;
 pub mod model;
 pub mod order;
 pub mod page;
 pub mod repo;
-pub mod restrictions;
 pub mod search;

@@ -1,5 +1,5 @@
-//! Remove-after-read slot arithmetic (`ReaderViewModel.deleteChapterIfNeeded`, `PlayerViewModel`) and the speed-limit
-//! conversion (`MangaDownloader.kt`). Pure functions; the callers hold the lists.
+//! Remove-after-read slot arithmetic (`ReaderViewModel.deleteChapterIfNeeded`, `PlayerViewModel`) and the download
+//! warnings. Pure functions; the callers hold the lists.
 
 /// Milliseconds a download-queue notification stays up (`MangaDownloader.kt`, behaviour section 17).
 pub const DOWNLOAD_NOTIFICATION_TIMEOUT_MS: u64 = 30_000;
@@ -68,12 +68,6 @@ pub fn download_network_allowed(only_over_wifi: bool, network_not_metered: bool)
     !only_over_wifi || network_not_metered
 }
 
-/// `download_speed_limit` (KiB/s) as bytes per second. `0` means unthrottled and negative values are treated as `0`
-/// (E-DL-02). Widened to `i64` before the multiplication (E-DL-11).
-pub fn speed_limit_bytes_per_second(limit_kib: i32) -> i64 {
-    i64::from(limit_kib.max(0)) * 1024
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,14 +104,6 @@ mod tests {
         assert!(download_network_allowed(false, false), "any network when the option is off");
         assert!(download_network_allowed(true, true), "unmetered network");
         assert!(!download_network_allowed(true, false), "metered network with wifi-only on");
-    }
-
-    #[test]
-    fn speed_limit_is_kibibytes_per_second_without_overflow() {
-        assert_eq!(speed_limit_bytes_per_second(1), 1024);
-        assert_eq!(speed_limit_bytes_per_second(0), 0, "unthrottled");
-        assert_eq!(speed_limit_bytes_per_second(-5), 0, "E-DL-02");
-        assert_eq!(speed_limit_bytes_per_second(i32::MAX), 2_147_483_647_i64 * 1024, "TC-DL-09");
     }
 }
 

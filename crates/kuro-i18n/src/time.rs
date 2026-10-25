@@ -1,5 +1,5 @@
-//! Relative dates and times, the short duration, and the relative-timestamps summary (plan
-//! 51-i18n T-51a-016, T-51a-025, T-51a-042). Thresholds follow `plans/51-i18n/p1-behavior.md`
+//! Relative dates and times and the short duration (plan
+//! 51-i18n T-51a-016, T-51a-025). Thresholds follow `plans/51-i18n/p1-behavior.md`
 //! section 6. Every function takes `now` or `today` as an argument, so tests use a fixed clock.
 
 use chrono::{DateTime, Local, NaiveDate, NaiveDateTime};
@@ -138,20 +138,6 @@ pub fn duration_short(total_seconds: i64, fallback: &str) -> String {
     } else {
         parts.join(" ")
     }
-}
-
-/// The subtitle of the "Relative timestamps" row (T-51a-042): `"Today" instead of "<date>"`, with
-/// today's date in the active date format.
-pub fn relative_toggle_subtitle(today: NaiveDate, style: DateStyle<'_>) -> String {
-    let today_text = tr(MsgKey::relative_time_today);
-    let date_text = style.absolute(today);
-    trf(
-        MsgKey::pref_relative_format_summary,
-        &[
-            ("arg1", Arg::Str(&today_text)),
-            ("arg2", Arg::Str(&date_text)),
-        ],
-    )
 }
 
 #[cfg(test)]
@@ -328,15 +314,6 @@ mod tests {
         assert_eq!(
             relative_datetime(now() - Duration::minutes(5), now(), style(true)),
             "5 minutes ago"
-        );
-    }
-
-    #[test]
-    fn relative_toggle_subtitle_names_today_and_the_date() {
-        // T-51a-042: "Today" instead of the formatted current date.
-        assert_eq!(
-            relative_toggle_subtitle(today(), style(true)),
-            "\"Today\" instead of \"2026-10-09\""
         );
     }
 }

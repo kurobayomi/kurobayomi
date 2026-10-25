@@ -104,12 +104,6 @@ impl LibraryFilters {
     }
 }
 
-/// Whether the "Customized update frequency" row shows in the library filter (T-08a-039). Release builds hide it. Debug
-/// builds show it, and so does any build started with `KUROBAYOMI_DEV=1` (`dev_env` is that variable's value).
-pub fn interval_custom_toggle_visible(debug_build: bool, dev_env: Option<&str>) -> bool {
-    debug_build || dev_env == Some("1")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,13 +241,5 @@ mod tests {
         let f = LibraryFilters { tracking: BTreeMap::from([(1, TriState::ENABLED_IS)]), ..Default::default() };
         assert_eq!(ids(&f, &BTreeSet::new(), &rows, &BTreeMap::new()).len(), 4);
         assert!(f.has_active(), "the raw preference counts even while no tracker is logged in");
-    }
-
-    #[test]
-    fn the_interval_row_is_hidden_in_release_and_shown_in_debug_or_with_the_dev_variable() {
-        assert!(!interval_custom_toggle_visible(false, None));
-        assert!(!interval_custom_toggle_visible(false, Some("0")));
-        assert!(interval_custom_toggle_visible(true, None));
-        assert!(interval_custom_toggle_visible(false, Some("1")));
     }
 }

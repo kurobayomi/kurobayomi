@@ -11,7 +11,7 @@
 //! A first sync (an entry with no stored items) stamps its items with the time the entry was added, not with now: they
 //! are the back catalogue, not updates (docs/design/unified-model.md section 7; see the planner).
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::{DateTime, Local};
@@ -112,16 +112,6 @@ pub struct SyncOptions {
     pub window: (i64, i64),
     pub mark_duplicate_done: bool,
     pub is_local: bool,
-}
-
-/// The duplicate rule from its multi-select preference: on when the set holds `"new"` (chapters,
-/// `MARK_DUPLICATE_CHAPTER_READ_NEW`) or `"new_episode"` (episodes, `MARK_DUPLICATE_EPISODE_SEEN_NEW`). The `"existing"`
-/// values are separate rules and do not turn this one on.
-pub fn mark_duplicate_done_from_pref(kind: Kind, rule: &BTreeSet<String>) -> bool {
-    rule.contains(match kind {
-        Kind::Manga => kuro_prefs::library::MARK_DUPLICATE_CHAPTER_READ_NEW,
-        Kind::Anime => kuro_prefs::library::MARK_DUPLICATE_EPISODE_SEEN_NEW,
-    })
 }
 
 /// The row a source item becomes: name sanitised, number widened, the source order its position.
@@ -703,28 +693,5 @@ mod tests {
             assert_eq!(after.last_update, NOW_MS);
             assert_ne!(after.next_update, SENTINEL_NEXT, "recomputed");
         }
-    }
-
-    /// A duplicate of a done item is marked done when the rule is on, so it is not reported as new.
-    #[tokio::test]
-    async fn a_duplicate_is_marked_done_when_the_rule_is_on() {
-        for kind in [Kind::Manga, Kind::Anime] {
-            let f = plain(kind);
-            f.insert(Item { done: true, ..f.item("/old", 1.0) });
-            let raw = vec![SourceItem { number: 1.0, ..f.src("/old", "Item 1", 0) }, SourceItem { number: 1.0, ..f.src("/alt", "Item 1", 0) }];
-            let on = f.sync.run(raw, &f.entry(), SyncOptions { mark_duplicate_done: true, ..opts(true) }, None).await.unwrap();
-            assert!(on.is_empty(), "{kind}: the duplicate is marked done, so it is not reported as new");
-            assert!(f.stored().iter().any(|r| r.url == "/alt" && r.done));
-        }
-    }
-
-    #[test]
-    fn the_duplicate_preference_set_maps_to_the_flag_per_kind() {
-        let set = |items: &[&str]| items.iter().map(|s| (*s).to_owned()).collect::<BTreeSet<String>>();
-        assert!(mark_duplicate_done_from_pref(Kind::Manga, &set(&["new", "existing"])));
-        assert!(!mark_duplicate_done_from_pref(Kind::Manga, &set(&["existing"])), "existing is another rule");
-        assert!(mark_duplicate_done_from_pref(Kind::Anime, &set(&["new_episode", "existing_episode"])));
-        assert!(!mark_duplicate_done_from_pref(Kind::Anime, &set(&["existing_episode"])));
-        assert!(!mark_duplicate_done_from_pref(Kind::Anime, &set(&["new"])), "the manga value does not turn the anime rule on");
     }
 }

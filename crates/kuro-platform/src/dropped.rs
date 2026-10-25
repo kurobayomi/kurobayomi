@@ -10,7 +10,7 @@
 //! | T-01a-038 | RxJava bridge (`Observable.asFlow`) | Not ported. It only bridged RxJava 1 in legacy extension APIs. Rust sources are async functions or streams. |
 //! | T-01a-041 | R8 shrinker rules | Not applicable to Rust. The extension host-API checklist is handed to area 20. |
 //! | T-01a-044 | extension-installer strategies (legacy, package installer, Shizuku, private) | Not ported. The key `extension_installer` is accepted on backup import and kept as an unknown extra, never read. Extension installs are defined by area 20. |
-//! | T-01a-046 | Picture-in-Picture capability flag | Not ported. [`crate::device::device_has_pip`] is constant `false`. The always-on-top mini player replaces PiP (area 46). |
+//! | T-01a-046 | Picture-in-Picture capability flag | Not ported, and no flag exists. The always-on-top mini player replaces PiP (area 46). |
 //!
 //! | T-req-platform-006 | tracker login through `WebViewHost::oauth_login` | Not ported for AniList, Simkl, Shikimori and Bangumi. Their client ids are registered with the redirects `aniyomi://` and `kurobayomi://`, and a loopback address would be refused by those providers. MyAnimeList already logs in through its loopback redirect. `oauth_login` stays for a provider that accepts a loopback redirect. |
 //! | T-req-platform-007 | second-launch forwarding through `SingleInstance` | The app uses GApplication forwarding (`is_unique` picks the flags), which also carries the command line and files over D-Bus and works in a sandbox. The Unix-socket `SocketInstance` was removed: every build has GApplication, and std's Unix sockets do not build on Windows. |
@@ -19,15 +19,3 @@
 //! The Linux notifier (T-req-platform-004) is the app's `misc::notify`, behind [`crate::notifier::Notifier`]. Channel groups, the `POST_NOTIFICATIONS`
 //! permission and the notification colour are dropped on Linux: the portal asks for permission and freedesktop
 //! notifications have no colour.
-//!
-//! The tests below keep the platform decisions true: a later change that adds one of these pieces fails them.
-
-#[cfg(test)]
-mod tests {
-    use crate::device::device_has_pip;
-
-    #[test]
-    fn picture_in_picture_is_never_offered() {
-        assert!(!device_has_pip());
-    }
-}

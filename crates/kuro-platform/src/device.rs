@@ -1,6 +1,6 @@
 //! Device conditions that gate library updates: Wi-Fi, an unmetered network and the power source (T-08a-028).
 //! Linux reads them from NetworkManager and UPower; other platforms report every condition as not met.
-//! Also here: low-RAM detection, the texture limit choices and the hardware bitmap threshold (T-01a-022, T-01a-030).
+//! Also here: low-RAM detection and the texture probe result (T-01a-022, T-01a-030).
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -37,13 +37,6 @@ pub fn network_manager_present() -> bool {
 /// `MemTotal` below this many bytes counts as low RAM: 3 GiB (`ActivityManager.isLowRamDevice` in Android).
 pub const LOW_RAM_BYTES: u64 = 3_221_225_472;
 
-/// The device texture limit is never below this (`GLUtil.SAFE_TEXTURE_LIMIT`).
-pub const SAFE_TEXTURE_LIMIT: i32 = 2048;
-/// The limit used when no GL context can be created for the probe.
-pub const FALLBACK_TEXTURE_LIMIT: i32 = 16384;
-/// Step of the custom texture limit options (`GLUtil.MULTIPLIER`).
-const TEXTURE_STEP: i32 = 1024;
-
 /// `MemTotal` from `/proc/meminfo` text, in bytes. `None` when the line is missing or does not parse.
 pub fn mem_total_bytes(meminfo: &str) -> Option<u64> {
     let line = meminfo.lines().find(|l| l.starts_with("MemTotal:"))?;
@@ -77,80 +70,9 @@ pub fn record_texture_probe(max_texture_size: i32) {
     }
 }
 
-/// The limit with its inputs passed in: `env` is the `KUROBAYOMI_TEXTURE_LIMIT` value and `probe` the probe result
-/// (0 when none). A positive env value wins. Otherwise the limit is `max(probe, 2048)`, or 16384 without a probe.
-pub fn texture_limit_from(env: Option<&str>, probe: i32) -> i32 {
-    if let Some(value) = env.and_then(|s| s.trim().parse::<i32>().ok()).filter(|v| *v > 0) {
-        return value;
-    }
-    let probe = if probe > 0 { probe } else { FALLBACK_TEXTURE_LIMIT };
-    probe.max(SAFE_TEXTURE_LIMIT)
-}
-
-/// The device texture limit, resolved on the first call and then fixed for the process.
-pub fn device_texture_limit() -> i32 {
-    static LIMIT: OnceLock<i32> = OnceLock::new();
-    *LIMIT.get_or_init(|| {
-        let env = std::env::var("KUROBAYOMI_TEXTURE_LIMIT").ok();
-        texture_limit_from(env.as_deref(), PROBED_TEXTURE_LIMIT.load(Ordering::Relaxed))
-    })
-}
-
-/// The custom texture limit choices for a device limit, largest first: the device limit, then every multiple of
-/// 1024 below it down to 2048 (`GLUtil.CUSTOM_TEXTURE_LIMIT_OPTIONS`).
-///
-/// Kept for T-12a-039 (it requires the generator and its vectors), which conflicts with T-13a-030 (do not port it
-/// unless a maximum-decode-size setting is added). T-12a-039 wins for the generator only: there is no setting, no
-/// texture-limit row and no stored `pref_hardware_bitmap_threshold`, so T-13a-030's other rules hold.
-pub fn custom_texture_limit_options(device: i32) -> Vec<i32> {
-    let mut out = vec![device];
-    let steps = device / TEXTURE_STEP;
-    for step in (2..=steps).rev() {
-        let value = step * TEXTURE_STEP;
-        if value < device {
-            out.push(value);
-        }
-    }
-    out
-}
-
-/// Picture-in-picture is not offered on the desktop (T-01a-046): GTK has no PiP window, and the always-on-top mini
-/// player replaces it. Constant, so no code path depends on PiP.
-pub const fn device_has_pip() -> bool {
-    false
-}
-
 #[cfg(test)]
 mod limits_tests {
     use super::*;
-
-    #[test]
-    fn options_match_the_kotlin_algorithm() {
-        let sixteen = custom_texture_limit_options(16384);
-        assert_eq!(sixteen.len(), 15);
-        assert_eq!(sixteen.first(), Some(&16384));
-        assert_eq!(sixteen.last(), Some(&2048));
-        assert_eq!(sixteen[1], 15360, "steps of 1024 below the device limit");
-        assert_eq!(custom_texture_limit_options(8192).len(), 7);
-        assert_eq!(custom_texture_limit_options(4096), vec![4096, 3072, 2048]);
-        assert_eq!(custom_texture_limit_options(3000), vec![3000, 2048]);
-        assert_eq!(custom_texture_limit_options(2048), vec![2048]);
-    }
-
-    #[test]
-    fn env_override_wins_and_bad_values_fall_back_to_the_probe() {
-        assert_eq!(texture_limit_from(Some("4096"), 16384), 4096);
-        assert_eq!(texture_limit_from(Some(" 3000 "), 0), 3000);
-        assert_eq!(texture_limit_from(Some("0"), 8192), 8192);
-        assert_eq!(texture_limit_from(Some("many"), 8192), 8192);
-    }
-
-    #[test]
-    fn probe_is_floored_at_the_safe_limit_and_missing_probe_uses_the_fallback() {
-        assert_eq!(texture_limit_from(None, 1024), SAFE_TEXTURE_LIMIT);
-        assert_eq!(texture_limit_from(None, 8192), 8192);
-        assert_eq!(texture_limit_from(None, 0), FALLBACK_TEXTURE_LIMIT);
-    }
 
     #[test]
     fn low_ram_threshold_is_strictly_below_three_gib() {

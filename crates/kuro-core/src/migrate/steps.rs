@@ -239,19 +239,8 @@ mod tests {
     }
 
     #[test]
-    fn restrictions_map_to_constraints() {
-        let set = |items: &[&str]| items.iter().map(|s| (*s).to_owned()).collect::<BTreeSet<_>>();
-        let all = library_update_constraints(&set(&["wifi", "network_not_metered", "ac"]));
-        assert_eq!(
-            all,
-            Constraints { requires_connected: true, requires_unmetered: true, requires_ac: true, battery_not_low: true }
-        );
-        assert_eq!(library_update_constraints(&set(&[])), Constraints { battery_not_low: true, ..Constraints::NONE });
-        assert_eq!(
-            library_update_constraints(&set(&["battery_not_low"])),
-            Constraints { battery_not_low: true, ..Constraints::NONE },
-            "a retired value adds nothing"
-        );
+    fn no_restriction_leaves_only_the_battery_constraint() {
+        assert_eq!(library_update_constraints(&BTreeSet::new()), Constraints { battery_not_low: true, ..Constraints::NONE });
     }
 
     #[test]

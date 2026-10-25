@@ -1,11 +1,9 @@
-//! Decides whether a stored chapter, episode or season must be rewritten after a source refresh
-//! (`ShouldUpdateDbChapter.kt`, `ShouldUpdateDbEpisode.kt`, `ShouldUpdateDbSeason.kt`).
+//! Decides whether a stored chapter or episode must be rewritten after a source refresh
+//! (`ShouldUpdateDbChapter.kt`, `ShouldUpdateDbEpisode.kt`).
 //!
 //! Deviation D4 / quirk Q1: the upload date is ignored when the source reports 0, so a source that never
-//! dates its items no longer rewrites every row on each refresh. Q15 is preserved: a season memo change alone
-//! does not count.
+//! dates its items no longer rewrites every row on each refresh.
 
-use kuro_data::entry::Entry;
 use kuro_data::item::Item;
 
 /// One item of either kind: scanlator, name, date upload (skipped when the source date is 0), number and source order,
@@ -21,13 +19,6 @@ pub fn should_update_db_item(db: &Item, src: &Item) -> bool {
         || db.fillermark != src.fillermark
         || db.preview_url != src.preview_url
         || db.memo != src.memo
-}
-
-/// Season: title, season number and season source order. The memo is not compared (Q15).
-pub fn should_update_db_season(db: &Entry, src: &Entry) -> bool {
-    db.title != src.title
-        || db.season_number != src.season_number
-        || db.season_source_order != src.season_source_order
 }
 
 #[cfg(test)]
@@ -59,10 +50,6 @@ mod tests {
             preview_url: Some("p".into()),
             ..Item::create(Kind::Anime)
         }
-    }
-
-    fn season() -> Entry {
-        Entry { title: "Season 1".into(), season_number: Some(1.0), season_source_order: Some(3), ..Entry::create(Kind::Anime) }
     }
 
     #[test]
@@ -124,19 +111,5 @@ mod tests {
         let db = Item { memo: Some(kuro_db::codec::Memo(a)), ..episode() };
         let src = Item { memo: Some(kuro_db::codec::Memo(b)), ..episode() };
         assert!(!should_update_db_item(&db, &src));
-    }
-
-    #[test]
-    fn season_compares_three_fields_and_not_memo() {
-        assert!(!should_update_db_season(&season(), &season()));
-        assert!(should_update_db_season(&season(), &Entry { title: "x".into(), ..season() }));
-        assert!(should_update_db_season(&season(), &Entry { season_number: Some(2.0), ..season() }));
-        assert!(should_update_db_season(&season(), &Entry { season_source_order: Some(0), ..season() }));
-        let mut memo = serde_json::Map::new();
-        memo.insert("k".into(), serde_json::Value::from(true));
-        assert!(
-            !should_update_db_season(&season(), &Entry { memo: Some(kuro_db::codec::Memo(memo)), ..season() }),
-            "Q15: memo alone is ignored"
-        );
     }
 }
