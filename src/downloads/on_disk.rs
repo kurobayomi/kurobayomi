@@ -32,13 +32,14 @@ pub struct Unit {
     pub label: String,
 }
 
-/// Every title folder of `tree` (under `root`) with its units, by title. `entries_of` gives a source's library entries,
+/// Every title folder of `tree` (under `root`) that holds a unit, with its units, by title (a folder left empty, by a
+/// cancelled download for one, is not listed). `entries_of` gives a source's library entries,
 /// `items_of` an entry's items; the units come in the items' order, the unknown ones after them.
 pub fn titles(kind: Kind, tree: &Tree, root: &Path, entries_of: impl Fn(i64) -> Vec<Entry>, items_of: impl Fn(i64) -> Vec<Item>) -> Vec<Title> {
     let mut titles = Vec::new();
     for (source_id, source) in &tree.sources {
         let entries: HashMap<String, Entry> = entries_of(*source_id).into_iter().map(|e| (entry_dir_name(&e.title), e)).collect();
-        for folder in source.entries.values() {
+        for folder in source.entries.values().filter(|folder| !folder.units.is_empty()) {
             let path = root.join(&folder.source_dir).join(&folder.dir_name);
             let Some(entry) = entries.get(&folder.dir_name) else {
                 let units = folder.units.iter().map(|name| Unit { item_id: None, label: name.clone() }).collect();
@@ -85,10 +86,10 @@ mod tests {
         let stem = |name: &str| unit_dir_stems(Kind::Anime, UnitName::new(name, None))[0].clone();
         let (one, two) = (stem("Episode 1"), stem("Episode 2"));
         let entries: BTreeMap<String, EntryDir> =
-            [folder("Bleach: TYBW", &[&two, &one, "Episode 99 (stray)"]), folder("Gone From Library", &["Episode 1"])].into_iter().collect();
+            [folder("Bleach: TYBW", &[&two, &one, "Episode 99 (stray)"]), folder("Gone From Library", &["Episode 1"]), folder("One Piece", &[])].into_iter().collect();
         let tree = Tree { sources: [(7, SourceDir { dir_name: "Source (EN)".into(), entries })].into_iter().collect() };
         let titles = titles(Kind::Anime, &tree, Path::new("/dl"), |_| vec![entry(1, "Bleach: TYBW")], |_| vec![item(10, "Episode 1"), item(11, "Episode 2"), item(12, "Episode 3")]);
-        assert_eq!(titles.len(), 2);
+        assert_eq!(titles.len(), 2, "an empty title folder is not listed");
         let bleach = &titles[0];
         assert_eq!((bleach.entry_id, bleach.label.as_str()), (Some(1), "Bleach: TYBW"), "the library's title, not the folder name");
         assert_eq!(bleach.folder, Path::new("/dl/Source (EN)").join(entry_dir_name("Bleach: TYBW")));
