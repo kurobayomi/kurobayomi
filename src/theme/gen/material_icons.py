@@ -58,6 +58,7 @@ ICONS = {
     "emblem-system": "settings",
     "external-link": "open_in_new",
     "folder-download": "download",
+    "folder-new": "create_new_folder",
     "folder": "folder",
     "go-down": "arrow_downward",
     "go-next": "arrow_forward",

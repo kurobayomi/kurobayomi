@@ -4,6 +4,9 @@
 use std::rc::Rc;
 
 use gtk::prelude::*;
+use kuro_i18n::{MsgKey, tr};
+
+use crate::widgets::context_menu::{self, Item};
 
 #[derive(Clone)]
 pub struct TabStrip {
@@ -26,9 +29,11 @@ impl TabStrip {
         Self { scroller, row }
     }
 
-    /// Rebuilds the strip with `labels`, `active` pressed. `on_select` gets the index of a tab the user picks.
-    /// The buttons are created before their handlers are connected, so setting the active one does not fire it.
-    pub fn set(&self, labels: &[String], active: usize, on_select: Rc<dyn Fn(usize)>) {
+    /// Rebuilds the strip with `labels`, `active` pressed. `on_select` gets the index of a tab the user picks, and
+    /// `on_update` the index of a tab whose right-click menu's "Update category" was chosen; the menu is there only with
+    /// more than one category (with one, Refresh updates the same titles). The buttons are created before their handlers
+    /// are connected, so setting the active one does not fire it.
+    pub fn set(&self, labels: &[String], active: usize, on_select: Rc<dyn Fn(usize)>, on_update: Rc<dyn Fn(usize)>) {
         while let Some(child) = self.row.first_child() {
             self.row.remove(&child);
         }
@@ -39,6 +44,13 @@ impl TabStrip {
                     on_select(index);
                 }
             });
+            if labels.len() > 1 {
+                let on_update = on_update.clone();
+                context_menu::attach(&button, move |_, _| {
+                    let on_update = on_update.clone();
+                    vec![Item::new(tr(MsgKey::action_update_category), 0, move || on_update(index))]
+                });
+            }
         }
         self.scroller.set_visible(!labels.is_empty());
     }

@@ -1,5 +1,5 @@
-//! The download queue page (lane D): one kind's queue as a list, with Pause or Resume and Clear in the header menu,
-//! Clear, and the shared download button on each row (a click cancels, or retries a failed row). The commands go to the
+//! The download queue page (lane D): one kind's queue as a list, with a Pause/Resume button and a Clear queue button
+//! in the page header (both hidden while the queue is empty), and the shared download button on each row (a click cancels, or retries a failed row). The commands go to the
 //! one download service (`Downloads`), and the rows come from its snapshot. A unit whose source is not installed is an
 //! ordinary row that reads "Waiting for source". A row's right-click menu offers Cancel, Retry (a failed row), Move to
 //! top and Move to bottom. The list is rebuilt once a second, only when its rows or their states changed; the buttons
@@ -27,9 +27,9 @@ use crate::widgets::download_button::{DownloadButton, Request};
 /// How often the page checks the queue.
 const REFRESH: Duration = Duration::from_secs(1);
 
-/// The queue page of one kind, its title search and its "more" menu entries (Pause or Resume, Clear queue) for the page
-/// header, or `None` when the app runs no download service (the Download tab then shows its empty state).
-pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<crate::ui::MenuEntry>)> {
+/// The queue page of one kind, its title search and its header buttons (Pause or Resume, Clear queue), or `None` when
+/// the app runs no download service (the Download tab then shows its empty state).
+pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<gtk::Widget>)> {
     let downloads = live::downloads()?;
     let column = crate::ui::column();
     let list = crate::ui::boxed_list();
@@ -40,8 +40,8 @@ pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<crate::ui:
     column.append(&empty);
     let search = crate::ui::list_search(&list);
 
-    let page = Page { kind, downloads: downloads.clone(), list, empty, shown: Rc::new(RefCell::new(None)), buttons: Rc::default() };
-    let menu = menu_entries(&downloads, kind);
+    let (run, clear) = header_buttons(&downloads, kind);
+    let page = Page { kind, downloads: downloads.clone(), list, empty, run: run.clone(), clear: clear.clone(), shown: Rc::new(RefCell::new(None)), buttons: Rc::default() };
 
     page.draw();
     live::follow(&column, {
@@ -61,7 +61,7 @@ pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<crate::ui:
         refresh.draw();
         glib::ControlFlow::Continue
     });
-    Some((column.upcast(), search, menu))
+    Some((column.upcast(), search, vec![run.upcast(), clear.upcast()]))
 }
 
 /// The state the page draws: the service and the widgets that change.
@@ -71,6 +71,9 @@ struct Page {
     downloads: Downloads,
     list: gtk::ListBox,
     empty: gtk::Box,
+    /// The header's Pause/Resume and Clear queue buttons.
+    run: gtk::Button,
+    clear: gtk::Button,
     /// The key of the rows last drawn. The list is rebuilt only when it changes.
     shown: Rc<RefCell<Option<String>>>,
     /// The download button of each row drawn, by kind and item id, so the live progress reaches it.
@@ -81,6 +84,10 @@ impl Page {
     fn draw(&self) {
         let model = lane_model(&self.downloads, self.kind);
         let items = model.flat();
+        // the run state changes without the rows changing, so the buttons follow it on every tick
+        self.run.set_visible(!items.is_empty());
+        self.clear.set_visible(!items.is_empty());
+        show_run(&self.run, running(&self.downloads, self.kind));
         let key: String = items.iter().map(row_key).collect::<Vec<_>>().join("|");
         if self.shown.borrow().as_deref() == Some(key.as_str()) {
             return;
@@ -155,17 +162,29 @@ fn running(downloads: &Downloads, kind: Kind) -> bool {
     downloads.snapshot().run(kind) == RunState::Running
 }
 
-/// The header menu: Pause while the lane runs, Resume while it does not, and Clear queue. The menu is never empty, even
-/// with nothing queued.
-fn menu_entries(downloads: &Downloads, kind: Kind) -> Vec<crate::ui::MenuEntry> {
-    use crate::ui::MenuEntry;
-    let (pause, resume, clear) = (downloads.clone(), downloads.clone(), downloads.clone());
-    let (when_pause, when_resume) = (downloads.clone(), downloads.clone());
-    vec![
-        MenuEntry::new(tr(MsgKey::ui_pause_downloads), move || pause.pause(kind)).when(move || running(&when_pause, kind)),
-        MenuEntry::new(tr(MsgKey::ui_resume_downloads), move || resume.start(kind)).when(move || !running(&when_resume, kind)),
-        MenuEntry::new(tr(MsgKey::ui_clear_queue), move || clear.clear(kind)),
-    ]
+/// The header buttons: one that pauses the lane while it runs and resumes it otherwise, and Clear queue. The page
+/// hides both while nothing is queued.
+fn header_buttons(downloads: &Downloads, kind: Kind) -> (gtk::Button, gtk::Button) {
+    let run = crate::ui::icon_button("media-playback-start-symbolic", &tr(MsgKey::ui_resume_downloads));
+    let toggle = downloads.clone();
+    run.connect_clicked(move |button| {
+        if running(&toggle, kind) { toggle.pause(kind) } else { toggle.start(kind) }
+        show_run(button, running(&toggle, kind));
+    });
+    let clear = crate::ui::icon_button("edit-clear-all-symbolic", &tr(MsgKey::ui_clear_queue));
+    let downloads = downloads.clone();
+    clear.connect_clicked(move |_| downloads.clear(kind));
+    (run, clear)
+}
+
+/// Shows Pause on the run button while the lane runs, Resume otherwise.
+fn show_run(button: &gtk::Button, running: bool) {
+    let (icon, tip) = if running { ("media-playback-pause-symbolic", MsgKey::ui_pause_downloads) } else { ("media-playback-start-symbolic", MsgKey::ui_resume_downloads) };
+    if button.icon_name().as_deref() != Some(icon) {
+        button.set_icon_name(icon);
+        button.set_tooltip_text(Some(&tr(tip)));
+        button.update_property(&[gtk::accessible::Property::Label(&tr(tip))]);
+    }
 }
 
 /// What one row shows, as a key: a change of any of these rebuilds the list.

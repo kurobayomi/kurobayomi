@@ -277,10 +277,8 @@ pub fn build(tabs: &gtk::Stack) -> GBox {
     let header = ui::header_bar();
     header.set_decoration_layout(Some(&ui::decoration(true)));
     header.set_title_widget(Some(&title()));
-    // the open tab's search before the app name and its ⋮ menu after it (`lead`)
-    let (search_host, menu_host) = super::lead::hosts();
-    header.pack_start(&search_host);
-    header.pack_end(&menu_host);
+    // the open tab's search before the app name (`lead`)
+    header.pack_start(&super::lead::host());
     ui::no_sticky_focus(&header);
 
     let list = gtk::ListBox::new();
@@ -379,7 +377,7 @@ mod tests {
             }
             assert!(!texts.iter().any(|l| l == "More"), "More is gone");
             let all = crate::screens::alone::descendants(panel.upcast_ref());
-            assert!(!all.iter().any(|w| w.is::<gtk::MenuButton>()), "no menu of its own: the open page's ⋮ comes in beside the title");
+            assert!(!all.iter().any(|w| w.is::<gtk::MenuButton>()), "no menu of its own: a tab page's actions are buttons in its own header");
             assert!(all.iter().any(|w| w.downcast_ref::<gtk::Switch>().is_some_and(|s| s.action_name().as_deref() == Some(crate::incognito::TOGGLE_ACTION))), "Incognito has a switch");
             let downloads = all
                 .iter()

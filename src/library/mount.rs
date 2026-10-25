@@ -395,7 +395,7 @@ pub fn build(kind: Kind) -> Option<Built> {
     }
     // the view options button carries its own dot while a filter is on (T-37a-056)
     let (search, refresh, options) = view.controls();
-    let mut end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.clone().upcast()), options: Some(options), menu: menu_sections(kind, &view), ..Default::default() }.widgets();
+    let mut end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.clone().upcast()), extra: local_folder_buttons(kind).map(|b| b.upcast::<gtk::Widget>()).into(), options: Some(options), ..Default::default() }.widgets();
     // Categories sits just before Refresh (user, 2026-10-24)
     let at = end.iter().position(|w| *w == refresh.clone().upcast::<gtk::Widget>()).unwrap_or(end.len());
     end.insert(at, categories_button().upcast());
@@ -409,21 +409,17 @@ fn categories_button() -> gtk::Button {
     button
 }
 
-/// The header menu's sections: the category update (only with more than one category; the refresh button updates the whole
-/// library, local titles included) and the local folders (link one, open the Local folder). Categories is a button
-/// ([`categories_button`]). How the covers are filtered, sorted and shown is the view options button's.
-fn menu_sections(kind: Kind, view: &LibraryView) -> Vec<Vec<crate::ui::MenuEntry>> {
-    use crate::ui::MenuEntry;
+/// The local folder buttons of the header: link a folder, open the Local folder. Updating one category is F5 and a
+/// category tab's right-click menu; the refresh button updates the whole library, local titles included.
+fn local_folder_buttons(kind: Kind) -> [gtk::Button; 2] {
     let (link, open) = local_folder_actions(kind);
-    let (update, count) = (view.clone(), view.clone());
-    vec![
-        vec![MenuEntry::new(tr(MsgKey::action_update_category), move || update.update_category()).when(move || count.category_count() > 1)],
-        vec![
-            // the item opens a folder chooser, so it ends in "…"
-            MenuEntry::new(format!("{}…", tr(if kind == Kind::Anime { MsgKey::ui_add_local_anime_folder } else { MsgKey::ui_add_local_manga_folder })), link),
-            MenuEntry::new(tr(MsgKey::ui_open_local_folder), open),
-        ],
-    ]
+    // the button opens a folder chooser, so its name ends in "…"
+    let label = format!("{}…", tr(if kind == Kind::Anime { MsgKey::ui_add_local_anime_folder } else { MsgKey::ui_add_local_manga_folder }));
+    let link_button = crate::ui::icon_button("folder-new-symbolic", &label);
+    link_button.connect_clicked(move |_| link());
+    let open_button = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_local_folder));
+    open_button.connect_clicked(move |_| open());
+    [link_button, open_button]
 }
 
 /// Link a folder and open the Local folder, from the local folder module, for `kind`.
@@ -566,21 +562,19 @@ mod tests {
         assert_eq!(source_info(&db, Kind::Manga, 42), SourceInfo { name: "42".into(), language: String::new() });
     }
 
-    /// The header menu: the category update (hidden with one category, because the refresh button updates the whole
-    /// library) and the local folders, whose items reach the local flow. Categories is a button, not a menu item.
+    /// The header buttons: the local folders, each reaching the local flow, and Categories. Update category is not one
+    /// (F5 and the tab's right-click menu).
     #[test]
-    fn the_header_menu_holds_the_library_actions_once_each_and_reaches_the_local_flow() {
+    fn the_header_buttons_reach_the_local_flow() {
         crate::testing::with_display(|| {
-            let (_dir, view) = crate::library::view::test_view(crate::library::view::test_nav());
             for (kind, word) in [(Kind::Manga, "manga"), (Kind::Anime, "anime")] {
-                let menu = crate::ui::menu_button(menu_sections(kind, &view)).expect("the library has a menu");
-                let labels = crate::widgets::view_options::menu_labels(&menu.menu_model().expect("a menu"));
+                let [link, open] = local_folder_buttons(kind);
                 let article = if kind == Kind::Anime { "an" } else { "a" };
-                assert_eq!(labels, [tr(MsgKey::action_update_category), format!("Link {article} {word} folder…"), "Open the Local folder".to_owned()]);
-                assert!(!labels.iter().any(|l| l.contains("Update library")), "the refresh button is the only library update");
+                assert_eq!(link.tooltip_text().as_deref(), Some(format!("Link {article} {word} folder…").as_str()));
+                assert_eq!(open.tooltip_text().as_deref(), Some("Open the Local folder"));
                 LOCAL_CALLS.with(|c| *c.borrow_mut() = Some(Vec::new()));
-                menu.activate_action("more.e1", None).expect("the link item");
-                menu.activate_action("more.e2", None).expect("the open item");
+                link.emit_clicked();
+                open.emit_clicked();
                 let calls = LOCAL_CALLS.with(|c| c.borrow_mut().take()).unwrap_or_default();
                 assert_eq!(calls, [format!("{word} link"), format!("{word} open")]);
             }

@@ -82,7 +82,7 @@ impl BrowseShell {
         let options = ViewOptions::new(&tr(MsgKey::ui_view_options), &[]);
         let inner = Rc::new(Inner { stack, search: gtk::SearchEntry::new(), options, deps });
         // the shared header row: the Anime | Manga switch at the start, the search toggle and the actions at the end, the bar under it
-        let (options, menu) = inner.header_actions();
+        let options = inner.header_actions();
         let on_refresh = Rc::clone(&inner.deps.on_refresh);
         let refresh = crate::ui::refresh_button(&tr(MsgKey::browse_check_sources));
         refresh.connect_clicked(move |button| on_refresh(button));
@@ -91,7 +91,6 @@ impl BrowseShell {
             refresh: Some(refresh.clone().upcast()),
             extra: vec![gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
             options: Some(options),
-            menu,
             ..Default::default()
         }
         .widgets();
@@ -205,8 +204,8 @@ impl Inner {
         self.close_search();
     }
 
-    /// The view-options menu and the "more" menu entries of the header (the shared row is `ui::HeaderActions`).
-    fn header_actions(self: &Rc<Self>) -> (gtk::Widget, Vec<Vec<crate::ui::MenuEntry>>) {
+    /// The view-options menu of the header (the shared row is `ui::HeaderActions`).
+    fn header_actions(self: &Rc<Self>) -> gtk::Widget {
         let on_language = Rc::clone(&self.deps.on_language);
         self.options.connect(move |pick| {
             if let Pick::Toggle(name, on) = pick
@@ -227,7 +226,7 @@ impl Inner {
         self.options.widget.add_controller(opening);
 
         // no "more" menu: the search button is the global search, and Repositories is a button of its own
-        (self.options.widget.clone().upcast(), Vec::new())
+        self.options.widget.clone().upcast()
     }
 
     /// The Repositories button, before Refresh: opens the repository list for the visible kind.

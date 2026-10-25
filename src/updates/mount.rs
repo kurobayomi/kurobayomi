@@ -65,14 +65,15 @@ pub fn history() -> Option<Built> {
     let (anime, manga) = (HistoryScreen::new(Kind::Anime), HistoryScreen::new(Kind::Manga));
     let view = |screen: &Rc<HistoryScreen>| {
         let target = Rc::clone(screen);
-        let menu = vec![vec![crate::ui::MenuEntry::new(tr(MsgKey::pref_clear_history), move || target.ask_clear())]];
+        let clear = crate::ui::icon_button("user-trash-symbolic", &tr(MsgKey::pref_clear_history));
+        clear.connect_clicked(move |_| target.ask_clear());
         let target = Rc::clone(screen);
         let refresh = crate::ui::refresh_button(&tr(MsgKey::action_webview_refresh));
         refresh.connect_clicked(move |button| {
             crate::ui::spin_once(button);
             target.reload();
         });
-        let end = crate::ui::HeaderActions { search: Some(screen.search().clone()), refresh: Some(refresh.upcast()), menu, ..Default::default() }.widgets();
+        let end = crate::ui::HeaderActions { search: Some(screen.search().clone()), refresh: Some(refresh.upcast()), extra: vec![clear.upcast()], ..Default::default() }.widgets();
         Built { content: screen.widget().clone().upcast(), end }
     };
     let (page, _) = tab_page([view(&anime), view(&manga)]);
@@ -119,10 +120,12 @@ pub fn updates() -> Option<Built> {
                 actions.refresh = Some(button.upcast());
             } else if item.label == VIEW_UPCOMING {
                 // each kind has its own Upcoming page, as in the source (the anime tab opens the anime one)
-                actions.menu.push(vec![crate::ui::MenuEntry::new(tr(MsgKey::label_upcoming), move || {
+                let button = crate::ui::icon_button(&item.icon, &tr(MsgKey::label_upcoming));
+                button.connect_clicked(move |_| {
                     UPCOMING_KIND.with(|k| k.set(kind));
                     crate::ui::open("upcoming");
-                })]);
+                });
+                actions.extra.push(button.upcast());
             } else {
                 let button = crate::ui::icon_button(&item.icon, &item.label);
                 let label = item.label.clone();

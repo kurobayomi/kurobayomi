@@ -1,7 +1,7 @@
-//! The open tab's search toggle and ⋮ menu in the sidebar's header (user, 2026-10-14). Every tab page leads its own
-//! header with them (`ui::pack_lead`), which is where they stay in a narrow window. While the sidebar shows a tab page,
-//! both move into the sidebar's header around the app name: the search before it, the menu after it. Switching tabs,
-//! pushing a page or narrowing the window puts them back first.
+//! The open tab's search toggle in the sidebar's header (user, 2026-10-14). Every tab page leads its own header with it
+//! (`ui::pack_lead`), which is where it stays in a narrow window. While the sidebar shows a tab page, it moves into the
+//! sidebar's header before the app name. Switching tabs, pushing a page or narrowing the window puts it back first. A
+//! tab page has no ⋮ menu: its actions are buttons at the end of its own header (user, 2026-10-25).
 
 use std::cell::RefCell;
 
@@ -9,15 +9,15 @@ use gtk::prelude::*;
 use gtk::Box as GBox;
 
 thread_local! {
-    /// The two places in the sidebar's header: before the app name (search) and after it (menu).
-    static HOSTS: (GBox, GBox) = (GBox::new(gtk::Orientation::Horizontal, 0), GBox::new(gtk::Orientation::Horizontal, 0));
-    /// The slots now in the sidebar's header, each with the lead box it came from and whether it goes first there.
-    static AWAY: RefCell<Vec<(gtk::Widget, GBox, bool)>> = const { RefCell::new(Vec::new()) };
+    /// The place in the sidebar's header before the app name.
+    static HOST: GBox = GBox::new(gtk::Orientation::Horizontal, 0);
+    /// The slot now in the sidebar's header, with the lead box it came from.
+    static AWAY: RefCell<Option<(gtk::Widget, GBox)>> = const { RefCell::new(None) };
 }
 
-/// The sidebar header's places for the search (before the app name) and the menu (after it).
-pub fn hosts() -> (GBox, GBox) {
-    HOSTS.with(|(search, menu)| (search.clone(), menu.clone()))
+/// The sidebar header's place for the search (before the app name).
+pub fn host() -> GBox {
+    HOST.with(GBox::clone)
 }
 
 /// The lead box of a tab page: in the header that starts the page.
@@ -39,35 +39,32 @@ fn lead_of(page: &gtk::Widget) -> Option<GBox> {
     find(&header)
 }
 
-/// Puts the slots of `page` (the visible tab page, when one is on screen) in the sidebar's header when `wide`, and
-/// anything there before back into its own page.
+/// Puts the search slot of `page` (the visible tab page, when one is on screen) in the sidebar's header when `wide`,
+/// and one there before back into its own page.
 pub fn place(page: Option<&gtk::Widget>, wide: bool) {
-    for (slot, home, first) in AWAY.with(|away| std::mem::take(&mut *away.borrow_mut())) {
+    if let Some((slot, home)) = AWAY.with(|away| away.borrow_mut().take()) {
         if let Some(parent) = slot.parent().and_downcast::<GBox>() {
             parent.remove(&slot);
         }
-        if first { home.prepend(&slot) } else { home.append(&slot) }
+        home.prepend(&slot);
         // the page being left still fades out on screen: it must not flash its slots back in its own header
         home.set_visible(!wide);
     }
     let Some(lead) = page.and_then(lead_of) else { return };
-    // an empty slot box still takes its spacing in the header, so while the sidebar holds the slots every page's box is
+    // an empty slot box still takes its spacing in the header, so while the sidebar holds the slot every page's box is
     // hidden, the page on screen and the one fading out alike: the Anime | Manga switch then keeps its place across a
     // change of tab
     lead.set_visible(!wide);
     if !wide {
         return;
     }
-    let (search_host, menu_host) = hosts();
-    for (class, host, first) in [(crate::ui::LEAD_SEARCH, search_host, true), (crate::ui::LEAD_MENU, menu_host, false)] {
-        let mut child = lead.first_child();
-        while let Some(slot) = child {
-            child = slot.next_sibling();
-            if slot.has_css_class(class) {
-                lead.remove(&slot);
-                host.append(&slot);
-                AWAY.with(|away| away.borrow_mut().push((slot, lead.clone(), first)));
-            }
+    let mut child = lead.first_child();
+    while let Some(slot) = child {
+        child = slot.next_sibling();
+        if slot.has_css_class(crate::ui::LEAD_SEARCH) {
+            lead.remove(&slot);
+            host().append(&slot);
+            AWAY.with(|away| *away.borrow_mut() = Some((slot, lead.clone())));
         }
     }
 }
@@ -77,21 +74,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_slots_go_to_the_sidebar_when_wide_and_come_back_in_order() {
+    fn the_search_goes_to_the_sidebar_when_wide_and_comes_back() {
         crate::testing::with_display(|| {
             let page = GBox::new(gtk::Orientation::Vertical, 0);
             let header = gtk::HeaderBar::new();
             page.append(&header);
-            let (search, menu) = (gtk::ToggleButton::new(), gtk::Button::new());
-            crate::ui::pack_lead(&header, Some(search.upcast_ref()), Some(menu.upcast_ref()));
+            let search = gtk::ToggleButton::new();
+            crate::ui::pack_lead(&header, Some(search.upcast_ref()), None);
             let lead = lead_of(page.upcast_ref()).expect("the lead box");
             place(Some(page.upcast_ref()), true);
-            let (search_host, menu_host) = hosts();
-            assert!(search.is_ancestor(&search_host) && menu.is_ancestor(&menu_host), "both in the sidebar's header");
+            assert!(search.is_ancestor(&host()), "in the sidebar's header");
             assert!(lead.first_child().is_none());
             place(Some(page.upcast_ref()), false);
-            assert!(search.is_ancestor(&lead) && menu.is_ancestor(&lead), "back home");
-            assert!(lead.first_child().expect("a slot").has_css_class(crate::ui::LEAD_SEARCH), "the search first again");
+            assert!(search.is_ancestor(&lead), "back home");
             place(Some(page.upcast_ref()), true);
             let other = GBox::new(gtk::Orientation::Vertical, 0);
             place(Some(other.upcast_ref()), true);
@@ -103,5 +98,52 @@ mod tests {
             place(None, true);
             assert!(search.is_ancestor(&lead), "no page on screen: nothing moves");
         });
+    }
+
+    /// A tab page has no ⋮ menu (user, 2026-10-25): its actions are buttons in its header. Only pages pushed over the
+    /// tabs fill `HeaderActions::menu`: a title's page and the Upcoming page's guide.
+    #[test]
+    fn no_tab_page_has_a_more_menu() {
+        const PUSHED: [&str; 2] = ["src/entry_core/details/route.rs", "src/updates/upcoming/page.rs"];
+        fn files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).expect("the source folder").flatten() {
+                let path = entry.path();
+                if path.is_dir() { files(&path, out) } else if path.extension().is_some_and(|e| e == "rs") { out.push(path) }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mut all = Vec::new();
+        files(&root.join("src"), &mut all);
+        let mut filled = Vec::new();
+        for path in all {
+            let name = path.strip_prefix(root).expect("under the crate").to_string_lossy().replace('\\', "/");
+            // the pushed pages, the struct itself and this test
+            if PUSHED.contains(&name.as_str()) || name == "src/ui.rs" || name == "src/shell/lead.rs" {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).expect("a source file");
+            for (at, _) in text.match_indices("HeaderActions {") {
+                // the struct literal, up to its closing brace
+                let mut depth = 0;
+                let body: String = text[at..]
+                    .chars()
+                    .take_while(|c| {
+                        match c {
+                            '{' => depth += 1,
+                            '}' => depth -= 1,
+                            _ => {}
+                        }
+                        !(depth == 0 && *c == '}')
+                    })
+                    .collect();
+                if body.split(|c: char| !c.is_alphanumeric() && c != '_').any(|word| word == "menu") {
+                    filled.push(name.clone());
+                }
+            }
+            if text.contains(".menu.push") {
+                filled.push(name);
+            }
+        }
+        assert!(filled.is_empty(), "a tab page fills HeaderActions::menu: {filled:?}");
     }
 }

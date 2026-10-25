@@ -27,17 +27,16 @@ the user's GTK theme (named colours `@theme_*` only, in `src/theme/style.css`), 
 
 ### Library header (one row)
 
-`[Anime | Manga]   [ search ......... ]   [refresh] [menu]`
+`[search] [Anime | Manga]   [categories] [refresh] [link folder] [open Local folder] [view options]`
 
-- Start: the Anime / Manga switch (a `GtkStackSwitcher` over the two library views).
-- Centre: the search entry of the visible kind.
-- End: one refresh button (update the active category; insensitive while a pass runs) and one menu.
+- Start: the search toggle (in the sidebar's header beside the app name while the sidebar shows), then the Anime /
+  Manga switch (a `GtkStackSwitcher` over the two library views).
+- End: icon buttons, each with a tooltip: Categories, Refresh (updates the whole library; insensitive while a pass
+  runs), Link a folder…, Open the Local folder, and View options (filter, sort, display; it carries `kb-filter-on`
+  while a filter is on).
+- No ⋮ menu on any tab page (user, 2026-10-25): every action is a header button. Updating one category is F5 (the
+  open one) and the right-click menu of a category tab (with more than one category).
 - No page title: the sidebar already says Library, the switch says which kind.
-- The menu (`GtkPopoverMenu`, three sections):
-  1. Filter…, Sort…, Display… (open the library sheet on that tab; Display holds the grid density)
-  2. Update library, Open random entry
-  3. Add local folder…, Rescan local folders
-- While a filter is on, the menu button carries `kb-filter-on` (the icon takes the theme's selected colour).
 - While entries are selected, search and refresh hide and the selection row (count, select all, invert, cancel)
   shows under the header; the action bar (categories, mark, download, delete) slides up at the bottom.
 

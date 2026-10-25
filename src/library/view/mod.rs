@@ -339,16 +339,6 @@ impl LibraryView {
         submit(&self.inner);
     }
 
-    /// The header menu's "Update category": a pass over the category on show.
-    pub fn update_category(&self) {
-        refresh_active(&self.inner);
-    }
-
-    /// How many categories the library shows tabs for.
-    pub fn category_count(&self) -> usize {
-        self.inner.borrow().built.as_ref().map_or(0, |built| built.pages.len())
-    }
-
     /// How many cells the grid shows. Test-only.
     #[cfg(test)]
     pub(crate) fn cover_count(&self) -> usize {
@@ -847,7 +837,15 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
             select_tab(&inner, index);
         }
     });
-    tabs.set(&view.labels, view.index, on_select);
+    let weak = Rc::downgrade(inner);
+    // a tab's right-click "Update category" opens that tab and updates it, as F5 does the open one
+    let on_update: Rc<dyn Fn(usize)> = Rc::new(move |index| {
+        if let Some(inner) = weak.upgrade() {
+            select_tab(&inner, index);
+            refresh_active(&inner);
+        }
+    });
+    tabs.set(&view.labels, view.index, on_select, on_update);
 
     apply_columns(inner);
     show_mode_view(inner);

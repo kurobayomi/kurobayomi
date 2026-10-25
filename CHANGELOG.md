@@ -13,6 +13,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   shows the setup's progress window until the new version starts; a plain quit still installs without a window.
 - A source's view options match the Library's: View (Grid or List), Grid style (Compact, Comfortable, Cover only) and
   Cover size. The look is remembered for every source, separately from the Library's.
+- The ⋮ menu beside the app name is gone: Library, Updates, History and Downloads show its actions as buttons in the
+  page header (link a folder, open the Local folder, Upcoming, Clear history, Pause or Resume and Clear queue, the last
+  two only while something is queued). Update category is F5 or a category tab's right-click menu.
 
 ## [0.2.2] - 2026-10-25
 

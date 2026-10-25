@@ -180,7 +180,7 @@ pub(crate) fn fab(overlay: &gtk::Overlay, label: &str, icon: &str) -> Button {
 // ---------- library ----------
 
 /// The Library destination as a whole page: one header row (Anime | Manga switch, the visible kind's search, its
-/// refresh and menu) over the two library views (docs/design/main-window.md). The page has no title of its own.
+/// refresh and buttons) over the two library views (docs/design/main-window.md). The page has no title of its own.
 fn libraries() -> Option<Built> {
     built(kind_page([Kind::Anime, Kind::Manga].map(|kind| library(if kind.is_anime() { "anime_library" } else { "manga_library" }, kind)), false), vec![])
 }
@@ -195,15 +195,15 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     kinds.set_transition_type(gtk::StackTransitionType::Crossfade);
     kinds.set_vexpand(true);
     let (bars, end) = (gtk::Stack::new(), gtk::Stack::new());
-    // a tab page leads its header with the visible kind's search toggle and ⋮ menu (`ui::pack_lead`); a pushed page keeps
-    // them at the end
-    let (lead_search, lead_menu) = (gtk::Stack::new(), gtk::Stack::new());
+    // a tab page leads its header with the visible kind's search toggle (`ui::pack_lead`); a pushed page keeps it at the
+    // end. A tab page has no ⋮ menu: its actions are buttons at the end (guard test `no_tab_page_has_a_more_menu`)
+    let lead_search = gtk::Stack::new();
     for (b, anime) in views.into_iter().zip([true, false]) {
         let name = if anime { "anime" } else { "manga" };
         kinds.add_titled(&b.content, Some(name), if anime { "Anime" } else { "Manga" });
         let mut rest = b.end.into_iter().peekable();
         let actions = GBox::new(O::Horizontal, 4);
-        let (search, menu) = (GBox::new(O::Horizontal, 0), GBox::new(O::Horizontal, 0));
+        let search = GBox::new(O::Horizontal, 0);
         let bar: gtk::Widget = match rest.next_if(|w| w.is::<gtk::SearchEntry>()).and_downcast::<gtk::SearchEntry>() {
             // keys typed in this kind's content open its bar; the other kind's content is hidden and takes none
             Some(entry) => {
@@ -215,13 +215,12 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
         };
         bars.add_named(&bar, Some(name));
         for w in rest {
-            if !back && w.has_css_class(crate::ui::MORE_MENU) { menu.append(&w) } else { actions.append(&w) }
+            actions.append(&w);
         }
         end.add_named(&actions, Some(name));
         lead_search.add_named(&search, Some(name));
-        lead_menu.add_named(&menu, Some(name));
     }
-    for follower in [&bars, &end, &lead_search, &lead_menu] {
+    for follower in [&bars, &end, &lead_search] {
         kinds.bind_property("visible-child-name", follower, "visible-child-name").sync_create().build();
     }
     crate::shell::kind_choice::follow(&kinds, ["anime", "manga"]);
@@ -230,7 +229,7 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     if back {
         header.pack_start(&crate::ui::back_button());
     } else {
-        crate::ui::pack_lead(&header, Some(lead_search.upcast_ref()), Some(lead_menu.upcast_ref()));
+        crate::ui::pack_lead(&header, Some(lead_search.upcast_ref()), None);
     }
     let switch = gtk::StackSwitcher::builder().stack(&kinds).build();
     header.pack_start(&switch);
@@ -259,7 +258,7 @@ fn downloads() -> Option<Built> {
 }
 
 fn downloads_view(kind: Kind) -> Built {
-    if let Some((page, search, menu)) = crate::downloads::queue_page::page(kind) {
+    if let Some((page, search, buttons)) = crate::downloads::queue_page::page(kind) {
         // refresh checks the download folders of this kind again (Settings' Reindex downloads, for one kind)
         let refresh = crate::ui::refresh_button(&kuro_i18n::tr(kuro_i18n::MsgKey::downloads_check_files));
         refresh.connect_clicked(move |button| {
@@ -269,7 +268,7 @@ fn downloads_view(kind: Kind) -> Built {
                 crate::toast::notify(&tr(MsgKey::ui_checking_the_downloaded_files_again));
             }
         });
-        let end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.upcast()), menu: vec![menu], ..Default::default() }.widgets();
+        let end = crate::ui::HeaderActions { search: Some(search), refresh: Some(refresh.upcast()), extra: buttons, ..Default::default() }.widgets();
         return Built { content: scrolled(&page).upcast(), end };
     }
     let library = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::label_library));

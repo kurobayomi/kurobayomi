@@ -308,7 +308,7 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
     if back {
         header.pack_start(&back_button());
     }
-    // every page leads with its search toggle and its ⋮ menu, after Back on a pushed page (`pack_lead`)
+    // every page leads with its search toggle, and a pushed page with its ⋮ menu after Back (`pack_lead`)
     let search = bar.as_ref().map(|_| end.remove(0));
     let menu = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i));
     if search.is_some() || menu.is_some() {
@@ -838,19 +838,19 @@ pub fn spin_once(button: &gtk::Button) {
 /// One turn of the refresh arrow, in milliseconds (`style.css` uses the same).
 const SPIN_MS: u64 = 700;
 
-/// The css class of a page's ⋮ menu ([`menu_button`]), so a tab page can lead its header with it.
+/// The css class of a page's ⋮ menu ([`menu_button`]), so a pushed page can lead its header with it.
 pub const MORE_MENU: &str = "kb-more";
-/// The box at the start of a tab page's header that holds its two lead slots: the search toggle, then the ⋮ menu.
+/// The box at the start of a page's header that holds its two lead slots: the search toggle, then the ⋮ menu.
 pub const LEAD: &str = "kb-lead";
 /// The lead slot of the search toggle.
 pub const LEAD_SEARCH: &str = "kb-lead-search";
 /// The lead slot of the ⋮ menu.
 pub const LEAD_MENU: &str = "kb-lead-menu";
 
-/// Leads a page's header with its search toggle and its ⋮ menu (user, 2026-10-14), on every page: the tabs and the pages
-/// pushed over them. In a narrow window they stay here, after Back on a pushed page; with the sidebar showing, the shell
-/// moves the top page's two into the sidebar's header around the app name, the search before it and the menu after it
-/// (`shell::lead`). Call after Back and before anything else is packed at the start.
+/// Leads a page's header with its search toggle and its ⋮ menu (user, 2026-10-14), after Back on a pushed page. A tab
+/// page has no ⋮ menu (its actions are buttons at the end); with the sidebar showing, the shell moves a tab page's search
+/// into the sidebar's header before the app name (`shell::lead`). Call after Back and before anything else is packed at
+/// the start.
 pub fn pack_lead(header: &gtk::HeaderBar, search: Option<&gtk::Widget>, menu: Option<&gtk::Widget>) {
     let lead = GBox::new(O::Horizontal, 4);
     lead.add_css_class(LEAD);
@@ -878,7 +878,8 @@ pub struct HeaderActions {
     pub extra: Vec<gtk::Widget>,
     /// Sort, filter and display options, for a page with a list to shape.
     pub options: Option<gtk::Widget>,
-    /// The "more" menu: everything else the page can do, in sections.
+    /// The "more" menu: everything else the page can do, in sections. Pushed pages only: a tab page's actions are
+    /// buttons (`extra`), guarded by `shell::lead`'s `no_tab_page_has_a_more_menu`.
     pub menu: Vec<Vec<MenuEntry>>,
 }
 
