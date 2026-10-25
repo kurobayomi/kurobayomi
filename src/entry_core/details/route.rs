@@ -535,6 +535,18 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let weak = Rc::downgrade(&view);
     *weak_view.borrow_mut() = weak.clone();
     view.apply_width(first_width());
+    // auto-track binds in the background after an add: the Tracking button reads the count again when it lands
+    crate::updates::track_binding::watch_binds({
+        let weak = weak.clone();
+        move |bound_id| {
+            let Some(view) = weak.upgrade() else { return false };
+            let loaded = view.model.borrow().as_ref().map(|m| (m.entry.id, m.entry.source));
+            if let Some((id, source_id)) = loaded.filter(|(id, _)| *id == bound_id) {
+                view.runner.send(EntryCmd::ReadTracking { entry_id: id, source_id });
+            }
+            true
+        }
+    });
 
     let on_view = |f: fn(&Rc<View>)| {
         let weak = weak.clone();

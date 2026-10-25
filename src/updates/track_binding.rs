@@ -13,6 +13,21 @@ use crate::browse::entries::TrackerBinder;
 
 static CTX: RwLock<Option<Arc<TrackCtx>>> = RwLock::new(None);
 
+thread_local! {
+    /// The open entry pages, told on the GTK thread when auto-track bound an entry. A watcher returns false once its
+    /// page is gone and is then dropped.
+    static WATCHERS: std::cell::RefCell<Vec<Box<dyn Fn(i64) -> bool>>> = std::cell::RefCell::default();
+}
+
+/// Registers a page that wants to hear about auto-track binds (`f` gets the entry id). GTK thread only.
+pub fn watch_binds(f: impl Fn(i64) -> bool + 'static) {
+    WATCHERS.with(|w| w.borrow_mut().push(Box::new(f)));
+}
+
+fn bound(entry_id: i64) {
+    WATCHERS.with(|w| w.borrow_mut().retain(|f| f(entry_id)));
+}
+
 /// Registers the tracking context the binders use. The last call wins.
 pub fn install(ctx: Arc<TrackCtx>) {
     *CTX.write().unwrap_or_else(|e| e.into_inner()) = Some(ctx);
@@ -38,14 +53,17 @@ pub fn binder(kind: Kind) -> TrackerBinder {
             for (tracker, error) in failures {
                 tracing::warn!(entry = id, tracker = tracker.0, %error, "an enhanced tracker could not be bound");
             }
-            let bound = match kind {
+            let auto = match kind {
                 Kind::Anime => kuro_track::auto_bind::auto_bind_anime(&ctx, id, &title).await,
                 Kind::Manga => kuro_track::auto_bind::auto_bind_manga(&ctx, id, &title).await,
             };
-            match bound {
+            match auto {
                 Ok(true) => {
                     let text = kuro_i18n::trf(kuro_i18n::MsgKey::track_auto_bound, &[("title", kuro_i18n::Arg::Str(&title))]);
-                    gtk::glib::MainContext::default().invoke(move || crate::toast::notify(text));
+                    gtk::glib::MainContext::default().invoke(move || {
+                        crate::toast::notify(text);
+                        bound(id);
+                    });
                 }
                 Ok(false) => {}
                 Err(error) => tracing::warn!(entry = id, %error, "auto-track could not bind the title"),
@@ -66,6 +84,26 @@ pub fn bind_entry(db: &Arc<kuro_db::handle::Db>, kind: Kind, id: i64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_bind_reaches_the_watching_pages_and_a_gone_page_is_dropped() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+        let (alive, gone) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
+        let a = Rc::clone(&alive);
+        watch_binds(move |id| {
+            a.set(a.get() + id);
+            true
+        });
+        let g = Rc::clone(&gone);
+        watch_binds(move |_| {
+            g.set(g.get() + 1);
+            false
+        });
+        bound(5);
+        bound(7);
+        assert_eq!((alive.get(), gone.get()), (12, 1), "the second page left after the first bind");
+    }
 
     #[test]
     fn without_a_tracking_context_the_binder_does_nothing() {
