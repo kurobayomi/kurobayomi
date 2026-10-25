@@ -1,6 +1,6 @@
 //! Header shortcuts of the entry screens (T-38a-046). The chapter and episode list keys are `selection::key_command`. In the
 //! header: F opens the filter sheet, R or Ctrl+R refreshes (T-38a-050), Ctrl+M
-//! migrates and W opens the WebView when it is available. Upstream: `MangaScreen.kt` key handling. Pure: the window asks
+//! migrates and W opens the title in the browser for an HTTP source. Upstream: `MangaScreen.kt` key handling. Pure: the window asks
 //! `header_key` and shows [`help`].
 
 use kuro_i18n::{MsgKey, tr};
@@ -12,16 +12,16 @@ pub enum HeaderKey {
     Filter,
     Refresh,
     Migrate,
-    WebView,
+    Browser,
 }
 
-/// The header action of a lowercase letter with these modifiers. W needs the WebView feature to be on.
+/// The header action of a lowercase letter with these modifiers. W needs an HTTP source (a page to open).
 pub fn header_key(letter: char, mods: Mods, webview_available: bool) -> Option<HeaderKey> {
     match (letter, mods.ctrl) {
         ('f', false) => Some(HeaderKey::Filter),
         ('r', _) => Some(HeaderKey::Refresh),
         ('m', true) => Some(HeaderKey::Migrate),
-        ('w', false) if webview_available => Some(HeaderKey::WebView),
+        ('w', false) if webview_available => Some(HeaderKey::Browser),
         _ => None,
     }
 }
@@ -41,7 +41,7 @@ pub fn help() -> Vec<(String, String)> {
         (key("F"), tr(MsgKey::ui_open_the_filter_sheet)),
         (key("R"), tr(MsgKey::action_webview_refresh)),
         (key("Ctrl+M"), tr(MsgKey::action_migrate)),
-        (key("W"), tr(MsgKey::ui_open_the_webview)),
+        (key("W"), tr(MsgKey::action_open_in_browser)),
         (tr(MsgKey::ui_f1_or), tr(MsgKey::ui_show_this_help)),
     ]
 }
@@ -63,9 +63,9 @@ mod tests {
     }
 
     #[test]
-    fn w_opens_the_webview_only_when_it_is_available() {
+    fn w_opens_the_browser_only_when_the_source_has_a_page() {
         let none = Mods::default();
-        assert_eq!(header_key('w', none, true), Some(HeaderKey::WebView));
+        assert_eq!(header_key('w', none, true), Some(HeaderKey::Browser));
         assert_eq!(header_key('w', none, false), None);
     }
 

@@ -1,7 +1,7 @@
 //! The action row under an entry header (T-38a-017, T-39a-026) and the next update label (T-38a-018). Upstream:
 //! `MangaInfoHeader.kt:163-240` (manga) and `AnimeInfoHeader.kt` (anime). The rules are here; `action_row_view` draws them.
 //!
-//! The row has four equal buttons: library, interval, tracking and WebView. An inactive button uses the foreground at
+//! The row has four equal buttons: library, interval, tracking and Browser. An inactive button uses the foreground at
 //! 0.38 alpha (`INACTIVE_ALPHA`), an active one the primary colour.
 
 use kuro_domain::entries::fetch_interval::next_update_days;
@@ -98,7 +98,7 @@ pub fn tracking_visible(has_callback: bool) -> bool {
     has_callback
 }
 
-/// The WebView button is shown only for an HTTP source (E-26).
+/// The Browser button (the title in the system browser) is shown only for an HTTP source (E-26).
 pub fn webview_visible(http_source: bool) -> bool {
     http_source
 }

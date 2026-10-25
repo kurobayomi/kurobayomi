@@ -1,6 +1,6 @@
 //! The action row widget (T-38a-017, T-39a-026): four equal buttons under the entry header, drawn from the rules of
-//! `action_row`. The library button is the page's `LibraryButton`; the interval, tracking and WebView buttons are built
-//! here. Tracking and WebView appear only when the page passes a callback for them.
+//! `action_row`. The library button is the page's `LibraryButton`; the interval, tracking and Browser buttons are built
+//! here. Tracking and Browser appear only when the page passes a callback for them.
 
 use std::rc::Rc;
 
@@ -24,7 +24,7 @@ pub struct RowState {
     pub tracking_count: i64,
     /// The page has a tracking callback (anime), or always does (manga).
     pub has_tracking: bool,
-    /// The source is HTTP and the page has a WebView callback.
+    /// The source is HTTP and the page has a Browser callback.
     pub webview: bool,
 }
 
@@ -135,7 +135,7 @@ impl ActionRow {
         self.tracking.text(&tracking_text, tracking_tone(state.tracking_count));
         self.tracking.button.set_visible(tracking_visible(state.has_tracking));
 
-        self.webview.text(&tr(MsgKey::action_web_view), Tone::Inactive);
+        self.webview.text(&tr(MsgKey::ui_browser), Tone::Inactive);
         self.webview.button.set_visible(webview_visible(state.webview));
     }
 }

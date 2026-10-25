@@ -63,7 +63,7 @@ use super::store::EntryStore;
 use super::related_view;
 use crate::data;
 use crate::entry_core::dialog::CategoryDialog;
-use crate::entry_core::handoff::{self, MigrateRequest, WebViewRequest};
+use crate::entry_core::handoff::{self, MigrateRequest};
 use crate::entry_core::header::SearchRequest;
 use crate::entry_core::action_row::interval_click_opens_dialog;
 use crate::entry_core::action_row_view::{ActionRow, RowState};
@@ -321,8 +321,8 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     list_head.append(&empty);
     list_head.append(&seasons.widget);
 
-    // the action row (T-39a-026): library, interval (the dialog of T-38a-028), tracking and WebView. WebView shows
-    // only for an HTTP source (`RowState::webview`).
+    // the action row (T-39a-026): library, interval (the dialog of T-38a-028), tracking and Browser. Browser shows
+    // only for an HTTP source (`RowState::webview`) and opens the title's page in the system browser.
     let action_row = ActionRow::new(
         Rc::new({
             let weak = Rc::clone(&weak_view);
@@ -344,7 +344,7 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
             let weak = Rc::clone(&weak_view);
             move || {
                 if let Some(view) = weak.borrow().upgrade() {
-                    view.webview_pressed();
+                    view.browser_pressed();
                 }
             }
         })),
@@ -714,7 +714,7 @@ fn key_controller(weak: &Weak<View>) -> gtk::EventControllerKey {
 }
 
 impl View {
-    /// F (the list options menu), R (refresh), Ctrl+M (migrate, a favorite only) and W (WebView, an HTTP source only), the
+    /// F (the list options menu), R (refresh), Ctrl+M (migrate, a favorite only) and W (the browser, an HTTP source only), the
     /// header keys of `shortcuts::header_key` (T-38a-046). `true` when the key was one of them and ran.
     fn header_key_pressed(self: &Rc<Self>, key: gtk::gdk::Key, state: gtk::gdk::ModifierType) -> bool {
         use crate::entry_core::selection::Mods;
@@ -734,7 +734,7 @@ impl View {
             // a selection disables Refresh, as it does the header button
             Some(HeaderKey::Refresh) if !selecting => self.refresh(),
             Some(HeaderKey::Migrate) if favorite => self.migrate(),
-            Some(HeaderKey::WebView) => self.webview_pressed(),
+            Some(HeaderKey::Browser) => self.browser_pressed(),
             _ => return false,
         }
         true
@@ -1169,11 +1169,11 @@ impl View {
         self.open_tracking();
     }
 
-    /// The WebView button (an HTTP source only): the entry's page in the WebView.
-    fn webview_pressed(&self) {
-        let request = self.model.borrow().as_ref().and_then(|m| Some(WebViewRequest { url: self.env.backend.web_url(m.entry.source, &m.entry.url)?, title: m.entry.title.clone() }));
-        if let Some(request) = request {
-            handoff::open_webview(request);
+    /// The Browser button and W (an HTTP source only): the entry's page in the system browser, as Open in browser.
+    fn browser_pressed(&self) {
+        let url = self.model.borrow().as_ref().filter(|m| m.accepts_dispatch()).and_then(|m| self.env.backend.web_url(m.entry.source, &m.entry.url));
+        if let Some(url) = url {
+            overflow_menu::open_in_browser(&url);
         }
     }
 
@@ -1927,8 +1927,8 @@ mod tests {
             let labels: Vec<String> = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).map(|l| l.label().to_string()).collect();
             assert!(labels.iter().any(|t| t == "In library"), "the library button of a favorite");
             assert!(labels.iter().any(|t| t == "Tracking"), "the tracking button has its callback");
-            let webview = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).find(|l| l.label() == "WebView").and_then(|l| l.ancestor(Button::static_type()));
-            assert!(webview.is_some_and(|b| !b.is_visible()), "WebView shows for an HTTP source only");
+            let webview = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).find(|l| l.label() == "Browser").and_then(|l| l.ancestor(Button::static_type()));
+            assert!(webview.is_some_and(|b| !b.is_visible()), "Browser shows for an HTTP source only");
             let download = buttons.iter().find(|b| b.label().as_deref() == Some("Download all")).expect("the Download all button exists");
             assert!(!download.is_visible(), "no download handler, no Download all");
             assert!(buttons.iter().any(|b| b.tooltip_text().as_deref() == Some("Refresh") && b.is_sensitive()), "the refresh button");

@@ -45,9 +45,8 @@ pub struct BrowseEnv {
     pub migrate: Rc<dyn Fn(i64, i64)>,
     pub edit_categories: Rc<dyn Fn()>,
     pub on_back: Rc<dyn Fn()>,
+    /// Opens a web address in the system browser: Open in browser of the source's page.
     pub open_url: Rc<dyn Fn(&str)>,
-    /// Open in WebView: the url and the source's name.
-    pub open_webview: Rc<dyn Fn(String, String)>,
     /// The Settings item of a configurable source.
     pub on_settings: Rc<dyn Fn(i64)>,
     pub toast: Rc<dyn Fn(ToastSpec)>,
@@ -76,13 +75,13 @@ pub fn source_page(env: &BrowseEnv, source_id: i64, query: BrowseQuery) -> Sourc
     let filters = Rc::new(SourceFilters::new(defaults));
     let (_never_sent, ready) = watch::channel(true);
 
-    // Help is the page's own (the local source's guide); Open in WebView needs the source's site
+    // Help is the page's own (the local source's guide); Open in browser needs the source's site
     let on_overflow: Rc<dyn Fn(OverflowItem)> = {
-        let (open, settings, name) = (Rc::clone(&env.open_webview), Rc::clone(&env.on_settings), source.name.clone());
+        let (open, settings) = (Rc::clone(&env.open_url), Rc::clone(&env.on_settings));
         Rc::new(move |item| match item {
-            OverflowItem::OpenInWebView => {
+            OverflowItem::OpenInBrowser => {
                 if let Some(url) = &home {
-                    open(url.clone(), name.clone());
+                    open(url);
                 }
             }
             OverflowItem::Settings => settings(source_id),
@@ -212,7 +211,7 @@ pub(crate) fn now_ms() -> i64 {
 
 /// The app side of a source page of `kind`, over that kind's library.
 fn production_env(kind: Kind) -> BrowseEnv {
-    use crate::entry_core::handoff::{self, SourcePrefsRequest, WebViewRequest};
+    use crate::entry_core::handoff::{self, SourcePrefsRequest};
 
     BrowseEnv {
         kind,
@@ -225,7 +224,6 @@ fn production_env(kind: Kind) -> BrowseEnv {
         edit_categories: Rc::new(move || super::glue::open_categories(kind)),
         on_back: Rc::new(crate::ui::pop),
         open_url: Rc::new(|url| crate::ui::open_link(url, None)),
-        open_webview: Rc::new(|url, title| handoff::open_webview(WebViewRequest { url, title })),
         on_settings: Rc::new(move |source_id| handoff::open_source_preferences(SourcePrefsRequest { source_id, kind })),
         toast: Rc::new(|spec| crate::toast::notify(spec.message)),
         now_ms: Rc::new(now_ms),
@@ -342,8 +340,7 @@ pub(crate) mod tests {
             migrate: Rc::new(|_, _| {}),
             edit_categories: Rc::new(|| {}),
             on_back: Rc::new(move || back.borrow_mut().push("back".into())),
-            open_url: Rc::new(|_| {}),
-            open_webview: Rc::new(move |url, name| web.borrow_mut().push(format!("webview {url} {name}"))),
+            open_url: Rc::new(move |url| web.borrow_mut().push(format!("browser {url}"))),
             on_settings: Rc::new(move |id| settings.borrow_mut().push(format!("settings {id}"))),
             toast: Rc::new(|_| {}),
             now_ms: Rc::new(|| 1),
@@ -437,7 +434,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn a_runnable_source_of_either_kind_lists_offers_latest_and_opens_its_site_in_the_web_view() {
+    fn a_runnable_source_of_either_kind_lists_offers_latest_and_opens_its_site_in_the_browser() {
         for kind in [Kind::Manga, Kind::Anime] {
             let rig = rig_of(kind);
             let page = source_page(&rig.env, 42, BrowseQuery::Popular);
@@ -446,10 +443,10 @@ pub(crate) mod tests {
             assert!(pump_until(|| shown.listing.loaded_count() > 0), "{kind:?}: the listing loads");
             let overflow = shown.header.overflow.as_ref().expect("the overflow menu");
             let labels = crate::widgets::view_options::menu_labels(&overflow.menu_model().expect("a menu"));
-            let label = tr(MsgKey::action_open_in_web_view);
+            let label = tr(MsgKey::action_open_in_browser);
             let item = labels.iter().position(|l| *l == label).expect("item");
             overflow.activate_action(&format!("more.e{item}"), None).expect("the item's action");
-            assert_eq!(*rig.log.borrow(), ["webview https://src.example Src42"], "{kind:?}");
+            assert_eq!(*rig.log.borrow(), ["browser https://src.example"], "{kind:?}");
         }
     }
 
@@ -463,7 +460,7 @@ pub(crate) mod tests {
 
     pub(crate) fn smoke() {
         a_listed_source_that_cannot_run_and_an_unknown_one_get_the_missing_source_page_for_either_kind();
-        a_runnable_source_of_either_kind_lists_offers_latest_and_opens_its_site_in_the_web_view();
+        a_runnable_source_of_either_kind_lists_offers_latest_and_opens_its_site_in_the_browser();
         a_route_of_either_kind_is_taken_for_the_browse_source_screen();
         a_source_the_directory_does_not_know_gets_the_missing_source_page();
         a_page_opened_on_a_search_starts_with_that_search_and_shows_the_text();

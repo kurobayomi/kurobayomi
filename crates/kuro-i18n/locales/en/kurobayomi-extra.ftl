@@ -1021,3 +1021,6 @@ track_pulled_chapters = Marked { $count } chapters as read from { $tracker }
 
 # source: kurobayomi
 ui_download_not_in_library = The library no longer has this: open its folder to see it
+
+# source: kurobayomi
+ui_browser = Browser

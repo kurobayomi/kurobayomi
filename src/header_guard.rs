@@ -33,7 +33,7 @@ mod tests {
     fn the_pages_that_can_be_built_in_a_test_have_a_header_bar() {
         crate::testing::with_display(|| {
             let (stack, _window) = crate::testing::nav();
-            for id in ["download_queue", "tracking_sheet", "webview", "new_update", "crash"] {
+            for id in ["download_queue", "tracking_sheet", "new_update", "crash"] {
                 assert_has_header(id, crate::screens::build(id).upcast_ref());
             }
             // the loading page of a deep link: a resolver that never answers keeps it on show

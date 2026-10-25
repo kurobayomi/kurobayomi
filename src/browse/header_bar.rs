@@ -225,11 +225,11 @@ pub(crate) mod tests {
         let webview = descendants(header.bar.upcast_ref())
             .into_iter()
             .filter_map(|w| w.downcast::<gtk::Button>().ok())
-            .find(|b| b.tooltip_text().as_deref() == Some(overflow_label(OverflowItem::OpenInWebView).as_str()))
+            .find(|b| b.tooltip_text().as_deref() == Some(overflow_label(OverflowItem::OpenInBrowser).as_str()))
             .expect("the Open in WebView button");
         assert!(webview.is_visible() && !header.overflow.as_ref().expect("the ⋮ menu").is_visible());
         webview.emit_clicked();
-        assert_eq!(log.borrow().last().map(String::as_str), Some("overflow OpenInWebView"));
+        assert_eq!(log.borrow().last().map(String::as_str), Some("overflow OpenInBrowser"));
         let slot = header.search.parent().expect("the search's slot");
         let next = slot.next_sibling().and_downcast::<gtk::Button>().expect("a button after the search");
         assert_eq!(next.tooltip_text().as_deref(), Some(tr(MsgKey::action_webview_refresh).as_str()), "the search is first of the actions, before Refresh");

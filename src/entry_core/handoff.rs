@@ -1,6 +1,6 @@
 //! What an entry page hands to the screens it opens (T-38a-016, T-38a-033, T-38a-017). `ui::open` takes a screen id and
-//! nothing else, so a request that carries data (the genre to search, the entry to migrate, the page to show in the
-//! WebView) is parked here first; the screen that opens takes it. A request is read once. No GTK here except the
+//! nothing else, so a request that carries data (the genre to search, the entry to migrate, the source whose settings
+//! open) is parked here first; the screen that opens takes it. A request is read once. No GTK here except the
 //! `open_*` helpers, which push the screen after parking the request.
 
 use std::cell::RefCell;
@@ -9,13 +9,6 @@ use kuro_platform::kind::Kind;
 
 use crate::entry_core::header::SearchRequest;
 use crate::ui;
-
-/// The page the WebView screen shows.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WebViewRequest {
-    pub url: String,
-    pub title: String,
-}
 
 /// The entry a migrate flow starts from. `anime` picks the library the old entry lives in.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -36,7 +29,6 @@ pub struct SourcePrefsRequest {
 thread_local! {
     static SOURCE_PREFS: RefCell<Option<SourcePrefsRequest>> = const { RefCell::new(None) };
     static SEARCH: RefCell<Option<SearchRequest>> = const { RefCell::new(None) };
-    static WEBVIEW: RefCell<Option<WebViewRequest>> = const { RefCell::new(None) };
     static MIGRATE: RefCell<Option<MigrateRequest>> = const { RefCell::new(None) };
 }
 
@@ -56,10 +48,6 @@ pub fn park_source_prefs(request: SourcePrefsRequest) {
 /// The source the opened source-preferences screen is for, handed out once.
 pub fn take_source_prefs() -> Option<SourcePrefsRequest> {
     SOURCE_PREFS.with(|s| s.borrow_mut().take())
-}
-
-pub fn park_webview(request: WebViewRequest) {
-    WEBVIEW.with(|s| *s.borrow_mut() = Some(request));
 }
 
 pub fn park_migrate(request: MigrateRequest) {
@@ -150,11 +138,6 @@ pub fn open_search(request: SearchRequest, kind: Kind, http_source: bool) {
 pub fn open_source_preferences(request: SourcePrefsRequest) {
     park_source_prefs(request);
     ui::open("source_preferences");
-}
-
-pub fn open_webview(request: WebViewRequest) {
-    park_webview(request);
-    ui::open("webview");
 }
 
 /// The overflow menu's Migrate: the search of the migrate flow, for this entry.
