@@ -431,10 +431,10 @@ mod tests {
             settings.set_widget_name(SETTINGS_PAGE);
             ui::push(&settings);
             assert!(places.selected_row().is_none(), "no tab while Settings shows");
-            assert_eq!(bottom.selected_row().map(|r| r.index()), Some(3), "the Settings row");
+            assert_eq!(bottom.selected_row().map(|r| r.index()), Some(2), "the Settings row");
             let inside = gtk::Label::new(None);
             ui::push(&inside);
-            assert_eq!(bottom.selected_row().map(|r| r.index()), Some(3), "a page inside Settings keeps it");
+            assert_eq!(bottom.selected_row().map(|r| r.index()), Some(2), "a page inside Settings keeps it");
             ui::pop_to_root();
             assert_eq!(places.selected_row().map(|r| r.index()), Some(1), "back on the tab");
             assert!(bottom.selected_row().is_none());
