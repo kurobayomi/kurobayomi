@@ -129,3 +129,14 @@ How the nightly works:
 These things exist in the code but the UI does not offer them. Bring one back only when the user asks.
 
 - **Library "Sort by" menu** (`src/library/view/options.rs`, both kinds): Total episodes/chapters, Episode/Chapter fetch date, Airing time and Random (`HIDDEN_SORTS`), and the "Reverse order" check (`OFFER_REVERSE`). The sort types, their labels and any stored sort stay valid, so a sort saved earlier still applies; the menu just shows no radio for a hidden one. The episode list of an entry page keeps its own Reverse order (it is that list's main control).
+
+## How the user delegates work (user, 2026-10-25; also in the global CLAUDE.md)
+
+- **"session"**: a separate child session per piece of work, which the user can open and watch; it reports back to the
+  session that started it, which checks the result (its commit, its diff) and tells the user.
+- **"subagent"**: a hidden helper inside the conversation. **"suggest a task"**: a proposal card that runs nothing until
+  started. **"task list"**: the checklist of steps a session works through.
+- The flow: this session, then its child sessions, then each one's task list. "Nested child" or "child" means a child
+  session, never a subagent.
+- Child sessions share this checkout: each stages its own files by name, switches no branch, and commits locally only
+  unless the user says push.
