@@ -1,6 +1,6 @@
 [package]
 name = "kurobayomi"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 
 [features]
@@ -59,7 +59,7 @@ members =["crates/kuro-core", "crates/kuro-i18n", "crates/kuro-platform", "crate
 resolver = "3"
 
 [workspace.package]
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.85"
 license = "Apache-2.0"

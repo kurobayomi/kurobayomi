@@ -6,6 +6,18 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-26
+
+### Added
+
+- A repository's sources show when each was added and last updated, under its description ("Added 19 Oct 2026 ·
+  Updated 25 Oct 2026"), in the sources list and in Browse.
+
+### Changed
+
+- A repository may list kinds of sources this version cannot show yet: those are left out, and the repository's other
+  sources load as before. Until now one unknown entry stopped the whole repository from loading.
+
 ## [0.2.4] - 2026-10-25
 
 ### Changed
