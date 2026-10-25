@@ -18,6 +18,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Fixed
 
+- Open in WebView opened an empty page whose Back and Forward did nothing: the in-app WebView was never built. A
+  source's page now has Open in browser, and a title's page a Browser button (and W), which open the site in your
+  browser.
 - A title added to the library while Incognito is on is no longer tracked automatically: Incognito sends nothing to
   the trackers, and auto-track put the title on your AniList or MyAnimeList list.
 

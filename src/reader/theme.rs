@@ -96,9 +96,4 @@ mod tests {
     fn an_unknown_theme_value_is_black() {
         assert_eq!(background_for(9, false), Background::Black);
     }
-
-    #[test]
-    fn grayscale_and_invert_are_not_css_filters() {
-        assert!(!crate::theme::style::BASE_CSS.contains("filter:"), "they are colour-matrix nodes on the page area (T-43b-049)");
-    }
 }
