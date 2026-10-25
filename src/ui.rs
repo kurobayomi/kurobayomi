@@ -325,10 +325,11 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
     if back {
         header.pack_start(&back_button());
     }
-    // a pushed page leads with its ⋮ menu after Back (`pack_lead`); the search toggle stays first of the actions
-    if let Some(menu) = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i)) {
-        pack_lead(&header, &menu);
-    }
+    // a pushed page leads with its ⋮ menu after Back (`pack_lead`); the search toggle is first of the actions, or leads
+    // the row in the phone layout (`search_follows_width`)
+    let search = bar.as_ref().map(|_| end.remove(0));
+    let menu = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i));
+    let lead = (search.is_some() || menu.is_some()).then(|| pack_lead(&header, menu.as_ref()));
     let (switches, end): (Vec<gtk::Widget>, Vec<gtk::Widget>) = end.into_iter().partition(|w| w.is::<gtk::StackSwitcher>());
     let mut narrow_rows = Vec::new();
     for w in &switches {
@@ -339,6 +340,11 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
     }
     for w in end.iter().rev() {
         header.pack_end(w);
+    }
+    if let (Some(search), Some(lead)) = (&search, &lead) {
+        let slot = GBox::new(O::Horizontal, 0);
+        header.pack_end(&slot);
+        search_follows_width(&header, search, lead, &slot);
     }
     no_sticky_focus(&header);
     b.append(&header);
@@ -855,17 +861,52 @@ const SPIN_MS: u64 = 700;
 
 /// The css class of a page's ⋮ menu ([`menu_button`]), so a pushed page can lead its header with it.
 pub const MORE_MENU: &str = "kb-more";
-/// The box at the start of a pushed page's header that holds its ⋮ menu.
+/// The box at the start of a page's header: the search toggle in the phone layout, then a pushed page's ⋮ menu.
 pub const LEAD: &str = "kb-lead";
 
-/// Leads a pushed page's header with its ⋮ menu (user, 2026-10-14), after Back. A tab page has no ⋮ menu (its actions are
-/// buttons at the end), and every page's search toggle is the first of its actions at the end of the row (user,
-/// 2026-10-25). Call after Back and before anything else is packed at the start.
-pub fn pack_lead(header: &gtk::HeaderBar, menu: &gtk::Widget) {
+/// Packs a page's lead box, with a pushed page's ⋮ menu (user, 2026-10-14), after Back. A tab page has no ⋮ menu (its
+/// actions are buttons at the end). The search toggle comes in first in the phone layout ([`search_follows_width`]).
+/// An empty box is hidden, so it takes no spacing. Call after Back and before anything else is packed at the start.
+pub fn pack_lead(header: &gtk::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
     let lead = GBox::new(O::Horizontal, 4);
     lead.add_css_class(LEAD);
-    lead.append(menu);
+    if let Some(menu) = menu {
+        lead.append(menu);
+    }
+    lead.set_visible(lead.first_child().is_some());
     header.pack_start(&lead);
+    lead
+}
+
+/// Moves `toggle` first into `lead` when `narrow`, else first into `end`, and hides whichever box is left empty.
+fn put_search(toggle: &gtk::Widget, lead: &GBox, end: &GBox, narrow: bool) {
+    let target = if narrow { lead } else { end };
+    if toggle.parent().as_ref() != Some(target.upcast_ref()) {
+        if let Some(parent) = toggle.parent().and_downcast::<GBox>() {
+            parent.remove(toggle);
+        }
+        target.prepend(toggle);
+    }
+    for side in [lead, end] {
+        side.set_visible(side.first_child().is_some());
+    }
+}
+
+/// A page's search toggle: first in `lead` (the start of the header) in the phone layout, below
+/// `shell::layout::WIDE_MIN_WIDTH_PX`, and first in `end` (its actions at the end) in a wider window (user, 2026-10-25).
+/// Either box is hidden while empty, so it takes no spacing.
+pub fn search_follows_width(header: &gtk::HeaderBar, toggle: &gtk::Widget, lead: &GBox, end: &GBox) {
+    let place = {
+        let (toggle, lead, end) = (toggle.clone(), lead.clone(), end.clone());
+        move |narrow: bool| put_search(&toggle, &lead, &end, narrow)
+    };
+    place(window_width().is_some_and(|w| w < crate::shell::layout::WIDE_MIN_WIDTH_PX));
+    header.add_tick_callback(move |header, _| {
+        if let Some(width) = header.root().map(|root| root.width()).filter(|w| *w > 0) {
+            place(width < crate::shell::layout::WIDE_MIN_WIDTH_PX);
+        }
+        glib::ControlFlow::Continue
+    });
 }
 
 /// What a main page puts in its header, left to right: search, refresh, the page's own buttons, sort/filter, and the
@@ -1324,6 +1365,25 @@ pub fn generic(s: &Screen) -> GBox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_search_leads_the_row_in_the_phone_layout_and_is_first_of_the_actions_otherwise() {
+        crate::testing::with_display(|| {
+            let (lead, end) = (GBox::new(O::Horizontal, 4), GBox::new(O::Horizontal, 4));
+            let (toggle, refresh) = (gtk::ToggleButton::new(), Button::new());
+            end.append(&refresh);
+            let toggle = toggle.upcast::<gtk::Widget>();
+            put_search(&toggle, &lead, &end, false);
+            assert_eq!(end.first_child().as_ref(), Some(&toggle), "first of the actions in a wide window");
+            assert!(!lead.is_visible(), "the empty lead box takes no spacing");
+            put_search(&toggle, &lead, &end, true);
+            assert_eq!(lead.first_child().as_ref(), Some(&toggle), "at the start of the row on a phone");
+            assert!(lead.is_visible() && end.is_visible(), "the actions keep their other buttons");
+            assert_eq!(end.first_child().as_ref(), Some(refresh.upcast_ref()));
+            put_search(&toggle, &lead, &end, false);
+            assert_eq!(end.first_child().as_ref(), Some(&toggle), "back at the end when the window widens");
+        });
+    }
 
     #[test]
     fn the_switch_leaves_a_header_short_of_room_and_comes_back_with_room_to_spare() {

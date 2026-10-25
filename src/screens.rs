@@ -195,8 +195,10 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     kinds.set_transition_type(gtk::StackTransitionType::Crossfade);
     kinds.set_vexpand(true);
     let (bars, end) = (gtk::Stack::new(), gtk::Stack::new());
-    // the visible kind's search toggle is the first of its actions at the end. A tab page has no ⋮ menu: its actions are
-    // buttons at the end (guard test `no_tab_page_has_a_more_menu`)
+    // the visible kind's search toggle is the first of its actions at the end, or leads the row in the phone layout
+    // (`ui::search_follows_width`). A tab page has no ⋮ menu: its actions are buttons at the end (guard test
+    // `no_tab_page_has_a_more_menu`)
+    let mut searches = Vec::new();
     for (b, anime) in views.into_iter().zip([true, false]) {
         let name = if anime { "anime" } else { "manga" };
         kinds.add_titled(&b.content, Some(name), if anime { "Anime" } else { "Manga" });
@@ -206,7 +208,9 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
             // keys typed in this kind's content open its bar; the other kind's content is hidden and takes none
             Some(entry) => {
                 let (bar, toggle) = crate::ui::search_row(&entry, &b.content);
-                actions.append(&toggle);
+                // both kinds' toggles share the lead box in the phone layout: only the visible kind's shows
+                kinds.bind_property("visible-child-name", &toggle, "visible").transform_to(move |_, shown: Option<String>| Some(shown.as_deref() == Some(name))).sync_create().build();
+                searches.push((toggle.upcast::<gtk::Widget>(), actions.clone()));
                 bar.upcast()
             }
             None => GBox::new(O::Horizontal, 0).upcast(),
@@ -225,6 +229,10 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     header.set_decoration_layout(Some(&decoration(false)));
     if back {
         header.pack_start(&crate::ui::back_button());
+    }
+    let lead = crate::ui::pack_lead(&header, None);
+    for (toggle, actions) in &searches {
+        crate::ui::search_follows_width(&header, toggle, &lead, actions);
     }
     let switch = gtk::StackSwitcher::builder().stack(&kinds).build();
     header.pack_start(&switch);
