@@ -197,7 +197,9 @@ pub fn header_bar() -> gtk::HeaderBar {
 /// The Anime | Manga switch of a page header, and the row under the header that takes it in a narrow window. Below the
 /// width where the sidebar gives way to the bottom bar (`shell::layout::WIDE_MIN_WIDTH_PX`) the header keeps only its
 /// buttons and the window buttons, so it fits a window down to the 360 px minimum; the switch then sits centred in its own
-/// row, as phone apps put tabs under the toolbar. Append the returned row right under the header.
+/// row, as phone apps put tabs under the toolbar. It also moves there while the sidebar shows once the header runs short
+/// of room ([`switch_fits`]): a switch kept in a full header would set the window's minimum width above that breakpoint,
+/// and the window could never get narrow. Append the returned row right under the header.
 pub fn switch_with_narrow_row(header: &gtk::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
     let row = GBox::new(O::Horizontal, 0);
     row.set_halign(Align::Center);
@@ -214,15 +216,30 @@ pub fn switch_with_narrow_row(header: &gtk::HeaderBar, switch: &gtk::StackSwitch
     header.add_tick_callback(move |header, _| {
         // no width yet (the first frames) decides nothing: taken as wide, it put the switch back for a frame and the window
         // grew to fit it
-        let Some(width) = header.root().map(|root| root.width()).filter(|w| *w > 0) else { return glib::ControlFlow::Continue };
-        let narrow = width < crate::shell::layout::WIDE_MIN_WIDTH_PX;
-        if switch.is_visible() == narrow {
+        let Some(width) = header.root().map(|root| root.width()).filter(|w| *w > 0 && header.width() > 0) else { return glib::ControlFlow::Continue };
+        // the header's minimum with the switch in it: a hidden widget measures 0, so the row's copy stands in for it
+        let shown = switch.is_visible();
+        let extra = if shown { 0 } else { narrow_row.measure(O::Horizontal, -1).0 };
+        let need = header.measure(O::Horizontal, -1).0 + extra;
+        let narrow = width < crate::shell::layout::WIDE_MIN_WIDTH_PX || !switch_fits(header.width(), need, shown);
+        if shown == narrow {
             switch.set_visible(!narrow);
             narrow_row.set_visible(narrow);
         }
         glib::ControlFlow::Continue
     });
     row
+}
+
+/// Spare width the header keeps while the switch is in it: the switch leaves before the header is full, so the window's
+/// minimum width stays below what the window is and the window can still be narrowed.
+const SWITCH_ROOM_PX: i32 = 48;
+/// The switch comes back only with this much more room again, so a width at the edge does not flip it every frame.
+const SWITCH_RETURN_PX: i32 = 24;
+
+/// Whether the switch stays in (or goes back to) a header `width` pixels wide that needs `need` with the switch in it.
+fn switch_fits(width: i32, need: i32, shown: bool) -> bool {
+    width >= need + SWITCH_ROOM_PX + if shown { 0 } else { SWITCH_RETURN_PX }
 }
 
 /// The Back button of a pushed page's header.
@@ -1307,6 +1324,16 @@ pub fn generic(s: &Screen) -> GBox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_switch_leaves_a_header_short_of_room_and_comes_back_with_room_to_spare() {
+        // in the header: it stays while the header has its spare room, and leaves just before, so the window can shrink
+        assert!(switch_fits(600 + SWITCH_ROOM_PX, 600, true));
+        assert!(!switch_fits(600 + SWITCH_ROOM_PX - 1, 600, true));
+        // under the header: back only with the extra room, so a width at the edge does not flip it every frame
+        assert!(!switch_fits(600 + SWITCH_ROOM_PX, 600, false));
+        assert!(switch_fits(600 + SWITCH_ROOM_PX + SWITCH_RETURN_PX, 600, false));
+    }
 
     /// A link a source hands over opens only when it is a web or mail link, never a file or folder of this computer.
     #[test]
