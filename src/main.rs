@@ -297,7 +297,7 @@ fn build_window(app: &gtk::Application) {
 
     // reader/player are immersive: no sidebar or tab bar while they're on screen
     let refresh = {
-        let (win, nav, tabs) = (win.clone(), nav.clone(), tabs.clone());
+        let (win, nav) = (win.clone(), nav.clone());
         move || {
             let immersive = nav.visible_child().is_some_and(|c| matches!(c.widget_name().as_str(), "screen:reader" | "screen:player"));
             let (width, _) = window_size::size_of(&win);
@@ -306,11 +306,6 @@ fn build_window(app: &gtk::Application) {
             sidebar.set_visible(shown.sidebar);
             // a narrow window packs its header buttons tighter (`style.css`, `.kb-narrow`)
             if shown.bottom_bar { win.add_css_class("kb-narrow") } else { win.remove_css_class("kb-narrow") }
-            // the top page's search and ⋮ menu sit in the sidebar's header while it shows: the open tab, or the page pushed
-            // over the tabs
-            let on_tabs = nav.visible_child().as_ref() == Some(tabs.upcast_ref());
-            let top = if on_tabs { tabs.visible_child() } else { nav.visible_child() };
-            shell::lead::place(top.as_ref(), shown.sidebar);
             sep.set_visible(shown.sidebar);
             bottom.set_visible(shown.bottom_bar);
         }

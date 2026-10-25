@@ -56,15 +56,16 @@ pub fn build(deps: HeaderDeps) -> SourceHeader {
 
     bar.pack_start(&back_button(Rc::clone(&deps.on_back)));
 
-    // the search and the ⋮ menu lead the row after Back, as on every page (`ui::pack_lead`)
+    // the ⋮ menu leads the row after Back, as on every pushed page (`ui::pack_lead`)
     let overflow = overflow_menu(&deps);
-    let search = deps.search.clone();
-    crate::ui::pack_lead(&bar, Some(search.upcast_ref()), overflow.as_ref().map(|menu| menu.upcast_ref()));
+    if let Some(menu) = &overflow {
+        crate::ui::pack_lead(&bar, menu.upcast_ref());
+    }
 
     let display = display_menu(&deps);
     bar.pack_end(&display.widget);
 
-    // the actions at the end: refresh, then the display options
+    // the actions at the end, left to right: search, refresh, then the view options
     let on_refresh = Rc::clone(&deps.on_refresh);
     let refresh = crate::ui::refresh_button(&tr(MsgKey::action_webview_refresh));
     refresh.connect_clicked(move |button| {
@@ -72,6 +73,8 @@ pub fn build(deps: HeaderDeps) -> SourceHeader {
         on_refresh();
     });
     bar.pack_end(&refresh);
+    let search = deps.search.clone();
+    bar.pack_end(&search);
     crate::ui::no_sticky_focus(&bar);
 
     SourceHeader { bar, search, display, overflow }
@@ -169,6 +172,8 @@ pub(crate) mod tests {
         let reopened = build(deps(Rc::clone(&prefs), &log, false, true));
         assert_eq!(reopened.display.radio("mode").as_deref(), Some("list"), "the stored look is shown again");
         assert!(header.search.is_ancestor(&header.bar), "the search toggle is in the header");
+        let next = header.search.next_sibling().and_downcast::<gtk::Button>().expect("a button after the search");
+        assert_eq!(next.tooltip_text().as_deref(), Some(tr(MsgKey::action_webview_refresh).as_str()), "the search is first of the actions, before Refresh");
     }
 
     pub(crate) fn smoke() {

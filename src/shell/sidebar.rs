@@ -277,8 +277,6 @@ pub fn build(tabs: &gtk::Stack) -> GBox {
     let header = ui::header_bar();
     header.set_decoration_layout(Some(&ui::decoration(true)));
     header.set_title_widget(Some(&title()));
-    // the open tab's search before the app name (`lead`)
-    header.pack_start(&super::lead::host());
     ui::no_sticky_focus(&header);
 
     let list = gtk::ListBox::new();

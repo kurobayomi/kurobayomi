@@ -280,8 +280,8 @@ pub fn search_row(entry: &gtk::SearchEntry, page: &impl IsA<gtk::Widget>) -> (gt
 
 /// A navigation page: one header row above `content` (docs/design/other-tabs.md). A pushed page (`back`) shows the
 /// back button and its title; a sidebar destination shows no title, because the sidebar already names it. When the
-/// first `end` widget is a search entry the page gets the shared search ([`search_row`]): the toggle leads the actions
-/// and the bar sits under the header; a pushed page opens with the bar showing. An Anime | Manga switch (a stack
+/// first `end` widget is a search entry the page gets the shared search ([`search_row`]): the toggle is the first of the
+/// actions at the end and the bar sits under the header; a pushed page opens with the bar showing. An Anime | Manga switch (a stack
 /// switcher) among `end` goes to the start of the row, after Back, where the Library has its switch.
 pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>, back: bool) -> GBox {
     let header = header_bar();
@@ -308,11 +308,9 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
     if back {
         header.pack_start(&back_button());
     }
-    // every page leads with its search toggle, and a pushed page with its ⋮ menu after Back (`pack_lead`)
-    let search = bar.as_ref().map(|_| end.remove(0));
-    let menu = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i));
-    if search.is_some() || menu.is_some() {
-        pack_lead(&header, search.as_ref(), menu.as_ref());
+    // a pushed page leads with its ⋮ menu after Back (`pack_lead`); the search toggle stays first of the actions
+    if let Some(menu) = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i)) {
+        pack_lead(&header, &menu);
     }
     let (switches, end): (Vec<gtk::Widget>, Vec<gtk::Widget>) = end.into_iter().partition(|w| w.is::<gtk::StackSwitcher>());
     let mut narrow_rows = Vec::new();
@@ -840,28 +838,16 @@ const SPIN_MS: u64 = 700;
 
 /// The css class of a page's ⋮ menu ([`menu_button`]), so a pushed page can lead its header with it.
 pub const MORE_MENU: &str = "kb-more";
-/// The box at the start of a page's header that holds its two lead slots: the search toggle, then the ⋮ menu.
+/// The box at the start of a pushed page's header that holds its ⋮ menu.
 pub const LEAD: &str = "kb-lead";
-/// The lead slot of the search toggle.
-pub const LEAD_SEARCH: &str = "kb-lead-search";
-/// The lead slot of the ⋮ menu.
-pub const LEAD_MENU: &str = "kb-lead-menu";
 
-/// Leads a page's header with its search toggle and its ⋮ menu (user, 2026-10-14), after Back on a pushed page. A tab
-/// page has no ⋮ menu (its actions are buttons at the end); with the sidebar showing, the shell moves a tab page's search
-/// into the sidebar's header before the app name (`shell::lead`). Call after Back and before anything else is packed at
-/// the start.
-pub fn pack_lead(header: &gtk::HeaderBar, search: Option<&gtk::Widget>, menu: Option<&gtk::Widget>) {
+/// Leads a pushed page's header with its ⋮ menu (user, 2026-10-14), after Back. A tab page has no ⋮ menu (its actions are
+/// buttons at the end), and every page's search toggle is the first of its actions at the end of the row (user,
+/// 2026-10-25). Call after Back and before anything else is packed at the start.
+pub fn pack_lead(header: &gtk::HeaderBar, menu: &gtk::Widget) {
     let lead = GBox::new(O::Horizontal, 4);
     lead.add_css_class(LEAD);
-    for (widget, class) in [(search, LEAD_SEARCH), (menu, LEAD_MENU)] {
-        if let Some(widget) = widget {
-            let slot = GBox::new(O::Horizontal, 0);
-            slot.add_css_class(class);
-            slot.append(widget);
-            lead.append(&slot);
-        }
-    }
+    lead.append(menu);
     header.pack_start(&lead);
 }
 

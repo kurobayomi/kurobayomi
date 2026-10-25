@@ -195,20 +195,18 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     kinds.set_transition_type(gtk::StackTransitionType::Crossfade);
     kinds.set_vexpand(true);
     let (bars, end) = (gtk::Stack::new(), gtk::Stack::new());
-    // a tab page leads its header with the visible kind's search toggle (`ui::pack_lead`); a pushed page keeps it at the
-    // end. A tab page has no ⋮ menu: its actions are buttons at the end (guard test `no_tab_page_has_a_more_menu`)
-    let lead_search = gtk::Stack::new();
+    // the visible kind's search toggle is the first of its actions at the end. A tab page has no ⋮ menu: its actions are
+    // buttons at the end (guard test `no_tab_page_has_a_more_menu`)
     for (b, anime) in views.into_iter().zip([true, false]) {
         let name = if anime { "anime" } else { "manga" };
         kinds.add_titled(&b.content, Some(name), if anime { "Anime" } else { "Manga" });
         let mut rest = b.end.into_iter().peekable();
         let actions = GBox::new(O::Horizontal, 4);
-        let search = GBox::new(O::Horizontal, 0);
         let bar: gtk::Widget = match rest.next_if(|w| w.is::<gtk::SearchEntry>()).and_downcast::<gtk::SearchEntry>() {
             // keys typed in this kind's content open its bar; the other kind's content is hidden and takes none
             Some(entry) => {
                 let (bar, toggle) = crate::ui::search_row(&entry, &b.content);
-                if back { actions.append(&toggle) } else { search.append(&toggle) }
+                actions.append(&toggle);
                 bar.upcast()
             }
             None => GBox::new(O::Horizontal, 0).upcast(),
@@ -218,9 +216,8 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
             actions.append(&w);
         }
         end.add_named(&actions, Some(name));
-        lead_search.add_named(&search, Some(name));
     }
-    for follower in [&bars, &end, &lead_search] {
+    for follower in [&bars, &end] {
         kinds.bind_property("visible-child-name", follower, "visible-child-name").sync_create().build();
     }
     crate::shell::kind_choice::follow(&kinds, ["anime", "manga"]);
@@ -228,8 +225,6 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     header.set_decoration_layout(Some(&decoration(false)));
     if back {
         header.pack_start(&crate::ui::back_button());
-    } else {
-        crate::ui::pack_lead(&header, Some(lead_search.upcast_ref()), None);
     }
     let switch = gtk::StackSwitcher::builder().stack(&kinds).build();
     header.pack_start(&switch);

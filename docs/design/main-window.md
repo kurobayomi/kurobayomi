@@ -27,11 +27,10 @@ the user's GTK theme (named colours `@theme_*` only, in `src/theme/style.css`), 
 
 ### Library header (one row)
 
-`[search] [Anime | Manga]   [categories] [refresh] [link folder] [open Local folder] [view options]`
+`[Anime | Manga]   [search] [categories] [refresh] [link folder] [open Local folder] [view options]`
 
-- Start: the search toggle (in the sidebar's header beside the app name while the sidebar shows), then the Anime /
-  Manga switch (a `GtkStackSwitcher` over the two library views).
-- End: icon buttons, each with a tooltip: Categories, Refresh (updates the whole library; insensitive while a pass
+- Start: the Anime / Manga switch (a `GtkStackSwitcher` over the two library views).
+- End: icon buttons, each with a tooltip: the search toggle first, as on every page (user, 2026-10-25), then Categories, Refresh (updates the whole library; insensitive while a pass
   runs), Link a folder…, Open the Local folder, and View options (filter, sort, display; it carries `kb-filter-on`
   while a filter is on).
 - No ⋮ menu on any tab page (user, 2026-10-25): every action is a header button. Updating one category is F5 (the
