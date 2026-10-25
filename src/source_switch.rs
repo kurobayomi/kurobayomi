@@ -396,16 +396,26 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
     }
     let switch = gtk::Switch::builder().active(is_on(prefs, &entry.id)).valign(gtk::Align::Center).build();
     switch.update_property(&[gtk::accessible::Property::Label(&entry.name)]);
+    let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+    spinner.set_visible(false);
     let (key, name) = (entry.id.clone(), entry.name.clone());
+    let spinner_weak = spinner.downgrade();
     switch.connect_state_set(move |switch, on| {
         // a state that matches the stored switch is a change this handler made: let it through
         if live().is_some_and(|prefs| is_on(&prefs, &key) == on) {
             return gtk::glib::Propagation::Proceed;
         }
         let weak = switch.downgrade();
+        let spinner = spinner_weak.clone();
         if on {
             switch.set_sensitive(false);
+            if let Some(spinner) = spinner.upgrade() {
+                spinner.set_visible(true);
+            }
             turn_on_then(key.clone(), move |worked| {
+                if let Some(spinner) = spinner.upgrade() {
+                    spinner.set_visible(false);
+                }
                 if let Some(switch) = weak.upgrade() {
                     switch.set_sensitive(true);
                     switch.set_active(worked);
@@ -413,8 +423,10 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
                 }
             });
         } else {
+            switch.set_sensitive(false);
             confirm_off(key.clone(), &name, move |off| {
                 if let Some(switch) = weak.upgrade() {
+                    switch.set_sensitive(true);
                     switch.set_active(!off);
                     switch.set_state(!off);
                 }
@@ -422,7 +434,10 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
         }
         gtk::glib::Propagation::Stop
     });
-    let row = crate::ui::row(&entry.name, Some(&subtitle), Some(switch.upcast()));
+    let suffix = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    suffix.append(&spinner);
+    suffix.append(&switch);
+    let row = crate::ui::row(&entry.name, Some(&subtitle), Some(suffix.upcast()));
     if let Some(icon) = crate::recipe_sources::saved_icon(link, entry) {
         if let Some(line) = row.child().and_downcast::<gtk::Box>() {
             let picture = gtk::Image::from_file(icon);
@@ -608,12 +623,33 @@ mod tests {
                 .iter()
                 .map(|entry| {
                     let row = picker_row(&prefs, "https://repo.test/index.min.json", entry);
-                    let line = row.child().and_downcast::<gtk::Box>().expect("the row's line");
-                    let switch = line.last_child().and_downcast::<gtk::Switch>().expect("the switch ends the row");
-                    switch.is_active()
+                    picker_switch(&row).is_active()
                 })
                 .collect();
             assert_eq!(states, [false, true]);
+        });
+    }
+
+    /// The suffix of a picker row: its spinner and its switch.
+    fn picker_switch(row: &gtk::ListBoxRow) -> gtk::Switch {
+        let line = row.child().and_downcast::<gtk::Box>().expect("the row's line");
+        let suffix = line.last_child().and_downcast::<gtk::Box>().expect("the spinner and switch end the row");
+        suffix.last_child().and_downcast::<gtk::Switch>().expect("the switch ends the suffix")
+    }
+
+    /// A turn-on shows the row's spinner and locks the switch until it ends; the row starts with the spinner hidden.
+    #[test]
+    fn a_picker_row_shows_a_spinner_while_a_turn_on_is_pending() {
+        crate::testing::with_display(|| {
+            let prefs = SourcePrefs::new(PrefStore::in_memory());
+            let repo = index(&["a"]);
+            let row = picker_row(&prefs, "https://repo.test/index.min.json", &repo.sources[0]);
+            let switch = picker_switch(&row);
+            let spinner = switch.prev_sibling().and_downcast::<gtk::Spinner>().expect("the spinner is beside the switch");
+            assert!(!spinner.is_visible(), "no spinner at rest");
+            switch.set_active(true);
+            assert!(spinner.is_visible(), "the spinner shows while the file is fetched");
+            assert!(!switch.is_sensitive(), "the switch is locked meanwhile");
         });
     }
 
