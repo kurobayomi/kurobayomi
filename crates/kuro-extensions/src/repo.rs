@@ -5,6 +5,7 @@
 //! A source's file is a recipe (`.toml`, `docs/source-recipes.md`) or a plug-in component (`.wasm`, `wit/kuro-source.wit`).
 //! The index is read here; the GTK side stores the links and the index text, and decides where a fetched file goes.
 
+use chrono::NaiveDate;
 use kuro_platform::kind::Kind;
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -48,6 +49,17 @@ pub struct Entry {
     /// Optional: an older index has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// When the repository first listed the source, and when it last changed it (`YYYY-MM-DD`), shown under the
+    /// description. Optional: an older index has none, and a malformed date reads as none.
+    #[serde(default, deserialize_with = "lenient_date", skip_serializing_if = "Option::is_none")]
+    pub added: Option<NaiveDate>,
+    #[serde(default, deserialize_with = "lenient_date", skip_serializing_if = "Option::is_none")]
+    pub updated: Option<NaiveDate>,
+}
+
+/// A `YYYY-MM-DD` date, or none for anything else, so one bad date never fails the whole index.
+fn lenient_date<'de, D: serde::Deserializer<'de>>(value: D) -> Result<Option<NaiveDate>, D::Error> {
+    Ok(serde_json::Value::deserialize(value)?.as_str().and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()))
 }
 
 /// A source's state as its repository reports it: the Browse row shows it as a coloured dot.
@@ -418,6 +430,20 @@ mod tests {
         assert_eq!(index.sources[0].description.as_deref(), Some("Webtoons with dates"));
         assert_eq!(index.sources[1].description, None, "an older index has none");
         assert!(!serde_json::to_string(&index.sources[1]).unwrap().contains("description"), "none is not written out");
+    }
+
+    #[test]
+    fn added_and_updated_dates_are_read_when_given_and_a_bad_one_is_ignored() {
+        let dated = entry("a", "manga", "en").replace(r#""version":1"#, r#""version":1,"added":"2026-10-25","updated":"2026-11-02""#);
+        let bad = entry("c", "manga", "en").replace(r#""version":1"#, r#""version":1,"added":"25/10/2026","updated":7"#);
+        let index = parse_index(&index_of(&[dated, entry("b", "manga", "en"), bad])).expect("a bad date does not break the index");
+        assert_eq!(index.sources[0].added, NaiveDate::from_ymd_opt(2026, 10, 25));
+        assert_eq!(index.sources[0].updated, NaiveDate::from_ymd_opt(2026, 11, 2));
+        assert!(serde_json::to_string(&index.sources[0]).unwrap().contains(r#""added":"2026-10-25""#));
+        for missing in &index.sources[1..] {
+            assert_eq!((missing.added, missing.updated), (None, None));
+            assert!(!serde_json::to_string(missing).unwrap().contains("added"), "none is not written out");
+        }
     }
 
     #[test]

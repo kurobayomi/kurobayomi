@@ -5093,6 +5093,12 @@ source_switch_off_body =
 source_switch_picker_title = Sources in { $repo }
 
 # source: kurobayomi
+source_switch_added = Added { $date }
+
+# source: kurobayomi
+source_switch_updated = Updated { $date }
+
+# source: kurobayomi
 source_switch_picker_intro = Turn on the sources you want. A source that is off is not downloaded or updated, and does not show in Browse or search.
 
 # source: kurobayomi

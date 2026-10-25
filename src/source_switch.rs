@@ -394,6 +394,9 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
     if let Some(about) = crate::recipe_sources::described(entry) {
         subtitle = format!("{subtitle}\n{about}");
     }
+    if let Some(dates) = crate::recipe_sources::dated(entry) {
+        subtitle = format!("{subtitle}\n{dates}");
+    }
     let switch = gtk::Switch::builder().active(is_on(prefs, &entry.id)).valign(gtk::Align::Center).build();
     switch.update_property(&[gtk::accessible::Property::Label(&entry.name)]);
     let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);

@@ -465,7 +465,7 @@ fn load_sources() -> Vec<String> {
                     icons.insert(format!("repo.{}", entry.id), path);
                 }
                 statuses.insert(format!("repo.{}", entry.id), entry.status);
-                if let Some(text) = described(entry) {
+                if let Some(text) = about(entry) {
                     descriptions.insert(format!("repo.{}", entry.id), text);
                 }
                 plugins.push((entry.id.clone(), entry.kind, entry.hosts.clone(), bytes));
@@ -480,7 +480,7 @@ fn load_sources() -> Vec<String> {
                         icons.insert(package_of(&recipe), path);
                     }
                     statuses.insert(package_of(&recipe), entry.status);
-                    if let Some(text) = described(entry) {
+                    if let Some(text) = about(entry) {
                         descriptions.insert(package_of(&recipe), text);
                     }
                     recipe_keys.insert(recipe.id.clone(), entry.id.clone());
@@ -627,6 +627,24 @@ pub fn description(source_id: i64) -> Option<String> {
 pub fn described(entry: &repo::Entry) -> Option<String> {
     let line = entry.description.as_deref()?.split_whitespace().collect::<Vec<_>>().join(" ");
     (!line.is_empty()).then(|| line.chars().take(120).collect())
+}
+
+/// When the repository added and last changed a source, as one line ("Added 10/25/26 · Updated 11/2/26") in the app's
+/// date format; only the dates the index gives, none without any.
+pub fn dated(entry: &repo::Entry) -> Option<String> {
+    let locale = kuro_i18n::current_locale().tag;
+    let format = kuro_i18n::date::DateFormat::from_pref(crate::misc::diet_defaults::LIBRARY_DATE_FORMAT);
+    let parts: Vec<String> = [(entry.added, kuro_i18n::MsgKey::source_switch_added), (entry.updated, kuro_i18n::MsgKey::source_switch_updated)]
+        .into_iter()
+        .filter_map(|(date, key)| Some(kuro_i18n::trf(key, &[("date", kuro_i18n::Arg::Str(&format.format(date?, locale)))])))
+        .collect();
+    (!parts.is_empty()).then(|| parts.join(" · "))
+}
+
+/// What a source row shows under its name from the index: the description, then the dates on their own line.
+fn about(entry: &repo::Entry) -> Option<String> {
+    let lines: Vec<String> = [described(entry), dated(entry)].into_iter().flatten().collect();
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 /// The status a Check now found for a source from the user's own connection, by source id. It wins over the index's
@@ -779,11 +797,22 @@ mod tests {
             icon_sha256: None,
             status: repo::Status::Active,
             description: text.map(str::to_owned),
+            added: None,
+            updated: None,
         };
         assert_eq!(described(&entry(Some("  Manga and\n webtoons  "))).as_deref(), Some("Manga and webtoons"));
         assert_eq!(described(&entry(Some("   "))), None);
         assert_eq!(described(&entry(None)), None);
         assert_eq!(described(&entry(Some(&"x".repeat(300)))).map(|d| d.chars().count()), Some(120));
+
+        // the dates: only those given, on a line of their own under the description
+        let day = chrono::NaiveDate::from_ymd_opt(2026, 10, 25);
+        assert_eq!(dated(&entry(None)), None);
+        assert!(!dated(&repo::Entry { added: day, ..entry(None) }).unwrap().contains(" · "));
+        let both = repo::Entry { added: day, updated: day, ..entry(Some("Manga")) };
+        assert!(dated(&both).unwrap().contains(" · "));
+        assert_eq!(about(&both).unwrap().lines().count(), 2);
+        assert_eq!(about(&entry(None)), None);
     }
     const ANIME: &str = include_str!("../crates/kuro-source-scrape/tests/fixtures/anime/recipe.toml");
 

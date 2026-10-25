@@ -718,6 +718,7 @@ checksum = "1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327"
 dependencies = [
  "iana-time-zone",
  "num-traits",
+ "serde",
  "windows-link",
 ]
 
@@ -3504,6 +3505,7 @@ version = "0.2.4"
 dependencies = [
  "async-channel",
  "base64 0.23.1",
+ "chrono",
  "ed25519-dalek",
  "flate2",
  "futures",
