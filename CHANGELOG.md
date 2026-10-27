@@ -6,6 +6,13 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Fixed
+
+- Selecting several episodes or chapters scrolled the list back to the top at every click; it stays where it was now.
+- Emptying the cache folder (by hand or with a cleaner) could leave the app with no sources at all when the repository
+  could not be reached at the next start. The saved repositories (each index and the sources' files) now live in the
+  data folder instead of the cache, and an existing copy moves there on its own at the first start.
+
 ## [0.2.5] - 2026-10-26
 
 ### Added

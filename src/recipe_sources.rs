@@ -725,6 +725,23 @@ fn remember_poster(db: &Arc<kuro_db::handle::Db>, source_id: i64, anime_url: &st
     }
 }
 
+/// Moves the saved repositories (indexes and source files) out of the cache folder of versions up to 0.2.5 into the data
+/// folder, once, so nothing is fetched again. A move that fails (the two folders on different drives) leaves the old
+/// copies, and the sources are fetched again into the new folder.
+fn move_saved_repos(paths: &dyn Paths) {
+    let (old, new) = (paths.old_repo_sources_dir(), paths.repo_sources_dir());
+    if !old.is_dir() || new.exists() {
+        return;
+    }
+    if let Some(parent) = new.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::rename(&old, &new) {
+        Ok(()) => tracing::info!("the saved repositories moved from the cache to the data folder"),
+        Err(error) => tracing::warn!(%error, "the saved repositories could not move to the data folder; they are fetched again"),
+    }
+}
+
 /// Builds the shared client, installs the image service the covers draw through, and loads the sources: the recipes of
 /// the scrapers folder and the repo links. Call once at start, inside the app's runtime.
 pub fn start(store: &PrefStore, paths: &Arc<dyn Paths + Send + Sync>) {
@@ -736,6 +753,7 @@ pub fn start(store: &PrefStore, paths: &Arc<dyn Paths + Send + Sync>) {
         }
     };
     *CLIENT.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(client.clone());
+    move_saved_repos(paths.as_ref());
     let _ = PATHS.set(Arc::clone(paths));
     let _ = PREFS.set(store.clone());
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -781,6 +799,25 @@ mod tests {
     use super::*;
 
     const MANGA: &str = include_str!("../crates/kuro-source-scrape/tests/fixtures/manga/recipe.toml");
+
+    #[test]
+    fn the_saved_repositories_move_from_the_cache_to_the_data_folder_once() {
+        let paths = TempPaths::new().unwrap();
+        let link = "https://example.test/index.min.json";
+        let (old, new) = (repo::link_dir(&paths.old_repo_sources_dir(), link), repo::link_dir(&paths.repo_sources_dir(), link));
+        std::fs::create_dir_all(&old).unwrap();
+        let saved = |dir: &std::path::Path| dir.join("index.min.json");
+        std::fs::write(saved(&old), "{}").unwrap();
+        move_saved_repos(&paths);
+        assert_eq!(std::fs::read_to_string(saved(&new)).unwrap(), "{}", "moved");
+        assert!(!paths.old_repo_sources_dir().exists(), "nothing left in the cache");
+        // a later start with a new copy in place moves nothing over it
+        std::fs::create_dir_all(paths.old_repo_sources_dir()).unwrap();
+        move_saved_repos(&paths);
+        assert!(saved(&new).exists());
+        // nothing saved yet: nothing to move, no error
+        move_saved_repos(&TempPaths::new().unwrap());
+    }
 
     #[test]
     fn a_description_is_one_trimmed_line_and_an_empty_one_is_none() {

@@ -75,9 +75,14 @@ pub trait Paths {
     fn scrapers_dir(&self) -> PathBuf {
         self.data_dir().join("scrapers")
     }
-    /// Source files fetched from repository links (recipes and plug-ins), one checked copy per source. They are fetched
-    /// again when missing or changed, so the folder is a cache.
+    /// Source files fetched from repository links (recipes and plug-ins), one checked copy per source, and each
+    /// repository's saved index. They live with the app's data, not in its cache: a cleaner that empties the cache must not
+    /// leave the app without sources while the repository cannot be reached (user, 2026-10-27).
     fn repo_sources_dir(&self) -> PathBuf {
+        self.data_dir().join("repo-sources")
+    }
+    /// Where versions up to 0.2.5 kept [`Paths::repo_sources_dir`], in the cache; the app moves it once at start.
+    fn old_repo_sources_dir(&self) -> PathBuf {
         self.cache_dir().join("repo-sources")
     }
     /// The cookies and storage of the hidden web pages that pass a site's browser check (`hidden_pages`), kept so a
@@ -245,7 +250,8 @@ mod role_tests {
         assert_eq!(p.extensions_dir(), PathBuf::from("/d/extensions"));
         assert_eq!(p.anime_extensions_dir(), PathBuf::from("/d/extensions/anime"));
         assert_eq!(p.scrapers_dir(), PathBuf::from("/d/scrapers"));
-        assert_eq!(p.repo_sources_dir(), PathBuf::from("/k/repo-sources"));
+        assert_eq!(p.repo_sources_dir(), PathBuf::from("/d/repo-sources"));
+        assert_eq!(p.old_repo_sources_dir(), PathBuf::from("/k/repo-sources"));
         assert_eq!(p.wasm_cache_dir(), PathBuf::from("/k/wasm-components"));
         assert_eq!(p.web_pages_data_dir(), PathBuf::from("/d/webkit"));
         assert_eq!(p.web_pages_cache_dir(), PathBuf::from("/k/webkit"));
