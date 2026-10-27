@@ -356,11 +356,59 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
 
     root.append(&header.bar);
     root.append(&search_bar);
+    // Escape clears a selection first (issue #7), as in the Library; Ctrl+A selects every loaded cover, Ctrl+I flips them
+    {
+        let view = listing_view.downgrade();
+        let esc = gtk::EventControllerKey::new();
+        esc.set_propagation_phase(gtk::PropagationPhase::Capture);
+        esc.connect_key_pressed(move |_, key, _, _| match view.upgrade().filter(|view| key == gtk::gdk::Key::Escape && view.has_selection()) {
+            Some(view) => {
+                view.clear_selection();
+                gtk::glib::Propagation::Stop
+            }
+            None => gtk::glib::Propagation::Proceed,
+        });
+        root.add_controller(esc);
+        let (view, entry) = (listing_view.downgrade(), search.clone());
+        let keys = gtk::EventControllerKey::new();
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            let Some(view) = view.upgrade() else { return gtk::glib::Propagation::Proceed };
+            let ctrl = modifiers.contains(gtk::gdk::ModifierType::CONTROL_MASK);
+            let typing = entry.has_focus() || entry.focus_child().is_some();
+            match crate::library::keys::shortcut(key, ctrl, view.has_selection(), typing) {
+                Some(crate::library::keys::Shortcut::SelectAll) if !typing => view.select_all(),
+                Some(crate::library::keys::Shortcut::Invert) if !typing => view.invert_selection(),
+                _ => return gtk::glib::Propagation::Proceed,
+            }
+            gtk::glib::Propagation::Stop
+        });
+        root.add_controller(keys);
+    }
     // Escape closes the open search first and then the window's handler leaves; Back clears its text first (B-EC-10)
     {
         let (bar, close) = (search_bar.clone(), search_bar.clone());
         super::keys::attach_escape_step(&root, move || bar.is_search_mode(), move || close.set_search_mode(false));
     }
+    // the shared selection header takes the place of the chips while covers are selected (`selection_bar`)
+    let count = gtk::Label::new(None);
+    let sel_header = {
+        let (cancel, all) = (listing_view.downgrade(), listing_view.downgrade());
+        crate::ui::selection_header(
+            &count,
+            move || {
+                if let Some(view) = cancel.upgrade() {
+                    view.clear_selection();
+                }
+            },
+            move || {
+                if let Some(view) = all.upgrade() {
+                    view.select_all();
+                }
+            },
+        )
+    };
+    sel_header.set_visible(false);
+    root.append(&sel_header);
     root.append(&chips);
     root.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     listing_view.widget().set_vexpand(true);
@@ -388,6 +436,7 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
         FavoriteFlow::new_for(store, &root, hooks, kind)
     });
     *flow_slot.borrow_mut() = flow.clone();
+    root.append(&selection_bar(&listing_view, flow.clone(), SelectionRow { count, header: sel_header, chips: chips.clone() }));
 
     // list mode fills the window below the top bar (B§2.8)
     let (view, bar, last) = (listing_view.downgrade(), header.bar.clone(), Cell::new(-1));
@@ -403,6 +452,53 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
     });
 
     SourcePage::Browse(BrowseSourcePage { root, header, listing: listing_view, search, popular, latest: latest_chip, filter: filter_chip, flow })
+}
+
+/// The widgets the selection swaps: the count label of the shared selection header, the header, and the chip row it
+/// replaces.
+struct SelectionRow {
+    count: gtk::Label,
+    header: gtk::Box,
+    chips: gtk::Box,
+}
+
+/// The bulk actions of a browse page's selection (issue #7): Add to library for the selected covers that are not in the
+/// library (the favourite flow's bulk add: the default category, or the chooser once, then a duplicate check per title),
+/// and Set categories for those that are. Each clears the selection. The bar shows while something is selected.
+fn selection_bar(listing: &ListingView, flow: Option<Rc<FavoriteFlow>>, row: SelectionRow) -> gtk::Revealer {
+    let add = gtk::Button::with_label(&tr(MsgKey::add_to_library));
+    let categories = gtk::Button::with_label(&tr(MsgKey::action_move_category));
+    let bar = crate::ui::action_bar(&[add.clone(), categories.clone()]);
+    if let Some(flow) = &flow {
+        let (view, flow_add) = (listing.downgrade(), Rc::clone(flow));
+        add.connect_clicked(move |_| {
+            let Some(view) = view.upgrade() else { return };
+            let picked = view.selected();
+            view.clear_selection();
+            flow_add.add_many(picked);
+        });
+        let (view, flow_set) = (listing.downgrade(), Rc::clone(flow));
+        categories.connect_clicked(move |_| {
+            let Some(view) = view.upgrade() else { return };
+            let picked = view.selected();
+            view.clear_selection();
+            flow_set.set_categories_many(picked);
+        });
+    }
+    let (view, shown) = (listing.downgrade(), bar.clone());
+    let can_act = flow.is_some();
+    listing.connect_selection(move || {
+        let Some(view) = view.upgrade() else { return };
+        let picked = view.selected();
+        let open = !picked.is_empty();
+        row.count.set_label(&trf(MsgKey::library_selected_count, &[("count", Arg::Str(&picked.len().to_string()))]));
+        row.header.set_visible(open);
+        row.chips.set_visible(!open);
+        add.set_visible(can_act && picked.iter().any(|item| !item.favorite));
+        categories.set_visible(can_act && picked.iter().any(|item| item.favorite));
+        shown.set_reveal_child(open);
+    });
+    bar
 }
 
 // ---------- global_search ----------
@@ -1208,6 +1304,32 @@ pub(crate) mod tests {
         assert!(rig.log.borrow().is_empty(), "retry is handled inside the listing");
     }
 
+    /// Issue #7: selected covers swap the chips for the selection header and show the action bar; Escape clears them.
+    fn selecting_covers_swaps_the_chips_for_the_selection_header_and_escape_clears_it() {
+        let found = ListedPage {
+            items: (1..=3).map(|id| ListItem { id, title: format!("t{id}"), url: format!("/{id}"), ..ListItem::default() }).collect(),
+            has_next: false,
+        };
+        let rig = source_rig(false, FilterList::default(), vec![Ok(found)]);
+        let SourcePage::Browse(page) = &rig.page else { panic!("browse page") };
+        let chips = page.popular.parent().expect("the chip row");
+        assert!(pump_until(|| {
+            page.listing.select_all();
+            page.listing.has_selection()
+        }));
+        let count = trf(MsgKey::library_selected_count, &[("count", Arg::Str("3"))]);
+        assert!(all_labels(&page.root).contains(&count), "the header counts the selection");
+        assert!(!chips.is_visible(), "the selection header takes the chips' place");
+        let bar = descendants::<gtk::Revealer>(&page.root).into_iter().find(|r| r.reveals_child()).expect("the action bar shows");
+        assert!(all_buttons(&bar).iter().all(|b| !b.is_visible()), "a page without the library store offers no bulk action");
+        let none = gtk::gdk::ModifierType::empty();
+        let all = page.root.observe_controllers();
+        let keys: Vec<gtk::EventControllerKey> = (0..all.n_items()).filter_map(|i| all.item(i)).filter_map(|c| c.downcast::<gtk::EventControllerKey>().ok()).collect();
+        assert!(keys.iter().any(|k| k.emit_by_name::<bool>("key-pressed", &[&gtk::gdk::Key::Escape, &0_u32, &none])), "Escape is taken");
+        assert!(!page.listing.has_selection(), "Escape clears the selection");
+        assert!(chips.is_visible() && !bar.reveals_child());
+    }
+
     fn escape_closes_an_open_search_first_and_otherwise_goes_on() {
         let (_tx, ready) = watch::channel(true);
         let page = global_search(search_nav(SearchChips::default()).0, ready);
@@ -1231,6 +1353,7 @@ pub(crate) mod tests {
 
     pub(crate) fn smoke() {
         escape_closes_an_open_search_first_and_otherwise_goes_on();
+        selecting_covers_swaps_the_chips_for_the_selection_header_and_escape_clears_it();
         a_stub_source_shows_only_its_title_back_and_the_missing_message();
         back_clears_the_search_text_first_and_then_leaves();
         popular_latest_and_a_search_from_them_start_from_fresh_defaults();

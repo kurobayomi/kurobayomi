@@ -6,6 +6,15 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Added
+
+- Browse can select several titles at once, as the Library does: Ctrl+click, Shift+click for a range, press and hold,
+  Ctrl+A, Ctrl+I, and Esc to clear. The bar at the bottom adds the selected titles to the library in one go (one
+  category question for all of them) or sets the categories of those already in it.
+- Drag to select: in the Library, in Browse and in a title's episode or chapter list, drag from an empty spot to draw a
+  box; every title or row it touches is selected. Hold Ctrl to add to the selection instead of replacing it. Only what
+  is on screen is selected; the list does not scroll while you drag.
+
 ## [0.2.6] - 2026-10-27
 
 ### Fixed

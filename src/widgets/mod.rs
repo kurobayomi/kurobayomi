@@ -4,6 +4,7 @@
 pub mod download_button;
 pub mod page_header;
 pub mod context_menu;
+pub mod drag_select;
 pub mod cover_grid;
 pub mod int_slider;
 pub mod rail;

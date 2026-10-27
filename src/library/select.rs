@@ -1,19 +1,60 @@
 //! Selection of library entries (behaviour 10, T-37a-025). Pure: the view feeds it the displayed page and the
 //! rows it clicks. The selection keeps a copy of each selected row, so bulk actions still have the entry after the
-//! page or the search changed.
+//! page or the search changed. The rules are generic over what is selected, so Browse covers (issue #7) follow the
+//! same toggle, range, select all and invert as the Library; `Selection` is the Library's.
 
 use std::collections::HashMap;
 
 use kuro_domain::library::model::LibraryRow;
 use kuro_domain::library::page::LibraryItem;
 
-#[derive(Clone, Debug, Default)]
-pub struct Selection {
-    order: Vec<i64>,
-    rows: HashMap<i64, LibraryRow>,
+/// Something a selection holds: its id, and the group a range stays inside (the Library's categories).
+pub trait Selectable: Clone {
+    fn key(&self) -> i64;
+    /// A range never crosses groups. One group by default.
+    fn group(&self) -> i64 {
+        0
+    }
 }
 
-impl Selection {
+/// One cell of a displayed page and the entry it shows.
+pub trait Shown {
+    type Entry: Selectable;
+    fn entry(&self) -> &Self::Entry;
+}
+
+impl Selectable for LibraryRow {
+    fn key(&self) -> i64 {
+        self.id
+    }
+    fn group(&self) -> i64 {
+        self.category
+    }
+}
+
+impl Shown for LibraryItem {
+    type Entry = LibraryRow;
+    fn entry(&self) -> &LibraryRow {
+        &self.row
+    }
+}
+
+/// The Library's selection.
+pub type Selection = SelectionOf<LibraryRow>;
+
+#[derive(Clone, Debug)]
+pub struct SelectionOf<T> {
+    order: Vec<i64>,
+    rows: HashMap<i64, T>,
+}
+
+impl<T> Default for SelectionOf<T> {
+    fn default() -> Self {
+        Self { order: Vec::new(), rows: HashMap::new() }
+    }
+}
+
+impl<T: Selectable> SelectionOf<T> {
     pub fn contains(&self, id: i64) -> bool {
         self.rows.contains_key(&id)
     }
@@ -32,7 +73,7 @@ impl Selection {
     }
 
     /// The selected rows, in the order they were selected.
-    pub fn rows(&self) -> impl Iterator<Item = &LibraryRow> {
+    pub fn rows(&self) -> impl Iterator<Item = &T> {
         self.order.iter().filter_map(|id| self.rows.get(id))
     }
 
@@ -42,14 +83,14 @@ impl Selection {
     }
 
     /// Selected entries that are not on the displayed page (E-10: the header reports them).
-    pub fn hidden_count(&self, visible: &[LibraryItem]) -> usize {
-        self.order.iter().filter(|id| !visible.iter().any(|item| item.row.id == **id)).count()
+    pub fn hidden_count<P: Shown<Entry = T>>(&self, visible: &[P]) -> usize {
+        self.order.iter().filter(|id| !visible.iter().any(|item| item.entry().key() == **id)).count()
     }
 
     /// Plain click in selection mode: flips the entry.
-    pub fn toggle(&mut self, row: &LibraryRow) {
-        if self.contains(row.id) {
-            self.remove(row.id);
+    pub fn toggle(&mut self, row: &T) {
+        if self.contains(row.key()) {
+            self.remove(row.key());
         } else {
             self.add(row);
         }
@@ -58,44 +99,45 @@ impl Selection {
     /// Long press or right click: selects the inclusive range from the last selected entry to `row` on the
     /// displayed page. It never deselects. When the anchor and `row` are not both on the page, or they belong to
     /// different categories, only `row` is added.
-    pub fn toggle_range(&mut self, row: &LibraryRow, page: &[LibraryItem]) {
+    pub fn toggle_range<P: Shown<Entry = T>>(&mut self, row: &T, page: &[P]) {
         let anchor = self.order.last().and_then(|id| self.rows.get(id)).cloned();
-        let Some(anchor) = anchor.filter(|a| a.category == row.category) else {
+        let Some(anchor) = anchor.filter(|a| a.group() == row.group()) else {
             self.add(row);
             return;
         };
-        let from = page.iter().position(|item| item.row.id == anchor.id);
-        let to = page.iter().position(|item| item.row.id == row.id);
+        let from = page.iter().position(|item| item.entry().key() == anchor.key());
+        let to = page.iter().position(|item| item.entry().key() == row.key());
         let (Some(from), Some(to)) = (from, to) else {
             self.add(row);
             return;
         };
         let (lo, hi) = if from <= to { (from, to) } else { (to, from) };
         for item in &page[lo..=hi] {
-            self.add(&item.row);
+            self.add(item.entry());
         }
     }
 
-    pub fn select_all(&mut self, page: &[LibraryItem]) {
+    pub fn select_all<P: Shown<Entry = T>>(&mut self, page: &[P]) {
         for item in page {
-            self.add(&item.row);
+            self.add(item.entry());
         }
     }
 
     /// Flips every entry of the page: selected ones are removed, the others are added.
-    pub fn invert(&mut self, page: &[LibraryItem]) {
+    pub fn invert<P: Shown<Entry = T>>(&mut self, page: &[P]) {
         for item in page {
-            if self.contains(item.row.id) {
-                self.remove(item.row.id);
+            let row = item.entry();
+            if self.contains(row.key()) {
+                self.remove(row.key());
             } else {
-                self.add(&item.row);
+                self.add(row);
             }
         }
     }
 
     /// Replaces each snapshot with the current row and drops entries that left the library.
-    pub fn refresh(&mut self, library: &[LibraryRow]) {
-        let fresh: HashMap<i64, &LibraryRow> = library.iter().map(|r| (r.id, r)).collect();
+    pub fn refresh(&mut self, library: &[T]) {
+        let fresh: HashMap<i64, &T> = library.iter().map(|r| (r.key(), r)).collect();
         self.order.retain(|id| fresh.contains_key(id));
         self.rows.retain(|id, row| match fresh.get(id) {
             Some(current) => {
@@ -106,10 +148,10 @@ impl Selection {
         });
     }
 
-    fn add(&mut self, row: &LibraryRow) {
-        if !self.rows.contains_key(&row.id) {
-            self.order.push(row.id);
-            self.rows.insert(row.id, row.clone());
+    fn add(&mut self, row: &T) {
+        if !self.rows.contains_key(&row.key()) {
+            self.order.push(row.key());
+            self.rows.insert(row.key(), row.clone());
         }
     }
 

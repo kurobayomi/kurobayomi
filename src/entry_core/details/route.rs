@@ -398,7 +398,10 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
         .hexpand(true)
         .vexpand(true)
         .build();
-    let panes = TwoPane::new(scroller.upcast_ref());
+    // a drag beside the rows selects every row it touches (issue #7)
+    let drag = crate::widgets::drag_select::DragSelect::new(&scroller);
+    drag.attach(&list.widget, list.drag_hooks());
+    let panes = TwoPane::new(drag.widget().upcast_ref());
     let info = InfoBlock::new(action_row);
     // the related rows come with the description (`ExpandableAnimeDescription`); there are none until the runner has some
     let related_host = GBox::new(O::Vertical, 0);

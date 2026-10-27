@@ -178,6 +178,12 @@ gridview > child:hover .kb-card-cover {
 gridview > child:hover .kb-card-selected .kb-card-cover {
   box-shadow: 0 0 0 3px @theme_selected_bg_color;
 }
+/* The box a drag on a grid's or a list's empty space draws (widgets/drag_select.rs): every item it touches is selected. */
+.kb-drag-band {
+  background-color: alpha(@theme_selected_bg_color, 0.18);
+  border: 1px solid alpha(@theme_selected_bg_color, 0.7);
+  border-radius: 4px;
+}
 .kb-cover-initials {
   background-color: alpha(@theme_selected_bg_color, 0.22);
 }

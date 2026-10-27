@@ -136,6 +136,8 @@ fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
         card.append(w);
     }
     let slot = GBox::new(O::Vertical, 0);
+    // a leading slot (the info block) is never the start of a drag
+    crate::widgets::drag_select::mark(&slot, None);
     // a row is as tall as what it shows: a stack is as tall as its tallest child by default, which padded a leading
     // slot (the "11 episodes" line) to the height of an episode card
     let stack = gtk::Stack::builder().vhomogeneous(false).hhomogeneous(false).build();
@@ -153,6 +155,8 @@ impl RowWidgets {
         set_class(&self.card, "kb-item-selected", row.selected);
         let item = row.missing.is_none();
         self.stack.set_widget_name(&if item { format!("row:{}", row.id) } else { String::new() });
+        // the card is the row's own press area; a drag that starts beside it selects (`widgets::drag_select`)
+        crate::widgets::drag_select::mark(&self.card, item.then_some(row.id));
         for w in [self.lead.upcast_ref::<gtk::Widget>(), self.text.upcast_ref()] {
             w.set_visible(item);
         }
@@ -255,6 +259,8 @@ pub struct ItemList {
     store: gio::ListStore,
     leading: RefCell<Vec<gtk::Widget>>,
     shown: RefCell<Vec<RowItem>>,
+    /// The page's row press: a drag selects through it with Ctrl held, as a Ctrl+click does.
+    on_row: Rc<dyn Fn(i64, Press)>,
 }
 
 impl ItemList {
@@ -371,10 +377,34 @@ impl ItemList {
         let widget = gtk::ListView::new(Some(gtk::NoSelection::new(Some(store.clone()))), Some(factory));
         widget.set_focusable(true);
         widget.add_css_class("kb-item-list");
-        let this = Rc::new(Self { widget, store, leading: RefCell::new(Vec::new()), shown: RefCell::new(Vec::new()) });
+        let this = Rc::new(Self {
+            widget,
+            store,
+            leading: RefCell::new(Vec::new()),
+            shown: RefCell::new(Vec::new()),
+            on_row: Rc::clone(&callbacks.on_row),
+        });
         *list.borrow_mut() = Rc::downgrade(&this);
         this.widget.add_controller(key_controller(Rc::downgrade(&this), callbacks.on_row));
         this
+    }
+
+    /// What a drag over the list (`widgets::drag_select`) asks: a row's selected state as shown, and a flip of one row,
+    /// which is a Ctrl+click of it. Clearing flips every selected row on show; one a filter hides keeps its state.
+    pub fn drag_hooks(self: &Rc<Self>) -> crate::widgets::drag_select::Hooks {
+        let ctrl = Press { alt: false, mods: Mods { shift: false, ctrl: true } };
+        let (shown, toggle, clear) = (Rc::downgrade(self), Rc::clone(&self.on_row), Rc::downgrade(self));
+        crate::widgets::drag_select::Hooks {
+            is_selected: Rc::new(move |id| shown.upgrade().is_some_and(|list| list.shown.borrow().iter().any(|row| row.id == id && row.selected))),
+            toggle: Rc::new(move |id| toggle(id, ctrl)),
+            clear: Rc::new(move || {
+                let Some(list) = clear.upgrade() else { return };
+                let selected: Vec<i64> = list.shown.borrow().iter().filter(|row| row.selected).map(|row| row.id).collect();
+                for id in selected {
+                    (list.on_row)(id, ctrl);
+                }
+            }),
+        }
     }
 
     /// Replaces the leading slots (widgets that scroll with the rows). One splice of the head of the store.

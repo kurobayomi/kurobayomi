@@ -11,7 +11,7 @@
 //! on screen are not rebuilt. The 2,000-item scroll check is manual (`p2-edge-cases-and-tests.md` section 7.3).
 
 use std::cell::{Cell, RefCell};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
@@ -31,7 +31,10 @@ use super::prefs::BrowsePrefs;
 use super::primitives::{EmptyAction, ToastAction, ToastDuration, ToastSpec, stub_source_label};
 use super::tasks::{PageTasks, Tagged};
 use super::view::{CoverGuard, CoverLoader, empty_state, grid_cell, list_cell};
+use crate::library::keys;
+use crate::library::select::{Selectable, SelectionOf, Shown};
 use crate::widgets::context_menu::{self, Item};
+use crate::widgets::drag_select::{self, DragSelect};
 
 /// What the listing needs from the app.
 pub struct ListingDeps {
@@ -83,6 +86,27 @@ struct Inner {
     grid: gtk::GridView,
     list: gtk::ListView,
     scroller: gtk::ScrolledWindow,
+    /// The covers picked for a bulk action (issue #7): Ctrl+click, Shift+click, press and hold, Ctrl+A or a drag, by the
+    /// Library's rules (`library::select`). A new listing starts with none.
+    selection: RefCell<SelectionOf<ListItem>>,
+    /// The ids drawn selected now: a change rebinds only the cells whose state changed.
+    shown_selected: RefCell<HashSet<i64>>,
+    /// Runs after every change of the selection (the page's selection bar).
+    on_selection: RefCell<Option<Rc<dyn Fn()>>>,
+}
+
+/// A browsed cover is selected by its library row id; a range has no groups.
+impl Selectable for ListItem {
+    fn key(&self) -> i64 {
+        self.id
+    }
+}
+
+impl Shown for ListItem {
+    type Entry = ListItem;
+    fn entry(&self) -> &ListItem {
+        self
+    }
 }
 
 /// The listing widget. Cloning shares the same listing.
@@ -169,7 +193,9 @@ impl ListingView {
         footer.append(&more);
         footer.set_visible(false);
         let items_page = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        items_page.append(&scroller);
+        // a drag on the grid's empty space selects the covers it touches
+        let drag = DragSelect::new(&scroller);
+        items_page.append(drag.widget());
         items_page.append(&footer);
         stack.add_named(&items_page, Some("items"));
 
@@ -197,7 +223,12 @@ impl ListingView {
             grid,
             list,
             scroller,
+            selection: RefCell::new(SelectionOf::default()),
+            shown_selected: RefCell::new(HashSet::new()),
+            on_selection: RefCell::new(None),
         });
+        drag.attach(&inner.grid, drag_hooks(&inner));
+        drag.attach(&inner.list, drag_hooks(&inner));
         let view = Self { inner, root };
         view.wire();
         view
@@ -255,6 +286,39 @@ impl ListingView {
     /// Shows the favourite flag of the entry with library id `id` (an optimistic flip or its undo).
     pub fn set_favorite(&self, id: i64, favorite: bool) {
         self.inner.set_favorite_where(|item| item.id == id, favorite);
+    }
+
+    /// Runs `notify` after every change of the selection.
+    pub fn connect_selection(&self, notify: impl Fn() + 'static) {
+        *self.inner.on_selection.borrow_mut() = Some(Rc::new(notify));
+    }
+
+    pub fn has_selection(&self) -> bool {
+        !self.inner.selection.borrow().is_empty()
+    }
+
+    /// The selected covers, in selection order, with the favourite flag the listing shows now.
+    pub fn selected(&self) -> Vec<ListItem> {
+        let picked: Vec<ListItem> = self.inner.selection.borrow().rows().cloned().collect();
+        let listing = self.inner.listing.borrow();
+        picked
+            .into_iter()
+            .map(|item| listing.slots().iter().flatten().find(|shown| shown.id == item.id).cloned().unwrap_or(item))
+            .collect()
+    }
+
+    /// Ctrl+A: every loaded cover.
+    pub fn select_all(&self) {
+        self.inner.select_with(|sel, page| sel.select_all(page));
+    }
+
+    /// Ctrl+I: flips every loaded cover.
+    pub fn invert_selection(&self) {
+        self.inner.select_with(|sel, page| sel.invert(page));
+    }
+
+    pub fn clear_selection(&self) {
+        self.inner.select_with(|sel, _| sel.clear());
     }
 
     /// Makes the list fill the window below the top bar (B§2.8): the content never gets shorter than this.
@@ -343,7 +407,10 @@ impl Inner {
     fn restart(self: &Rc<Self>, query: BrowseQuery, filters: FilterList) {
         self.tasks.borrow_mut().restart();
         self.listing.borrow_mut().restart_with(query, filters);
+        // the covers of the old listing go, and so does their selection
+        self.selection.borrow_mut().clear();
         self.store.remove_all();
+        self.redraw_selection();
         self.toast_dismissed.set(false);
         self.prefill();
         self.render();
@@ -371,6 +438,45 @@ impl Inner {
         let object = self.store.item(position).and_downcast::<glib::BoxedAnyObject>()?;
         let item = object.borrow::<Option<ListItem>>().clone();
         item
+    }
+
+    /// Runs a selection change against the loaded covers, then redraws the cells whose state changed.
+    fn select_with(self: &Rc<Self>, change: impl FnOnce(&mut SelectionOf<ListItem>, &[ListItem])) {
+        let page: Vec<ListItem> = self.listing.borrow().slots().iter().flatten().cloned().collect();
+        change(&mut self.selection.borrow_mut(), &page);
+        self.redraw_selection();
+    }
+
+    /// A new object at each position whose selected state changed, so the view binds that cell again; then the page hears
+    /// of the change.
+    fn redraw_selection(self: &Rc<Self>) {
+        let now: HashSet<i64> = self.selection.borrow().ids().iter().copied().collect();
+        let before = self.shown_selected.replace(now.clone());
+        for index in 0..self.store.n_items() {
+            let Some(item) = self.item_at(index) else { continue };
+            if now.contains(&item.id) == before.contains(&item.id) {
+                continue;
+            }
+            let slot = self.listing.borrow().slots().get(index as usize).cloned();
+            if let Some(slot) = slot {
+                self.store.splice(index, 1, &[glib::BoxedAnyObject::new(slot)]);
+            }
+        }
+        let notify = self.on_selection.borrow().clone();
+        if let Some(notify) = notify {
+            notify();
+        }
+    }
+
+    /// A primary click on a cover (`library::keys::press`): Shift selects a range, Ctrl (or any click while something is
+    /// selected) toggles. A plain click with nothing selected is the view's own activation, which opens the entry.
+    fn press(self: &Rc<Self>, item: &ListItem, shift: bool, ctrl: bool) {
+        let selecting = !self.selection.borrow().is_empty();
+        match keys::press(shift, ctrl, selecting) {
+            keys::Press::Range => self.select_with(|sel, page| sel.toggle_range(item, page)),
+            keys::Press::Toggle => self.select_with(|sel, _| sel.toggle(item)),
+            keys::Press::Open => {}
+        }
     }
 
     /// Sets the favourite flag of every loaded item that `matches`, in the listing and in the store.
@@ -487,7 +593,8 @@ impl Inner {
             // the cell takes focus so the Menu key reaches its menu
             holder.set_focusable(true);
             let (weak, menu) = (item.downgrade(), Rc::clone(&menu));
-            context_menu::attach(&holder, move |_, _| {
+            // the right click (and the Menu key) open the cover's menu; a press and hold selects (`bind_cell`)
+            context_menu::attach_without_long_press(&holder, move |_, _| {
                 let entry = weak.upgrade().and_then(|row| row.item()).and_downcast::<glib::BoxedAnyObject>();
                 // the item is copied out, so no borrow of the row is held while the menu is built or run
                 let item = entry.and_then(|entry| entry.borrow::<Option<ListItem>>().clone());
@@ -495,6 +602,7 @@ impl Inner {
             });
             item.set_child(Some(&holder));
         });
+        let page = Rc::downgrade(self);
         factory.connect_bind({
             let binds = Rc::clone(&binds);
             move |_, object| {
@@ -513,10 +621,13 @@ impl Inner {
                 } else {
                     grid_cell(slot.as_ref(), mode, &load, &guard, cover_px)
                 };
+                let shown = (*slot).clone();
+                drop(slot);
                 while let Some(old) = holder.first_child() {
                     holder.remove(&old);
                 }
                 holder.append(&cell);
+                bind_cell(&page, &cell, shown);
             }
         });
         factory.connect_teardown(move |_, object| {
@@ -597,6 +708,83 @@ impl Inner {
         while let Some(child) = slot.first_child() {
             slot.remove(&child);
         }
+    }
+}
+
+/// The selection side of a drawn cover: its look, its id for a drag, and the click and long press that select it.
+fn bind_cell(page: &Weak<Inner>, cell: &gtk::Box, item: Option<ListItem>) {
+    drag_select::mark(cell, item.as_ref().map(|item| item.id));
+    let Some(item) = item else { return };
+    if page.upgrade().is_some_and(|inner| inner.selection.borrow().contains(item.id)) {
+        cell.add_css_class("kb-card-selected");
+    }
+    // a click that selects claims the press, so the view does not also open the entry; the release does the selecting.
+    // A long press (mouse or touch) selects instead, as in the Library, and the release that ends it does nothing more.
+    let long_pressed = Rc::new(Cell::new(false));
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_PRIMARY);
+    click.connect_pressed({
+        let (page, long_pressed) = (page.clone(), Rc::clone(&long_pressed));
+        move |gesture, _, _, _| {
+            long_pressed.set(false);
+            let Some(inner) = page.upgrade() else { return };
+            let state = gesture.current_event_state();
+            let selecting = !inner.selection.borrow().is_empty();
+            let shift = state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+            let ctrl = state.contains(gtk::gdk::ModifierType::CONTROL_MASK);
+            if keys::press(shift, ctrl, selecting) != keys::Press::Open {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+            }
+        }
+    });
+    click.connect_released({
+        let (page, item, long_pressed) = (page.clone(), item.clone(), Rc::clone(&long_pressed));
+        move |gesture, _, _, _| {
+            if long_pressed.get() {
+                return;
+            }
+            let Some(inner) = page.upgrade() else { return };
+            let state = gesture.current_event_state();
+            inner.press(&item, state.contains(gtk::gdk::ModifierType::SHIFT_MASK), state.contains(gtk::gdk::ModifierType::CONTROL_MASK));
+        }
+    });
+    cell.add_controller(click);
+    let long = gtk::GestureLongPress::new();
+    long.connect_pressed({
+        let page = page.clone();
+        move |gesture, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            long_pressed.set(true);
+            // on idle, so no borrow is held while the selection binds the cells again
+            let (page, item) = (page.clone(), item.clone());
+            glib::idle_add_local_once(move || {
+                if let Some(inner) = page.upgrade() {
+                    inner.select_with(|sel, _| sel.toggle(&item));
+                }
+            });
+        }
+    });
+    cell.add_controller(long);
+}
+
+/// A drag over the grid or the list (`widgets::drag_select`) selects through the same toggle as a Ctrl+click.
+fn drag_hooks(inner: &Rc<Inner>) -> drag_select::Hooks {
+    let (selected, toggle, clear) = (Rc::downgrade(inner), Rc::downgrade(inner), Rc::downgrade(inner));
+    drag_select::Hooks {
+        is_selected: Rc::new(move |id| selected.upgrade().is_some_and(|inner| inner.selection.borrow().contains(id))),
+        toggle: Rc::new(move |id| {
+            let Some(inner) = toggle.upgrade() else { return };
+            inner.select_with(|sel, page| {
+                if let Some(item) = page.iter().find(|item| item.id == id) {
+                    sel.toggle(item);
+                }
+            });
+        }),
+        clear: Rc::new(move || {
+            if let Some(inner) = clear.upgrade() {
+                inner.select_with(|sel, _| sel.clear());
+            }
+        }),
     }
 }
 
@@ -849,6 +1037,39 @@ pub(crate) mod tests {
         assert_eq!(*rig.opened.borrow(), ["b"]);
     }
 
+    /// Issue #7: Ctrl+click, Shift+click, a plain click while selecting, invert and select all follow the Library's rules
+    /// over the loaded covers; the page hears each change, and a new listing starts with nothing selected.
+    fn clicks_select_covers_by_the_library_rules_and_a_new_listing_clears_them() {
+        let page = Ok(ListedPage {
+            items: (1..=5).map(|id| ListItem { id, title: format!("t{id}"), url: format!("/{id}"), ..ListItem::default() }).collect(),
+            has_next: false,
+        });
+        let rig = rig(vec![page], true, false, false);
+        assert!(pump(|| rig.view.inner.store.n_items() == 5));
+        let changes = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&changes);
+        rig.view.connect_selection(move || counter.set(counter.get() + 1));
+        let item = |i: u32| rig.view.inner.item_at(i).expect("loaded");
+        let ids = || rig.view.selected().iter().map(|item| item.id).collect::<Vec<_>>();
+        rig.view.inner.press(&item(0), false, false);
+        assert!(ids().is_empty(), "a plain click with nothing selected opens instead");
+        rig.view.inner.press(&item(1), false, true);
+        assert_eq!(ids(), [2], "Ctrl+click selects");
+        rig.view.inner.press(&item(3), true, false);
+        assert_eq!(ids(), [2, 3, 4], "Shift+click selects the range from the last pick");
+        rig.view.inner.press(&item(2), false, false);
+        assert_eq!(ids(), [2, 4], "a plain click while selecting toggles");
+        rig.view.invert_selection();
+        assert_eq!(ids(), [1, 3, 5]);
+        rig.view.select_all();
+        assert_eq!(ids(), [1, 3, 5, 2, 4], "select all adds the rest, in page order");
+        assert!(changes.get() >= 5, "every change reaches the page");
+        rig.view.inner.apply_favorite_urls(&["/1".to_owned()].into());
+        assert!(rig.view.selected()[0].favorite, "the selection reports the flag the listing shows now");
+        rig.view.restart(BrowseQuery::Latest);
+        assert!(!rig.view.has_selection(), "a new listing starts with nothing selected");
+    }
+
     fn dropping_the_view_aborts_its_loader() {
         let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_time().build().expect("runtime");
         let _guard = rt.enter();
@@ -906,6 +1127,7 @@ pub(crate) mod tests {
         covers_observe_the_favourite_flag_of_their_entry();
         a_stub_shows_its_label_and_never_loads();
         the_display_mode_picks_the_grid_or_the_list_and_activation_opens_the_entry();
+        clicks_select_covers_by_the_library_rules_and_a_new_listing_clears_them();
         dropping_the_view_aborts_its_loader();
     }
 }

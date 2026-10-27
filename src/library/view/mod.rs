@@ -230,7 +230,9 @@ impl LibraryView {
         root.append(&tabs.scroller);
         root.append(&title);
         root.append(&hint);
-        root.append(&scroller);
+        // a drag on the grid's empty space selects the covers it touches (issue #7)
+        let drag = crate::widgets::drag_select::DragSelect::new(&scroller);
+        root.append(drag.widget());
         root.append(&empty);
         root.append(welcome.widget());
         root.append(&bar);
@@ -273,6 +275,10 @@ impl LibraryView {
             bar_label,
         }));
         let view = Self { inner: inner.clone(), root };
+        let weak = Rc::downgrade(&inner);
+        let (grid, list) = (inner.borrow().grid.clone(), inner.borrow().list.clone());
+        drag.attach(&grid, drag_hooks(&weak));
+        drag.attach(&list, drag_hooks(&weak));
         // a resize across a column boundary or the 900 px breakpoint changes the count without a data change
         let (weak, seen) = (Rc::downgrade(&inner), FlagCell::new((-1, -1)));
         let scroller = inner.borrow().scroller.clone();
@@ -983,6 +989,28 @@ fn select_with(inner: &Rc<RefCell<Inner>>, change: impl FnOnce(&mut Selection, &
     render_with(inner, true);
 }
 
+/// A drag over the grid or the list (`widgets::drag_select`) selects through the same toggle as a Ctrl+click.
+fn drag_hooks(weak: &Weak<RefCell<Inner>>) -> crate::widgets::drag_select::Hooks {
+    let (selected, toggle, clear) = (weak.clone(), weak.clone(), weak.clone());
+    crate::widgets::drag_select::Hooks {
+        is_selected: Rc::new(move |id| selected.upgrade().is_some_and(|inner| inner.borrow().selection.contains(id))),
+        toggle: Rc::new(move |id| {
+            if let Some(inner) = toggle.upgrade() {
+                select_with(&inner, |sel, page| {
+                    if let Some(item) = page.iter().find(|item| item.row.id == id) {
+                        sel.toggle(&item.row);
+                    }
+                });
+            }
+        }),
+        clear: Rc::new(move || {
+            if let Some(inner) = clear.upgrade() {
+                select_with(&inner, |sel, _| sel.clear());
+            }
+        }),
+    }
+}
+
 /// Queues the downloads of the selected entries with one amount of the Download menu, then clears the selection.
 fn selected_download(inner: &Rc<RefCell<Inner>>, amount: actions::DownloadAmount) {
     let (ids, run) = {
@@ -1096,6 +1124,7 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         Cell::Global(query) => {
             let button = gtk::Button::with_label(&cells::global_label(&query));
             button.add_css_class("library-global-search");
+            crate::widgets::drag_select::mark(&button, None);
             let weak_global = weak.clone();
             button.connect_clicked(move |_| {
                 let Some(inner) = weak_global.upgrade() else { return };
@@ -1143,6 +1172,7 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         card::build(&item, mode, selected, show_continue, &extras)
     };
     list_item.set_child(Some(&card.root));
+    crate::widgets::drag_select::mark(&card.root, Some(item.row.id));
 
     // the action runs on release; a long press (mouse or touch) selects instead, as on the episode and chapter rows, and the
     // release that ends it does not also open the entry
