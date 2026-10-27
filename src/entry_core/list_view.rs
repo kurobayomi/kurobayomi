@@ -390,7 +390,43 @@ impl ItemList {
     pub fn sync(&self, rows: Vec<RowItem>) {
         let offset = self.leading.borrow().len() as u32;
         let old = self.shown.replace(rows.clone());
+        // a row is replaced by a fresh object; when that row holds keyboard focus (it was just clicked, as in a
+        // selection), GTK loses its place and scrolls the list to the top. Focus leaves the row first and comes back
+        // to the same row after, so the list stays where it was.
+        let focused = self.focused_id();
+        if focused.is_some()
+            && let Some(root) = self.widget.root()
+        {
+            root.set_focus(None::<&gtk::Widget>);
+        }
         sync_store(&self.store, offset, &old, &rows);
+        // once GTK has made the new row's widget, which it does on its next turn: the list's cursor goes to the row, and
+        // the row (its content is named `row:<id>`) takes keyboard focus again
+        if let Some((id, index)) = focused.and_then(|id| rows.iter().position(|r| r.id == id).map(|index| (id, index))) {
+            let widget = self.widget.downgrade();
+            glib::idle_add_local_once(move || {
+                let Some(widget) = widget.upgrade() else { return };
+                widget.scroll_to(offset + index as u32, gtk::ListScrollFlags::FOCUS, None);
+                let name = format!("row:{id}");
+                let mut stack = vec![widget.upcast::<gtk::Widget>()];
+                while let Some(w) = stack.pop() {
+                    if w.widget_name() == name {
+                        // the named row content cannot take focus; the list's item around it can
+                        if !w.grab_focus()
+                            && let Some(item) = w.parent()
+                        {
+                            item.grab_focus();
+                        }
+                        return;
+                    }
+                    let mut child = w.first_child();
+                    while let Some(c) = child {
+                        child = c.next_sibling();
+                        stack.push(c);
+                    }
+                }
+            });
+        }
     }
 
     /// The id of the row that holds keyboard focus.
@@ -546,6 +582,55 @@ mod tests {
         });
     }
 
+    /// Selecting a row redraws it as a fresh object while it holds keyboard focus; GTK then lost its place and the
+    /// list jumped to the top (user, 2026-10-27). It stays where it was now.
+    #[test]
+    fn redrawing_the_focused_row_keeps_the_list_where_it_was() {
+        crate::testing::with_display(|| {
+            let ctx = glib::MainContext::default();
+            let settle = || {
+                for _ in 0..200 {
+                    while ctx.iteration(false) {}
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+            };
+            let rows = |selected: Option<i64>| -> Vec<RowItem> {
+                (1..=200).map(|id| RowItem { selected: Some(id) == selected, ..RowItem::new(id, format!("Episode {id}")) }).collect()
+            };
+            let list = ItemList::new(
+                Kind::Anime,
+                Callbacks {
+                    on_row: Rc::new(|_: i64, _: Press| {}),
+                    on_menu: Rc::new(|_: i64, _: RowAction| {}),
+                    on_download: Rc::new(|_: i64, _: Request| {}),
+                    on_summary: Rc::new(|_: i64| {}),
+                },
+            );
+            list.sync(rows(None));
+            let scroller = gtk::ScrolledWindow::builder().child(&list.widget).build();
+            let window = gtk::Window::builder().default_width(600).default_height(400).child(&scroller).build();
+            window.present();
+            settle();
+            let adjustment = scroller.vadjustment();
+            adjustment.set_value(adjustment.upper() / 2.0);
+            settle();
+            let before = adjustment.value();
+            // the row a click would focus: one on screen
+            let id = list.shown.borrow().iter().map(|r| r.id).nth((before / adjustment.upper() * 200.0) as usize + 2).expect("a row on screen");
+            list.focus_row(id);
+            assert!(crate::entry_core::page_shell::test_util::pump(&ctx, || list.focused_id() == Some(id)), "the row holds focus");
+            settle();
+            let focused_at = adjustment.value();
+            list.sync(rows(Some(id)));
+            assert!(crate::entry_core::page_shell::test_util::pump(&ctx, || list.focused_id() == Some(id)), "focus is back on the row");
+            settle();
+            // putting focus back may nudge the row fully into view, never more than about a row
+            assert!((adjustment.value() - focused_at).abs() < 100.0, "the list stays put: {focused_at} -> {}", adjustment.value());
+            assert!(adjustment.value() > before / 2.0, "not back at the top");
+            window.destroy();
+        });
+    }
+
     /// The crash of round 3: a press whose page redraws the list from inside the handler (`act -> render -> sync`)
     /// panicked with "already borrowed". A plain click, a right click, a touch long press and the menu's Select now
     /// each run a handler that re-syncs the list, and nothing panics.
@@ -606,10 +691,16 @@ mod tests {
 
             click(1).emit_by_name::<()>("released", &[&1i32, &4.0f64, &4.0f64]);
             assert_eq!(pressed.borrow().len(), 1, "a plain click reached the page");
-            click(1).emit_by_name::<()>("pressed", &[&1i32, &4.0f64, &4.0f64]);
+            // the click redrew the row, and the focus it held came back to a new widget: press the row on screen now
+            let shown_now = card().expect("a row");
+            let model = shown_now.observe_controllers();
+            let controllers: Vec<gtk::EventController> = (0..model.n_items()).filter_map(|i| model.item(i).and_downcast::<gtk::EventController>()).collect();
+            let press = controllers.iter().filter_map(|c| c.downcast_ref::<gtk::GestureClick>()).find(|g| g.button() == 1).expect("a click gesture").clone();
+            let long = controllers.iter().find_map(|c| c.downcast_ref::<gtk::GestureLongPress>().cloned()).expect("the long press");
+            press.emit_by_name::<()>("pressed", &[&1i32, &4.0f64, &4.0f64]);
             long.emit_by_name::<()>("pressed", &[&4.0f64, &4.0f64]);
             assert!(pump(&ctx, || selects() == 1), "the long press selects the row, with no borrow held");
-            click(1).emit_by_name::<()>("released", &[&1i32, &4.0f64, &4.0f64]);
+            press.emit_by_name::<()>("released", &[&1i32, &4.0f64, &4.0f64]);
             assert_eq!(pressed.borrow().len(), 2, "the release that ends a long press does not open the row");
             let menu = || descendants(list.widget.upcast_ref()).into_iter().find_map(|w| w.downcast::<gtk::PopoverMenu>().ok());
             assert!(menu().is_none(), "the long press opens no menu");
@@ -644,3 +735,4 @@ mod tests {
         });
     }
 }
+
