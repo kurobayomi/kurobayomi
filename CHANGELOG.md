@@ -6,6 +6,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-27
+
 ### Fixed
 
 - Selecting several episodes or chapters scrolled the list back to the top at every click; it stays where it was now.
