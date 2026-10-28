@@ -6,6 +6,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-28
+
 ### Added
 
 - Browse can select several titles at once, as the Library does: Ctrl+click, Shift+click for a range, press and hold,
