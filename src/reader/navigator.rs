@@ -32,6 +32,18 @@ pub fn slider_target(value: f64, current_page: i32) -> Option<usize> {
     if page == current_page { None } else { Some((page - 1).max(0) as usize) }
 }
 
+/// Above this many pages the slider shows no page marks: they would sit too close to tell apart.
+pub const MAX_PAGE_MARKS: i32 = 100;
+
+/// The slider values that get a mark, one per page, so the slider reads as a row of page parts. None for a single
+/// page or past [`MAX_PAGE_MARKS`].
+pub fn page_marks(total: i32) -> Vec<f64> {
+    if !slider_visible(total) || total > MAX_PAGE_MARKS {
+        return Vec::new();
+    }
+    (1..=total).map(f64::from).collect()
+}
+
 /// The horizontal padding of the navigator for a window size: 24 px in a wide window, 8 px otherwise.
 pub fn horizontal_padding(window_width: i32, window_height: i32) -> i32 {
     if crate::window_size::is_tablet_ui(window_width, window_height) { 24 } else { 8 }
@@ -85,6 +97,8 @@ pub struct Navigator {
     total_label: gtk::Label,
     spinner: gtk::Spinner,
     current: Cell<i32>,
+    /// The page total the slider's marks were drawn for, so they are redrawn only when it changes.
+    marks_for: Cell<i32>,
     /// Set while the navigator writes its own value, so the slider does not call back.
     syncing: Cell<bool>,
     on_step: RefCell<Rc<dyn Fn(Step)>>,
@@ -133,6 +147,7 @@ impl Navigator {
             total_label,
             spinner,
             current: Cell::new(-1),
+            marks_for: Cell::new(-1),
             syncing: Cell::new(false),
             on_step: RefCell::new(Rc::new(|_: Step| {})),
             on_page: RefCell::new(Rc::new(|_: usize| {})),
@@ -190,6 +205,12 @@ impl Navigator {
         self.slider.set_range(1.0, f64::from(state.total.max(1)));
         self.slider.set_value(slider_value(state.current_page, state.total));
         self.syncing.set(false);
+        if self.marks_for.replace(state.total) != state.total {
+            self.slider.clear_marks();
+            for value in page_marks(state.total) {
+                self.slider.add_mark(value, gtk::PositionType::Bottom, None);
+            }
+        }
     }
 }
 
@@ -217,6 +238,15 @@ mod tests {
         assert!(!slider_visible(1));
         assert!(!slider_visible(0));
         assert!(slider_visible(2));
+    }
+
+    #[test]
+    fn every_page_gets_a_mark_up_to_the_limit() {
+        assert_eq!(page_marks(3), vec![1.0, 2.0, 3.0]);
+        assert_eq!(page_marks(19).len(), 19);
+        assert!(page_marks(1).is_empty(), "a single page has no slider");
+        assert_eq!(page_marks(MAX_PAGE_MARKS).len(), MAX_PAGE_MARKS as usize);
+        assert!(page_marks(MAX_PAGE_MARKS + 1).is_empty(), "too many to tell apart");
     }
 
     #[test]
