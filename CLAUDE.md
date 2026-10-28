@@ -76,6 +76,17 @@ Do not start these before the plan waves, the P0 audit and the first push of a g
 - **oomd exemption** is only set on the running Claude app cgroups; make it permanent with a user systemd drop-in if the user agrees.
 - **AnimePahe (user, 2026-10-12: separate job for later):** test the automatic Cloudflare window (`src/cloudflare_window.rs`) on AnimePahe and see whether the site accepts the app's requests with the cookie it collects; if the TLS fingerprint is refused, no cookie import helps. The manual cookie import and the Torrent settings page were deleted the same day; torrent streaming comes back only with a torrent source (bundled TorrServer or a Rust engine, no settings).
 - **Docs:** refresh the README progress table with an audited number after the P0 audit.
+- **Torrent sources (user, 2026-10-29: planned).** The app first needs torrent playback: a source marks a video as a
+  torrent (magnet or `.torrent`, with the file to play), and the app streams it to the player over a local address. The
+  suggested engine is a built-in Rust one (librqbit, Apache-2.0, no extra binary, no settings) rather than bundling
+  TorrServer (GPL-3, a Go binary per platform); `kuro-core`'s TorrServer client and the player's "start the torrent
+  server first" hook are leftovers to reuse or remove. Then, in Tsuikabako:
+  - **Nyaa (anime):** port `all/nyaatorrent` from yuzono (~370 lines; lists and episodes from nyaa.si, each a torrent).
+    SubsPlease and Torrentio Anime (titles from AniList and Kitsu) use the same playback and can follow.
+  - **Torrentio for movies and TV (later):** titles from Cinemeta; waits on the decision of how movies and TV appear in
+    the app (a new kind in the index, which needs app 0.2.5 or newer, or a separate list). Its optional debrid mode
+    (Real-Debrid, AllDebrid, Premiumize, TorBox) needs the user's account key, so a source settings screen: a
+    power-user feature to decide on its own.
 
 ## Standing instruction update (user, 2026-10-11): the P0 audit is started
 
