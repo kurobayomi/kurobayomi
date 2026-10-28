@@ -1,6 +1,7 @@
-//! The chapter list of the reader: a panel that slides in from the right over the pages, so a far chapter is one click
-//! away instead of a trip back to the manga page. The top bar's list button and the L key open it; a click on a row, or
-//! Enter in its search box, opens that chapter. The matching rules are pure functions, tested without GTK.
+//! The chapter list of the reader, and the episode list of the player: a panel that slides in from the right over the
+//! pages or the video, so a far chapter or episode is one click away instead of a trip back to the entry page. The top
+//! bar's list button opens it (and L in the reader, E in the player); a click on a row, or Enter in its search box, opens
+//! that one. The matching rules are pure functions, tested without GTK.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -65,6 +66,8 @@ pub fn shown_order(mut rows: Vec<Row>) -> Vec<Row> {
 
 pub struct ChapterPanel {
     revealer: gtk::Revealer,
+    /// "Chapters" or "Episodes"; the title adds the count.
+    heading: String,
     title: gtk::Label,
     search: gtk::SearchEntry,
     scroller: gtk::ScrolledWindow,
@@ -76,13 +79,14 @@ pub struct ChapterPanel {
 }
 
 impl ChapterPanel {
-    pub fn new() -> Rc<Self> {
+    /// A panel titled `heading` ("Chapters", "Episodes") with `placeholder` in its search box.
+    pub fn new(heading: String, placeholder: String) -> Rc<Self> {
         let title = gtk::Label::builder().xalign(0.0).hexpand(true).css_classes(["heading"]).build();
         let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["flat"]).tooltip_text(strings::close()).build();
         let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         head.append(&title);
         head.append(&close);
-        let search = gtk::SearchEntry::builder().placeholder_text(strings::chapter_list_search()).build();
+        let search = gtk::SearchEntry::builder().placeholder_text(placeholder).build();
         let list = gtk::ListBox::new();
         list.set_selection_mode(gtk::SelectionMode::None);
         list.add_css_class("navigation-sidebar");
@@ -115,6 +119,7 @@ impl ChapterPanel {
 
         let panel = Rc::new(Self {
             revealer,
+            heading,
             title,
             search: search.clone(),
             scroller,
@@ -170,6 +175,11 @@ impl ChapterPanel {
         self.revealer.reveals_child()
     }
 
+    /// Whether the keyboard focus is in the panel (its search box or a row), so the keys belong to it.
+    pub fn has_focus(&self) -> bool {
+        self.revealer.root().and_then(|root| root.focus()).is_some_and(|focus| focus.is_ancestor(&self.revealer))
+    }
+
     /// Called with the reader-list index of the chapter picked. The panel closes first.
     pub fn connect_pick(&self, f: impl Fn(usize) + 'static) {
         *self.on_pick.borrow_mut() = Some(Rc::new(f));
@@ -223,7 +233,7 @@ impl ChapterPanel {
 
     fn set_rows(&self, rows: Vec<Row>) {
         let rows = shown_order(rows);
-        self.title.set_text(&format!("{} · {}", strings::chapters(), rows.len()));
+        self.title.set_text(&format!("{} · {}", self.heading, rows.len()));
         self.list.remove_all();
         for row in &rows {
             self.list.append(&build_row(row));
@@ -353,7 +363,7 @@ mod tests {
     #[test]
     fn opening_lists_every_chapter_and_a_pick_hands_back_its_index() {
         crate::testing::with_display(|| {
-            let panel = ChapterPanel::new();
+            let panel = ChapterPanel::new(strings::chapters(), strings::chapter_list_search());
             let picked = Rc::new(std::cell::Cell::new(None));
             let seen = Rc::clone(&picked);
             panel.connect_pick(move |index| seen.set(Some(index)));

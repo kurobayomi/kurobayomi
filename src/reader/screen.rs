@@ -808,7 +808,7 @@ pub fn open_with(
     bottom.set_valign(gtk::Align::End);
     page_layer.add_overlay(&bottom);
     // the chapter list floats over the pages' right side, below a floating top bar so the window buttons stay reachable
-    let chapter_panel = ChapterPanel::new();
+    let chapter_panel = ChapterPanel::new(strings::chapters(), strings::chapter_list_search());
     page_layer.add_overlay(chapter_panel.root());
     // with auto-hide (`auto_hide_bars`) the top bar floats over the pages too, so hiding it never moves them; without it
     // the bar sits above the pages and never covers one

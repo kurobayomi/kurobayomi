@@ -9,6 +9,7 @@ use kuro_data::entry::EntryRepo;
 use kuro_data::item::{Item, ItemRepo};
 use kuro_db::handle::Db;
 
+use crate::reader::chapter_panel::Row;
 use crate::reader::chapters::{ListOptions, build_reader_list};
 
 /// Which neighbour to find.
@@ -50,6 +51,32 @@ pub fn playback_list(db: &Arc<Db>, episode_id: i64, downloaded_only: bool, on_di
         return Ok(None);
     };
     Ok(list.iter().position(|e| e.id == episode_id).map(|at| (list, at)))
+}
+
+/// The playback list of `episode_id`'s entry as the episode list shows it, with the episode ids in the same order.
+/// `None` before the app data exists or when the list cannot be read.
+pub fn episode_rows(episode_id: i64) -> Option<(Vec<Row>, Vec<i64>)> {
+    if !crate::data::is_installed() {
+        return None;
+    }
+    let app = crate::data::app();
+    let on_disk = downloaded_ids(&app.db, episode_id);
+    let (list, at) = playback_list(&app.db, episode_id, app.base.downloaded_only.get(), &on_disk).ok()??;
+    let rows = list
+        .iter()
+        .enumerate()
+        .map(|(index, e)| Row {
+            index,
+            name: e.name.clone(),
+            number: e.number,
+            scanlator: e.scanlator.clone(),
+            read: e.done,
+            bookmarked: e.bookmark,
+            downloaded: on_disk.contains(&e.id),
+            current: index == at,
+        })
+        .collect();
+    Some((rows, list.iter().map(|e| e.id).collect()))
 }
 
 /// [`adjacent`] over the app's database, its downloads and its downloaded-only mode.

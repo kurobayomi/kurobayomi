@@ -1036,3 +1036,6 @@ reader_chapter_list_search = Chapter number or name
 
 # source: kurobayomi
 reader_chapter_list_back = Back to { $chapter }
+
+# source: kurobayomi
+player_episode_list_search = Episode number or name
