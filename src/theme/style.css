@@ -384,3 +384,12 @@ listview.kb-item-list > row:focus {
 .kb-status-broken {
   background-color: @error_color;
 }
+
+/* The reader's chapter list (reader/chapter_panel.rs): a panel over the right side of the pages, with the chapter being
+ * read tinted with the theme's selection colour. */
+.reader-chapter-panel {
+  border-left: 1px solid @borders;
+}
+.reader-chapter-current {
+  background-color: alpha(@theme_selected_bg_color, 0.25);
+}

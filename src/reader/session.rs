@@ -382,6 +382,22 @@ impl ReaderSession {
         let Some(target) = nav::target(self.chapters.len(), self.current, step) else {
             return AdjacentOutcome::NoNeighbour;
         };
+        self.load_at(target, build)
+    }
+
+    /// Opens the chapter at `index` of the reader's list, for the chapter list's jump. The outcomes are those of
+    /// [`Self::load_adjacent`]; an index past the list is `NoNeighbour`.
+    pub fn load_at(
+        &mut self,
+        target: usize,
+        build: impl FnOnce(&Rc<ReaderChapter>) -> Result<Loader, LoadError>,
+    ) -> AdjacentOutcome {
+        if self.adjacent_busy {
+            return AdjacentOutcome::Busy;
+        }
+        if target >= self.chapters.len() {
+            return AdjacentOutcome::NoNeighbour;
+        }
         self.adjacent_busy = true;
         let result = self.switch_chapter(target, build);
         self.adjacent_busy = false;

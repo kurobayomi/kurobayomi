@@ -159,6 +159,25 @@ pub fn viewer() -> String {
     tr(MsgKey::viewer)
 }
 
+/// The chapter list's title and the top bar button's tooltip.
+pub fn chapters() -> String {
+    tr(MsgKey::chapters)
+}
+
+pub fn action_filter_bookmarked() -> String {
+    tr(MsgKey::action_filter_bookmarked)
+}
+
+/// The chapter list's search box placeholder.
+pub fn chapter_list_search() -> String {
+    tr(MsgKey::reader_chapter_list_search)
+}
+
+/// The button that returns to the chapter read before a jump from the chapter list.
+pub fn chapter_list_back(chapter: &str) -> String {
+    trf(MsgKey::reader_chapter_list_back, &[("chapter", Arg::Str(chapter))])
+}
+
 pub fn pref_crop_borders() -> String {
     tr(MsgKey::pref_crop_borders)
 }

@@ -55,6 +55,7 @@ pub mod delete_queue;
 pub mod download_ahead;
 pub mod error_card;
 pub mod chapters;
+pub mod chapter_panel;
 pub mod chrome;
 #[cfg(test)]
 mod chrome_tests;

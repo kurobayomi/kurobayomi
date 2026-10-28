@@ -83,7 +83,7 @@ fn the_navigator_is_the_whole_bottom_bar_and_has_no_settings_buttons() {
 fn the_top_bar_labels_the_bookmark_by_its_state_and_has_a_named_back_button() {
     crate::testing::with_display(|| {
         let bar = TopBar { manga_title: "Manga".into(), chapter_name: "Chapter 1".into(), bookmarked: true, is_http_source: false };
-        let actions = TopBarActions { on_back: Box::new(|| {}), on_bookmark: Box::new(|| {}) };
+        let actions = TopBarActions { on_back: Box::new(|| {}), on_bookmark: Box::new(|| {}), on_chapters: Box::new(|| {}) };
         let (header, title) = build_top_bar(&bar, actions);
         // the player's format: a plain two-line title that takes no clicks
         assert_eq!((title.title.label().as_str(), title.subtitle().as_str()), ("Manga", "Chapter 1"), "the manga over the chapter");
@@ -91,6 +91,7 @@ fn the_top_bar_labels_the_bookmark_by_its_state_and_has_a_named_back_button() {
         let buttons = buttons_under(header.upcast_ref());
         assert!(position_of(&buttons, &strings::action_remove_bookmark()).is_some(), "a bookmarked chapter offers to unbookmark");
         assert!(position_of(&buttons, "Back").is_some(), "the back button is named");
+        assert!(position_of(&buttons, &super::chrome::chapters_tooltip()).is_some(), "the chapter list has its button");
         let menu = all_of::<gtk::MenuButton>(header.upcast_ref()).pop().expect("the menu button");
         assert!(menu.tooltip_text().is_none(), "no tooltip to cover the open menu");
     });
@@ -195,7 +196,7 @@ fn choosing_a_radio_mode_applies_it_and_the_state_is_the_current_mode() {
 fn the_top_bar_menu_is_a_native_popover_menu_and_the_title_has_a_position_line() {
     crate::testing::with_display(|| {
         let bar = TopBar { manga_title: "M".into(), chapter_name: "C".into(), bookmarked: false, is_http_source: true };
-        let actions = TopBarActions { on_back: Box::new(|| {}), on_bookmark: Box::new(|| {}) };
+        let actions = TopBarActions { on_back: Box::new(|| {}), on_bookmark: Box::new(|| {}), on_chapters: Box::new(|| {}) };
         let (header, title) = build_top_bar(&bar, actions);
         let menu = all_of::<gtk::MenuButton>(header.upcast_ref()).pop().expect("the menu button");
         let popover = menu.popover().expect("the popover");

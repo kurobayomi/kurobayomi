@@ -165,6 +165,11 @@ pub fn bookmark_label(bookmarked: bool) -> String {
     if bookmarked { strings::action_remove_bookmark() } else { strings::action_bookmark() }
 }
 
+/// The chapter list button's tooltip, with its key.
+pub fn chapters_tooltip() -> String {
+    format!("{} (L)", strings::chapters())
+}
+
 /// The error card: the message, a Retry button and a Close button. The reader does not close by itself.
 pub fn build_error_card(error: &LoadError, on_retry: impl Fn() + 'static, on_close: impl Fn() + 'static) -> gtk::Box {
     let card = gtk::Box::new(gtk::Orientation::Vertical, 12);
@@ -200,6 +205,8 @@ pub struct TopBar {
 pub struct TopBarActions {
     pub on_back: Box<dyn Fn()>,
     pub on_bookmark: Box<dyn Fn()>,
+    /// Opens or closes the chapter list.
+    pub on_chapters: Box<dyn Fn()>,
 }
 
 /// The top bar before a chapter is known (the page list is loading, or the load failed): Back and the window buttons,
@@ -213,7 +220,7 @@ pub fn build_bare_top_bar(on_back: impl Fn() + 'static) -> gtk::HeaderBar {
 /// the bookmark and the menu on the right. The bar is never hidden. The menu's actions come from the page's
 /// [`ACTION_GROUP`]; the returned title takes the page position.
 pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (gtk::HeaderBar, page_header::TwoLineTitle) {
-    let TopBarActions { on_back, on_bookmark } = actions;
+    let TopBarActions { on_back, on_bookmark, on_chapters } = actions;
     let (header, title) = page_header::media_header(&page_header::MediaTitle::new(&bar.manga_title, &bar.chapter_name), on_back);
 
     let bookmark = gtk::ToggleButton::builder()
@@ -229,9 +236,13 @@ pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (gtk::HeaderBar, p
     let menu = gtk::MenuButton::builder().icon_name("view-more-symbolic").popover(&popover).build();
     menu.update_property(&[gtk::accessible::Property::Label(&strings::overflow_menu())]);
 
-    // pack_end puts the first widget packed at the far right: the menu, then the bookmark
+    let chapters = gtk::Button::builder().icon_name("view-list-symbolic").tooltip_text(chapters_tooltip()).build();
+    chapters.connect_clicked(move |_| on_chapters());
+
+    // pack_end puts the first widget packed at the far right: the menu, then the bookmark, then the chapter list
     header.pack_end(&menu);
     header.pack_end(&bookmark);
+    header.pack_end(&chapters);
     // the buttons packed here came after page_header::header made its pass, so they need their own
     crate::ui::no_sticky_focus(&header);
     (header, title)

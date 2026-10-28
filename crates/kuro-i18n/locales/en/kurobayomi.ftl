@@ -5200,3 +5200,9 @@ ui_download_not_in_library = The library no longer has this: open its folder to 
 
 # source: kurobayomi
 ui_browser = Browser
+
+# source: kurobayomi
+reader_chapter_list_search = Chapter number or name
+
+# source: kurobayomi
+reader_chapter_list_back = Back to { $chapter }

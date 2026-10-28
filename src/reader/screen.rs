@@ -29,6 +29,7 @@ use kuro_data::entry::{Entry, EntryRepo, EntryUpdate};
 use kuro_prefs::reader::{MangaReaderPrefs, ReaderPrefs, ReadingMode};
 use tokio::sync::watch;
 
+use super::chapter_panel::{self, ChapterPanel};
 use super::chapters::ListOptions;
 use super::delete_queue::Pending;
 use super::chrome::{self, MenuHandlers, TopBar, TopBarActions, build_bare_top_bar, build_error_card, build_top_bar};
@@ -312,6 +313,50 @@ impl ReaderCore {
         }
     }
 
+    /// Opens the chapter at `index` of the reader's list (the chapter list's jump). A failure keeps the current chapter.
+    pub fn jump_to(&self, index: usize) -> AdjacentOutcome {
+        match self.session.borrow_mut().as_mut() {
+            Some(session) => session.load_at(index, |chapter| (self.deps.build)(chapter)),
+            None => AdjacentOutcome::NoNeighbour,
+        }
+    }
+
+    /// The reader's list as the chapter list shows it, with the chapter being read marked.
+    pub fn chapter_rows(&self) -> Vec<chapter_panel::Row> {
+        let session = self.session.borrow();
+        let Some(session) = session.as_ref() else { return Vec::new() };
+        let current = session.current_index();
+        session
+            .chapters()
+            .iter()
+            .enumerate()
+            .map(|(index, c)| chapter_panel::Row {
+                index,
+                name: c.chapter.name.clone(),
+                number: c.chapter.number,
+                scanlator: c.chapter.scanlator.clone(),
+                read: c.read.get(),
+                bookmarked: c.bookmark.get(),
+                downloaded: (self.deps.is_downloaded)(&c.chapter),
+                current: Some(index) == current,
+            })
+            .collect()
+    }
+
+    /// The position of a chapter in the reader's list.
+    pub fn chapter_index(&self, chapter_id: i64) -> Option<usize> {
+        self.session.borrow().as_ref()?.chapters().iter().position(|c| c.chapter.id == chapter_id)
+    }
+
+    /// The page the current chapter opens on, 0-based.
+    pub fn requested_page(&self) -> usize {
+        self.session
+            .borrow()
+            .as_ref()
+            .and_then(|s| s.current_chapter().map(|c| c.requested_page.get()))
+            .map_or(0, |page| usize::try_from(page).unwrap_or(0))
+    }
+
     /// What the top bar shows for the current chapter: the manga title, the chapter name, the bookmark state, and
     /// whether the chapter comes from an HTTP source (which gets the web entries in the overflow menu).
     pub fn top_bar(&self) -> Option<TopBar> {
@@ -432,7 +477,6 @@ impl ReaderCore {
         }
     }
 
-    #[cfg(test)]
     /// The current chapter's position in the reader list.
     pub fn current_index(&self) -> Option<usize> {
         self.session.borrow().as_ref().and_then(|s| s.current_index())
@@ -676,6 +720,15 @@ struct Screen {
     keep_awake: KeepAwake,
     /// An adjacent load is waiting for its frame or running; further presses are ignored.
     stepping: Cell<bool>,
+    chapter_panel: Rc<ChapterPanel>,
+    /// The "Back to chapter" button shown for a moment after a jump from the chapter list.
+    back_button: gtk::Button,
+    /// The chapter and page (0-based) the back button returns to.
+    back_to: Cell<Option<(i64, usize)>>,
+    /// Counts the back button's showings, so only the latest one's timer hides it.
+    back_shown: Cell<u64>,
+    /// The chapter, page and name a running jump leaves; the back button gets them when the jump lands.
+    leaving: RefCell<Option<(i64, usize, String)>>,
 }
 
 const PAGE_LOADING: &str = "loading";
@@ -736,6 +789,9 @@ pub fn open_with(
     top.set_reveal_child(true);
     // the page slider with the chapter buttons is the only thing in the floating bottom bar
     let bottom_column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    // after a jump from the chapter list, a button back to the chapter left sits above the slider for a moment
+    let back_button = gtk::Button::builder().halign(gtk::Align::Center).margin_bottom(8).css_classes(["osd"]).visible(false).build();
+    bottom_column.append(&back_button);
     bottom_column.append(&navigator.root);
     // a press on the bar is picked by the bar (an overlay above the pages), so it never reaches the page's tap handler;
     // no extra gesture here, as claiming the press on the bar would also steal the slider's own drag
@@ -751,6 +807,9 @@ pub fn open_with(
     // it goes on the page layer, so the reader's sheets still open above it
     bottom.set_valign(gtk::Align::End);
     page_layer.add_overlay(&bottom);
+    // the chapter list floats over the pages' right side, below a floating top bar so the window buttons stay reachable
+    let chapter_panel = ChapterPanel::new();
+    page_layer.add_overlay(chapter_panel.root());
     // with auto-hide (`auto_hide_bars`) the top bar floats over the pages too, so hiding it never moves them; without it
     // the bar sits above the pages and never covers one
     let auto_hide = auto_hide_bars();
@@ -801,6 +860,11 @@ pub fn open_with(
         ui: RefCell::new(UiState::default()),
         keep_awake: KeepAwake::default(),
         stepping: Cell::new(false),
+        chapter_panel: Rc::clone(&chapter_panel),
+        back_button: back_button.clone(),
+        back_to: Cell::new(None),
+        back_shown: Cell::new(0),
+        leaving: RefCell::new(None),
     });
     root.insert_action_group(chrome::ACTION_GROUP, Some(&screen.menu_actions));
 
@@ -827,6 +891,28 @@ pub fn open_with(
                 true
             }
             None => false,
+        }
+    });
+    let picked = weak.clone();
+    chapter_panel.connect_pick(move |index| {
+        if let Some(s) = picked.upgrade() {
+            jump(&s, index, None, true);
+        }
+    });
+    let closed = weak.clone();
+    chapter_panel.connect_closed(move || {
+        if let Some(root) = closed.upgrade().and_then(|s| s.root.upgrade()) {
+            root.grab_focus();
+        }
+    });
+    let back = weak.clone();
+    back_button.connect_clicked(move |button| {
+        button.set_visible(false);
+        let Some(s) = back.upgrade() else { return };
+        if let Some((chapter_id, page)) = s.back_to.take() {
+            if let Some(index) = s.core.chapter_index(chapter_id) {
+                jump(&s, index, Some(page), false);
+            }
         }
     });
     let dismissed = weak.clone();
@@ -981,6 +1067,10 @@ fn handle_key(screen: &Rc<Screen>, key: gtk::gdk::Key, modifiers: gtk::gdk::Modi
         }
         return glib::Propagation::Stop;
     }
+    if key == gtk::gdk::Key::Escape && screen.chapter_panel.is_open() {
+        screen.chapter_panel.close();
+        return glib::Propagation::Stop;
+    }
     if key == gtk::gdk::Key::Escape {
         // first on the root, wherever the focus is: an open sheet is dismissed before anything else (T-043a-079)
         match state::escape_action(screen.sheet.is_open(), window_of(screen).is_some_and(|w| w.is_fullscreen())) {
@@ -1004,6 +1094,10 @@ fn handle_key(screen: &Rc<Screen>, key: gtk::gdk::Key, modifiers: gtk::gdk::Modi
     }
     if let Some(propagation) = shortcut(screen, key, modifiers) {
         return propagation;
+    }
+    if is_chapter_list_key(key, modifiers) {
+        toggle_chapter_panel(screen);
+        return glib::Propagation::Stop;
     }
     // the reader's focus is on the root, so the keys the viewer owns (arrows, page keys) come through here
     if screen.viewer_slot.borrow().as_ref().is_some_and(|v| v.handle_key(key, modifiers)) {
@@ -1364,11 +1458,71 @@ fn keep_menu_for_a_moment(screen: &Screen) {
     screen.keep_menu_until.set(Some(std::time::Instant::now() + std::time::Duration::from_millis(1200)));
 }
 
-/// Rebuilds the top bar when the chapter shown is not the current one.
+/// Rebuilds the top bar when the chapter shown is not the current one. An open chapter list follows it.
 fn sync_top_bar(screen: &Rc<Screen>) {
     if screen.core.current_chapter_id() != Some(screen.shown_chapter.get()) {
         rebuild_top_bar(screen);
+        if screen.chapter_panel.is_open() {
+            screen.chapter_panel.refresh(screen.core.chapter_rows());
+        }
     }
+}
+
+/// L, with no Ctrl or Alt, opens and closes the chapter list.
+fn is_chapter_list_key(key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType) -> bool {
+    let held = gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::ALT_MASK;
+    !modifiers.intersects(held) && key.to_unicode().is_some_and(|c| c.eq_ignore_ascii_case(&'l'))
+}
+
+/// Opens the chapter list, or closes it when it is open. Nothing opens before a chapter is loaded.
+fn toggle_chapter_panel(screen: &Rc<Screen>) {
+    if screen.chapter_panel.is_open() {
+        screen.chapter_panel.close();
+        return;
+    }
+    let rows = screen.core.chapter_rows();
+    if !rows.is_empty() {
+        keep_menu_for_a_moment(screen);
+        screen.chapter_panel.open(rows);
+    }
+}
+
+/// Opens the chapter at `index` of the reader's list, on `page` (0-based) or else where the chapter opens by itself.
+/// With `offer_back`, a button back to the chapter being left shows for a moment once the jump lands.
+fn jump(screen: &Rc<Screen>, index: usize, page: Option<usize>, offer_back: bool) {
+    if screen.core.current_index() == Some(index) || screen.stepping.replace(true) {
+        return;
+    }
+    let leaving = offer_back
+        .then(|| {
+            let id = screen.core.current_chapter_id()?;
+            let name = screen.core.top_bar()?.chapter_name;
+            let (current, _) = screen.core.page_counts();
+            Some((id, usize::try_from(current - 1).unwrap_or(0), name))
+        })
+        .flatten();
+    *screen.leaving.borrow_mut() = leaving;
+    keep_menu_for_a_moment(screen);
+    refresh(screen);
+    run_move(screen, Move::To { index, page });
+}
+
+/// How long the back button stays after a jump.
+const BACK_BUTTON_FOR: std::time::Duration = std::time::Duration::from_secs(8);
+
+fn show_back_button(screen: &Rc<Screen>, chapter_id: i64, page: usize, name: &str) {
+    screen.back_to.set(Some((chapter_id, page)));
+    screen.back_button.set_label(&strings::chapter_list_back(name));
+    screen.back_button.set_visible(true);
+    let shown = screen.back_shown.get() + 1;
+    screen.back_shown.set(shown);
+    let weak = Rc::downgrade(screen);
+    glib::timeout_add_local_once(BACK_BUTTON_FOR, move || {
+        if let Some(s) = weak.upgrade().filter(|s| s.back_shown.get() == shown) {
+            s.back_button.set_visible(false);
+            s.back_to.set(None);
+        }
+    });
 }
 
 /// Builds the top bar for the current chapter (T-043a-040): back, the manga and chapter title, the bookmark toggle
@@ -1399,6 +1553,14 @@ fn rebuild_top_bar(screen: &Rc<Screen>) {
             // the bar is rebuilt after the click has finished, so its icon and label follow the new state
             glib::idle_add_local_once(move || rebuild_top_bar(&screen));
         }),
+        on_chapters: {
+            let screen = Rc::downgrade(screen);
+            Box::new(move || {
+                if let Some(screen) = screen.upgrade() {
+                    toggle_chapter_panel(&screen);
+                }
+            })
+        },
     };
     let (bar, title) = build_top_bar(&info, actions);
     *screen.position.borrow_mut() = Some(title);
@@ -1484,29 +1646,48 @@ fn press(screen: &Rc<Screen>, step: Step) {
     }
     keep_menu_for_a_moment(screen);
     refresh(screen);
-    run_step(screen, step);
+    run_move(screen, Move::Step(step));
 }
 
-/// Loads the adjacent chapter on the next idle turn. A page list still being fetched keeps the navigator's spinner on
-/// and is asked for again shortly (the buttons stay disabled meanwhile); any other outcome ends the step.
-fn run_step(screen: &Rc<Screen>, step: Step) {
+/// A chapter change: a step to the next or previous chapter, or a jump from the chapter list to `index`, on `page` or
+/// else where the chapter opens by itself.
+#[derive(Clone, Copy)]
+enum Move {
+    Step(Step),
+    To { index: usize, page: Option<usize> },
+}
+
+/// Loads the chapter on the next idle turn. A page list still being fetched keeps the navigator's spinner on
+/// and is asked for again shortly (the buttons stay disabled meanwhile); any other outcome ends the move.
+fn run_move(screen: &Rc<Screen>, step: Move) {
     let screen = Rc::clone(screen);
     glib::idle_add_local_once(move || {
-        let outcome = screen.core.step(step);
+        let outcome = match step {
+            Move::Step(step) => screen.core.step(step),
+            Move::To { index, .. } => screen.core.jump_to(index),
+        };
         if matches!(&outcome, AdjacentOutcome::Failed(message) if source_pages::is_pending(message)) {
             let weak = Rc::downgrade(&screen);
             glib::timeout_add_local_once(PENDING_RETRY, move || {
                 if let Some(screen) = weak.upgrade() {
-                    run_step(&screen, step);
+                    run_move(&screen, step);
                 }
             });
             return;
         }
         screen.stepping.set(false);
+        let leaving = screen.leaving.borrow_mut().take();
         if matches!(outcome, AdjacentOutcome::Moved(_)) {
-            // the viewer shows the new chapter from its first page
+            // a step shows the new chapter from its first page; a jump where it opens (or the page the back button kept)
+            let page = match step {
+                Move::Step(_) => 0,
+                Move::To { page, .. } => page.unwrap_or_else(|| screen.core.requested_page()),
+            };
             reload_chapters(&screen);
-            move_viewer(&screen, 0);
+            move_viewer(&screen, page);
+            if let Some((chapter_id, page, name)) = leaving {
+                show_back_button(&screen, chapter_id, page, &name);
+            }
         }
         drain_events(&screen);
         sync_top_bar(&screen);
