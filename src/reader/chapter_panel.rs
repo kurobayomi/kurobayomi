@@ -37,15 +37,20 @@ pub fn number_text(number: f64) -> Option<String> {
     }
 }
 
-/// Whether `row` matches the search text: every row for a blank query, else a number that starts with it or a name
-/// (or scanlator) that contains it, ignoring case.
+/// Whether `row` matches the search text: every row for a blank query; for a number, a chapter number that starts with
+/// it (so "7" does not find chapter 57 through its name "Ch. 57"); else a name (or scanlator) that contains it, ignoring
+/// case. A chapter with no known number is searched by its name.
 pub fn matches(row: &Row, query: &str) -> bool {
     let query = query.trim().to_lowercase();
     if query.is_empty() {
         return true;
     }
-    number_text(row.number).is_some_and(|n| n.starts_with(&query))
-        || row.name.to_lowercase().contains(&query)
+    // digits and a dot only: `f64` parsing would also take words such as "nan" and "inf"
+    let numeric = query.chars().all(|c| c.is_ascii_digit() || c == '.') && query.chars().any(|c| c.is_ascii_digit());
+    if let Some(number) = number_text(row.number).filter(|_| numeric) {
+        return number.starts_with(&query);
+    }
+    row.name.to_lowercase().contains(&query)
         || row.scanlator.as_deref().is_some_and(|s| s.to_lowercase().contains(&query))
 }
 
@@ -343,6 +348,14 @@ mod tests {
         assert!(matches(&r, "rematch"));
         assert!(matches(&r, "lunar"));
         assert!(!matches(&r, "58"));
+    }
+
+    #[test]
+    fn a_word_that_reads_as_a_float_is_searched_as_text_and_an_unnumbered_chapter_by_its_name() {
+        let r = row(0, 3.0, "Nanatsu no Taizai");
+        assert!(matches(&r, "nan"), "\"nan\" is a word here, not a number");
+        let unknown = row(1, -1.0, "Extra 12");
+        assert!(matches(&unknown, "12"), "no chapter number: the name is searched");
     }
 
     #[test]
