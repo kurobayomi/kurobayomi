@@ -11,6 +11,10 @@
 //! Source traffic rule: the engine makes its own tracker and peer connections, outside the app's internet-only client.
 //! Trackers on this computer or a private network are dropped from the magnet before it is added, and local peer
 //! discovery is off. Peers learned from the DHT or from trackers are not filtered.
+//!
+//! Incoming peers: the engine listens on a port and asks the router to forward it (UPnP) while the app runs, as
+//! common torrent clients do by default. Without it only peers with an open port could be reached, and most home peers
+//! have none, so the first pieces took over a minute.
 
 use std::collections::HashSet;
 use std::io::SeekFrom;
@@ -20,7 +24,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use librqbit::dht::DhtPersistenceConfig;
-use librqbit::{AddTorrent, AddTorrentOptions, DhtSessionConfig, ManagedTorrent, Session, SessionOptions};
+use librqbit::{AddTorrent, AddTorrentOptions, DhtSessionConfig, ListenerOptions, ManagedTorrent, Session, SessionOptions};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::OnceCell;
@@ -172,6 +176,8 @@ async fn start(cache_dir: PathBuf) -> Result<Arc<Engine>, String> {
         }),
         persistence: None,
         disable_local_service_discovery: true,
+        // incoming peers on a port the router forwards (see the module docs)
+        listen: Some(ListenerOptions { enable_upnp_port_forwarding: true, ..Default::default() }),
         ..Default::default()
     };
     let session = Session::new_with_opts(files_dir, options).await.map_err(|e| format!("{e:#}"))?;
