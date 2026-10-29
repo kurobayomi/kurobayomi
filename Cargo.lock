@@ -3412,7 +3412,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-archive"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "chrono",
  "kuro-core",
@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-backup"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-channel",
  "chrono",
@@ -3448,7 +3448,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-core"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "icu_collator",
@@ -3476,7 +3476,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-data"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "chrono",
  "kuro-db",
@@ -3491,7 +3491,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-db"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "kuro-platform",
  "kuro-testkit",
@@ -3506,7 +3506,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-domain"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3537,7 +3537,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-downloads"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "futures",
@@ -3563,7 +3563,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-extensions"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-channel",
  "base64 0.23.1",
@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-i18n"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "chrono",
  "fluent-bundle",
@@ -3613,7 +3613,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-images"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "bytes",
  "chrono",
@@ -3641,7 +3641,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-local"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3663,7 +3663,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-net"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -3695,7 +3695,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-platform"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-channel",
  "async-trait",
@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-player"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-channel",
  "bytes",
@@ -3748,7 +3748,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-prefs"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "chrono",
  "kuro-i18n",
@@ -3761,7 +3761,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-source"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "bytes",
@@ -3782,7 +3782,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-source-http"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "bytes",
  "encoding_rs",
@@ -3798,7 +3798,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-source-scrape"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3822,7 +3822,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-source-wasm"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-channel",
  "async-trait",
@@ -3852,7 +3852,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-testkit"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "async-trait",
  "kuro-data",
@@ -3867,7 +3867,7 @@ dependencies = [
 
 [[package]]
 name = "kuro-track"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "ammonia",
  "async-trait",
@@ -3900,7 +3900,7 @@ dependencies = [
 
 [[package]]
 name = "kurobayomi"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "argon2",
  "async-channel",

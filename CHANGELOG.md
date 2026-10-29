@@ -6,6 +6,20 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-29
+
+### Added
+
+- The reader has a chapter list: the list button in its top bar (or L) opens it over the right side of the pages,
+  scrolled to the chapter being read. Type a number and press Enter to open that chapter, or a word to narrow the list
+  by name or scanlator. Read chapters are dimmed; bookmarked and downloaded ones carry an icon. After a jump, a "Back
+  to" button above the page slider returns to the chapter and page you left, for eight seconds.
+- The player has an episode list the same way: the list button in its top bar (or E) opens it over the video, scrolled
+  to the episode playing; type a number and press Enter to play that episode, Esc to close it.
+- The reader's page slider marks every page with a small tick (up to 100 pages).
+- Every top bar has a pin that keeps the window above other windows. It shows on X11 and Windows; Wayland does not let
+  apps ask for it, so it is hidden there.
+
 ## [0.2.7] - 2026-10-28
 
 ### Added
