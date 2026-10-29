@@ -226,7 +226,7 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     }
     crate::shell::kind_choice::follow(&kinds, ["anime", "manga"]);
     let header = crate::ui::header_bar();
-    header.set_decoration_layout(Some(&decoration(false)));
+    crate::ui::window_buttons(&header);
     if back {
         header.pack_start(&crate::ui::back_button());
     }

@@ -46,6 +46,19 @@ mod tests {
     }
 
     #[test]
+    fn a_page_header_carries_the_pin_next_to_the_window_buttons() {
+        crate::testing::with_display(|| {
+            let _ = crate::testing::nav();
+            let page = crate::ui::page("Title", &gtk::Label::new(None), vec![gtk::Button::new().upcast()], true);
+            let pins = crate::screens::alone::descendants(page.upcast_ref())
+                .into_iter()
+                .filter(|w| w.downcast_ref::<gtk::ToggleButton>().is_some_and(|b| b.icon_name().as_deref() == Some("view-pin-symbolic")))
+                .count();
+            assert_eq!(pins, 1, "a page header has one pin");
+        });
+    }
+
+    #[test]
     fn a_dialog_window_has_its_header_bar_as_its_titlebar() {
         crate::testing::with_display(|| {
             let _ = crate::testing::nav();

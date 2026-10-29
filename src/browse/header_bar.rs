@@ -42,7 +42,7 @@ const TITLE_MIN_PX: i32 = 48;
 
 pub fn build(deps: HeaderDeps) -> SourceHeader {
     let bar = crate::ui::header_bar();
-    bar.set_decoration_layout(Some(&crate::ui::decoration(false)));
+    crate::ui::window_buttons(&bar);
     // an Inscription, not a Label: an ellipsized label still needs the width of "…", which kept the window from 360 px
     // the natural width counts average-width characters, so a name of wide letters ("AnimePahe") needs more than its count
     let chars = u32::try_from(deps.source_name.chars().count()).unwrap_or(u32::MAX).saturating_mul(3) / 2 + 1;
@@ -90,7 +90,7 @@ pub fn build(deps: HeaderDeps) -> SourceHeader {
 /// The header of a page that has nothing but its title and a way back: the missing-source page (T-41a-008).
 pub fn stub_header(title: &str, on_back: Rc<dyn Fn()>) -> gtk::HeaderBar {
     let bar = crate::ui::header_bar();
-    bar.set_decoration_layout(Some(&crate::ui::decoration(false)));
+    crate::ui::window_buttons(&bar);
     bar.set_title_widget(Some(&gtk::Label::builder().label(title).css_classes(["title"]).ellipsize(gtk::pango::EllipsizeMode::End).build()));
     bar.pack_start(&back_button(on_back));
     crate::ui::no_sticky_focus(&bar);

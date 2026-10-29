@@ -129,7 +129,7 @@ fn every_key_renders_with_its_declared_arguments() {
 #[test]
 fn key_table_matches_english_file() {
     assert_eq!(MsgKey::ALL.len(), MSG_COUNT);
-    assert_eq!(MSG_COUNT, 1682, "1343 from the Aniyomi base (1434 minus the 91 dropped names) and the 339 in kurobayomi-extra.ftl");
+    assert_eq!(MSG_COUNT, 1683, "1343 from the Aniyomi base (1434 minus the 91 dropped names) and the 340 in kurobayomi-extra.ftl");
     let ids: HashSet<&str> = MsgKey::ALL.iter().map(|k| k.id()).collect();
     assert_eq!(ids.len(), MSG_COUNT, "ids are unique");
     assert_eq!(MsgKey::r#type.id(), "type");

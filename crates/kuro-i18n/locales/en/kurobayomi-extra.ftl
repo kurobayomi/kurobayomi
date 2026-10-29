@@ -1039,3 +1039,6 @@ reader_chapter_list_back = Back to { $chapter }
 
 # source: kurobayomi
 player_episode_list_search = Episode number or name
+
+# source: kurobayomi
+window_keep_above = Keep above other windows

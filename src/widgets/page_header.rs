@@ -89,7 +89,7 @@ pub fn page_position(page: i32, total: i32) -> Option<String> {
 /// first widget it packs with `pack_end` sits at the far right.
 pub fn header(title: &impl IsA<gtk::Widget>, on_back: impl Fn() + 'static) -> gtk::HeaderBar {
     let header = crate::ui::header_bar();
-    header.set_decoration_layout(Some(&crate::ui::decoration(false)));
+    crate::ui::window_buttons(&header);
     header.set_title_widget(Some(title.upcast_ref()));
     let back = crate::ui::icon_button("go-previous-symbolic", &tr(MsgKey::action_webview_back));
     back.connect_clicked(move |_| on_back());

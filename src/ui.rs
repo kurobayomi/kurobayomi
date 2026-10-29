@@ -194,6 +194,44 @@ pub fn header_bar() -> gtk::HeaderBar {
     header
 }
 
+thread_local! {
+    /// Whether the window is kept above other windows; every header's pin shows it.
+    static PINNED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The window buttons of a content header (the right part of the layout), with the pin just before them. Call it before
+/// packing anything else at the end, so the pin sits next to the window buttons.
+pub fn window_buttons(header: &gtk::HeaderBar) {
+    header.set_decoration_layout(Some(&decoration(false)));
+    header.pack_end(&pin_button());
+}
+
+/// Keeps the window above other windows while active. It hides itself where the system cannot do that (Wayland), and
+/// takes the window's state each time its page shows, so the pins of every page agree.
+fn pin_button() -> gtk::ToggleButton {
+    let pin = gtk::ToggleButton::builder().icon_name("view-pin-symbolic").tooltip_text(tr(MsgKey::window_keep_above)).build();
+    pin.set_focus_on_click(false);
+    let surface = |pin: &gtk::ToggleButton| pin.native().and_then(|n| n.surface());
+    pin.connect_realize(move |pin| {
+        if !surface(pin).is_some_and(|s| kuro_platform::window_level::can_keep_above(&s)) {
+            pin.set_visible(false);
+        }
+    });
+    pin.connect_map(|pin| pin.set_active(PINNED.with(std::cell::Cell::get)));
+    pin.connect_toggled(move |pin| {
+        let above = pin.is_active();
+        if above == PINNED.with(std::cell::Cell::get) {
+            return;
+        }
+        if surface(pin).is_some_and(|s| kuro_platform::window_level::set_keep_above(&s, above)) {
+            PINNED.with(|p| p.set(above));
+        } else {
+            pin.set_active(!above);
+        }
+    });
+    pin
+}
+
 /// The Anime | Manga switch of a page header, and the row under the header that takes it in a narrow window. Below the
 /// width where the sidebar gives way to the bottom bar (`shell::layout::WIDE_MIN_WIDTH_PX`) the header keeps only its
 /// buttons and the window buttons, so it fits a window down to the 360 px minimum; the switch then sits centred in its own
@@ -302,7 +340,7 @@ pub fn search_row(entry: &gtk::SearchEntry, page: &impl IsA<gtk::Widget>) -> (gt
 /// switcher) among `end` goes to the start of the row, after Back, where the Library has its switch.
 pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>, back: bool) -> GBox {
     let header = header_bar();
-    header.set_decoration_layout(Some(&decoration(false)));
+    window_buttons(&header);
     let b = GBox::new(O::Vertical, 0);
     let mut end = end;
     let mut bar = None;

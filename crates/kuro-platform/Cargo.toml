@@ -17,6 +17,8 @@ async-channel = { workspace = true }
 async-trait = { workspace = true }
 chacha20poly1305 = "0.10.1"
 directories = { workspace = true }
+# the app window's surface, for keeping it above other windows (window_level)
+gdk = { version = "0.11.5", package = "gdk4" }
 # the system keyring: the Secret Service on Linux, the Credential Manager on Windows
 keyring = { workspace = true, optional = true }
 libc = "0.2.189"
@@ -38,6 +40,9 @@ zbus = "5.13.2"
 webkit6 = "0.6"
 # webkit6 needs GTK's 4.10+ API switched on; the app does that too (v4_14), this keeps the crate building on its own
 gtk = { version = "0.11.5", package = "gtk4", features = ["v4_14"] }
+# keeping the window above others on X11: the window's id from GDK, the window manager asked over its own connection
+gdk-x11 = { version = "0.11.5", package = "gdk4-x11" }
+x11rb = "0.13.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Globalization", "Win32_Graphics_OpenGL", "Win32_Storage_FileSystem", "Win32_System_Com", "Win32_System_LibraryLoader", "Win32_System_Registry", "Win32_System_SystemInformation", "Win32_System_Threading", "Win32_System_WindowsProgramming", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
@@ -45,6 +50,8 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Globa
 # API. webview2-com speaks the `windows` crate's types, so that crate is used for those calls
 webview2-com = "0.39"
 windows = { version = "0.62", features = ["Win32_Foundation"] }
+# the window handle behind a GDK surface (window_level)
+gdk-win32 = { version = "0.11.5", package = "gdk4-win32" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros", "rt", "time", "net", "io-util"] }
