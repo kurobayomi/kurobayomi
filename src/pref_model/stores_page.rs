@@ -203,7 +203,7 @@ pub fn build<T: Keyed + Send + 'static>(
     let list = crate::ui::boxed_list();
     let column = crate::ui::column();
     // a page of repositories filters their sources by kind and language, with the search
-    let kinds = ops.has_sources().then(|| gtk::DropDown::from_strings(&[&tr(MsgKey::label_all), &tr(MsgKey::label_anime), &tr(MsgKey::label_manga)]));
+    let kinds = ops.has_sources().then(|| gtk::DropDown::from_strings(&[&tr(MsgKey::label_all), &tr(MsgKey::label_anime), &tr(MsgKey::label_manga), &tr(MsgKey::label_torrent)]));
     let languages = ops.has_sources().then(|| gtk::DropDown::from_strings(&[&tr(MsgKey::source_switch_all_languages)]));
     if let (Some(kinds), Some(languages)) = (&kinds, &languages) {
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -260,7 +260,12 @@ pub fn build<T: Keyed + Send + 'static>(
         let weak = Rc::downgrade(&inner);
         kinds.connect_selected_notify(move |drop| {
             if let Some(page) = weak.upgrade() {
-                page.filter.borrow_mut().kind = [None, Some(Kind::Anime), Some(Kind::Manga)].get(drop.selected() as usize).copied().flatten();
+                // the fourth entry, Torrent, keeps every kind and shows the torrent sources alone
+                {
+                    let mut filter = page.filter.borrow_mut();
+                    filter.kind = [None, Some(Kind::Anime), Some(Kind::Manga)].get(drop.selected() as usize).copied().flatten();
+                    filter.torrent = drop.selected() == 3;
+                }
                 page.refilter();
             }
         });
@@ -847,14 +852,14 @@ mod tests {
             true
         }
         fn sources_list(&self, _key: &str, filter: Rc<RefCell<SourceFilter>>) -> Option<(gtk::ListBox, Vec<String>)> {
-            const SOURCES: [(&str, Kind, &str); 2] = [("Alpha", Kind::Anime, "en"), ("Beta", Kind::Manga, "ru")];
+            const SOURCES: [(&str, Kind, &str, bool); 2] = [("Alpha", Kind::Anime, "en", true), ("Beta", Kind::Manga, "ru", false)];
             let list = crate::ui::boxed_list();
-            for (name, _, _) in SOURCES {
+            for (name, _, _, _) in SOURCES {
                 list.append(&crate::ui::row(name, None, None));
             }
             list.set_filter_func(move |row| {
-                let (name, kind, lang) = SOURCES[row.index() as usize];
-                filter.borrow().shows(name, kind, lang)
+                let (name, kind, lang, torrent) = SOURCES[row.index() as usize];
+                filter.borrow().shows(name, kind, lang, torrent)
             });
             Some((list, vec!["en".into(), "ru".into()]))
         }

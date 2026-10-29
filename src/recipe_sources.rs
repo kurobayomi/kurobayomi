@@ -834,6 +834,7 @@ mod tests {
             icon_sha256: None,
             status: repo::Status::Active,
             description: text.map(str::to_owned),
+            torrent: false,
             added: None,
             updated: None,
         };

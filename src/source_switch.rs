@@ -323,12 +323,17 @@ pub struct SourceFilter {
     pub kind: Option<Kind>,
     /// One language code only ("ru"); `None` is every language.
     pub lang: Option<String>,
+    /// Torrent sources only.
+    pub torrent: bool,
 }
 
 impl SourceFilter {
-    /// Whether a source of `kind` and `lang`, found by `text` ([`search_text`]), shows.
-    pub fn shows(&self, text: &str, kind: Kind, lang: &str) -> bool {
-        self.kind.is_none_or(|k| k == kind) && self.lang.as_deref().is_none_or(|l| l == lang) && crate::ui::title_matches(text, &self.query)
+    /// Whether a source of `kind` and `lang`, a torrent source when `torrent`, found by `text` ([`search_text`]), shows.
+    pub fn shows(&self, text: &str, kind: Kind, lang: &str, torrent: bool) -> bool {
+        self.kind.is_none_or(|k| k == kind)
+            && self.lang.as_deref().is_none_or(|l| l == lang)
+            && (!self.torrent || torrent)
+            && crate::ui::title_matches(text, &self.query)
     }
 }
 
@@ -343,12 +348,12 @@ pub fn sources_list(link: &str, filter: Rc<std::cell::RefCell<SourceFilter>>) ->
     entries.sort_by(|a, b| (a.kind != Kind::Anime, &a.lang, a.name.to_lowercase()).cmp(&(b.kind != Kind::Anime, &b.lang, b.name.to_lowercase())));
     let languages: Vec<String> = entries.iter().map(|entry| entry.lang.clone()).collect::<BTreeSet<_>>().into_iter().collect();
     // what each row is found by, in row order: rows are never removed, so a row's index names its source
-    let rows: Vec<(String, Kind, String)> = entries.iter().map(|entry| (search_text(entry), entry.kind, entry.lang.clone())).collect();
+    let rows: Vec<(String, Kind, String, bool)> = entries.iter().map(|entry| (search_text(entry), entry.kind, entry.lang.clone(), entry.torrent)).collect();
     for entry in entries {
         list.append(&picker_row(&prefs, link, entry));
     }
     list.set_filter_func(move |row| {
-        usize::try_from(row.index()).ok().and_then(|i| rows.get(i)).is_none_or(|(text, kind, lang)| filter.borrow().shows(text, *kind, lang))
+        usize::try_from(row.index()).ok().and_then(|i| rows.get(i)).is_none_or(|(text, kind, lang, torrent)| filter.borrow().shows(text, *kind, lang, *torrent))
     });
     Some((list, languages))
 }
@@ -381,15 +386,21 @@ pub fn open_picker(link: &str) {
 
 /// What a picker row is found by: the source's name, language, kind and description.
 fn search_text(entry: &Entry) -> String {
-    let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
+    let kind = kind_label(entry);
     let language = crate::browse::names::localized_display_name(&entry.lang);
     let about = crate::recipe_sources::described(entry).unwrap_or_default();
     format!("{} {language} {kind} {about}", entry.name)
 }
 
+/// "Anime" or "Manga", with "· Torrent" after it for a torrent source.
+fn kind_label(entry: &Entry) -> String {
+    let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
+    if entry.torrent { format!("{kind} · {}", tr(MsgKey::label_torrent)) } else { kind }
+}
+
 /// One row of the picker: icon, name, language and kind, and the switch.
 fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow {
-    let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
+    let kind = kind_label(entry);
     let mut subtitle = format!("{} · {kind}", crate::browse::names::localized_display_name(&entry.lang));
     if let Some(about) = crate::recipe_sources::described(entry) {
         subtitle = format!("{subtitle}\n{about}");
@@ -591,13 +602,16 @@ mod tests {
     #[test]
     fn the_filter_shows_a_source_only_when_its_text_kind_and_language_all_match() {
         let everything = SourceFilter::default();
-        assert!(everything.shows("Senkuro", Kind::Manga, "ru"));
+        assert!(everything.shows("Senkuro", Kind::Manga, "ru", false));
         let manga = SourceFilter { kind: Some(Kind::Manga), ..SourceFilter::default() };
-        assert!(manga.shows("Senkuro", Kind::Manga, "ru") && !manga.shows("AnimeGG", Kind::Anime, "en"));
+        assert!(manga.shows("Senkuro", Kind::Manga, "ru", false) && !manga.shows("AnimeGG", Kind::Anime, "en", false));
         let russian = SourceFilter { lang: Some("ru".into()), ..SourceFilter::default() };
-        assert!(russian.shows("Senkuro", Kind::Manga, "ru") && !russian.shows("MangaDex", Kind::Manga, "en"));
-        let both = SourceFilter { query: "ink".into(), kind: Some(Kind::Manga), lang: Some("ru".into()) };
-        assert!(both.shows("InkStory", Kind::Manga, "ru") && !both.shows("Senkuro", Kind::Manga, "ru"));
+        assert!(russian.shows("Senkuro", Kind::Manga, "ru", false) && !russian.shows("MangaDex", Kind::Manga, "en", false));
+        let both = SourceFilter { query: "ink".into(), kind: Some(Kind::Manga), lang: Some("ru".into()), torrent: false };
+        assert!(both.shows("InkStory", Kind::Manga, "ru", false) && !both.shows("Senkuro", Kind::Manga, "ru", false));
+        let torrents = SourceFilter { torrent: true, ..SourceFilter::default() };
+        assert!(torrents.shows("SubsPlease", Kind::Anime, "all", true) && !torrents.shows("AnimeGG", Kind::Anime, "en", false));
+        assert!(everything.shows("SubsPlease", Kind::Anime, "all", true), "no filter shows torrent sources too");
     }
 
     #[test]

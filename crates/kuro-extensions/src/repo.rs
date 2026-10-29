@@ -49,6 +49,10 @@ pub struct Entry {
     /// Optional: an older index has none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Whether the source's videos are torrents (magnet links), which the app streams with its own torrent engine.
+    /// The Sources page can show these alone. Missing means not a torrent source.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub torrent: bool,
     /// When the repository first listed the source, and when it last changed it (`YYYY-MM-DD`), shown under the
     /// description. Optional: an older index has none, and a malformed date reads as none.
     #[serde(default, deserialize_with = "lenient_date", skip_serializing_if = "Option::is_none")]
@@ -430,6 +434,15 @@ mod tests {
         assert_eq!(index.sources[0].description.as_deref(), Some("Webtoons with dates"));
         assert_eq!(index.sources[1].description, None, "an older index has none");
         assert!(!serde_json::to_string(&index.sources[1]).unwrap().contains("description"), "none is not written out");
+    }
+
+    #[test]
+    fn the_torrent_flag_is_read_when_given_and_false_otherwise() {
+        let torrent = entry("a", "anime", "all").replace(r#""version":1"#, r#""version":1,"torrent":true"#);
+        let index = parse_index(&index_of(&[torrent, entry("b", "anime", "en")])).unwrap();
+        assert!(index.sources[0].torrent);
+        assert!(!index.sources[1].torrent, "an older index has none");
+        assert!(!serde_json::to_string(&index.sources[1]).unwrap().contains("torrent"), "false is not written out");
     }
 
     #[test]

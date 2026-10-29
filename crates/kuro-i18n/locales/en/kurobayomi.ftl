@@ -5149,3 +5149,6 @@ torrent_no_peers = No one is sharing this torrent right now, so it cannot play. 
 
 # source: kurobayomi
 torrent_no_video = This torrent holds no video file
+
+# source: kurobayomi
+label_torrent = Torrent
