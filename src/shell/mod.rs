@@ -8,7 +8,7 @@
 pub mod appbar;
 pub mod argv;
 pub mod banners;
-// the holds wait for the torrent and HTTP servers (T-53a-035), which start them from their own lanes
+// the holds wait for the HTTP server (T-53a-035), which starts them from their own lanes
 // the splash timing and the migration gate wait for the startup lane; the downloaded filter waits for the reader's call
 pub mod bootstrap;
 // the route table and the share flow are called by the window's launch code, which applies their steps in its own lane

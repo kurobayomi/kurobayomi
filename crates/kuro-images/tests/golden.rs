@@ -124,7 +124,6 @@ fn g_exc() {
         message: message.map(str::to_owned),
     };
     let rows = [
-        (AppError::TorrServerDisabled, "TorrServer is not running"),
         (
             AppError::Http { code: 404 },
             "HTTP 404, check website in WebView",

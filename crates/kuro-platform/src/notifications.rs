@@ -21,8 +21,8 @@ pub struct NotificationCategory {
     pub silent: bool,
 }
 
-/// The 13 channels that the app registers at startup, in the order of the Kotlin file.
-pub const CATEGORIES: [NotificationCategory; 13] = [
+/// The 12 channels that the app registers at startup, in the order of the Kotlin file.
+pub const CATEGORIES: [NotificationCategory; 12] = [
     NotificationCategory { channel_id: "common_channel", group: None, importance: Importance::Low, name_key: "channel_common", show_badge: true, silent: false },
     NotificationCategory { channel_id: "library_progress_channel", group: Some("group_library"), importance: Importance::Low, name_key: "channel_progress", show_badge: false, silent: false },
     NotificationCategory { channel_id: "library_errors_channel", group: Some("group_library"), importance: Importance::Low, name_key: "channel_errors", show_badge: false, silent: false },
@@ -32,7 +32,6 @@ pub const CATEGORIES: [NotificationCategory; 13] = [
     NotificationCategory { channel_id: "backup_restore_progress_channel", group: Some("group_backup_restore"), importance: Importance::Low, name_key: "channel_progress", show_badge: false, silent: false },
     NotificationCategory { channel_id: "backup_restore_complete_channel_v2", group: Some("group_backup_restore"), importance: Importance::High, name_key: "channel_complete", show_badge: false, silent: true },
     NotificationCategory { channel_id: "incognito_mode_channel", group: None, importance: Importance::Low, name_key: "pref_incognito_mode", show_badge: true, silent: false },
-    NotificationCategory { channel_id: "torrent_server_channel", group: None, importance: Importance::Low, name_key: "pref_category_torrentserver", show_badge: false, silent: false },
     NotificationCategory { channel_id: "http_server_channel", group: None, importance: Importance::Low, name_key: "pref_http_server_name", show_badge: false, silent: false },
     NotificationCategory { channel_id: "app_apk_update_channel", group: Some("group_apk_updates"), importance: Importance::Default, name_key: "channel_app_updates", show_badge: true, silent: false },
     NotificationCategory { channel_id: "ext_apk_update_channel", group: Some("group_apk_updates"), importance: Importance::Default, name_key: "channel_ext_updates", show_badge: true, silent: false },
@@ -79,7 +78,7 @@ pub fn hints(category: &NotificationCategory) -> Hints {
         "library_progress_channel" | "downloader_progress_channel" | "backup_restore_progress_channel"
         | "backup_restore_complete_channel_v2" => Some("transfer"),
         "library_errors_channel" | "downloader_error_channel" => Some("transfer.error"),
-        "torrent_server_channel" | "http_server_channel" => Some("device"),
+        "http_server_channel" => Some("device"),
         _ => None,
     };
     Hints {
@@ -127,7 +126,6 @@ mod tests {
         assert_eq!(cat("library_errors_channel"), Some("transfer.error"));
         assert_eq!(cat("downloader_error_channel"), Some("transfer.error"));
         assert_eq!(cat("http_server_channel"), Some("device"));
-        assert_eq!(cat("torrent_server_channel"), Some("device"));
         assert_eq!(cat("common_channel"), None);
     }
 }

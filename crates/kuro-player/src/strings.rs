@@ -81,7 +81,6 @@ pub const TABLE: &[Entry] = &[
     fixed("picture_saved", "Picture saved"),
     fixed("http_server_start_failure", "Failed to start http server"),
     fixed("http_server_is_running", "Http server is running"),
-    fixed("torrentserver_is_running", "Torrent Server is running"),
     fixed("action_close", "Close"),
     fixed("action_stop", "Stop"),
     fixed("player_screenshot_failed", "Screenshot failed"),

@@ -20,7 +20,6 @@ use crate::reader::ReaderPrefs;
 use crate::settings_load;
 use crate::source::SourcePrefs;
 use crate::store::PrefStore;
-use crate::torrent::TorrentPrefs;
 use crate::ui::UiPrefs;
 
 /// Every preference section. Clones of a section share the store.
@@ -32,8 +31,6 @@ pub struct Prefs {
     pub network: NetworkPrefs,
     pub reader: ReaderPrefs,
     pub player: PlayerPrefs,
-    /// `[torrent]`: the embedded torrent server settings (T-02a-021).
-    pub torrent: TorrentPrefs,
     /// `[backup]`: the automatic backup interval and its app state (T-02a-024).
     pub backup: BackupPrefs,
     /// `[storage]`: the chosen base storage folder (T-02a-024).
@@ -75,7 +72,6 @@ impl Prefs {
             network: NetworkPrefs::new(store.clone()),
             reader: ReaderPrefs::new(store.clone()),
             player: PlayerPrefs::new(store.clone()),
-            torrent: TorrentPrefs::new(store.clone()),
             backup: BackupPrefs::new(store.clone()),
             storage: StoragePrefs::new(store.clone()),
             secrets,
@@ -103,7 +99,6 @@ impl Prefs {
         self.network.repair()?;
         self.reader.repair()?;
         self.player.repair()?;
-        self.torrent.repair()?;
         self.backup.repair()?;
         self.storage.repair()
     }
@@ -138,7 +133,6 @@ mod tests {
         let changes = prefs.store().subscribe();
         prefs.base.incognito_mode.set(true).unwrap();
         assert!(prefs.base.incognito_mode.get());
-        assert!(prefs.torrent.torr_server_port.get() == "8090");
         assert!(changes.try_recv().is_ok(), "a set publishes a change event");
     }
 

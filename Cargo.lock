@@ -3823,7 +3823,6 @@ dependencies = [
  "md-5",
  "proptest",
  "quick-xml 0.42.0",
- "reqwest",
  "serde",
  "serde_json",
  "sha1 0.11.0",

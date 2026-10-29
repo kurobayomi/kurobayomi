@@ -76,8 +76,7 @@ mod tests {
 
     use super::*;
 
-    /// Files that may hold the text `content://` in code: the cover loader refuses such a URL, and the torrent route of the
-    /// player crate is outside `src/`.
+    /// Files that may hold the text `content://` in code: the cover loader refuses such a URL.
     const CONTENT_URI_REFUSERS: [&str; 1] = ["src/feed/cover.rs"];
 
     fn root() -> PathBuf {

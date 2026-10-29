@@ -30,7 +30,6 @@ const ALLOWED: &[(&str, &str, &str)] = &[
     ("src/channel.rs", "REPOSITORY", "a GitHub owner/name, not shown"),
     ("src/reader/viewers/nav.rs", "*", "overlay labels as message key plus English fallback"),
     ("src/shell/desktop_labels.rs", "*", "the table of desktop action keys: each row names its message keys and keeps the English as a fallback"),
-    ("src/entry_core/details/torrent_server.rs", "*", "HTTP bytes of a local probe and a developer-facing error"),
     ("src/library_update/store.rs", "*", "SQL"),
     ("src/settings.rs", "SELECT count(*) FROM items i JOIN entries e ON e._id = i.entry_id WHERE e.kind = ?1", "SQL"),
     ("src/player_view/hls_proxy.rs", "*", "HTTP bytes of the local relay"),

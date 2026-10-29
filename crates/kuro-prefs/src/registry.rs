@@ -183,37 +183,6 @@ pub fn find_path(path: &str) -> Option<&'static PrefMeta> {
     REGISTRY.iter().find(|m| m.table == table && m.field == field)
 }
 
-/// Plan `pref_torrserver_tackers` default: 26 announce URLs, spaces removed, newline-joined,
-/// no trailing newline (p1-data-and-config.md section 6.1).
-pub const TORRSERVER_TRACKERS: &str = concat!(
-    "http://nyaa.tracker.wf:7777/announce\n",
-    "http://anidex.moe:6969/announce\n",
-    "http://tracker.anirena.com:80/announce\n",
-    "udp://tracker.uw0.xyz:6969/announce\n",
-    "http://share.camoe.cn:8080/announce\n",
-    "http://t.nyaatracker.com:80/announce\n",
-    "udp://47.ip-51-68-199.eu:6969/announce\n",
-    "udp://9.rarbg.me:2940\n",
-    "udp://9.rarbg.to:2820\n",
-    "udp://exodus.desync.com:6969/announce\n",
-    "udp://explodie.org:6969/announce\n",
-    "udp://ipv4.tracker.harry.lu:80/announce\n",
-    "udp://open.stealth.si:80/announce\n",
-    "udp://opentor.org:2710/announce\n",
-    "udp://opentracker.i2p.rocks:6969/announce\n",
-    "udp://retracker.lanta-net.ru:2710/announce\n",
-    "udp://tracker.cyberia.is:6969/announce\n",
-    "udp://tracker.dler.org:6969/announce\n",
-    "udp://tracker.ds.is:6969/announce\n",
-    "udp://tracker.internetwarriors.net:1337\n",
-    "udp://tracker.openbittorrent.com:6969/announce\n",
-    "udp://tracker.opentrackr.org:1337/announce\n",
-    "udp://tracker.tiny-vps.com:6969/announce\n",
-    "udp://tracker.torrent.eu.org:451/announce\n",
-    "udp://valakas.rollo.dnsabr.com:2710/announce\n",
-    "udp://www.torrent.eu.org:451/announce",
-);
-
 #[rustfmt::skip]
 define_prefs! {
     "__APP_STATE_pref_downloaded_only", AppState, Bool, false, "base", "downloaded_only";
@@ -260,12 +229,6 @@ define_prefs! {
     "backup_interval", Normal, Int, 12, "backup", "backup_interval";
     "__APP_STATE_last_auto_backup_timestamp", AppState, Long, 0, "backup", "last_auto_backup_timestamp";
     "__APP_STATE_storage_dir", AppState, Str, "", "storage", "base_storage_directory";
-    "pref_torrserver_enable", Normal, Bool, false, "torrent", "torr_server_enable";
-    "pref_torrserver_shownotice", Normal, Bool, false, "torrent", "torr_server_shown_notice";
-    "pref_torrserver_port", Normal, Str, "8090", "torrent", "torr_server_port";
-    "pref_torrserver_tackers", Normal, Str, TORRSERVER_TRACKERS, "torrent", "torr_server_trackers";
-    "pref_torrserver_proxymode", Normal, Str, "None", "torrent", "torr_server_proxy_mode";
-    "pref_torrserver_proxyurl", Normal, Str, "", "torrent", "torr_server_proxy_url";
     "pref_default_reading_mode_key", Normal, Int, 1, "reader", "default_reading_mode";
     "pref_image_scale_type_key", Normal, Int, 1, "reader", "image_scale_type";
     "pref_zoom_start_key", Normal, Int, 1, "reader", "zoom_start";
@@ -298,7 +261,7 @@ define_prefs! {
 /// The registry holds no row for them, a restore skips them ([`is_dropped`]) and nothing reads them, so an old
 /// `config.toml` or an Aniyomi backup that still carries one loads and restores without it. Each key and its reason
 /// is recorded in `docs/drop-decisions.md`.
-pub const DROPPED_KEYS: [&str; 277] = [
+pub const DROPPED_KEYS: [&str; 283] = [
     "extension_installer",
     "pref_hardware_bitmap_threshold",
     "eh_enable_source_blacklist",
@@ -578,6 +541,13 @@ pub const DROPPED_KEYS: [&str; 277] = [
     // source pinning, cut for one on/off switch per source (2026-10-23)
     "pinned_anime_catalogues",
     "pinned_catalogues",
+    // the TorrServer settings, cut when torrents started playing in the app with no settings (2026-10-29)
+    "pref_torrserver_enable",
+    "pref_torrserver_shownotice",
+    "pref_torrserver_port",
+    "pref_torrserver_tackers",
+    "pref_torrserver_proxymode",
+    "pref_torrserver_proxyurl",
 ];
 
 /// Whether `key` (as stored, without the backup prefix) belongs to a dropped feature.
@@ -675,16 +645,15 @@ mod tests {
     }
 
     /// Defaults the plan gives as prose, pinned to the value the registry must hold on Linux.
-    const PROSE_DEFAULTS: [(&str, Lit); 3] = [
+    const PROSE_DEFAULTS: [(&str, Lit); 2] = [
         ("source_languages", Lit::Set(&["all", "en"])),
         ("__APP_STATE_storage_dir", Lit::Str("")),
-        ("pref_torrserver_tackers", Lit::Str(TORRSERVER_TRACKERS)),
     ];
 
     #[test]
     fn registry_has_the_60_plan_rows_in_order() {
         let rows = plan_rows();
-        assert_eq!(rows.len(), 60, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
+        assert_eq!(rows.len(), 54, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
         // four Kurobayomi rows after the plan's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
         // (T-req-platform-004), `check_app_updates` (the update toggle, back from the settings diet, on by default) and
         // `last_kind` (the Anime | Manga choice every page shares), `appimage_menu_removed` (the user took the AppImage

@@ -12,8 +12,6 @@ pub mod loader;
 pub mod model;
 pub mod registry;
 pub mod thumbnail;
-pub mod torrent;
-pub mod torrent_lookup;
 pub mod traits;
 pub mod url;
 pub mod video;

@@ -36,11 +36,6 @@ pub fn continue_opens_external(always_external: bool) -> bool {
     always_external
 }
 
-/// The torrent server starts before the player opens, and only for a torrent source (17.5).
-pub fn starts_torrent_server(is_torrent: bool) -> bool {
-    is_torrent
-}
-
 /// The write of a row menu item on one episode, or `None` for the items that are not a flag write (Mark previous,
 /// Download and Select, which the caller runs). Bookmark goes through `bulk_mark_targets`, as the bottom bar does, so
 /// a menu item and a bulk action write the same way.
@@ -62,22 +57,20 @@ pub enum MenuEffect {
     Mark { ids: Vec<i64>, mark: Mark, on: bool },
 }
 
-/// How an episode is opened: the player, and whether the torrent server starts first.
+/// How an episode is opened: in the external player or the internal one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OpenPlan {
     pub external: bool,
-    pub torrent_server: bool,
 }
 
-/// What a tap on a row does (17.4): external is `always_external XOR alt`. The torrent server starts only when the
-/// torrent setting is on and the source is a torrent source (17.5).
-pub fn tap_plan(always_external: bool, alt: bool, torrent_enabled: bool, torrent_source: bool) -> OpenPlan {
-    OpenPlan { external: tap_opens_external(always_external, alt), torrent_server: starts_torrent_server(torrent_enabled && torrent_source) }
+/// What a tap on a row does (17.4): external is `always_external XOR alt`.
+pub fn tap_plan(always_external: bool, alt: bool) -> OpenPlan {
+    OpenPlan { external: tap_opens_external(always_external, alt) }
 }
 
 /// What continue watching and the season continue button do (17.2, 17.3): the setting as it is, with no inversion.
-pub fn continue_plan(always_external: bool, torrent_enabled: bool, torrent_source: bool) -> OpenPlan {
-    OpenPlan { external: continue_opens_external(always_external), torrent_server: starts_torrent_server(torrent_enabled && torrent_source) }
+pub fn continue_plan(always_external: bool) -> OpenPlan {
+    OpenPlan { external: continue_opens_external(always_external) }
 }
 
 #[cfg(test)]
@@ -95,10 +88,9 @@ mod tests {
     }
 
     #[test]
-    fn a_tap_plan_opens_externally_with_alt_and_starts_the_server_only_for_torrents() {
-        assert_eq!(tap_plan(false, false, true, false), OpenPlan { external: false, torrent_server: false });
-        assert_eq!(tap_plan(false, true, false, true), OpenPlan { external: true, torrent_server: false }, "the setting is off");
-        assert_eq!(tap_plan(false, false, true, true), OpenPlan { external: false, torrent_server: true });
+    fn a_tap_plan_opens_externally_with_alt() {
+        assert_eq!(tap_plan(false, false), OpenPlan { external: false });
+        assert_eq!(tap_plan(false, true), OpenPlan { external: true });
     }
 
     fn ep(id: i64, bookmark: bool, fillermark: bool) -> Item {
@@ -133,11 +125,5 @@ mod tests {
     fn tap_opens_internal_by_default_and_external_with_alt() {
         assert!(!tap_opens_external(false, false), "internal by default");
         assert!(tap_opens_external(false, true), "alt opens external");
-    }
-
-    #[test]
-    fn torrent_server_only_for_torrent_sources() {
-        assert!(starts_torrent_server(true));
-        assert!(!starts_torrent_server(false));
     }
 }

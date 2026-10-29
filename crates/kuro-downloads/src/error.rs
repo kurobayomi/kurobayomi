@@ -60,8 +60,8 @@ pub enum DownloadError {
     /// A folder move would cross filesystems. Holds the target path. No copy fallback (T-24a-071, E-F16).
     #[error("Cannot move the download to another disk: {0}")]
     CrossDevice(String),
-    /// A torrent link while the build has no `torrent-server` feature, or the server is not reachable (E-X04).
-    #[error("Torrent server is not available")]
+    /// A torrent link: torrent episodes play in the app but are not downloaded (E-X04).
+    #[error("Torrent episodes can be watched but not downloaded")]
     TorrentUnavailable,
 }
 

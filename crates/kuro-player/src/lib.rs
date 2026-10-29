@@ -26,7 +26,6 @@ pub mod source_url;
 pub mod speed;
 pub mod strings;
 pub mod time;
-pub mod torrent;
 pub mod track_select;
 pub mod tracks;
 pub mod types;

@@ -10,8 +10,6 @@ default = ["ntfs-names"]
 # Appends `_` to Windows device names (CON, PRN, AUX, NUL, COM1-9, LPT1-9) so folders copied to a Windows disk stay
 # valid. Decision D-DL-01, EC-76.
 ntfs-names = []
-# Torrent links go through TorrServer (T-24a-023). Without it a torrent link fails with `TorrentUnavailable` (E-X04).
-torrent-server = []
 
 [dependencies]
 async-trait = { workspace = true }

@@ -12,8 +12,7 @@ bytes = { workspace = true }
 futures = { workspace = true, default-features = false, features = ["std"] }
 md-5 = { workspace = true }
 thiserror = { workspace = true }
-# TorrServer client and bencode parser (T-16a-040, T-16a-041). `torrent` pulls in reqwest, used by the lookup.
-kuro-core = { path = "../kuro-core", features = ["torrent"] }
+kuro-core = { path = "../kuro-core" }
 kuro-platform = { path = "../kuro-platform" }
 reqwest = { workspace = true }
 tracing = { workspace = true }

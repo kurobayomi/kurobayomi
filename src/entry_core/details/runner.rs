@@ -106,12 +106,6 @@ pub trait EntryBackend: Send + Sync + 'static {
     fn play_external(&self, _anime_id: i64, _episode_id: i64) -> bool {
         false
     }
-    /// Whether the source serves torrents (`isSourceForTorrents`).
-    fn is_torrent_source(&self, _source_id: i64) -> bool {
-        false
-    }
-    /// Starts the torrent server before a torrent episode plays (17.5).
-    fn start_torrent_server(&self) {}
     /// The language code of a source (`source.lang`), for the language badge of a season. Empty when it is not known.
     fn source_language(&self, _source_id: i64) -> String {
         String::new()

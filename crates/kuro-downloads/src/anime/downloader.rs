@@ -21,7 +21,7 @@ use crate::anime::model::{AnimeDownload, Video};
 use crate::anime::progress::ProgressCell;
 use crate::naming::{UnitName, fat_safe, file_component, unit_dir_name, unit_dir_names};
 use crate::anime::resolve::{HosterResolver, resolve_video};
-use crate::anime::torrent::{TORRENT_SERVER_HOST, check_torrent};
+use crate::anime::torrent::check_torrent;
 use crate::error::DownloadError;
 use crate::naming::TMP_DIR_SUFFIX;
 use crate::layout::{Layout, rename_dir};
@@ -174,7 +174,7 @@ impl EpisodeEngine {
         let staging = anime_dir.join(format!("{target}{TMP_DIR_SUFFIX}"));
 
         let video = resolve_video(item, self.resolver.as_ref(), cancel).await?;
-        check_torrent(&video.url, TORRENT_SERVER_HOST)?;
+        check_torrent(&video.url)?;
         fs::create_dir_all(&staging)?;
         self.fetch(item, &video, &staging, cancel).await?;
         if !is_download_successful(&staging) {

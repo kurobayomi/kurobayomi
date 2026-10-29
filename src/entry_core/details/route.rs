@@ -43,7 +43,6 @@ use super::dispatch::{bottom_cmds, menu_cmds};
 use super::details_error::{DetailsError, required};
 use crate::entry_core::download_menu::{DownloadAmount, menu_visible};
 use super::intro_dialog;
-use super::torrent_server;
 use crate::entry_core::overflow_menu::{self, Entry as OverflowEntry, Item as OverflowItem};
 use super::viewer;
 use super::dialog_state::{EntryDialog, DialogSlot};
@@ -141,7 +140,7 @@ fn page_for(kind: Kind, entry_id: i64) -> GBox {
 }
 
 /// What the page needs from the app besides its runner: the preference store, the backend the runner uses (for the
-/// player and torrent choices that happen on the GTK thread) and the database.
+/// player choices that happen on the GTK thread) and the database.
 struct Env {
     prefs: PrefStore,
     backend: Arc<dyn EntryBackend>,
@@ -225,11 +224,6 @@ fn now_ms() -> i64 {
 /// The preference of the player the taps use (`pref_always_use_external_player`).
 fn always_external(prefs: &PrefStore) -> bool {
     prefs.pref::<bool>("pref_always_use_external_player", false).get()
-}
-
-/// The torrent server preference (`pref_torrserver_enable`).
-fn torrent_enabled(prefs: &PrefStore) -> bool {
-    prefs.pref::<bool>("pref_torrserver_enable", false).get()
 }
 
 /// The page actions in the order the top bar shows them (user, 2026-10-25): Edit categories first, Change intro length
@@ -991,7 +985,7 @@ impl View {
             self.runner.send(cmd);
         }
         if let Some((id, external)) = dispatch.open {
-            self.open_episode(id, OpenPlan { external, torrent_server: self.torrent_server_needed() });
+            self.open_episode(id, OpenPlan { external });
         }
         self.render();
     }
@@ -1021,12 +1015,6 @@ impl View {
         let Some(m) = model.as_ref() else { return };
         let numbers: Vec<f64> = m.episodes.iter().filter(|e| ids.contains(&e.id)).map(|e| e.number).collect();
         crate::entry_core::tracking::progress::marked(self.env.kind, m.entry.id, true, &numbers, crate::data::app().base.incognito_mode.get());
-    }
-
-    /// Whether the entry's source is a torrent source and the torrent server is on (17.4, 17.5).
-    fn torrent_server_needed(&self) -> bool {
-        let source = self.model.borrow().as_ref().map(|m| m.entry.source);
-        torrent_enabled(&self.env.prefs) && source.is_some_and(|s| self.env.backend.is_torrent_source(s))
     }
 
     /// Shows a message on the app's notification layer, replacing the one on screen. `action` is what its button runs.
@@ -1466,7 +1454,7 @@ impl View {
         };
         if let Some(id) = open {
             // a tap opens in the player the setting says, and Alt picks the other one (17.4)
-            let plan = tap_plan(always_external(&self.env.prefs), alt, torrent_enabled(&self.env.prefs), self.is_torrent_source());
+            let plan = tap_plan(always_external(&self.env.prefs), alt);
             self.open_episode(id, plan);
         }
         self.render();
@@ -1523,11 +1511,6 @@ impl View {
         }
     }
 
-    fn is_torrent_source(&self) -> bool {
-        let source = self.model.borrow().as_ref().map(|m| m.entry.source);
-        source.is_some_and(|s| self.env.backend.is_torrent_source(s))
-    }
-
     /// Opens an episode as the plan says. A missing episode is a typed error shown in the snackbar, not a panic.
     fn open_episode(&self, id: i64, plan: OpenPlan) {
         let found = {
@@ -1557,8 +1540,7 @@ impl View {
         });
     }
 
-    /// Starts the torrent server when the plan says so, then plays in the external player, or in the internal one when
-    /// the external one cannot start.
+    /// Plays in the external player, or in the internal one when the external one cannot start.
     fn play(&self, entry_id: i64, episode_id: i64, title: &str, name: &str, plan: OpenPlan) {
         // repeated clicks, or clicks queued while the window was busy, open the player once
         if !crate::ui::first_within("player", 1500) {
@@ -1566,23 +1548,6 @@ impl View {
         }
         // a local episode plays in the internal player at its saved position, whatever the plan says
         if crate::local_flow::open::open_local_episode(episode_id) {
-            return;
-        }
-        if plan.torrent_server {
-            // the server start waits up to eleven seconds, so it runs off the GTK thread; the episode opens when it
-            // answers, times out or fails (the failure is a toast and playback goes on), T-39b-052
-            self.env.backend.start_torrent_server();
-            let (tx, rx) = async_channel::bounded(1);
-            std::thread::spawn(move || {
-                let _ = tx.send_blocking(torrent_server::start_blocking(true, true));
-            });
-            let (backend, title, name) = (Arc::clone(&self.env.backend), title.to_owned(), name.to_owned());
-            glib::spawn_future_local(async move {
-                if let Ok(torrent_server::Outcome::Toast(text)) = rx.recv().await {
-                    crate::toast::notify(text);
-                }
-                Self::open_player(&backend, plan, entry_id, episode_id, &title, &name);
-            });
             return;
         }
         Self::open_player(&self.env.backend, plan, entry_id, episode_id, title, name);
@@ -1612,8 +1577,7 @@ impl View {
             let season = required(store.entry(season_id)?, || DetailsError::AnimeNotFound(season_id))?;
             let episodes = store.episodes(season_id)?;
             let episode = required(continue_episode(&episodes), || DetailsError::EpisodeNotFound(season_id))?;
-            let torrent = self.env.backend.is_torrent_source(season.source);
-            let plan = continue_plan(always_external(&self.env.prefs), torrent_enabled(&self.env.prefs), torrent);
+            let plan = continue_plan(always_external(&self.env.prefs));
             self.play(season_id, episode.id, &season.title, &episode.name, plan);
             Ok(())
         })();
@@ -1644,7 +1608,7 @@ impl View {
     fn open_next(self: &Rc<Self>) {
         let next = self.model.borrow().as_ref().and_then(EntryModel::next_unseen);
         if let Some(id) = next {
-            let plan = continue_plan(always_external(&self.env.prefs), torrent_enabled(&self.env.prefs), self.is_torrent_source());
+            let plan = continue_plan(always_external(&self.env.prefs));
             self.open_episode(id, plan);
         }
     }

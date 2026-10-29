@@ -7,7 +7,6 @@ use kuro_net::NetError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AppError {
-    TorrServerDisabled,
     Http {
         code: u16,
     },
@@ -47,7 +46,6 @@ impl AppError {
 /// The text of `Throwable.formattedMessage`, in the branch order of behavior section 28.1.
 pub fn user_message(error: &AppError) -> String {
     match error {
-        AppError::TorrServerDisabled => "TorrServer is not running".to_owned(),
         AppError::Http { code } => format!("HTTP {code}, check website in WebView"),
         AppError::UnknownHost { offline: true, .. } => "No Internet connection".to_owned(),
         AppError::UnknownHost { host, .. } => format!("Couldn't reach {host}"),
@@ -80,7 +78,6 @@ mod tests {
             offline,
         };
         let rows: Vec<(AppError, &str)> = vec![
-            (AppError::TorrServerDisabled, "TorrServer is not running"),
             (
                 AppError::Http { code: 404 },
                 "HTTP 404, check website in WebView",

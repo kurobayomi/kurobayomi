@@ -51,10 +51,6 @@ pub trait AnimeSourceLookup: Send + Sync + 'static {
     fn info(&self, _source_id: i64) -> Option<SourceInfo> {
         None
     }
-    /// Whether the source serves torrents (`isSourceForTorrents`).
-    fn is_torrent(&self, _source_id: i64) -> bool {
-        false
-    }
     /// Whether the source is configurable (`source is ConfigurableAnimeSource`): only then does the overflow menu offer
     /// Settings (T-39a-057).
     fn is_configurable(&self, _source_id: i64) -> bool {
@@ -67,7 +63,7 @@ pub trait AnimeSourceLookup: Send + Sync + 'static {
 }
 
 /// The lookup over live sources. The flags come from the source itself (`is_configurable`, `is_unmetered`); the trait has
-/// no HTTP or torrent marker, so those two read false and the page offers neither WebView nor the torrent start.
+/// no HTTP marker, so it reads false and the page offers no WebView.
 pub struct LiveSources {
     sources: Vec<Arc<dyn AnimeSource>>,
 }
@@ -257,10 +253,6 @@ impl EntryBackend for RemoteAnimeBackend {
                 }
             }
         })
-    }
-
-    fn is_torrent_source(&self, source_id: i64) -> bool {
-        self.lookup.is_torrent(source_id)
     }
 
     fn home_url(&self, source_id: i64) -> Option<String> {

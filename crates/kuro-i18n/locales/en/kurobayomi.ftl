@@ -568,66 +568,6 @@ editor_delete_file = Delete file
 editor_delete_file_confirmation = Do you wish to delete the file "{ $arg1 }"?
 
 # source: i18n-aniyomi
-pref_player_torrents = Torrent
-
-# source: i18n-aniyomi
-pref_player_torrents_summary = TorrServer options
-
-# source: i18n-aniyomi
-pref_player_torrents_enable = Enable TorrServer
-
-# source: i18n-aniyomi
-pref_player_torrents_notice = Legal Notice
-
-# source: i18n-aniyomi
-pref_player_torrents_notice_text = TorrServer relies on peer to peer file sharing to access content. By doing so, you also upload files to others. Any content you share is your sole responsibility.
-
-# source: i18n-aniyomi
-pref_player_torrents_notice_footer = No further notices will be issued.
-
-# source: i18n-aniyomi
-pref_player_torrents_port = TorrServer port
-
-# source: i18n-aniyomi
-pref_player_torrents_port_summary = Enter 0 to let system choose a port
-
-# source: i18n-aniyomi
-pref_player_torrents_port_error = Port must be a number between 0 and 65535
-
-# source: i18n-aniyomi
-pref_player_torrents_trackers = Torrent trackers
-
-# source: i18n-aniyomi
-pref_player_torrents_trackers_reset = Reset default torrent trackers string
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_mode = Proxy mode
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_mode_none = None
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_mode_tracker = Tracker
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_mode_peers = Peers
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_mode_full = Full
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_url = Proxy url
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_url_dialog = Supports http, https, socks4, socks4a, socks5, socks5h
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_url_invalid_uri = Invalid uri
-
-# source: i18n-aniyomi
-pref_player_torrents_proxy_url_invalid_protocol = Unsupported protocol: "{ $arg1 }"
-
-# source: i18n-aniyomi
 pref_player_advanced = Advanced
 
 # source: i18n-aniyomi
@@ -1007,15 +947,6 @@ label_cant_migrate_season = Unable to migrate season to episode
 
 # source: i18n-aniyomi
 label_show_seasons = Show seasons
-
-# source: i18n-aniyomi
-torrserver_disabled = TorrServer is not running
-
-# source: i18n-aniyomi
-torrentserver_is_running = Torrent Server is running
-
-# source: i18n-aniyomi
-pref_category_torrentserver = Torrent Server Preferences
 
 # source: i18n-aniyomi
 pref_http_server_name = Http server

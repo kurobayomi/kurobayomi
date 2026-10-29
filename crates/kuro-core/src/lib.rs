@@ -15,12 +15,11 @@
 //! | natural comparator | [`text::natural_cmp`] (port of the java-nat-sort comparator, no crate) |
 //! | quickjs | `rquickjs`, optional feature `js-sources` (P2) in the source layer, not here |
 //! | ffmpeg-kit | dropped: source ffmpeg arguments are not supported, `mpv` in `kuro-player` plays media |
-//! | TorrServer | external server process; client and supervisor in [`torrent`], feature `torrent` |
+//! | TorrServer | dropped: `librqbit` inside the app, in `kuro-torrent` |
 //!
 //! # Cargo features
 //!
-//! `archive` (libarchive wrapper), `heif` (AVIF and HEIF decoding), `torrent` (TorrServer client)
-//! and `updater`. All are off by default.
+//! `archive` (libarchive wrapper), `heif` (AVIF and HEIF decoding) and `updater`. All are off by default.
 
 pub mod app_info;
 pub mod archive;

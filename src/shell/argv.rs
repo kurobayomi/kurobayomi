@@ -23,7 +23,7 @@ Options:
   --run-backup    run one automatic backup and exit
   --help          print this text and exit
 
-Quit policy: closing the last window quits the application, unless the torrent server or the HTTP server is running;
+Quit policy: closing the last window quits the application, unless the HTTP server is running;
 then it keeps running without a window until you stop the server from its notice.
 
 Test hooks (ignored in release builds unless KUROBAYOMI_ALLOW_TEST_HOOKS=1):
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn the_quit_policy_is_in_the_help_text() {
-        assert!(USAGE.contains("Quit policy") && USAGE.contains("torrent server"));
+        assert!(USAGE.contains("Quit policy") && USAGE.contains("HTTP server"));
     }
 
     #[test]

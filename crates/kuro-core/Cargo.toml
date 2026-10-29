@@ -10,8 +10,6 @@ license.workspace = true
 archive = []
 # AVIF and HEIF decoding. HEIF has no decoder yet; see image/mod.rs.
 heif = []
-# TorrServer client and supervisor (T-13a-040, T-13a-041).
-torrent = ["dep:reqwest"]
 # Built-in updater (T-54a-003). Off until the updater lands.
 updater = []
 
@@ -34,7 +32,6 @@ jxl-oxide = { version = "0.11", features = ["image"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 quick-xml = "0.42.0"
-reqwest = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

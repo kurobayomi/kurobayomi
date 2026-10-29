@@ -12,7 +12,6 @@
 //! (`entry_core::text`) for title, author, artist and description.
 
 pub mod airing;
-pub mod torrent_server;
 pub mod entry_state;
 pub mod episode_row;
 pub mod format;

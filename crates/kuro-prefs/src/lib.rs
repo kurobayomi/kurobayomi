@@ -36,7 +36,6 @@ pub mod store;
 mod testutil;
 pub mod toml_backend;
 pub mod tracking;
-pub mod torrent;
 pub mod tristate;
 pub mod ui;
 pub mod values;
