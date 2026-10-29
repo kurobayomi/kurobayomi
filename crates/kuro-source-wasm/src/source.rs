@@ -354,7 +354,7 @@ impl AnimeSource for WasmAnimeSource {
         false
     }
 
-    /// Always true: an anime package answers the `hosters` op. A guest without it fails that call alone.
+    /// Always true: a guest without the `hosters` op gets its episode videos as one hoster (see `hosters`).
     fn provides_hosters(&self) -> bool {
         true
     }
@@ -380,9 +380,13 @@ impl AnimeSource for WasmAnimeSource {
         Ok(wire.into_iter().map(SEpisode::from).collect())
     }
 
+    /// A guest without servers leaves `hosters` out (the toolkit answers "unknown op"); its episode videos are then one
+    /// hoster, as for a source that provides no hosters.
     async fn hosters(&self, episode: &SEpisode) -> Result<Vec<Hoster>, SourceError> {
-        let wire: Vec<WireHoster> = self.0.typed("hosters", json!({ "episode": WireEpisode::from(episode) })).await?;
-        Ok(wire.into_iter().map(Hoster::from).collect())
+        match self.0.optional::<Vec<WireHoster>>("hosters", json!({ "episode": WireEpisode::from(episode) })).await? {
+            Some(wire) => Ok(wire.into_iter().map(Hoster::from).collect()),
+            None => Ok(vec![Hoster::synthetic(self.videos_for_episode(episode).await?)]),
+        }
     }
 
     async fn videos_for_hoster(&self, hoster: &Hoster) -> Result<Vec<Video>, SourceError> {
