@@ -29,6 +29,7 @@ kuro-images = { path = "crates/kuro-images" }
 kuro-player = { path = "crates/kuro-player" }
 kuro-track = { path = "crates/kuro-track" }
 kuro-net = { workspace = true }
+kuro-torrent = { workspace = true }
 http = { workspace = true }
 reqwest = { workspace = true, features = ["blocking"] }
 async-channel = { workspace = true }
@@ -55,7 +56,7 @@ kuro-testkit = { path = "crates/kuro-testkit" }
 proptest = "1.11.0"
 
 [workspace]
-members =["crates/kuro-core", "crates/kuro-i18n", "crates/kuro-platform", "crates/kuro-testkit", "crates/kuro-prefs", "crates/kuro-db", "crates/kuro-data", "crates/kuro-domain", "crates/kuro-source", "crates/kuro-source-http", "crates/kuro-source-scrape", "crates/kuro-net", "crates/kuro-extensions", "crates/kuro-player", "crates/kuro-source-wasm", "crates/kuro-downloads", "crates/kuro-images", "crates/kuro-local", "crates/kuro-archive", "crates/kuro-track", "crates/kuro-backup"]
+members =["crates/kuro-core", "crates/kuro-torrent", "crates/kuro-i18n", "crates/kuro-platform", "crates/kuro-testkit", "crates/kuro-prefs", "crates/kuro-db", "crates/kuro-data", "crates/kuro-domain", "crates/kuro-source", "crates/kuro-source-http", "crates/kuro-source-scrape", "crates/kuro-net", "crates/kuro-extensions", "crates/kuro-player", "crates/kuro-source-wasm", "crates/kuro-downloads", "crates/kuro-images", "crates/kuro-local", "crates/kuro-archive", "crates/kuro-track", "crates/kuro-backup"]
 resolver = "3"
 
 [workspace.package]
@@ -93,6 +94,7 @@ base64 = "0.23.1"
 wiremock = "0.6.5"
 kuro-domain = { path = "crates/kuro-domain" }
 kuro-net = { path = "crates/kuro-net" }
+kuro-torrent = { path = "crates/kuro-torrent" }
 kuro-platform = { path = "crates/kuro-platform" }
 kuro-prefs = { path = "crates/kuro-prefs" }
 kuro-source = { path = "crates/kuro-source" }

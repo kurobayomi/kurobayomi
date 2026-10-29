@@ -1,0 +1,18 @@
+[package]
+name = "kuro-torrent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+# The torrent engine (Apache-2.0). No HTTP API or web UI: the app serves the stream itself. rust-tls keeps OpenSSL out
+# and shares aws-lc with the rest of the app.
+librqbit = { version = "9.0.1", default-features = false, features = ["rust-tls"] }
+tokio = { workspace = true, features = ["net", "io-util", "fs", "time", "sync"] }
+tracing = { workspace = true }
+url = { workspace = true }
+kuro-net = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util"] }

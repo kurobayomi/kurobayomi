@@ -443,8 +443,9 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
     let (tx, rx) = async_channel::bounded(1);
     handle.spawn(async move {
         let answer = match crate::browse::errors::plain(source.name(), resolve_once(source.as_ref(), video)).await {
-            // the chosen stream's links are checked like the first one's (`source::allowed`)
-            Ok(Some(resolved)) => super::super::source::allowed(source.id(), resolved).await.map(Some),
+            // the chosen stream plays like the first one: a torrent through the engine, any other link checked
+            // (`source::playable`)
+            Ok(Some(resolved)) => super::super::source::playable(source.id(), resolved).await.map(Some),
             other => other,
         };
         let _ = tx.send(answer).await;

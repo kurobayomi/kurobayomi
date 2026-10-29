@@ -63,6 +63,11 @@ pub trait Paths {
     fn subtitle_cache_dir(&self) -> PathBuf {
         self.cache_dir().join("subtitles")
     }
+    /// Torrents being played: the engine's downloads and its DHT state. Emptied when the engine starts and when a torrent
+    /// stops playing, so nothing builds up.
+    fn torrent_cache_dir(&self) -> PathBuf {
+        self.cache_dir().join("torrents")
+    }
     /// Where a shared image is staged before it is handed to another app.
     fn share_staging_dir(&self) -> PathBuf {
         self.cache_dir().join("shared_image")
@@ -247,6 +252,7 @@ mod role_tests {
         assert_eq!(p.share_staging_dir(), PathBuf::from("/k/shared_image"));
         assert_eq!(p.browse_cache_dir(), PathBuf::from("/k/browse_results"));
         assert_eq!(p.subtitle_cache_dir(), PathBuf::from("/k/subtitles"));
+        assert_eq!(p.torrent_cache_dir(), PathBuf::from("/k/torrents"));
         assert_eq!(p.extensions_dir(), PathBuf::from("/d/extensions"));
         assert_eq!(p.anime_extensions_dir(), PathBuf::from("/d/extensions/anime"));
         assert_eq!(p.scrapers_dir(), PathBuf::from("/d/scrapers"));

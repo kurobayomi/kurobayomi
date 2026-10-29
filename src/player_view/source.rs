@@ -14,6 +14,8 @@ use kuro_player::load::http_header_fields;
 use kuro_player::track_select::{TrackCandidate, preferred_track};
 use kuro_player::tracks::external_track_commands;
 use kuro_source::anime::{AnimeSource, Hoster, SEpisode, Track, Video};
+use kuro_platform::paths::Paths as _;
+use kuro_platform::system_paths::SystemPaths;
 
 use super::Media;
 
@@ -101,7 +103,7 @@ pub fn resolve_episode(found: SourceEpisode, done: impl FnOnce(Result<Media, Str
         // the "Loading…" card never stays: after 30 seconds the toast says the source is not answering
         let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), best_stream(source.as_ref(), &s_episode, quality)).await;
         let answer = match answer {
-            Ok(video) => allowed(source.id(), video).await,
+            Ok(video) => playable(source.id(), video).await,
             Err(text) => Err(text),
         };
         let _ = tx.send(answer).await;
@@ -181,6 +183,35 @@ pub(super) async fn allowed(source_id: i64, video: Video) -> Result<Video, Strin
         }
     }
     Ok(video)
+}
+
+/// `video` ready for the player: a torrent (a `magnet:` address) is opened in the torrent engine and plays from its local
+/// address; any other video goes through [`allowed`]. The error is the text of the toast.
+pub(super) async fn playable(source_id: i64, mut video: Video) -> Result<Video, String> {
+    if !kuro_torrent::is_torrent(&video.video_url) {
+        return allowed(source_id, video).await;
+    }
+    let cache_dir = match SystemPaths::system() {
+        Ok(paths) => paths.torrent_cache_dir(),
+        Err(e) => {
+            tracing::error!(error = %e, "player: no app directories; the torrent is not opened");
+            return Err(tr(MsgKey::player_hoster_failed));
+        }
+    };
+    match kuro_torrent::open(&video.video_url, &cache_dir).await {
+        Ok(local) => {
+            video.video_url = local;
+            Ok(video)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "player: the torrent did not open");
+            Err(match e {
+                kuro_torrent::Error::NoPeers => tr(MsgKey::torrent_no_peers),
+                kuro_torrent::Error::NoVideo => tr(MsgKey::torrent_no_video),
+                kuro_torrent::Error::BadLink(_) | kuro_torrent::Error::Engine(_) => tr(MsgKey::player_hoster_failed),
+            })
+        }
+    }
 }
 
 pub(super) fn media_of(video: Video, title: crate::widgets::page_header::MediaTitle, preferred: &str, preferred_audio: &str) -> Media {

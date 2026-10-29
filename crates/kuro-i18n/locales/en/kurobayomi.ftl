@@ -5212,3 +5212,9 @@ player_episode_list_search = Episode number or name
 
 # source: kurobayomi
 window_keep_above = Keep above other windows
+
+# source: kurobayomi
+torrent_no_peers = No one is sharing this torrent right now, so it cannot play. Try another episode or server
+
+# source: kurobayomi
+torrent_no_video = This torrent holds no video file

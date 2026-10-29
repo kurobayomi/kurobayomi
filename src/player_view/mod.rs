@@ -226,6 +226,10 @@ impl Player {
             self.closed = true;
             self.save(true);
             self.playback.stop();
+            // a torrent that was playing is removed with its files
+            if let Ok(runtime) = tokio::runtime::Handle::try_current() {
+                runtime.spawn(kuro_torrent::close());
+            }
             self.awake.sync_for(false, &tr(MsgKey::ui_playing_video));
             after_seen::flush();
         }
