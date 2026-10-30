@@ -10,7 +10,8 @@
 //! Any other build (a local one, a package) has no `APPIMAGE`, no commit or no release check, and never updates itself.
 //!
 //! The download can be paused and cancelled from the About page (`pause`, `resume`, `cancel`), and it reads the file
-//! from the fastest of GitHub's download addresses (`fastest_route`).
+//! from the fastest of GitHub's download addresses (`fastest_route`), raced again for every connection: the first, one
+//! after each pause, and one after each connection that breaks off (`RECONNECTS` times per download).
 
 use kuro_i18n::{Arg, MsgKey, tr, trf};
 use std::io::{Read, Write};
@@ -260,10 +261,16 @@ fn header(package: &Package) -> (&'static [u8], &'static str) {
     }
 }
 
+/// How many broken connections one download replaces before it gives up.
+const RECONNECTS: u32 = 3;
+
 fn fetch_checked(client: &reqwest::blocking::Client, update: &Newer, package: &Package, part: &Path, progress: &dyn Fn(u64), control: &Control) -> Result<(), String> {
     let mut file = std::fs::File::create(part).map_err(|e| e.to_string())?;
     let (mut hasher, mut total, mut buf) = (Sha256::new(), 0_u64, [0_u8; 64 * 1024]);
-    // one pass per connection: the first, and a new one after each pause, asking for the rest of the file
+    // a connection that breaks off is replaced by a new one, from a fresh race for the fastest address, that asks for
+    // the rest of the file; a few times, then the error stands
+    let mut reconnects = RECONNECTS;
+    // one pass per connection: the first, a new one after each pause, and one after each break, asking for the rest
     loop {
         control.hold()?;
         let (client, url) = fastest_route(client, &update.url);
@@ -271,13 +278,28 @@ fn fetch_checked(client: &reqwest::blocking::Client, update: &Newer, package: &P
         if total > 0 {
             request = request.header(reqwest::header::RANGE, format!("bytes={total}-"));
         }
-        let mut response = request.send().and_then(|r| r.error_for_status()).map_err(|e| describe(&e))?;
+        let mut response = match request.send().and_then(|r| r.error_for_status()) {
+            Ok(response) => response,
+            // an answer like 404 stays the same on another address; a connection that failed may not
+            Err(e) if e.status().is_none() && reconnects > 0 => {
+                reconnects -= 1;
+                continue;
+            }
+            Err(e) => return Err(describe(&e)),
+        };
         if total > 0 && response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
             return Err(tr(MsgKey::ui_github_would_not_carry_on_the_download).to_owned());
         }
         let mut finished = false;
         while control.wish() == Wish::Run {
-            let n = response.read(&mut buf).map_err(|e| format!("the download from GitHub broke off ({e})"))?;
+            let n = match response.read(&mut buf) {
+                Ok(n) => n,
+                Err(_) if reconnects > 0 => {
+                    reconnects -= 1;
+                    break;
+                }
+                Err(e) => return Err(format!("the download from GitHub broke off ({e})")),
+            };
             if n == 0 {
                 finished = true;
                 break;
