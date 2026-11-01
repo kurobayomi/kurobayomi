@@ -11,7 +11,7 @@ use kuro_prefs::pref::Pref;
 use super::super::bind::{self, Outcome, Veto, WriteGate};
 use super::super::model::{Entry, ItemCommon};
 use super::dialog::{self, Dialog};
-use super::row::{self, set_subtitle, PrefRow, RowSpec};
+use crate::widgets::row::{self, set_subtitle, RowSpec};
 use super::CHECK_ROW_MIN;
 
 /// Called with the chosen key and the dialog, and a revert that re-selects the current key.
@@ -29,7 +29,7 @@ pub fn label_for(entries: &[Entry], key: &str) -> String {
 }
 
 /// A bound single-choice row. The store is written only after the veto accepts.
-pub fn row(common: &ItemCommon, pref: Pref<String>, entries: Vec<Entry>, veto: Veto<String>) -> PrefRow {
+pub fn row(common: &ItemCommon, pref: Pref<String>, entries: Vec<Entry>, veto: Veto<String>) -> adw::ActionRow {
     let gate = Rc::new(WriteGate::default());
     let commit: Commit = {
         let pref = pref.clone();
@@ -50,14 +50,14 @@ pub fn row(common: &ItemCommon, pref: Pref<String>, entries: Vec<Entry>, veto: V
         })
     };
     let (built, current, entries) = build(common, pref.get(), entries, commit);
-    let weak = built.row.downgrade();
+    let weak = built.downgrade();
     let refresh = refresher(&built, common, &current, entries);
     bind::follow(&pref, move || weak.upgrade().is_some(), move |value: String| refresh(&value));
     built
 }
 
 /// A single-choice row whose value the caller owns. Choosing an entry only calls `on_change`.
-pub fn basic_row(common: &ItemCommon, value: String, entries: Vec<Entry>, on_change: Veto<String>) -> PrefRow {
+pub fn basic_row(common: &ItemCommon, value: String, entries: Vec<Entry>, on_change: Veto<String>) -> adw::ActionRow {
     let gate = Rc::new(WriteGate::default());
     let commit: Commit = Rc::new(move |key: String, dialog: Dialog, revert: Revert, on_written: OnWritten| {
         let gate = gate.clone();
@@ -82,7 +82,7 @@ pub fn basic_row(common: &ItemCommon, value: String, entries: Vec<Entry>, on_cha
 }
 
 /// Builds the row and its dialog wiring. Returns the row, the shared current key and the entries.
-fn build(common: &ItemCommon, initial: String, entries: Vec<Entry>, commit: Commit) -> (PrefRow, Rc<RefCell<String>>, Rc<Vec<Entry>>) {
+fn build(common: &ItemCommon, initial: String, entries: Vec<Entry>, commit: Commit) -> (adw::ActionRow, Rc<RefCell<String>>, Rc<Vec<Entry>>) {
     let current = Rc::new(RefCell::new(initial.clone()));
     let subtitle_text = common.subtitle_for(&label_for(&entries, &initial));
     let built = row::build(RowSpec {
@@ -92,14 +92,14 @@ fn build(common: &ItemCommon, initial: String, entries: Vec<Entry>, commit: Comm
         trailing: None,
         on_click: None,
     });
-    built.row.set_activatable(common.enabled);
-    built.row.set_sensitive(common.enabled);
+    built.set_activatable(common.enabled);
+    built.set_sensitive(common.enabled);
 
     let entries = Rc::new(entries);
     let title = common.title.clone();
     let subtitle_template = common.subtitle.clone();
     let on_written: OnWritten = {
-        let (current, subtitle, entries) = (current.clone(), built.subtitle.clone(), entries.clone());
+        let (current, subtitle, entries) = (current.clone(), built.clone(), entries.clone());
         Rc::new(move |key: &str| {
             *current.borrow_mut() = key.to_owned();
             let text = subtitle_template
@@ -108,7 +108,7 @@ fn build(common: &ItemCommon, initial: String, entries: Vec<Entry>, commit: Comm
             set_subtitle(&subtitle, text.as_deref());
         })
     };
-    crate::widgets::row_activate::on_activate(&built.row, {
+    crate::widgets::row_activate::on_activate(&built, {
         let (current, entries, commit, on_written) = (current.clone(), entries.clone(), commit.clone(), on_written.clone());
         move |row| {
             let Some(parent) = row.root().and_downcast::<gtk::Window>() else {
@@ -122,12 +122,12 @@ fn build(common: &ItemCommon, initial: String, entries: Vec<Entry>, commit: Comm
 
 /// Re-renders the subtitle from a new stored key (watch callback, no write).
 fn refresher(
-    built: &PrefRow,
+    built: &adw::ActionRow,
     common: &ItemCommon,
     current: &Rc<RefCell<String>>,
     entries: Rc<Vec<Entry>>,
 ) -> impl Fn(&str) + 'static {
-    let (subtitle, template, current) = (built.subtitle.clone(), common.subtitle.clone(), current.clone());
+    let (subtitle, template, current) = (built.clone(), common.subtitle.clone(), current.clone());
     move |key: &str| {
         *current.borrow_mut() = key.to_owned();
         let text = template

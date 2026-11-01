@@ -245,10 +245,6 @@ entry.search > image:first-child {
 .tracker-check {
   color: @success_color;
 }
-.pref-slider-pill {
-  border-radius: 999px;
-  padding: 2px 10px;
-}
 
 /* Reader (reader/theme.rs): the page background is one of these classes, set on the reader widget. The colours are the
  * reader's own choices (white, black, the dark gray of the splash), not the GTK theme's, so they stay fixed. */

@@ -1,54 +1,59 @@
-//! Switch row (Kotlin `SwitchPreferenceWidget`). The whole row toggles; the switch is not a target.
+//! Switch row (Kotlin `SwitchPreferenceWidget`), an `adw::SwitchRow`: a click, Enter or Space anywhere on the row
+//! toggles. The row shows a new state only after the veto accepts it and the value is stored.
 
+use std::cell::Cell;
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_prefs::pref::Pref;
 
 use super::super::bind::{self, Veto, WriteGate};
 use super::super::model::ItemCommon;
-use super::row::{self, PrefRow, RowSpec};
+use crate::widgets::row;
 
-pub fn build(common: &ItemCommon, pref: Pref<bool>, veto: Veto<bool>) -> PrefRow {
-    let switch = gtk::Switch::new();
-    switch.set_valign(gtk::Align::Center);
-    switch.set_can_target(false);
-    switch.set_active(pref.get());
+/// Makes the row show `active`. `shown` is the state the row is meant to show: a notification that agrees with it is
+/// our own doing, one that does not is the user's flip.
+fn show(row: &adw::SwitchRow, shown: &Cell<bool>, active: bool) {
+    shown.set(active);
+    if row.is_active() != active {
+        row.set_active(active);
+    }
+}
 
+pub fn build(common: &ItemCommon, pref: Pref<bool>, veto: Veto<bool>) -> adw::SwitchRow {
+    let built = row::switch(&common.title, common.subtitle.as_deref(), common.icon, pref.get());
+    let shown = Rc::new(Cell::new(pref.get()));
     let gate = Rc::new(WriteGate::default());
-    let toggle = {
-        let (switch, pref, gate) = (switch.clone(), pref.clone(), gate.clone());
-        move || {
-            let next = !switch.is_active();
-            let (done_switch, done_pref) = (switch.clone(), pref.clone());
-            bind::write(gate.clone(), veto.clone(), pref.clone(), next, move |outcome| {
-                match outcome {
-                    bind::Outcome::Written => done_switch.set_active(next),
-                    bind::Outcome::Kept => {}
-                    bind::Outcome::Failed(message) => {
-                        tracing::warn!(key = done_pref.key(), %message, "setting not saved");
-                    }
+    built.connect_active_notify({
+        let (pref, shown) = (pref.clone(), shown.clone());
+        move |switch| {
+            let next = switch.is_active();
+            if next == shown.get() {
+                return;
+            }
+            // the row flips at once; put it back and let the write decide
+            switch.set_active(shown.get());
+            let (done_switch, done_pref, done_shown) = (switch.clone(), pref.clone(), shown.clone());
+            bind::write(gate.clone(), veto.clone(), pref.clone(), next, move |outcome| match outcome {
+                bind::Outcome::Written => show(&done_switch, &done_shown, next),
+                bind::Outcome::Kept => {}
+                bind::Outcome::Failed(message) => {
+                    tracing::warn!(key = done_pref.key(), %message, "setting not saved");
                 }
             });
         }
-    };
-    let built = row::build(RowSpec {
-        title: &common.title,
-        subtitle: common.subtitle.as_deref(),
-        icon: common.icon,
-        trailing: Some(switch.upcast_ref()),
-        on_click: Some(Rc::new(toggle)),
     });
 
-    let (alive, weak) = (switch.downgrade(), switch.downgrade());
-    bind::follow(&pref, move || alive.upgrade().is_some(), move |value| {
-        if let Some(switch) = weak.upgrade() {
-            if switch.is_active() != value {
-                switch.set_active(value);
+    let weak = built.downgrade();
+    bind::follow(&pref, { let weak = weak.clone(); move || weak.upgrade().is_some() }, {
+        let shown = shown.clone();
+        move |value| {
+            if let Some(switch) = weak.upgrade() {
+                show(&switch, &shown, value);
             }
         }
     });
-    built.row.set_sensitive(common.enabled);
+    built.set_sensitive(common.enabled);
     built
 }
 
@@ -65,50 +70,27 @@ mod tests {
         }
     }
 
-    fn find_switch(root: &gtk::Widget) -> Option<gtk::Switch> {
-        if let Some(found) = root.downcast_ref::<gtk::Switch>() {
-            return Some(found.clone());
-        }
-        let mut child = root.first_child();
-        while let Some(c) = child {
-            if let Some(found) = find_switch(&c) {
-                return Some(found);
-            }
-            child = c.next_sibling();
-        }
-        None
-    }
-
-    fn switch_in(root: &gtk::Widget) -> gtk::Switch {
-        find_switch(root).expect("a switch in the row")
-    }
-
-    // T-47ba-048, T-E20: a click, Enter or Space on the row toggles; the switch is not a target; a veto of false
-    // leaves both the switch and the stored value alone.
+    // T-47ba-048, T-E20: a flip of the row (what a click, Enter or Space does through libadwaita's switch) is written,
+    // and a veto of false leaves both the row and the stored value alone. A headless GTK does not toggle a switch by its
+    // `activate` signal, so the test sets the state the way the switch does after a click.
     #[test]
-    fn the_row_toggles_by_click_and_key_and_a_vetoed_write_changes_nothing() {
+    fn a_flip_of_the_row_is_written_and_a_vetoed_write_changes_nothing() {
         crate::testing::with_display(|| {
             let prefs = Prefs::in_memory();
             let pref = prefs.store().pref("switch_row_test", false);
             let accepted = build(&ItemCommon::new("Accepts"), pref.clone(), bind::accept());
-            let list = gtk::ListBox::new();
-            list.append(&accepted.row);
-            let switch = switch_in(accepted.row.upcast_ref());
-            assert!(!switch.can_target(), "the whole row is the target, not the glyph");
-            crate::widgets::row_activate::click_row(&accepted.row);
+            accepted.set_active(true);
             pump();
-            assert!(switch.is_active() && pref.get(), "a click on the row toggles it");
-            accepted.row.emit_by_name::<()>("activate", &[]);
+            assert!(accepted.is_active() && pref.get(), "a flip is written and shown");
+            accepted.set_active(false);
             pump();
-            assert!(!switch.is_active() && !pref.get(), "Enter or Space toggles it back");
+            assert!(!accepted.is_active() && !pref.get(), "and flips back");
 
             let vetoed_pref = prefs.store().pref("switch_row_vetoed", false);
             let vetoed = build(&ItemCommon::new("Vetoed"), vetoed_pref.clone(), bind::veto(|_: bool| async { Ok(false) }));
-            list.append(&vetoed.row);
-            let vetoed_switch = switch_in(vetoed.row.upcast_ref());
-            crate::widgets::row_activate::click_row(&vetoed.row);
+            vetoed.set_active(true);
             pump();
-            assert!(!vetoed_switch.is_active() && !vetoed_pref.get(), "a vetoed write leaves the switch and the value");
+            assert!(!vetoed.is_active() && !vetoed_pref.get(), "a vetoed write leaves the row and the value");
         });
     }
 }

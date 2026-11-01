@@ -1,13 +1,14 @@
 //! Dispatch from one settings item to its row. The match is exhaustive over the 13 variants (no `_` arm). Link rows end
 //! in the dim arrow and choice rows in the dim drop-down arrow, so a row says what a click does.
 
-use gtk::prelude::*;
 use gtk::{Image, ListBoxRow};
 
 use super::model::PreferenceItem;
 use super::strings;
 use super::widgets::dialog;
-use super::widgets::{info, list, multi_select, edit_text, row, slider, switch, text, TRACKER_CHECK_SIZE};
+use super::widgets::{list, multi_select, edit_text, slider, switch, text, TRACKER_CHECK_SIZE};
+use crate::widgets::row;
+use adw::prelude::*;
 
 /// The dim end marker of a row that opens a chooser (choice and multi-select rows): the same `pan-down` arrow a drop
 /// down shows, so every choice row reads the same way.
@@ -15,24 +16,22 @@ fn choice_marker() -> gtk::Widget {
     Image::builder().icon_name("pan-down-symbolic").css_classes(["dim-label"]).build().upcast()
 }
 
-/// Puts `marker` in the row's empty trailing slot.
-fn mark(built: row::PrefRow, marker: gtk::Widget) -> ListBoxRow {
-    if built.trailing.first_child().is_none() {
-        built.trailing.append(&marker);
-    }
-    built.row
+/// Ends the row in `marker`.
+fn mark(built: adw::ActionRow, marker: gtk::Widget) -> ListBoxRow {
+    built.add_suffix(&marker);
+    built.upcast()
 }
 
 /// The row for one item, or `None` when the item renders nothing (a blank info block).
 pub fn item_row(item: &PreferenceItem) -> Option<ListBoxRow> {
     let built = match item {
         PreferenceItem::Text { common, on_click } if common.link => {
-            mark(text::build(common, on_click.clone(), None), crate::ui::chevron().upcast())
+            text::build(common, on_click.clone(), Some(crate::ui::chevron().upcast_ref())).upcast()
         }
-        PreferenceItem::Text { common, on_click } => text::build(common, on_click.clone(), None).row,
-        PreferenceItem::Switch { common, pref, veto } => switch::build(common, pref.clone(), veto.clone()).row,
+        PreferenceItem::Text { common, on_click } => text::build(common, on_click.clone(), None).upcast(),
+        PreferenceItem::Switch { common, pref, veto } => switch::build(common, pref.clone(), veto.clone()).upcast(),
         PreferenceItem::Slider { common, value, range, steps, on_change } => {
-            slider::row(common, *value, range.clone(), *steps, on_change.clone())
+            slider::row(common, *value, range.clone(), *steps, on_change.clone()).upcast()
         }
         PreferenceItem::List { common, pref, entries, veto } => {
             mark(list::row(common, pref.clone(), entries.clone(), veto.clone()), choice_marker())
@@ -53,7 +52,7 @@ pub fn item_row(item: &PreferenceItem) -> Option<ListBoxRow> {
                 error_message.clone(),
                 veto.clone(),
             )
-            .row
+            .upcast()
         }
         PreferenceItem::EditTextInfo { common, pref, dialog_subtitle, can_be_blank, validate, error_message, veto } => {
             edit_text::row(
@@ -65,13 +64,13 @@ pub fn item_row(item: &PreferenceItem) -> Option<ListBoxRow> {
                 error_message.clone(),
                 veto.clone(),
             )
-            .row
+            .upcast()
         }
         PreferenceItem::Tracker { name, logged_in, on_login, on_logout } => {
             tracker_row(name, *logged_in, on_login.clone(), on_logout.clone())
         }
-        PreferenceItem::Info { text, .. } => return info::build(text),
-        PreferenceItem::Custom { build, .. } => custom_row(build()),
+        PreferenceItem::Info { text, .. } => return row::info(text).map(|row| row.upcast()),
+        PreferenceItem::Custom { build, .. } => row::wrap(&build()),
     };
     Some(built)
 }
@@ -99,11 +98,9 @@ fn tracker_row(name: &str, logged_in: bool, on_login: std::rc::Rc<dyn Fn()>, on_
         })),
     });
     if let Some(logo) = tracker_logo(name) {
-        if let Some(content) = built.row.child().and_downcast::<gtk::Box>() {
-            content.prepend(&logo);
-        }
+        built.add_prefix(&logo);
     }
-    built.row
+    built.upcast()
 }
 
 /// The bundled logo of the login row named `name`, when one is bundled.
@@ -129,14 +126,6 @@ fn confirm_logout(name: &str, on_logout: std::rc::Rc<dyn Fn()>) {
         },
         || {},
     );
-}
-
-fn custom_row(widget: gtk::Widget) -> ListBoxRow {
-    let row = ListBoxRow::new();
-    row.set_selectable(false);
-    row.set_activatable(false);
-    row.set_child(Some(&widget));
-    row
 }
 
 #[cfg(test)]

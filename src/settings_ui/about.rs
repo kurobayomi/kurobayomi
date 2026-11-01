@@ -71,7 +71,7 @@ pub fn version_row() -> PreferenceItem {
 /// row.
 fn update_center_row() -> PreferenceItem {
     use crate::appimage_update::{self as update, Status};
-    use crate::pref_model::widgets::row::{self, RowSpec};
+    use crate::widgets::row::{self, RowSpec};
     PreferenceItem::Custom {
         title: version_title().to_owned(),
         build: Rc::new(|| {
@@ -84,29 +84,17 @@ fn update_center_row() -> PreferenceItem {
                 download_button.set_valign(gtk::Align::Center);
                 download_button.add_css_class("flat");
             }
-            let end = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            // the download's bar and its spinner come first, then the buttons
+            let bar_spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let bar = gtk::ProgressBar::builder().valign(gtk::Align::Center).width_request(120).build();
+            let end = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            end.append(&bar_spinner);
+            end.append(&bar);
             end.append(&spinner);
             end.append(&pause);
             end.append(&cancel);
             end.append(&button);
-            let subtitle = version_subtitle();
-            let built = row::build(RowSpec { title: &version_title(), subtitle: Some(&subtitle), icon: None, trailing: Some(end.upcast_ref()), on_click: None });
-            let content = built.row.child().and_downcast::<gtk::Box>().expect("the row content");
-            built.row.set_child(None::<&gtk::Widget>);
-            let state = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(built.subtitle.css_classes()).build();
-            // the state line with the download's spinner right after its text, then the bar
-            let bar_spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
-            let state_row = gtk::Box::builder().spacing(6).build();
-            state_row.append(&state);
-            state_row.append(&bar_spinner);
-            let bar = gtk::ProgressBar::builder().margin_top(6).build();
-            if let Some(column) = built.subtitle.parent().and_downcast::<gtk::Box>() {
-                column.append(&state_row);
-                column.append(&bar);
-            }
-            let copy = gtk::GestureClick::new();
-            copy.connect_released(|_, _, _, _| copy_to_clipboard(&current_debug_block()));
-            content.add_controller(copy);
+            let built = row::build(RowSpec { title: &version_title(), subtitle: Some(&version_subtitle()), icon: None, trailing: Some(end.upcast_ref()), on_click: Some(Rc::new(|| copy_to_clipboard(&current_debug_block()))) });
             button.connect_clicked(|_| match update::status() {
                 Status::Installed(_) => crate::whats_new::restart(),
                 _ => update::check(),
@@ -116,16 +104,19 @@ fn update_center_row() -> PreferenceItem {
                 _ => update::pause(),
             });
             cancel.connect_clicked(|_| update::cancel());
-            let weak = (button.downgrade(), spinner.downgrade(), state.downgrade(), bar.downgrade(), bar_spinner.downgrade(), pause.downgrade(), cancel.downgrade());
+            let weak = (button.downgrade(), spinner.downgrade(), built.downgrade(), bar.downgrade(), bar_spinner.downgrade(), pause.downgrade(), cancel.downgrade());
             update::watch(move |status| {
-                let (Some(button), Some(spinner), Some(state), Some(bar), Some(bar_spinner), Some(pause), Some(cancel)) =
+                let (Some(button), Some(spinner), Some(row), Some(bar), Some(bar_spinner), Some(pause), Some(cancel)) =
                     (weak.0.upgrade(), weak.1.upgrade(), weak.2.upgrade(), weak.3.upgrade(), weak.4.upgrade(), weak.5.upgrade(), weak.6.upgrade())
                 else {
                     return false;
                 };
                 let line = status.line();
-                state.set_visible(line.is_some());
-                state.set_label(line.as_deref().unwrap_or_default());
+                // the state of the update goes under the build
+                row::set_subtitle(&row, Some(&match line {
+                    Some(line) => format!("{}\n{line}", version_subtitle()),
+                    None => version_subtitle(),
+                }));
                 bar.set_visible(status.fraction().is_some());
                 bar_spinner.set_visible(matches!(status, Status::Downloading { .. }));
                 bar.set_fraction(status.fraction().unwrap_or(0.0));
@@ -155,7 +146,7 @@ fn update_center_row() -> PreferenceItem {
                 }
                 true
             });
-            content.upcast()
+            built.upcast()
         }),
     }
 }

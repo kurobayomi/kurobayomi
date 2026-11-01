@@ -8,6 +8,7 @@ pub mod drag_select;
 pub mod cover_grid;
 pub mod int_slider;
 pub mod rail;
+pub mod row;
 pub mod row_activate;
 pub mod tabs;
 pub mod view_look;

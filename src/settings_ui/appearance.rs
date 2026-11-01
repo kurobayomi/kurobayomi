@@ -4,6 +4,7 @@
 //! Theme mode changes the look through one path, `theme::apply` (`update_settings`): the
 //! window marks and the GTK dark preference are set together, with no restart.
 use kuro_i18n::{MsgKey, tr};
+use adw::prelude::*;
 use std::rc::Rc;
 
 use kuro_prefs::prefs::Prefs;
@@ -21,17 +22,9 @@ pub fn theme_mode_row(prefs: &Prefs) -> PreferenceItem {
         title: title.to_owned(),
         build: Rc::new(move || {
             let built = theme_mode::row(&crate::pref_model::model::ItemCommon::new(&title), pref.clone());
-            custom_content(built.row)
+            built.upcast()
         }),
     }
-}
-
-/// The content of a built list row, taken out of it so it can be a `Custom` row's widget.
-fn custom_content(row: gtk::ListBoxRow) -> gtk::Widget {
-    use gtk::prelude::*;
-    let content = row.child().expect("the row content");
-    row.set_child(None::<&gtk::Widget>);
-    content
 }
 
 /// The five start screens in list order, with their titles.

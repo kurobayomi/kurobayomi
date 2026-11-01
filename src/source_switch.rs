@@ -389,7 +389,7 @@ fn search_text(entry: &Entry) -> String {
 }
 
 /// One row of the picker: icon, name, language and kind, and the switch.
-fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow {
+fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow {
     let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
     let mut subtitle = format!("{} · {kind}", crate::browse::names::localized_display_name(&entry.lang));
     if let Some(about) = crate::recipe_sources::described(entry) {
@@ -443,11 +443,9 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
     suffix.append(&switch);
     let row = crate::ui::row(&entry.name, Some(&subtitle), Some(suffix.upcast()));
     if let Some(icon) = crate::recipe_sources::saved_icon(link, entry) {
-        if let Some(line) = row.child().and_downcast::<gtk::Box>() {
-            let picture = gtk::Image::from_file(icon);
-            picture.set_pixel_size(32);
-            line.prepend(&picture);
-        }
+        let picture = gtk::Image::from_file(icon);
+        picture.set_pixel_size(32);
+        row.add_prefix(&picture);
     }
     row
 }
@@ -635,10 +633,11 @@ mod tests {
     }
 
     /// The suffix of a picker row: its spinner and its switch.
-    fn picker_switch(row: &gtk::ListBoxRow) -> gtk::Switch {
-        let line = row.child().and_downcast::<gtk::Box>().expect("the row's line");
-        let suffix = line.last_child().and_downcast::<gtk::Box>().expect("the spinner and switch end the row");
-        suffix.last_child().and_downcast::<gtk::Switch>().expect("the switch ends the suffix")
+    fn picker_switch(row: &adw::ActionRow) -> gtk::Switch {
+        fn find(widget: &gtk::Widget) -> Option<gtk::Switch> {
+            widget.downcast_ref::<gtk::Switch>().cloned().or_else(|| std::iter::successors(widget.first_child(), |c| c.next_sibling()).find_map(|c| find(&c)))
+        }
+        find(row.upcast_ref()).expect("the switch in the row")
     }
 
     /// A turn-on shows the row's spinner and locks the switch until it ends; the row starts with the spinner hidden.

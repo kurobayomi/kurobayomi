@@ -158,6 +158,7 @@ fn update_marks(id: &str) -> Vec<gtk::Widget> {
 }
 
 fn main_list(on_select: Rc<dyn Fn(&str)>) -> gtk::Widget {
+    use adw::prelude::*;
     let column = crate::ui::column();
     let list = crate::ui::boxed_list();
     for entry in entries() {
@@ -168,9 +169,7 @@ fn main_list(on_select: Rc<dyn Fn(&str)>) -> gtk::Widget {
         suffix.append(&crate::ui::chevron());
         let row = crate::ui::row(&entry.title, entry.subtitle.as_deref(), Some(suffix.upcast()));
         // the page's icon goes in front of its title
-        if let Some(inner) = row.child().and_downcast::<gtk::Box>() {
-            inner.prepend(&gtk::Image::from_icon_name(&entry.icon));
-        }
+        row.add_prefix(&gtk::Image::from_icon_name(&entry.icon));
         row.set_activatable(true);
         let (id, on_select) = (entry.id.clone(), on_select.clone());
         crate::widgets::row_activate::on_activate(&row, move |_| on_select(&id));

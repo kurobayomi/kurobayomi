@@ -116,7 +116,7 @@ fn with_action_bar(content: &gtk::Widget, action: &gtk::Button) -> gtk::Widget {
 }
 
 /// A check row: the whole row toggles the box.
-fn check_row(label: &str, active: bool) -> (gtk::ListBoxRow, gtk::CheckButton) {
+fn check_row(label: &str, active: bool) -> (adw::ActionRow, gtk::CheckButton) {
     let check = gtk::CheckButton::new();
     check.set_active(active);
     let row = crate::ui::row(label, None, Some(check.clone().upcast()));
@@ -133,7 +133,7 @@ pub fn create_page() -> Option<Built> {
     let screen = Rc::new(RefCell::new(CreateScreen::default()));
     let updating = Rc::new(Cell::new(false));
     let column = crate::ui::column();
-    let mut rows: Vec<(OptionId, gtk::ListBoxRow, gtk::CheckButton)> = Vec::new();
+    let mut rows: Vec<(OptionId, adw::ActionRow, gtk::CheckButton)> = Vec::new();
     for card in [Card::Library, Card::Settings, Card::Extensions] {
         column.append(&crate::ui::heading(&card_title(card)));
         let list = crate::ui::boxed_list();

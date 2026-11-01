@@ -7,7 +7,7 @@ use kuro_prefs::pref::Pref;
 use kuro_prefs::ui::ThemeMode;
 
 use super::super::model::ItemCommon;
-use super::row::{self, PrefRow, RowSpec};
+use crate::widgets::row::{self, RowSpec};
 
 /// Segment order in the UI (the enum declaration order differs).
 pub const SEGMENTS: [ThemeMode; 3] = [ThemeMode::SYSTEM, ThemeMode::LIGHT, ThemeMode::DARK];
@@ -34,7 +34,7 @@ pub fn apply(mode: ThemeMode) {
     crate::theme::apply::update_settings(|settings| settings.mode = mode);
 }
 
-pub fn row(common: &ItemCommon, pref: Pref<ThemeMode>) -> PrefRow {
+pub fn row(common: &ItemCommon, pref: Pref<ThemeMode>) -> adw::ActionRow {
     let current = pref.get();
     apply(current);
     let labels: Vec<String> = SEGMENTS.iter().map(|mode| segment_label(*mode)).collect();

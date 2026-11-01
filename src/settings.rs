@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::screens::{built, Built};
 use crate::ui::*;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Box as GBox, Button, Label, Orientation as O};
 use kuro_data::entry::EntryRepo;
 use kuro_data::source::StubSourceRepo;
@@ -73,13 +73,13 @@ fn clear_db(id: &str) -> Option<Built> {
     }
     let col = column();
     let l = boxed_list();
-    let entries: Rc<Vec<(i64, gtk::CheckButton, gtk::ListBoxRow)>> = Rc::new(
+    let entries: Rc<Vec<(i64, gtk::CheckButton, adw::ActionRow)>> = Rc::new(
         sources
             .into_iter()
             .map(|(source, name, count)| {
                 let check = gtk::CheckButton::new();
                 let r = row(&name, Some(&kuro_i18n::trf(kuro_i18n::MsgKey::clear_database_source_item_count, &[("arg1", kuro_i18n::Arg::Int(count))])), Some(check.clone().upcast()));
-                r.child().and_downcast::<GBox>().unwrap().prepend(&gtk::Image::from_icon_name("application-x-addon-symbolic"));
+                r.add_prefix(&gtk::Image::from_icon_name("application-x-addon-symbolic"));
                 l.append(&r);
                 (source, check, r)
             })

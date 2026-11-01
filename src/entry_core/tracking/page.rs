@@ -374,7 +374,7 @@ fn edit_rows(list: &ListBox, entry: &Entry, shown: Shown, bound: Bound, redraw: 
 }
 
 /// "Episodes" or "Chapters": a spin button over `0..=total` (10000 while the total is unknown) and "of N" beside it.
-fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> gtk::ListBoxRow {
+fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> adw::ActionRow {
     let spin = gtk::SpinButton::with_range(0.0, pickers::progress_max(shown.total) as f64, 1.0);
     spin.set_digits(0);
     spin.set_value(shown.progress as f64);
@@ -402,7 +402,7 @@ fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> gtk::List
 
 /// The start or finish date: a button with the day, whose popover holds a calendar, OK and, for a set date, Remove.
 /// A day in the future, a start after the finish or a finish before the start is refused with a toast.
-fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) -> gtk::ListBoxRow {
+fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) -> adw::ActionRow {
     let zone = chrono::Local;
     let text = picker_day(stored, &zone).map_or_else(|| tr(MsgKey::ui_not_set).to_owned(), |day| day.format("%Y-%m-%d").to_string());
     let button = gtk::MenuButton::builder().label(text).build();
