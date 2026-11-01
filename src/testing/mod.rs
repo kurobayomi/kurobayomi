@@ -82,31 +82,30 @@ pub fn with_display(body: impl FnOnce() + Send + 'static) {
     }
 }
 
-/// The navigation stack and window of the whole test binary, emptied on every call. `ui::nav_init` keeps the first
-/// stack it is given for the life of its thread, and every display test now shares the GTK thread, so they all take
-/// this one instead of making their own. Call it only from inside [`with_display`] or [`on_gtk`].
-pub fn nav() -> (gtk::Stack, gtk::ApplicationWindow) {
+/// The navigation view and window of the whole test binary, emptied on every call. `ui::nav_init` keeps the first view
+/// it is given for the life of its thread, and every display test now shares the GTK thread, so they all take this one
+/// instead of making their own. The first page a test pushes is its root. Call it only from inside [`with_display`] or
+/// [`on_gtk`].
+pub fn nav() -> (adw::NavigationView, gtk::ApplicationWindow) {
     use gtk::prelude::*;
 
     thread_local! {
-        static NAV: (gtk::Application, gtk::ApplicationWindow, gtk::Stack) = {
+        static NAV: (gtk::Application, gtk::ApplicationWindow, adw::NavigationView) = {
             let app = gtk::Application::builder()
                 .application_id("io.github.anas1412.KurobayomiTest")
                 .flags(gtk::gio::ApplicationFlags::NON_UNIQUE)
                 .build();
             app.register(gtk::gio::Cancellable::NONE).expect("register the test application");
             let window = gtk::ApplicationWindow::new(&app);
-            let stack = gtk::Stack::new();
-            window.set_child(Some(&stack));
-            crate::ui::nav_init(&stack, &window);
-            (app, window, stack)
+            let nav = adw::NavigationView::new();
+            window.set_child(Some(&nav));
+            crate::ui::nav_init(&nav, &window);
+            (app, window, nav)
         };
     }
-    NAV.with(|(_, window, stack)| {
-        while let Some(page) = stack.first_child() {
-            stack.remove(&page);
-        }
-        (stack.clone(), window.clone())
+    NAV.with(|(_, window, nav)| {
+        nav.replace(&[]);
+        (nav.clone(), window.clone())
     })
 }
 

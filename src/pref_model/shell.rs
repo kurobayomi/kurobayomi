@@ -364,10 +364,10 @@ mod tests {
     #[test]
     fn t_47b_003_back_walks_the_real_window_stack() {
         crate::testing::with_display(|| {
-            let (stack, _window) = crate::testing::nav();
+            let _ = crate::testing::nav();
             let tabs = gtk::Box::new(gtk::Orientation::Vertical, 0);
             tabs.set_widget_name("screen:tabs");
-            stack.add_child(&tabs);
+            crate::ui::push(&tabs);
 
             assert!(!back(), "no shell yet: the caller pops as usual");
             let page = |name: &str| {
@@ -381,10 +381,10 @@ mod tests {
             let settings = page("settings");
             let inner = page("settings_about");
             assert!(back(), "an inner page is popped first");
-            assert_eq!(stack.visible_child().as_ref(), Some(settings.upcast_ref()));
+            assert_eq!(crate::ui::visible_child().as_ref(), Some(settings.upcast_ref()));
             assert!(SHELL.with(|s| s.borrow().is_open()), "the shell stays open under it");
             assert!(back(), "then the shell closes");
-            assert_eq!(stack.visible_child().as_ref(), Some(tabs.upcast_ref()));
+            assert_eq!(crate::ui::visible_child().as_ref(), Some(tabs.upcast_ref()));
             assert!(!SHELL.with(|s| s.borrow().is_open()));
             assert!(!back(), "and the next back is the caller's");
             drop(inner);

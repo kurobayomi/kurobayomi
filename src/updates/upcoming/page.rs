@@ -504,10 +504,8 @@ mod tests {
     #[test]
     fn upcoming_page_is_titled_upcoming_and_escape_pops_it() {
         crate::testing::with_display(|| {
-            let (stack, _window) = crate::testing::nav();
-            let base = GBox::new(O::Vertical, 0);
-            stack.add_child(&base);
-            stack.set_visible_child(&base);
+            let _ = crate::testing::nav();
+            crate::ui::push(&GBox::new(O::Vertical, 0));
             let page = assemble(page(&Rc::default()));
             crate::ui::push(&page);
             let title = page.first_child().and_downcast::<adw::HeaderBar>().and_then(|bar| bar.title_widget()).and_downcast::<Label>().expect("the title");

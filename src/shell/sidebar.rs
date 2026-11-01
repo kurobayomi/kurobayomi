@@ -267,7 +267,7 @@ fn follow_pages(tabs: &gtk::Stack, places: &gtk::ListBox, bottom: &gtk::ListBox,
     let on_tab = Rc::clone(&sync);
     tabs.connect_visible_child_name_notify(move |_| on_tab());
     let on_page = Rc::clone(&sync);
-    ui::stack().connect_visible_child_notify(move |_| on_page());
+    ui::connect_page_changed(move || on_page());
     sync();
 }
 
@@ -409,11 +409,8 @@ mod tests {
     #[test]
     fn one_row_is_selected_the_place_on_screen() {
         crate::testing::with_display(|| {
-            let (stack, _) = crate::testing::nav();
-            if stack.first_child().is_none() {
-                stack.add_child(&gtk::Label::new(Some("root")));
-            }
-            ui::pop_to_root();
+            let _ = crate::testing::nav();
+            ui::push(&gtk::Label::new(Some("root")));
             let tabs = gtk::Stack::new();
             let ids: Vec<String> = ui::with_spec(|s| s.nav.iter().map(|n| n.id.clone()).collect());
             for id in &ids {

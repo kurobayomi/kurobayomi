@@ -233,11 +233,11 @@ fn build_window(app: &gtk::Application) {
     // each page brings its own header bar; an AdwApplicationWindow has no titlebar of its own
 
     // [sidebar | content nav stack], plus a bottom tab bar that replaces the sidebar when narrow
-    let nav = gtk::Stack::new();
-    nav.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    let nav = adw::NavigationView::new();
     nav.set_vexpand(true);
     nav.set_hexpand(true);
-    nav.set_hhomogeneous(false);
+    // every page handles Escape itself (`ui::pop`)
+    nav.set_pop_on_escape(false);
     ui::nav_init(&nav, &win);
     // the download managers start before the tab pages, so the Downloads page shows the live queue
     let host = shell::Shell::get().expect("the shell is installed in main");
@@ -247,7 +247,8 @@ fn build_window(app: &gtk::Application) {
     let base = &data::app().base;
     incognito::attach(app, base.incognito_mode.clone());
     let tabs = tabs();
-    nav.add_child(&tabs);
+    // the tabs are the root page: the first page of a navigation view is never popped
+    ui::push(&tabs);
     let sidebar = shell::sidebar::build(&tabs);
     let prefs = settings_ui::route::prefs();
     settings_ui::appearance::open_start_tab(&tabs, &prefs);
@@ -295,9 +296,9 @@ fn build_window(app: &gtk::Application) {
 
     // reader/player are immersive: no sidebar or tab bar while they're on screen
     let refresh = {
-        let (win, nav) = (win.clone(), nav.clone());
+        let win = win.clone();
         move || {
-            let immersive = nav.visible_child().is_some_and(|c| matches!(c.widget_name().as_str(), "screen:reader" | "screen:player"));
+            let immersive = ui::visible_page_name().is_some_and(|name| matches!(name.as_str(), "screen:reader" | "screen:player"));
             let (width, _) = window_size::size_of(&win);
             let chrome = shell::layout::chrome_for(width, win.is_maximized());
             let shown = shell::layout::visibility(chrome, immersive);
@@ -309,7 +310,7 @@ fn build_window(app: &gtk::Application) {
         }
     };
     let r = refresh.clone();
-    nav.connect_visible_child_notify(move |_| r());
+    ui::connect_page_changed(move || r());
     let r = refresh.clone();
     tabs.connect_visible_child_name_notify(move |_| r());
     // a search belongs to its tab: leaving the tab closes it

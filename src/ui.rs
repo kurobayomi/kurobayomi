@@ -1,6 +1,7 @@
 // Generic building blocks: navigation stack, spec item rows, sheets, dialogs, generic screens.
 use kuro_i18n::{MsgKey, tr};
 use crate::spec::{value_str, Dialog, Group, Item, Screen, Sheet, Spec};
+use adw::prelude::NavigationPageExt;
 use gtk::prelude::*;
 use gtk::{glib, Align, Box as GBox, Button, Label, ListBox, Orientation as O};
 use std::cell::OnceCell;
@@ -8,7 +9,7 @@ use std::rc::Rc;
 
 thread_local! {
     pub static SPEC: Spec = Spec::load();
-    static NAV: OnceCell<(gtk::Stack, gtk::ApplicationWindow)> = const { OnceCell::new() };
+    static NAV: OnceCell<(adw::NavigationView, gtk::ApplicationWindow)> = const { OnceCell::new() };
 }
 
 pub fn with_spec<R>(f: impl FnOnce(&Spec) -> R) -> R {
@@ -21,16 +22,12 @@ pub fn screen(id: &str) -> Screen {
 
 // ---------- navigation ----------
 
-pub fn nav_init(stack: &gtk::Stack, win: &gtk::ApplicationWindow) {
-    NAV.with(|n| n.set((stack.clone(), win.clone())).ok());
+pub fn nav_init(nav: &adw::NavigationView, win: &gtk::ApplicationWindow) {
+    NAV.with(|n| n.set((nav.clone(), win.clone())).ok());
 }
 
-fn nav() -> (gtk::Stack, gtk::ApplicationWindow) {
+fn nav() -> (adw::NavigationView, gtk::ApplicationWindow) {
     NAV.with(|n| n.get().cloned().expect("nav not initialised"))
-}
-
-pub fn stack() -> gtk::Stack {
-    nav().0
 }
 
 pub fn window() -> gtk::ApplicationWindow {
@@ -65,75 +62,73 @@ pub fn over_root(open: impl FnOnce()) {
     }
 }
 
+/// The navigation pages from the root up.
+fn pages(nav: &adw::NavigationView) -> Vec<adw::NavigationPage> {
+    let stack = nav.navigation_stack();
+    (0..stack.n_items()).filter_map(|i| stack.item(i).and_downcast::<adw::NavigationPage>()).collect()
+}
+
+/// A pushed widget as a navigation page. The widget keeps its own header bar, so the page has no title of its own.
+fn wrap(page: &impl IsA<gtk::Widget>) -> adw::NavigationPage {
+    adw::NavigationPage::builder().child(page).title("").build()
+}
+
+/// The widget on show: the child of the visible navigation page.
+pub fn visible_child() -> Option<gtk::Widget> {
+    nav().0.visible_page().and_then(|p| p.child())
+}
+
+/// The widget name of the page on show, such as `screen:reader`.
+pub fn visible_page_name() -> Option<String> {
+    visible_child().map(|w| w.widget_name().to_string())
+}
+
+/// Calls `f` each time the page on show changes (a push, a pop, a replace), as the change starts.
+pub fn connect_page_changed(f: impl Fn() + 'static) -> glib::SignalHandlerId {
+    nav().0.connect_visible_page_notify(move |_| f())
+}
+
+pub fn disconnect_page_changed(id: glib::SignalHandlerId) {
+    nav().0.disconnect(id);
+}
+
 pub fn push(page: &impl IsA<gtk::Widget>) {
     if OVER_ROOT.with(|flag| flag.replace(false)) {
         push_over_root(page);
         return;
     }
-    let stack = nav().0;
-    stack.add_child(page);
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Push);
-    stack.set_visible_child(page);
+    nav().0.push(&wrap(page));
 }
 
 pub fn pop() {
-    let stack = nav().0;
-    let Some(cur) = stack.visible_child() else { return };
-    let Some(prev) = cur.prev_sibling() else { return };
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&prev);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || stack.remove(&cur));
+    nav().0.pop();
 }
 
-/// The widget names of the stacked pages from the root up, and the index of the page on show. A page that was just
-/// popped stays in the list for a moment, so the index, not the length, says how deep the user is.
+/// The widget names of the stacked pages from the root up, and the index of the page on show (the last one: a popped
+/// page leaves the stack as the slide back starts).
 pub fn page_stack() -> (Vec<String>, usize) {
-    let stack = nav().0;
-    let mut names = Vec::new();
-    let mut shown = 0;
-    let visible = stack.visible_child();
-    let mut child = stack.first_child();
-    while let Some(c) = child {
-        if visible.as_ref() == Some(&c) {
-            shown = names.len();
-        }
-        names.push(c.widget_name().to_string());
-        child = c.next_sibling();
-    }
+    let names: Vec<String> = pages(&nav().0).iter().map(|p| p.child().map(|c| c.widget_name().to_string()).unwrap_or_default()).collect();
+    let shown = names.len().saturating_sub(1);
     (names, shown)
 }
 
 /// Shows the page at `index` of the stack (0 is the root) with one slide back, and drops the pages above it.
 pub fn pop_to(index: usize) {
-    let stack = nav().0;
-    let mut target = stack.first_child();
-    for _ in 0..index {
-        target = target.and_then(|w| w.next_sibling());
+    let nav = nav().0;
+    if let Some(target) = pages(&nav).get(index) {
+        nav.pop_to_page(target);
     }
-    let Some(target) = target else { return };
-    if stack.visible_child().as_ref() == Some(&target) {
-        return;
-    }
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&target);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
-        while let Some(w) = target.next_sibling() {
-            stack.remove(&w);
-        }
-    });
 }
 
 /// Pushes `page` straight over the root: one slide from the page on screen, then the pages that were between go.
 /// (Popping to the root first and then pushing played two slides.)
 pub fn push_over_root(page: &impl IsA<gtk::Widget>) {
-    let stack = nav().0;
-    let between: Vec<gtk::Widget> = std::iter::successors(stack.first_child().and_then(|r| r.next_sibling()), |w| w.next_sibling()).collect();
-    push(page);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
-        for w in between {
-            stack.remove(&w);
-        }
-    });
+    let nav = nav().0;
+    let new = wrap(page);
+    match pages(&nav).into_iter().next() {
+        Some(root) => nav.replace(&[root, new]),
+        None => nav.push(&new),
+    }
 }
 
 /// Drop every pushed page and show the root (sidebar destination clicked).
@@ -142,13 +137,7 @@ pub fn pop_to_root() {
     if OVER_ROOT.with(std::cell::Cell::get) {
         return;
     }
-    let stack = nav().0;
-    let Some(root) = stack.first_child() else { return };
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&root);
-    while let Some(w) = root.next_sibling() {
-        stack.remove(&w);
-    }
+    pop_to(0);
 }
 
 /// Split the window-button layout like GNOME split headers: sidebar gets the left part,
@@ -190,6 +179,8 @@ pub fn header_bar() -> adw::HeaderBar {
         static SAME_HEIGHT: gtk::SizeGroup = gtk::SizeGroup::new(gtk::SizeGroupMode::Vertical);
     }
     let header = adw::HeaderBar::new();
+    // the pages draw their own Back button
+    header.set_show_back_button(false);
     SAME_HEIGHT.with(|group| group.add_widget(&header));
     header
 }
@@ -1452,19 +1443,16 @@ mod tests {
     #[test]
     fn over_root_replaces_the_pages_with_one_push_or_pops_when_nothing_is_pushed() {
         crate::testing::with_display(|| {
-            let (stack, _) = crate::testing::nav();
-            if stack.first_child().is_none() {
-                stack.add_child(&gtk::Label::new(Some("root")));
-            }
-            pop_to_root();
+            let _ = crate::testing::nav();
+            push(&gtk::Label::new(Some("root")));
             let (a, b) = (gtk::Label::new(Some("a")), gtk::Label::new(Some("b")));
             push(&a);
             over_root(|| {
                 pop_to_root();
                 push(&b);
             });
-            assert_eq!(stack.visible_child().as_ref(), Some(b.upcast_ref::<gtk::Widget>()), "straight to the new page");
-            assert_eq!(stack.transition_type(), crate::shell::transitions::spec(crate::shell::transitions::Direction::Push, crate::shell::transitions::animations_enabled()).kind);
+            assert_eq!(visible_child().as_ref(), Some(b.upcast_ref::<gtk::Widget>()), "straight to the new page");
+            assert_eq!(page_stack().0.len(), 2, "the root and the new page: the page between went");
             over_root(|| {});
             assert_eq!(page_stack().1, 0, "nothing pushed: back at the root");
         });

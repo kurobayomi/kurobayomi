@@ -530,15 +530,14 @@ fn menu_items(choices: Vec<sheets::Choice>) -> Vec<Item> {
     choices.into_iter().filter(|choice| choice.enabled).map(|choice| Item::new(choice.title, 0, choice.pick).checked(choice.current)).collect()
 }
 
-/// Stops playback at once when the page leaves the main stack by a route the page does not see (Escape, Alt+Left, the
-/// mouse back button): the stack removes the page only after its 400 ms transition. The handler goes with the GL area.
+/// Stops playback at once when the page leaves the screen by a route the page does not see (Escape, Alt+Left, the
+/// mouse back button): the navigation view drops the page only after its slide. The handler goes with the GL area.
 fn watch_left(page: &gtk::Box, shared: &Shared, area: &gtk::GLArea) {
-    let stack = crate::ui::stack();
     let (page_ref, shared_ref) = (page.downgrade(), Rc::downgrade(shared));
-    let id = stack.connect_visible_child_notify(move |stack| {
+    let id = crate::ui::connect_page_changed(move || {
         let (Some(page), Some(shared)) = (page_ref.upgrade(), shared_ref.upgrade()) else { return };
-        let left = page.parent().as_ref() == Some(stack.upcast_ref::<gtk::Widget>())
-            && stack.visible_child().as_ref() != Some(page.upcast_ref::<gtk::Widget>());
+        let left = page.parent().is_some_and(|p| p.is::<adw::NavigationPage>())
+            && crate::ui::visible_child().as_ref() != Some(page.upcast_ref::<gtk::Widget>());
         if left {
             shared.borrow_mut().finish();
             // leaving the page leaves fullscreen first, so the page below is not shown full screen
@@ -550,7 +549,7 @@ fn watch_left(page: &gtk::Box, shared: &Shared, area: &gtk::GLArea) {
     let id = Cell::new(Some(id));
     area.connect_unrealize(move |_| {
         if let Some(id) = id.take() {
-            stack.disconnect(id);
+            crate::ui::disconnect_page_changed(id);
         }
     });
 }

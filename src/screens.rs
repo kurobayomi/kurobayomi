@@ -405,10 +405,10 @@ mod tests {
         use kuro_data::entry::{Entry, EntryRepo};
         use kuro_data::item::{Item, ItemRepo};
         alone::run(module_path!(), "opening_by_id_reaches_the_entry_page_the_reader_and_the_source_not_installed_toast", |ctx| {
-            let (nav, _window) = crate::testing::nav();
+            let _ = crate::testing::nav();
             let toast = alone::toast_label();
             let app = crate::data::app();
-            let top = || nav.visible_child().map(|c| c.widget_name().to_string());
+            let top = crate::ui::visible_page_name;
             let (entries, items) = (EntryRepo::new(app.db.clone()), ItemRepo::new(app.db.clone()));
             let manga = |source: i64, url: &str| {
                 let id = entries.insert(&Entry { source, url: url.into(), title: url.into(), ..Entry::create(Kind::Manga) }).expect("manga");
