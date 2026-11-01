@@ -102,8 +102,7 @@ stackswitcher > button.text-button {
 /* Top-bar and bottom-bar buttons are bare icons (user, 2026-10-14): no frame and no fill until hovered, pressed or switched
    on. One rule for every page's header (search, refresh, sort, menus, back) and for the narrow window's bottom bar, whose
    tab buttons show the open tab with the "on" fill. The header's Anime | Manga switch keeps its segmented look and a
-   suggested or destructive button keeps its colour. The window buttons are left out: themes such as Breeze draw their
-   icons as the background, which this rule would erase. */
+   suggested or destructive button keeps its colour. The window buttons have their own rules below. */
 headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close),
 headerbar menubutton > button.image-button,
 .kb-bottom-bar button {
@@ -136,6 +135,24 @@ headerbar menubutton > button.image-button:active,
 headerbar menubutton > button.image-button:checked,
 .kb-bottom-bar button:active,
 .kb-bottom-bar button:checked {
+  background: alpha(currentColor, 0.22);
+}
+/* The window buttons (minimize, maximize, close) are bare icons too, with the same fill on hover. Some themes (Breeze) draw
+   them as background pictures and swap in other pictures on hover, which the AppImage's GTK does not show, so the
+   buttons vanished under the mouse. Their own icon is shown instead and the theme's pictures are dropped. */
+headerbar windowcontrols button {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  transition: background 120ms ease;
+}
+headerbar windowcontrols button image {
+  color: inherit;
+}
+headerbar windowcontrols button:hover {
+  background: alpha(currentColor, 0.14);
+}
+headerbar windowcontrols button:active {
   background: alpha(currentColor, 0.22);
 }
 /* A refresh button at work: its arrow turns until the work ends (`ui::set_refreshing`), or once for a refresh that is done
@@ -365,9 +382,17 @@ listview.kb-item-list > row:focus {
 }
 
 /* The app's side lists (main panel, settings pages) sit on the panel's own background: a separate block behind the rows
- * would end after the last row and leave two shades in one panel. Selection and hover keep the theme's look. */
+ * would end after the last row and leave two shades in one panel. Selection keeps the theme's look. Hover and press use
+ * the state layer over the text colour: some themes (Breeze) fill a hovered row with the selection colour but keep the
+ * text colour, which is unreadable when the selection colour is light. */
 .navigation-sidebar {
   background-color: transparent;
+}
+.navigation-sidebar > row:hover:not(:selected) {
+  background-color: alpha(@theme_fg_color, 0.08);
+}
+.navigation-sidebar > row:active:not(:selected) {
+  background-color: alpha(@theme_fg_color, 0.10);
 }
 
 /* The status dot of a repo source's row (browse/sources_page.rs): green works, orange blocked for now, red broken. */
