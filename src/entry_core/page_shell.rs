@@ -37,12 +37,15 @@ pub struct ItemHeaderRow {
 }
 
 /// `options` is the list options button and `bulk` the menu button of the bulk actions, both made by the page. `page` is
-/// where typing opens the search (`ui::search_row`).
+/// where Ctrl+F opens the search (`ui::search_row`).
 pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton, page: &impl IsA<gtk::Widget>) -> ItemHeaderRow {
     let count = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let missing = Label::builder().xalign(1.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
     let entry = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).build();
     let (bar, toggle) = ui::search_row(&entry, page);
+    // the page's single-letter keys (F list options, R refresh, W browser) need the letters, so typing does not open the
+    // search here; Ctrl+F, the toggle and Escape still do
+    bar.set_key_capture_widget(None::<&gtk::Widget>);
     let linked = GBox::builder().css_classes(["linked"]).valign(gtk::Align::Center).build();
     linked.append(options);
     linked.append(&toggle);
@@ -181,6 +184,32 @@ pub(crate) mod test_util {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The list search is the app's one search (`ui::search_row`), but typing does not open it: the page's single-letter
+    /// keys need the letters.
+    #[test]
+    fn the_list_search_is_the_shared_one_and_leaves_the_letter_keys_alone() {
+        crate::testing::with_display(|| {
+            let page = GBox::new(O::Vertical, 0);
+            let header = item_header_row(Button::new().upcast_ref(), &gtk::MenuButton::new(), &page);
+            let mut stack = vec![header.row.clone()];
+            let mut bar = None;
+            while let Some(w) = stack.pop() {
+                if let Ok(b) = w.clone().downcast::<gtk::SearchBar>() {
+                    bar = Some(b);
+                    break;
+                }
+                let mut c = w.first_child();
+                while let Some(x) = c {
+                    c = x.next_sibling();
+                    stack.push(x);
+                }
+            }
+            let bar = bar.expect("the search bar");
+            assert!(bar.key_capture_widget().is_none(), "typing does not open the search");
+            assert_eq!(bar.child().and_then(|c| c.first_child()).as_ref(), Some(header.search.upcast_ref()), "the shared helper clamps the entry");
+        });
+    }
 
     #[test]
     fn the_button_label_hides_on_a_forward_scroll_and_shows_at_the_top_backward_and_at_the_end() {
