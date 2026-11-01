@@ -88,7 +88,7 @@ const SIZE: i32 = 18;
 #[allow(deprecated)]
 fn accent(area: &gtk::DrawingArea) -> gdk::RGBA {
     let context = area.style_context();
-    ["kuro_primary", "accent_color", "accent_bg_color"].iter().find_map(|name| context.lookup_color(name)).unwrap_or_else(|| area.color())
+    ["kuro_primary", "accent_color", "theme_selected_bg_color"].iter().find_map(|name| context.lookup_color(name)).unwrap_or_else(|| area.color())
 }
 
 /// The hollow circle, and for a download in progress the wedge of its percent inside it. The panel's Downloads item draws

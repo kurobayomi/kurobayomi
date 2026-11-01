@@ -9,7 +9,7 @@
 /* Divider (T-49ba-032): values/themes.xml android:divider, a 1 px line in the foreground colour. */
 .kb-divider, separator.kb-divider {
   min-height: 1px;
-  background-color: alpha(@window_fg_color, 0.12);
+  background-color: alpha(@theme_fg_color, 0.12);
 }
 
 .kb-button-text {
@@ -20,20 +20,20 @@
 /* Dialogs and popovers (T-49ba-030): the GTK surfaces keep their own radius and follow the palette. */
 window.dialog,
 popover.menu > contents {
-  background-color: @view_bg_color;
+  background-color: @theme_base_color;
 }
 
 /* Dialog windows (ui::modal): a 1px outline in the theme's border colour. Some themes (Breeze) give a dialog only a
  * dark shadow, which vanishes over a dark window behind it (user, 2026-10-12). */
 window.kb-dialog.csd {
-  outline: 1px solid alpha(currentColor, 0.15);
+  outline: 1px solid @borders;
   outline-offset: -1px;
 }
 
 /* Dragged or selected download card (T-49ba-027): draggable_card_foreground, alpha 0.08. */
 .kb-draggable.kb-dragged,
 .kb-draggable:selected {
-  background-image: linear-gradient(alpha(@accent_bg_color, 0.08), alpha(@accent_bg_color, 0.08));
+  background-image: linear-gradient(alpha(@theme_selected_bg_color, 0.08), alpha(@theme_selected_bg_color, 0.08));
 }
 
 /* Modal scrim (T-49ba-049): values/themes.xml android:backgroundDimAmount 0.32. */
@@ -70,8 +70,8 @@ window.kb-dialog.csd {
   border-radius: 999px;
   font-size: 0.8em;
   font-weight: 700;
-  background-color: @accent_bg_color;
-  color: @accent_fg_color;
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
 }
 /* The dot over a view options button while a Show only filter is on (widgets/view_options.rs). */
 .kb-dot {
@@ -79,11 +79,11 @@ window.kb-dialog.csd {
   min-height: 6px;
   margin: 5px;
   border-radius: 999px;
-  background-color: @accent_bg_color;
+  background-color: @theme_selected_bg_color;
 }
 .kb-library-context {
   font-weight: 600;
-  color: alpha(@window_fg_color, 0.7);
+  color: alpha(@theme_fg_color, 0.7);
 }
 /* The default theme of GTK 4.14 and 4.16 puts a 12 px margin on every box inside a grid (newer GTK does not), which costs a
    column and widens every gap. The grids size their own cells (widgets::cover_grid), so that margin is removed and a
@@ -163,7 +163,7 @@ button.kb-spin-once image {
 }
 .kb-card-cover {
   border-radius: 8px;
-  background-color: alpha(@window_fg_color, 0.06);
+  background-color: alpha(@theme_fg_color, 0.06);
 }
 /* A cover card under the pointer (Library, Browse and every other cover grid): a thin ring in the accent colour and a
    slightly brighter cover, easing in, so the card that a click opens is clear. A selected card keeps its thicker ring. */
@@ -171,41 +171,41 @@ gridview > child .kb-card-cover {
   transition: box-shadow 150ms ease, filter 150ms ease;
 }
 gridview > child:hover .kb-card-cover {
-  box-shadow: 0 0 0 2px alpha(@accent_bg_color, 0.75);
+  box-shadow: 0 0 0 2px alpha(@theme_selected_bg_color, 0.75);
   filter: brightness(1.08);
 }
 .kb-card-selected .kb-card-cover,
 gridview > child:hover .kb-card-selected .kb-card-cover {
-  box-shadow: 0 0 0 3px @accent_bg_color;
+  box-shadow: 0 0 0 3px @theme_selected_bg_color;
 }
 /* The box a drag on a grid's or a list's empty space draws (widgets/drag_select.rs): every item it touches is selected. */
 .kb-drag-band {
-  background-color: alpha(@accent_bg_color, 0.18);
-  border: 1px solid alpha(@accent_bg_color, 0.7);
+  background-color: alpha(@theme_selected_bg_color, 0.18);
+  border: 1px solid alpha(@theme_selected_bg_color, 0.7);
   border-radius: 4px;
 }
 .kb-cover-initials {
-  background-color: alpha(@accent_bg_color, 0.22);
+  background-color: alpha(@theme_selected_bg_color, 0.22);
 }
 .kb-cover-initials-text {
   font-size: 2.6em;
   font-weight: 800;
-  color: @accent_color;
+  color: @theme_selected_bg_color;
 }
 .kb-badge {
   padding: 1px 6px;
   border-radius: 6px;
   font-size: 0.75em;
   font-weight: 700;
-  background-color: alpha(@window_bg_color, 0.88);
-  color: @window_fg_color;
+  background-color: alpha(@theme_bg_color, 0.88);
+  color: @theme_fg_color;
 }
 .kb-badge image {
   -gtk-icon-size: 12px;
 }
 .kb-badge-unread {
-  background-color: @accent_bg_color;
-  color: @accent_fg_color;
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
 }
 .kb-card-title {
   font-size: 0.9em;
@@ -215,8 +215,8 @@ gridview > child:hover .kb-card-selected .kb-card-cover {
   padding: 24px 8px 6px 8px;
   font-size: 0.85em;
   font-weight: 600;
-  color: @window_fg_color;
-  background-image: linear-gradient(to top, alpha(@window_bg_color, 0.95), alpha(@window_bg_color, 0));
+  color: @theme_fg_color;
+  background-image: linear-gradient(to top, alpha(@theme_bg_color, 0.95), alpha(@theme_bg_color, 0));
 }
 .kb-empty-title {
   font-size: 1.3em;
@@ -240,7 +240,7 @@ entry.search > image:first-child {
 
 /* Settings pages (pref_model): the flash of a highlighted row, the error line and the tracker check. */
 .pref-flash {
-  background-color: alpha(@accent_bg_color, 0.18);
+  background-color: alpha(@theme_selected_bg_color, 0.18);
   transition: background-color 200ms ease;
 }
 .pref-flash-off {
@@ -280,14 +280,14 @@ entry.search > image:first-child {
 
 /* Manga header backdrop (entry_core/backdrop.rs): the blurred cover shows clearly at the top and eases into the window background by the bottom edge. */
 .kuro-backdrop-fade {
-  background-image: linear-gradient(to bottom, alpha(@window_bg_color, 0.3) 0%, alpha(@window_bg_color, 0.45) 60%, @window_bg_color 100%);
+  background-image: linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);
 }
 
 /* Banners (shell/banners.rs, shell/warning.rs, browse/banner.rs): a strip tinted with the theme's selection colour, or
  * with its error colour for a failure. The text keeps the theme's own foreground. */
 .kb-banner {
-  background-color: alpha(@accent_bg_color, 0.18);
-  color: @window_fg_color;
+  background-color: alpha(@theme_selected_bg_color, 0.18);
+  color: @theme_fg_color;
   padding: 4px 16px;
 }
 .kb-banner.kb-banner-error {
@@ -298,7 +298,7 @@ entry.search > image:first-child {
 /* Chapter and episode rows: the theme's selection colour for the unread dot, the bookmark and the filler mark. */
 .chapter-primary,
 .episode-tertiary {
-  color: @accent_color;
+  color: @theme_selected_bg_color;
 }
 
 /* The chapter and episode list (entry_core/list_view.rs): the rows are one card, parted by hairlines, with rounded
@@ -312,26 +312,26 @@ listview.kb-item-list > row:focus {
 }
 .kb-item {
   padding: 8px 12px;
-  background-color: @view_bg_color;
-  border-left: 1px solid alpha(@window_fg_color, 0.12);
-  border-right: 1px solid alpha(@window_fg_color, 0.12);
-  border-bottom: 1px solid alpha(@window_fg_color, 0.06);
+  background-color: @theme_base_color;
+  border-left: 1px solid alpha(@theme_fg_color, 0.12);
+  border-right: 1px solid alpha(@theme_fg_color, 0.12);
+  border-bottom: 1px solid alpha(@theme_fg_color, 0.06);
 }
 .kb-item:hover {
-  background-image: linear-gradient(alpha(@window_fg_color, 0.04), alpha(@window_fg_color, 0.04));
+  background-image: linear-gradient(alpha(@theme_fg_color, 0.04), alpha(@theme_fg_color, 0.04));
 }
 .kb-item.kb-item-selected {
-  background-image: linear-gradient(alpha(@accent_bg_color, 0.18), alpha(@accent_bg_color, 0.18));
+  background-image: linear-gradient(alpha(@theme_selected_bg_color, 0.18), alpha(@theme_selected_bg_color, 0.18));
 }
 .kb-item.kb-item-first {
   margin-top: 4px;
-  border-top: 1px solid alpha(@window_fg_color, 0.12);
+  border-top: 1px solid alpha(@theme_fg_color, 0.12);
   border-top-left-radius: 12px;
   border-top-right-radius: 12px;
 }
 .kb-item.kb-item-last {
   margin-bottom: 24px;
-  border-bottom-color: alpha(@window_fg_color, 0.12);
+  border-bottom-color: alpha(@theme_fg_color, 0.12);
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
@@ -352,14 +352,14 @@ listview.kb-item-list > row:focus {
   background-color: alpha(currentColor, 0.08);
 }
 .kuro-cal-day:focus-visible {
-  outline: 2px solid @accent_bg_color;
+  outline: 2px solid @theme_selected_bg_color;
   outline-offset: -2px;
 }
 .kuro-cal-today {
   border-color: currentColor;
 }
 .kuro-cal-dot {
-  background-color: @accent_bg_color;
+  background-color: @theme_selected_bg_color;
   border-radius: 9999px;
 }
 
@@ -388,8 +388,8 @@ listview.kb-item-list > row:focus {
 /* The reader's chapter list (reader/chapter_panel.rs): a panel over the right side of the pages, with the chapter being
  * read tinted with the theme's selection colour. */
 .reader-chapter-panel {
-  border-left: 1px solid alpha(currentColor, 0.15);
+  border-left: 1px solid @borders;
 }
 .reader-chapter-current {
-  background-color: alpha(@accent_bg_color, 0.25);
+  background-color: alpha(@theme_selected_bg_color, 0.25);
 }

@@ -47,7 +47,7 @@ pub fn system_rules(dark: bool) -> String {
     let active = Tokens::active_for(dark).to_css();
     // the tab pill follows the generic pill, so its alpha background wins at equal specificity
     format!(
-        ".{} {{ background-color: alpha(@accent_bg_color, {}); }}\n.{} {{ color: {active}; }}\n.{} {{ background-color: mix(@window_bg_color, @window_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@window_fg_color, {}); }}\n.{} {{ color: @accent_color; }}\n.{}:hover {{ background-color: alpha(@window_fg_color, {HOVER_ALPHA}); }}\n.{}:active {{ background-color: alpha(@window_fg_color, {}); }}\n.{count_pill} {{ background-color: alpha(@window_fg_color, {count_alpha}); }}\n",
+        ".{} {{ background-color: alpha(@theme_selected_bg_color, {}); }}\n.{} {{ color: {active}; }}\n.{} {{ background-color: mix(@theme_bg_color, @theme_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@theme_fg_color, {}); }}\n.{} {{ color: @theme_selected_bg_color; }}\n.{}:hover {{ background-color: alpha(@theme_fg_color, {HOVER_ALPHA}); }}\n.{}:active {{ background-color: alpha(@theme_fg_color, {}); }}\n.{count_pill} {{ background-color: alpha(@theme_fg_color, {count_alpha}); }}\n",
         class::SELECTED,
         selected_alpha(dark),
         class::ACTIVE,
@@ -67,7 +67,7 @@ pub fn system_rules(dark: bool) -> String {
 /// transition of `SCROLLBAR_FADE_MS`. Its colour is the primary accent.
 pub fn fast_thumb_rules() -> String {
     format!(
-        ".{thumb} {{ opacity: 0; border-radius: 6px; background-color: @accent_color; transition: opacity {fade}ms linear; }}\n.{thumb}.{shown} {{ opacity: 1; transition: none; }}\n",
+        ".{thumb} {{ opacity: 0; border-radius: 6px; background-color: @theme_selected_bg_color; transition: opacity {fade}ms linear; }}\n.{thumb}.{shown} {{ opacity: 1; transition: none; }}\n",
         thumb = class::FAST_THUMB,
         shown = class::FAST_SHOWN,
         fade = crate::theme::tokens::SCROLLBAR_FADE_MS,
@@ -85,16 +85,16 @@ pub fn widget_rules(system_dark: bool) -> String {
 pub fn widget_static_rules() -> String {
     format!(
         "\
-.{filled} {{ background-color: @accent_bg_color; color: @accent_fg_color; min-width: 58px; min-height: 40px; border-radius: 999px; padding: 0 24px; }}
+.{filled} {{ background-color: @theme_selected_bg_color; color: @theme_selected_fg_color; min-width: 58px; min-height: 40px; border-radius: 999px; padding: 0 24px; }}
 .{filled}:hover {{ box-shadow: 0 1px 2px alpha(black, 0.3); }}
-.{filled}:disabled {{ background-color: alpha(@accent_bg_color, 0.12); color: alpha(@window_fg_color, 0.38); }}
-.{text} {{ background: none; color: @accent_color; padding: 0 12px; }}
-.{text}:disabled {{ color: alpha(@window_fg_color, 0.38); }}
+.{filled}:disabled {{ background-color: alpha(@theme_selected_bg_color, 0.12); color: alpha(@theme_fg_color, 0.38); }}
+.{text} {{ background: none; color: @theme_selected_bg_color; padding: 0 12px; }}
+.{text}:disabled {{ color: alpha(@theme_fg_color, 0.38); }}
 .{sheet} {{ background-color: @popover_bg_color; border-radius: 28px 28px 0 0; padding: 24px; }}
 .{pill} {{ padding: 1px 6px; border-radius: 999px; }}
 .{hit} {{ min-width: 48px; min-height: 48px; }}
 .{noind}:hover, .{noind}:active {{ background-image: none; background-color: transparent; }}
-.{info_bar} {{ border-top: 1px solid alpha(@window_fg_color, 0.12); padding: 8px 0 16px 0; }}
+.{info_bar} {{ border-top: 1px solid alpha(@theme_fg_color, 0.12); padding: 8px 0 16px 0; }}
 ",
         filled = class::BUTTON_FILLED,
         text = class::BUTTON_TEXT,
@@ -127,8 +127,8 @@ mod tests {
     fn system_rules_follow_the_dark_flag() {
         let dark = system_rules(true);
         let light = system_rules(false);
-        assert!(dark.contains("alpha(@accent_bg_color, 0.16)"));
-        assert!(light.contains("alpha(@accent_bg_color, 0.22)"));
+        assert!(dark.contains("alpha(@theme_selected_bg_color, 0.16)"));
+        assert!(light.contains("alpha(@theme_selected_bg_color, 0.22)"));
         assert!(dark.contains(&format!(".kb-active {{ color: {}; }}", Rgba::argb(0xFFFF_EB3B).to_css())));
         assert!(light.contains(&format!(".kb-active {{ color: {}; }}", Rgba::argb(0xFFFF_C107).to_css())));
     }
@@ -138,14 +138,14 @@ mod tests {
     fn pill_geometry_is_always_on_and_colour_is_a_gtk_mix() {
         let rules = widget_rules(false);
         assert!(rules.contains(".kb-pill { padding: 1px 6px; border-radius: 999px; }"));
-        assert!(system_rules(true).contains(".kb-pill { background-color: mix(@window_bg_color"));
+        assert!(system_rules(true).contains(".kb-pill { background-color: mix(@theme_bg_color"));
     }
 
     // T-49b-021: an indicated surface has a hover and a press background; .kb-noindication has none.
     #[test]
     fn clickable_surface_has_hover_and_press_backgrounds() {
-        assert!(system_rules(false).contains(".kb-surface:hover { background-color: alpha(@window_fg_color, 0.08); }"));
-        assert!(system_rules(false).contains(".kb-surface:active { background-color: alpha(@window_fg_color, 0.1); }"));
+        assert!(system_rules(false).contains(".kb-surface:hover { background-color: alpha(@theme_fg_color, 0.08); }"));
+        assert!(system_rules(false).contains(".kb-surface:active { background-color: alpha(@theme_fg_color, 0.1); }"));
         assert!(widget_static_rules().contains(".kb-noindication:hover, .kb-noindication:active { background-image: none; background-color: transparent; }"));
     }
 
@@ -161,7 +161,7 @@ mod tests {
     // T-49b-026: the info icon is primary, not the amber filter tint.
     #[test]
     fn primary_icon_class_uses_the_primary_role() {
-        assert!(system_rules(true).contains(".kb-primary-icon { color: @accent_color; }"));
+        assert!(system_rules(true).contains(".kb-primary-icon { color: @theme_selected_bg_color; }"));
     }
 
     #[test]
@@ -241,18 +241,17 @@ mod base_css_tests {
     /// T-49ba-045: the base sheet names only GTK named colours, or a palette colour that the tint provider defines
     /// (`kuro_<role>`), so no rule refers to a colour that does not exist.
     #[test]
-    fn base_sheet_references_only_libadwaita_named_colours_and_palette_roles() {
-        // libadwaita's named colours (1.5)
-        const GTK: [&str; 12] = [
-            "window_bg_color",
-            "window_fg_color",
-            "view_bg_color",
-            "accent_bg_color",
-            "accent_fg_color",
-            "accent_color",
-            "popover_bg_color",
-            "headerbar_bg_color",
-            "card_bg_color",
+    fn base_sheet_references_only_gtk_named_colours_and_palette_roles() {
+        // the GTK named colours: GTK themes define them, and so does libadwaita (its GTK 3 compatibility names), so they
+        // resolve under libadwaita's own stylesheet and under distributions whose libadwaita keeps the GTK theme
+        const GTK: [&str; 9] = [
+            "theme_bg_color",
+            // the standard border colour (GTK's default theme and Breeze define it): the dialog outline
+            "borders",
+            "theme_fg_color",
+            "theme_base_color",
+            "theme_selected_bg_color",
+            "theme_selected_fg_color",
             "error_color",
             "success_color",
             "warning_color",
@@ -285,18 +284,18 @@ mod base_css_tests {
     #[test]
     fn screen_rules_live_in_the_base_sheet() {
         let rules = [
-            (".pref-flash", "background-color: alpha(@accent_bg_color, 0.18);"),
+            (".pref-flash", "background-color: alpha(@theme_selected_bg_color, 0.18);"),
             (".pref-error", "color: @error_color;"),
             (".tracker-check", "color: @success_color;"),
             (".reader-bg-black", "background-color: #000000;"),
             (".reader-bg-gray", "background-color: #202125;"),
             (".reader-scrim", "background-color: rgba(0, 0, 0, 0.5);"),
             (".reader-text-light", "color: #ffffff;"),
-            (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@window_bg_color, 0.3) 0%, alpha(@window_bg_color, 0.45) 60%, @window_bg_color 100%);"),
-            (".kb-banner", "background-color: alpha(@accent_bg_color, 0.18); color: @window_fg_color; padding: 4px 16px;"),
+            (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);"),
+            (".kb-banner", "background-color: alpha(@theme_selected_bg_color, 0.18); color: @theme_fg_color; padding: 4px 16px;"),
             (".kb-banner.kb-banner-error", "background-color: alpha(@error_color, 0.18); padding: 16px;"),
-            (".kuro-cal-day:focus-visible", "outline: 2px solid @accent_bg_color;"),
-            (".kuro-cal-dot", "background-color: @accent_bg_color;"),
+            (".kuro-cal-day:focus-visible", "outline: 2px solid @theme_selected_bg_color;"),
+            (".kuro-cal-dot", "background-color: @theme_selected_bg_color;"),
         ];
         for (selector, declaration) in rules {
             let body = declarations(selector).unwrap_or_else(|| panic!("{selector} is not in style.css"));
@@ -309,15 +308,15 @@ mod base_css_tests {
     #[test]
     fn count_pill_alpha_follows_the_dark_flag() {
         assert!(declarations(".kuro-count-pill").is_some_and(|b| b.contains("border-radius: 999px;")));
-        assert!(super::system_rules(true).contains(".kuro-count-pill { background-color: alpha(@window_fg_color, 0.12); }"));
-        assert!(super::system_rules(false).contains(".kuro-count-pill { background-color: alpha(@window_fg_color, 0.08); }"));
+        assert!(super::system_rules(true).contains(".kuro-count-pill { background-color: alpha(@theme_fg_color, 0.12); }"));
+        assert!(super::system_rules(false).contains(".kuro-count-pill { background-color: alpha(@theme_fg_color, 0.08); }"));
     }
 
     /// T-49ba-027: a dragged or selected download card gets alpha 0.08 of the selection colour.
     #[test]
     fn draggable_cards_tint_with_the_selection_colour() {
         assert!(has(".kb-draggable.kb-dragged,"));
-        assert!(has("alpha(@accent_bg_color, 0.08)"));
+        assert!(has("alpha(@theme_selected_bg_color, 0.08)"));
     }
 
     /// T-49ba-049: the modal scrim is black at 0.32.
@@ -336,7 +335,7 @@ mod base_css_tests {
     /// T-49ba-032: dividers are one pixel of the foreground at 0.12.
     #[test]
     fn dividers_are_one_pixel_at_012() {
-        assert!(has(".kb-divider, separator.kb-divider {\n  min-height: 1px;\n  background-color: alpha(@window_fg_color, 0.12);"));
+        assert!(has(".kb-divider, separator.kb-divider {\n  min-height: 1px;\n  background-color: alpha(@theme_fg_color, 0.12);"));
     }
 
     /// T-49ba-022: the tab-enter rotation classes that `anim::rotate_icon` sets.

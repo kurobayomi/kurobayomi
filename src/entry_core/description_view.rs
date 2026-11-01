@@ -21,7 +21,7 @@ fn scrim(host: &gtk::Widget) -> gtk::DrawingArea {
     let host = host.clone();
     area.set_draw_func(move |_, cr, w, h| {
         #[allow(deprecated)]
-        let bg = host.style_context().lookup_color("window_bg_color").unwrap_or_else(|| gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0));
+        let bg = host.style_context().lookup_color("theme_bg_color").unwrap_or_else(|| gtk::gdk::RGBA::new(0.0, 0.0, 0.0, 1.0));
         let (r, g, b) = (f64::from(bg.red()), f64::from(bg.green()), f64::from(bg.blue()));
         let fade = gtk::cairo::LinearGradient::new(0.0, 0.0, 0.0, f64::from(h));
         fade.add_color_stop_rgba(0.0, r, g, b, 0.0);
