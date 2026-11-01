@@ -1218,8 +1218,10 @@ pub(crate) mod tests {
         }
         find(root.upcast_ref(), &mut searches);
         assert!(searches.is_empty(), "no search bar");
-        let buttons = all_buttons(root);
-        assert_eq!(buttons.len(), 1, "back is the only control: no chips, no filter, no retry");
+        // the header carries the window pin (`ui::window_buttons`) beside Back
+        let (pins, buttons): (Vec<_>, Vec<_>) = all_buttons(root).into_iter().partition(|b| b.is::<gtk::ToggleButton>());
+        assert_eq!(pins.len(), 1, "the header's window pin");
+        assert_eq!(buttons.len(), 1, "back is the only other control: no chips, no filter, no retry");
         buttons[0].emit_clicked();
         assert_eq!(*rig.log.borrow(), ["back"]);
         assert!(rig.script.requests.lock().expect("lock").is_empty(), "and never loads");
