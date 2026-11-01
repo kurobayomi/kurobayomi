@@ -1,8 +1,7 @@
 //! Login, logout, refresh, delete and logging against a local wiremock server (T-29a-026, T-29a-027, T-29a-035,
 //! T-29a-043, T-29a-048). No test contacts myanimelist.net.
 
-use std::io::Write;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use serde_json::json;
 use wiremock::matchers::{body_string, method, path, query_param};
@@ -408,13 +407,7 @@ async fn a_remote_delete_failure_is_logged_and_the_local_removal_still_happens()
 
 #[tokio::test]
 async fn a_failed_remote_delete_is_logged_at_error_and_a_404_at_warn() {
-    let captured = Captured::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(captured.clone())
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let (captured, _guard) = crate::fakes::capture_logs(tracing::Level::TRACE);
 
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
@@ -446,13 +439,7 @@ async fn a_failed_remote_delete_is_logged_at_error_and_a_404_at_warn() {
 
 #[tokio::test]
 async fn a_remote_update_failure_is_logged_with_the_title_id_and_no_token() {
-    let captured = Captured::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_writer(captured.clone())
-        .with_ansi(false)
-        .with_max_level(tracing::Level::TRACE)
-        .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let (captured, _guard) = crate::fakes::capture_logs(tracing::Level::TRACE);
 
     let server = MockServer::start().await;
     let dir = tempfile::tempdir().unwrap();
@@ -495,34 +482,6 @@ async fn a_remote_update_failure_is_logged_with_the_title_id_and_no_token() {
     }
 }
 
-/// A log writer that keeps everything in memory, for the logging tests.
-#[derive(Clone, Default)]
-struct Captured(Arc<Mutex<Vec<u8>>>);
-
-impl Captured {
-    fn text(&self) -> String {
-        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
-    }
-}
-
-impl Write for Captured {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
-    type Writer = Captured;
-
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
-    }
-}
 
 #[allow(dead_code)]
 fn _tracker_type_is_send_sync() {
