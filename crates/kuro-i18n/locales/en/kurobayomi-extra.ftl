@@ -1045,3 +1045,12 @@ window_keep_above = Keep above other windows
 
 # source: kurobayomi
 window_keep_above_unavailable = This desktop does not let apps keep a window on top. Use the window menu instead.
+
+# source: kurobayomi
+download_queue_size_warning = Warning: large bulk downloads may lead to sources becoming slower and/or blocking Kurobayomi. Tap to learn more.
+
+# source: kurobayomi
+unofficial_anime_extension_message = This extension is not from the official list.
+
+# source: kurobayomi
+home_title = Kurobayomi

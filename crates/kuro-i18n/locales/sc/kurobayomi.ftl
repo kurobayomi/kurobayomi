@@ -88,8 +88,6 @@ pref_manga_library_update_categories_details = Sos elementos in sas categorias e
 
 unofficial_extension_message_aniyomi = Custa estensione non benit dae sa lista ufitziale.
 
-unofficial_anime_extension_message = Custa estensione non benit dae sa lista ufitziale.
-
 pref_remove_exclude_categories_manga = Categorias esclùdidas
 
 pref_clear_manga_database = Isbòida sa base de datos

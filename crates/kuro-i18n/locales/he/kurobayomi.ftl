@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = אפס/י את כל הפרקים עבור מנגה 
 
 download_insufficient_space = לא ניתן להוריד בעקבות מחסור בשטח אחסון
 
-download_queue_size_warning = אזהרה: תפזורת גדולה של הורדות עלולה לגרום למקורות להיות איטיים יותר ו/או חסימת Aniyomi. לחץ/י כדי ללמוד עוד.
-
 pref_invalidate_download_cache_summary = הכרח/י את האפליקציה לאמת פרקים (לקריאה/צפייה) מורדים.
 
 pref_progress_mark_as_seen = באיזו נקודה לסמן את הפרק כנצפה
@@ -289,8 +287,6 @@ pref_manga_library_update_categories_details = מנגה בקטגוריות שא�
 pref_anime_library_update_categories_details = אנימה בקטגוריות שאינן נכללות לא יעודכנו גם אם הן נמצאות גם בקטגוריות כלולות.
 
 unofficial_extension_message_aniyomi = הרחבה זו אינה מרשימת ההרחבות הרשמית של אניומי (Aniyomi).
-
-unofficial_anime_extension_message = הרחבה זו אינה מרשימת ההרחבות הרשמית של אניומי (Aniyomi).
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

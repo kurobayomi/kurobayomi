@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Bu manga için tüm bölümleri sıfırla
 
 download_insufficient_space = Düşük depolama alanı nedeniyle indirilemedi
 
-download_queue_size_warning = Uyarı: büyük toplu indirmeler, kaynakların daha yavaş çalışmasına ve/veya Aniyomi uygulamasını engellemesine neden olabilir. Daha fazla bilgi için dokunun.
-
 pref_invalidate_download_cache_summary = Uygulamayı indirilmiş manga ve anime bölümlerini tekrar kontrol etmeye zorla
 
 label_player_settings = Oynatıcı ayarları
@@ -741,8 +739,6 @@ pref_manga_library_update_categories_details = Hariç tutulan kategorilerdeki gi
 pref_anime_library_update_categories_details = Hariç tutulan kategorilerdeki animeler, dahil edilen kategorilerde de olsalar dahi güncellenmeyecektir.
 
 unofficial_extension_message_aniyomi = Bu uzantı, resmi Aniyomi uzantıları listesinden değildir.
-
-unofficial_anime_extension_message = Bu uzantı, resmi Aniyomi uzantıları listesinden değil.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

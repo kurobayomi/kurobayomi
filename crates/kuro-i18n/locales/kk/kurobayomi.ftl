@@ -62,8 +62,6 @@ dialog_with_checkbox_reset = Бұл манга үшін түгел тараул�
 
 download_insufficient_space = Жадта орын аз болған соң жүктелмеді
 
-download_queue_size_warning = Ескерту: Көп жүктеулер саны дереккөздер жұмысын баяулата алады және/немесе Aniyomi бұғатталына алады. Толығырақ оқу үшін басыңыз
-
 pref_invalidate_download_cache_summary = Қолданбаны жүктеп алынған тарауларды/бөлімдерді қайта тексеруге мәжбүрлеу
 
 label_player_settings = Ойнатқышты баптау

@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Resetovat všechny kapitoly této mangy
 
 download_insufficient_space = Nelze stáhnout kvůli nedostatku místa v úložisti
 
-download_queue_size_warning = Upozornění: stahování velkých objemů dat může zpomalit zdroje a/nebo blokovat Aniyomi. Klepnutím se dozvíte více.
-
 pref_invalidate_download_cache_summary = Vynutit aplikaci, aby znovu zkontrolovala stažené kapitoly a epizody
 
 label_player_settings = Nastavení přehrávače

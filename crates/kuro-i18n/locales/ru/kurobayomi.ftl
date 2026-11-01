@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Сбросить все главы для этог�
 
 download_insufficient_space = Не удалось загрузить из-за малого объема хранилища
 
-download_queue_size_warning = Предупреждение: Большое количество загрузок может привести к замедлению работы источников и/или блокировке Aniyomi. Нажмите для подробностей.
-
 pref_invalidate_download_cache_summary = Принуждает приложение перепроверить загруженные главы и серии
 
 label_player_settings = Настройки проигрывателя
@@ -739,8 +737,6 @@ pref_manga_library_update_categories_details = Манга в исключённ�
 pref_anime_library_update_categories_details = Аниме в исключённых категориях не обновляется, даже если она также находится во включённых категориях.
 
 unofficial_extension_message_aniyomi = Это расширение не входит в официальный список расширений Aniyomi.
-
-unofficial_anime_extension_message = Это расширение не входит в официальный список расширений Aniyomi.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

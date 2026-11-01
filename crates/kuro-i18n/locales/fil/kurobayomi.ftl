@@ -540,8 +540,6 @@ pref_anime_library_update_categories_details = Ang mga anime sa mga ibinukod na 
 
 unofficial_extension_message_aniyomi = Ang extension na ito ay hindi mula sa opisyal na listahan ng mga extension ng Aniyomi.
 
-unofficial_anime_extension_message = Ang extension na ito ay hindi mula sa opisyal na listahan ng mga extension ng Aniyomi.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = Kategoryang di-kasama

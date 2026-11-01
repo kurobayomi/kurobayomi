@@ -29,7 +29,7 @@
  "screens": [
   {
    "id": "home",
-   "title": "Aniyomi",
+   "title": "Kurobayomi",
    "kind": "custom",
    "toolbar": [],
    "menu": [],
@@ -840,11 +840,11 @@
      "items": [
       {
        "type": "info",
-       "title": "Select a folder where Aniyomi will store chapter downloads, backups, and more.\n\nA dedicated folder is recommended.\n\nSelected folder: <path>"
+       "title": "Select a folder where Kurobayomi will store chapter downloads, backups, and more.\n\nA dedicated folder is recommended.\n\nSelected folder: <path>"
       },
       {
        "type": "action",
-       "title": "Create default Aniyomi folder"
+       "title": "Create default Kurobayomi folder"
       },
       {
        "type": "action",
@@ -880,7 +880,7 @@
      "items": [
       {
        "type": "info",
-       "title": "New to Aniyomi? We recommend checking out the getting started guide."
+       "title": "New to Kurobayomi? We recommend checking out the getting started guide."
       },
       {
        "type": "action",
@@ -888,7 +888,7 @@
       },
       {
        "type": "info",
-       "title": "Reinstalling Aniyomi?"
+       "title": "Reinstalling Kurobayomi?"
       },
       {
        "type": "action",

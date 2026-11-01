@@ -54,8 +54,6 @@ dialog_with_checkbox_reset = إعادة تعيين جميع الفصول لهذ�
 
 download_insufficient_space = يتعذّر تنزيل الفصول بسبب انخفاض مساحة التخزين
 
-download_queue_size_warning = تحذير: يمكن أن تؤدِّي التنزيلات كبيرة الحجم والعدد إلى إبطاء المصادر أو/و حجز التطيق. اضغط لمعرفة المزيد۔
-
 pref_invalidate_download_cache_summary = فرض التطبيق على إعادة التحقق من الفصول التي تم تنزيلها
 
 label_player_settings = إعدادات المشغل
@@ -685,8 +683,6 @@ pref_manga_library_update_categories_details = المانجا في الفئات 
 pref_anime_library_update_categories_details = لن يتم تحديث الأنيمي في الفئات المستبعدة حتى لو كانت في الفئات المضمنة أيضًا.
 
 unofficial_extension_message_aniyomi = هذا الامتداد ليس من قائمة ملحقات "Aniyomi" الرسمية.
-
-unofficial_anime_extension_message = هذا الملحق ليس من قائمة ملحقات انيومي الرسمية.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
