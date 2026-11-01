@@ -92,20 +92,19 @@ mod tests {
         assert_eq!(apply_theme(ThemeMode::DARK), ThemeChoice::Dark);
     }
 
-    // T-47ba-040, T-01a-021: the one apply path sets the GTK preference, and System restores the startup value.
+    // T-47ba-040, T-01a-021: the one apply path sets libadwaita's colour scheme, and System follows the desktop.
     #[test]
-    fn each_mode_reaches_gtk_and_system_restores_the_startup_value() {
+    fn each_mode_reaches_the_style_manager() {
         crate::testing::with_display(|| {
             let Some(display) = gtk::gdk::Display::default() else { return };
-            let startup = crate::theme::dark::startup_prefer_dark();
             crate::theme::apply::install(&display, crate::theme::ThemeSettings::default());
-            let gtk_prefers_dark = || gtk::Settings::default().is_some_and(|s| s.is_gtk_application_prefer_dark_theme());
+            let style = adw::StyleManager::default();
             apply(ThemeMode::DARK);
-            assert!(gtk_prefers_dark());
+            assert!(style.is_dark());
             apply(ThemeMode::LIGHT);
-            assert!(!gtk_prefers_dark());
+            assert!(!style.is_dark());
             apply(ThemeMode::SYSTEM);
-            assert_eq!(gtk_prefers_dark(), startup);
+            assert_eq!(style.color_scheme(), adw::ColorScheme::Default);
         });
     }
 }

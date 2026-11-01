@@ -13,7 +13,7 @@
 //!   A stored `MONET` reads as the GTK theme (`prefs`).
 //! - `lightStatusBar`, `windowLightStatusBar`, `lightNavigationBar`, `elevationOverlayEnabled`, `windowLightNavigationBar`
 //!   and the API-27 navigation-bar overrides: GTK has no system bars and no forced dark mode; the
-//!   dark decision comes from the window background (`dark::`).
+//!   dark decision comes from libadwaita's style manager (`apply::follow_system`).
 //! - `forceDarkAllowed`, `statusBarColor`, `navigationBarColor`, `navigationBarDividerColor`,
 //!   `enforceNavigationBarContrast`, `enforceStatusBarContrast`, `windowActionModeOverlay`,
 //!   `elevationOverlayColor`: the same reason, no system bars and no elevation tint.
@@ -29,7 +29,6 @@ pub mod app_theme;
 pub mod apply;
 pub mod baseline;
 pub mod components;
-pub mod dark;
 pub mod icons;
 pub mod motion;
 pub mod prefs;
@@ -152,7 +151,7 @@ mod tests {
             apply::install(&display, ThemeSettings::default());
             let pref = kuro_prefs::ui::UiPrefs::new(kuro_prefs::store::PrefStore::in_memory()).theme_mode;
             follow_mode(&pref);
-            let prefers_dark = || gtk::Settings::default().is_some_and(|s| s.is_gtk_application_prefer_dark_theme());
+            let prefers_dark = || adw::StyleManager::default().is_dark();
             let pump = |ms: u64| {
                 let until = std::time::Instant::now() + std::time::Duration::from_millis(ms);
                 while std::time::Instant::now() < until {

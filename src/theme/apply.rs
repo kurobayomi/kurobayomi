@@ -16,7 +16,7 @@ use gtk::{gdk, CssProvider};
 
 use kuro_prefs::ui::ThemeMode;
 
-use super::{dark, resolve, style, Resolved, ThemeSettings};
+use super::{resolve, style, Resolved, ThemeSettings};
 
 thread_local! {
     /// The tint provider and the display it was added to. Added once; only its text changes.
@@ -27,8 +27,6 @@ thread_local! {
     static GUARD: Guard = const { Guard { applying: Cell::new(false), pending: Cell::new(false) } };
     /// The display and settings last applied, so a system change can re-apply them.
     static CURRENT: RefCell<Option<(gdk::Display, ThemeSettings)>> = const { RefCell::new(None) };
-    /// The last known system dark flag (portal, else GTK fallback). `None` until a read arrives.
-    static SYSTEM_DARK: Cell<Option<bool>> = const { Cell::new(None) };
     /// The dark flag last marked on the windows (T-49ba-003), for windows created later.
     static WINDOW_DARK: Cell<bool> = const { Cell::new(false) };
 }
@@ -138,71 +136,12 @@ fn load_into(
 /// Installs the palette and the base stylesheet, once, before the first window is presented (T-49ba-001). The palette
 /// goes first: the base sheet names `kuro_*` colours that only the palette defines, so they must exist when it is parsed.
 pub fn install(display: &gdk::Display, settings: ThemeSettings) -> bool {
-    // before the first write, so System can restore what the desktop had
-    dark::startup_prefer_dark();
-    drop_unreadable_theme(display);
     let applied = set_settings(display, settings);
     let base = CssProvider::new();
     connect_parse_log(&base);
     base.load_from_string(style::BASE_CSS);
     gtk::style_context_add_provider_for_display(display, &base, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     applied
-}
-
-/// More parse errors than this means the GTK theme was written for a newer GTK. adw-gtk3 6 (CSS variables) gives about
-/// 2900 on GTK 4.14; Tokyonight, which mostly works there, gives 36.
-// ponytail: a count, not a check of what the theme paints; replace with a newer bundled GTK once the AppImage moves past 4.14
-const UNREADABLE_THEME_ERRORS: u32 = 500;
-
-/// The built-in theme that stands in for an unreadable one, keeping a `-dark` name dark (`dark::gtk_fallback_dark`).
-pub fn builtin_theme_for(name: &str) -> &'static str {
-    if name.to_ascii_lowercase().ends_with("-dark") {
-        "Adwaita-dark"
-    } else {
-        "Adwaita"
-    }
-}
-
-/// The `GTK_THEME` value as (name, variant): GTK loads it in place of the theme setting. `None` when unset or empty.
-fn env_theme(value: Option<&str>) -> Option<(&str, Option<&str>)> {
-    let value = value.filter(|v| !v.is_empty())?;
-    Some(match value.split_once(':') {
-        Some((name, variant)) => (name, Some(variant)),
-        None => (value, None),
-    })
-}
-
-/// A theme written for GTK 4.16 or newer (CSS variables, as in adw-gtk3 6) barely parses on an older GTK such as the
-/// AppImage's 4.14: every background is lost and the window is see-through (issue #5). Such a theme is swapped for the
-/// built-in one for this run. A theme forced with `GTK_THEME` wins over the setting, so that one is checked and
-/// rewritten instead (issue #6).
-fn drop_unreadable_theme(display: &gdk::Display) {
-    if gtk::minor_version() >= 16 {
-        return;
-    }
-    let settings = gtk::Settings::for_display(display);
-    let env = std::env::var("GTK_THEME").ok();
-    let forced = env_theme(env.as_deref());
-    let Some(name) = forced.map(|(name, _)| name.into()).or_else(|| settings.gtk_theme_name()) else {
-        return;
-    };
-    let errors = Rc::new(Cell::new(0u32));
-    let probe = CssProvider::new();
-    let count = errors.clone();
-    probe.connect_parsing_error(move |_, _, _| count.set(count.get() + 1));
-    probe.load_named(&name, None);
-    if errors.get() > UNREADABLE_THEME_ERRORS {
-        let builtin = builtin_theme_for(&name);
-        tracing::warn!(theme = %name, errors = errors.get(), gtk = gtk::minor_version(), builtin, "GTK theme needs a newer GTK; using the built-in theme");
-        if let Some((_, variant)) = forced {
-            let value = variant.map_or(builtin.to_owned(), |v| format!("{builtin}:{v}"));
-            // GTK reads GTK_THEME again on the theme-name change below.
-            // SAFETY: runs once at startup on the main thread, before any screen starts work that reads the environment.
-            // ponytail: a race with a getenv on another thread stays possible; check before GTK init if one ever shows up
-            unsafe { std::env::set_var("GTK_THEME", value) };
-        }
-        settings.set_gtk_theme_name(Some(builtin));
-    }
 }
 
 /// Logs each parse error of a stylesheet with its location (T-49ba-045).
@@ -227,22 +166,25 @@ pub fn apply(display: &gdk::Display, settings: &ThemeSettings, system_dark: bool
     reapply(display, &tints)
 }
 
-/// The `gtk-application-prefer-dark-theme` value for a mode: Light and Dark force it, System puts
-/// back the value the desktop had at startup (`startup`), so System never forces light.
-pub fn gtk_prefer_dark(mode: ThemeMode, startup: bool) -> bool {
+/// The libadwaita colour scheme for a mode: System follows the desktop, Light and Dark force it.
+pub fn color_scheme(mode: ThemeMode) -> adw::ColorScheme {
     match mode {
-        ThemeMode::LIGHT => false,
-        ThemeMode::DARK => true,
-        ThemeMode::SYSTEM => startup,
+        ThemeMode::LIGHT => adw::ColorScheme::ForceLight,
+        ThemeMode::DARK => adw::ColorScheme::ForceDark,
+        _ => adw::ColorScheme::Default,
     }
 }
 
-/// Sets the GTK dark preference for a mode. A no-op without a display.
-pub fn sync_gtk_preference(mode: ThemeMode) {
-    let Some(settings) = gtk::Settings::default() else {
-        return;
-    };
-    settings.set_gtk_application_prefer_dark_theme(gtk_prefer_dark(mode, dark::startup_prefer_dark()));
+/// Sets libadwaita's colour scheme for a mode. A no-op before libadwaita is initialised.
+pub fn sync_color_scheme(mode: ThemeMode) {
+    if adw::is_initialized() {
+        adw::StyleManager::default().set_color_scheme(color_scheme(mode));
+    }
+}
+
+/// Whether the app is dark now, as libadwaita decided it (the forced mode, else the desktop).
+fn style_dark() -> bool {
+    adw::is_initialized() && adw::StyleManager::default().is_dark()
 }
 
 pub fn set_settings(display: &gdk::Display, settings: ThemeSettings) -> bool {
@@ -267,8 +209,9 @@ fn apply_current() -> bool {
     let Some((display, settings)) = current else {
         return false;
     };
-    let system_dark = SYSTEM_DARK.with(Cell::get).unwrap_or(false);
-    sync_gtk_preference(settings.mode);
+    sync_color_scheme(settings.mode);
+    // libadwaita has already folded the mode in, so its answer stands for the desktop's under System
+    let system_dark = style_dark();
     let dark = resolve(&settings, system_dark).tokens.dark;
     WINDOW_DARK.with(|m| m.set(dark));
     mark_windows();
@@ -302,18 +245,14 @@ pub fn mark_new_window(window: &gtk::Window) {
     mark_window(window);
 }
 
-fn set_system(read: dark::PortalRead) {
-    let last = SYSTEM_DARK.with(Cell::get);
-    let dark = dark::next_system(read, last, dark::gtk_fallback());
-    SYSTEM_DARK.with(|c| c.set(Some(dark)));
-    apply_current();
-}
-
-/// Starts following the desktop colour scheme (T-49a-011): reads the portal once, then re-applies
-/// on each `SettingChanged`. Call once after the window is realized.
+/// Starts following the desktop colour scheme (T-49a-011): libadwaita reads the desktop, and every change of its
+/// dark flag re-applies the palette. Call once after the window is realized.
 pub fn follow_system() {
-    dark::read_portal(set_system);
-    dark::watch(set_system);
+    if adw::is_initialized() {
+        adw::StyleManager::default().connect_dark_notify(|_| {
+            apply_current();
+        });
+    }
 }
 
 #[cfg(test)]
@@ -322,29 +261,12 @@ mod tests {
     use crate::theme::style::BASE_CSS;
     use kuro_prefs::ui::ThemeMode;
 
+    // T-01a-021: Light and Dark force the scheme, System follows the desktop.
     #[test]
-    fn an_unreadable_dark_theme_falls_back_to_the_dark_builtin() {
-        assert_eq!(builtin_theme_for("adw-gtk3-dark"), "Adwaita-dark");
-        assert_eq!(builtin_theme_for("Adw-Gtk3-Dark"), "Adwaita-dark");
-        assert_eq!(builtin_theme_for("adw-gtk3"), "Adwaita");
-    }
-
-    #[test]
-    fn a_forced_gtk_theme_is_split_into_name_and_variant() {
-        assert_eq!(env_theme(None), None);
-        assert_eq!(env_theme(Some("")), None);
-        assert_eq!(env_theme(Some("adw-gtk3")), Some(("adw-gtk3", None)));
-        assert_eq!(env_theme(Some("adw-gtk3:dark")), Some(("adw-gtk3", Some("dark"))));
-    }
-
-    // T-01a-021: Light and Dark force the GTK preference, System puts back the startup value.
-    #[test]
-    fn system_restores_the_startup_value_and_never_forces_light() {
-        for startup in [false, true] {
-            assert!(!gtk_prefer_dark(ThemeMode::LIGHT, startup));
-            assert!(gtk_prefer_dark(ThemeMode::DARK, startup));
-            assert_eq!(gtk_prefer_dark(ThemeMode::SYSTEM, startup), startup);
-        }
+    fn each_mode_maps_to_a_colour_scheme() {
+        assert_eq!(color_scheme(ThemeMode::LIGHT), adw::ColorScheme::ForceLight);
+        assert_eq!(color_scheme(ThemeMode::DARK), adw::ColorScheme::ForceDark);
+        assert_eq!(color_scheme(ThemeMode::SYSTEM), adw::ColorScheme::Default);
     }
 
     // T-01a-021: no display, no panic, nothing applied.
