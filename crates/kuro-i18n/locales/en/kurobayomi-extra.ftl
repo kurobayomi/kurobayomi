@@ -1042,3 +1042,6 @@ player_episode_list_search = Episode number or name
 
 # source: kurobayomi
 window_keep_above = Keep above other windows
+
+# source: kurobayomi
+window_keep_above_unavailable = This desktop does not let apps keep a window on top. Use the window menu instead.

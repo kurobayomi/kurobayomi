@@ -197,27 +197,25 @@ pub fn window_buttons(header: &adw::HeaderBar) {
     header.pack_end(&pin_button());
 }
 
-/// Keeps the window above other windows while active. It hides itself where the system cannot do that (Wayland), and
-/// takes the window's state each time its page shows, so the pins of every page agree.
+/// Keeps the window above other windows while active. It always shows; where the desktop cannot do it (a Wayland
+/// session without KWin), a click springs back and says so. It takes the window's state each time its page shows, so the
+/// pins of every page agree.
 fn pin_button() -> gtk::ToggleButton {
     let pin = gtk::ToggleButton::builder().icon_name("view-pin-symbolic").tooltip_text(tr(MsgKey::window_keep_above)).build();
     pin.set_focus_on_click(false);
     let surface = |pin: &gtk::ToggleButton| pin.native().and_then(|n| n.surface());
-    pin.connect_realize(move |pin| {
-        if !surface(pin).is_some_and(|s| kuro_platform::window_level::can_keep_above(&s)) {
-            pin.set_visible(false);
-        }
-    });
     pin.connect_map(|pin| pin.set_active(PINNED.with(std::cell::Cell::get)));
     pin.connect_toggled(move |pin| {
         let above = pin.is_active();
         if above == PINNED.with(std::cell::Cell::get) {
             return;
         }
-        if surface(pin).is_some_and(|s| kuro_platform::window_level::set_keep_above(&s, above)) {
+        let reached = surface(pin).is_some_and(|s| kuro_platform::window_level::can_keep_above(&s) && kuro_platform::window_level::set_keep_above(&s, above));
+        if reached {
             PINNED.with(|p| p.set(above));
         } else {
             pin.set_active(!above);
+            crate::toast::notify(tr(MsgKey::window_keep_above_unavailable));
         }
     });
     pin
@@ -639,12 +637,12 @@ pub enum LoadSize {
     Page,
 }
 
-/// A spinning spinner. `Inline` is 16 px, for a button or a row. `Page` is 32 px and centred, filling its parent: the
+/// A spinning spinner. `Inline` is 16 px, for a button or a row. `Page` is 48 px and centred, filling its parent: the
 /// "loading" state of a page.
 pub fn loading(size: LoadSize) -> gtk::Spinner {
     let px = match size {
         LoadSize::Inline => 16,
-        LoadSize::Page => 32,
+        LoadSize::Page => 48,
     };
     let spinner = gtk::Spinner::builder().spinning(true).width_request(px).height_request(px).build();
     if size == LoadSize::Page {
