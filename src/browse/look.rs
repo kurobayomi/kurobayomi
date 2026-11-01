@@ -2,7 +2,7 @@
 //! shared column, heading and status of `ui`: worded badges, the empty state with its one action, and the covers.
 //! Stock GTK widgets and theme colours only.
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Align, Orientation as O};
 use std::rc::Rc;
 
@@ -76,32 +76,15 @@ pub fn cover_art(owner: Kind, entry_id: i64, source_id: i64, url: Option<String>
     ArtRef { owner, entry_id, source_id, kind: ArtKind::Cover, url, favorite, last_modified }
 }
 
-/// A list row: `cover` (from [`row_cover`] at a [`CoverSize`]), the bold title, an optional dim subtitle, and an
-/// optional `trailing` widget at the end. `ui`'s row metrics, so every list of entries has the same insets.
-pub fn list_row(cover: Option<gtk::Widget>, title: &str, subtitle: Option<&str>, trailing: Option<gtk::Widget>) -> gtk::ListBoxRow {
-    let line = gtk::Box::new(O::Horizontal, 12);
-    line.set_margin_start(crate::ui::ROW_PAD_H);
-    line.set_margin_end(crate::ui::ROW_PAD_H);
-    line.set_margin_top(crate::ui::ROW_PAD_V);
-    line.set_margin_bottom(crate::ui::ROW_PAD_V);
-    line.set_size_request(-1, crate::ui::ROW_MIN_HEIGHT - 2 * crate::ui::ROW_PAD_V);
+/// A list row: `cover` (from [`row_cover`] at a [`CoverSize`]) as the prefix, the title, an optional dim subtitle, and an
+/// optional `trailing` widget at the end. `widgets::row`'s row, so every list of entries has the same insets.
+pub fn list_row(cover: Option<gtk::Widget>, title: &str, subtitle: Option<&str>, trailing: Option<gtk::Widget>) -> adw::ActionRow {
+    let row = crate::widgets::row::plain(title, subtitle, trailing.as_ref());
     if let Some(cover) = cover {
         cover.set_valign(Align::Center);
-        line.append(&cover);
+        row.add_prefix(&cover);
     }
-    let text = gtk::Box::new(O::Vertical, 2);
-    text.set_hexpand(true);
-    text.set_valign(Align::Center);
-    text.append(&crate::ui::row_title(title));
-    if let Some(subtitle) = subtitle.filter(|s| !s.is_empty()) {
-        text.append(&crate::ui::dim(subtitle));
-    }
-    line.append(&text);
-    if let Some(trailing) = trailing {
-        trailing.set_valign(Align::Center);
-        line.append(&trailing);
-    }
-    gtk::ListBoxRow::builder().child(&line).build()
+    row
 }
 
 /// The cover of a list row: [`cover`] with the small rounded corners and initials of a row.

@@ -12,7 +12,7 @@ use std::time::Duration;
 use chrono::{Local, Months};
 use gtk::gdk::{self, ModifierType};
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Box as GBox, Button, CheckButton, GestureClick, Image, Label, ListBox, Orientation as O};
 use kuro_domain::dates::ListRow;
 use kuro_platform::kind::Kind;
@@ -30,7 +30,6 @@ use crate::updates::download_host;
 use crate::updates::download_state::{Change, DiskCache, DownloadState};
 use crate::browse::look;
 use crate::updates::feed::{self, FeedRow, Gesture, Press};
-use crate::updates::row_texts;
 use crate::updates::format;
 use crate::updates::history::COALESCE_MS;
 use crate::updates::{copy, open_route, qualities};
@@ -387,8 +386,8 @@ impl UpdatesScreen {
     }
 
     /// One feed row (`look::list_row`): the selection check, the unread dot and the cover lead, the title sits over a line
-    /// of bookmark, fillermark, unit name and progress, and the download indicator ends the row. A read or seen row dims
-    /// the title and the unit name to 0.38.
+    /// of unit name and progress, and the bookmark, fillermark and download indicator end the row. A read or seen row
+    /// dims to 0.38.
     fn row(self: &Rc<Self>, feed_row: &FeedRow, mode: bool) -> gtk::ListBoxRow {
         let row = &feed_row.row;
         let lead = GBox::new(O::Horizontal, 12);
@@ -415,40 +414,38 @@ impl UpdatesScreen {
         cover.add_controller(cover_tap);
         lead.append(&cover);
 
-        let list_row = look::list_row(Some(lead.upcast()), &row.entry_title, None, Some(self.download_button(feed_row, mode).upcast()));
-        list_row.set_activatable(false);
-        list_row.set_widget_name(&feed::row_name(row.item_id));
-        let alpha = updates_page::row_alpha(row.done);
-        let texts = row_texts(&list_row);
-        if let Some(title) = texts.first_child() {
-            title.set_opacity(alpha);
-        }
-        let detail = GBox::new(O::Horizontal, 4);
+        // the bookmark and filler marks sit before the download indicator
+        let end = GBox::new(O::Horizontal, 4);
         if row.bookmark {
             let star = Image::from_icon_name("starred-symbolic");
             star.set_pixel_size(14);
             star.add_css_class("accent");
-            detail.append(&star);
+            star.set_valign(gtk::Align::Center);
+            end.append(&star);
         }
         if row.fillermark && self.kind.is_anime() {
             // the stock theme has no tertiary colour; the warning colour keeps it apart from the bookmark
             let tag = Image::from_icon_name("tag-symbolic");
             tag.set_pixel_size(14);
             tag.add_css_class("warning");
-            detail.append(&tag);
+            tag.set_valign(gtk::Align::Center);
+            end.append(&tag);
         }
-        let name = Label::builder().label(&row.item_name).xalign(0.0).single_line_mode(true).ellipsize(gtk::pango::EllipsizeMode::End).build();
-        name.set_opacity(alpha);
-        detail.append(&name);
-        if let Some(progress) = updates_page::progress_text(self.kind, row.done, row.progress, row.total_seconds) {
-            detail.append(&Label::builder().label(progress).css_classes(["dim-label"]).build());
-        }
-        texts.append(&detail);
+        end.append(&self.download_button(feed_row, mode));
+        let detail = match updates_page::progress_text(self.kind, row.done, row.progress, row.total_seconds) {
+            Some(progress) => format!("{} · {progress}", row.item_name),
+            None => row.item_name.clone(),
+        };
+        let list_row = look::list_row(Some(lead.upcast()), &row.entry_title, Some(&detail), Some(end.upcast()));
+        list_row.set_title_lines(1);
+        list_row.set_subtitle_lines(1);
+        list_row.set_widget_name(&feed::row_name(row.item_id));
+        list_row.set_opacity(updates_page::row_alpha(row.done));
         if feed_row.selected {
             list_row.add_css_class(crate::theme::style::class::SELECTED);
         }
-        self.attach_gestures(&list_row, row.item_id);
-        list_row
+        self.attach_gestures(list_row.upcast_ref(), row.item_id);
+        list_row.upcast()
     }
 
     /// Tap, Ctrl+click and Shift+click on a row, and its right-click menu (a long press on a touch screen), whose Select

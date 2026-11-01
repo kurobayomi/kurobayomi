@@ -48,18 +48,18 @@ struct Session {
 
 thread_local! {
     static SESSION: RefCell<Option<Session>> = const { RefCell::new(None) };
-    /// The window banner and its text, set by [`attach`].
-    static BANNER: RefCell<Option<(gtk::Revealer, gtk::Label)>> = const { RefCell::new(None) };
+    /// The window banner, set by [`attach`].
+    static BANNER: RefCell<Option<adw::Banner>> = const { RefCell::new(None) };
 }
 
 /// Shows the banner with `text`, or hides it.
 fn set_banner(text: Option<&str>) {
     BANNER.with(|b| {
-        if let Some((revealer, label)) = b.borrow().as_ref() {
+        if let Some(banner) = b.borrow().as_ref() {
             if let Some(text) = text {
-                label.set_text(text);
+                banner.set_title(text);
             }
-            revealer.set_reveal_child(text.is_some());
+            banner.set_revealed(text.is_some());
         }
     });
 }
@@ -86,21 +86,16 @@ enum Msg {
 /// Registers the host, the Cancel action and the close handler of `win`. Returns the banner that goes at the top of the
 /// window, hidden until a restore starts. Call once from the GTK main thread.
 pub fn attach(app: &gtk::Application, win: &gtk::ApplicationWindow) -> gtk::Widget {
-    let label = gtk::Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).build();
-    let cancel = gtk::Button::builder().label(tr(MsgKey::action_cancel)).css_classes(["flat"]).build();
-    cancel.set_action_name(Some(&format!("app.{CANCEL_ACTION}")));
-    let bar = gtk::Box::builder().spacing(12).css_classes(["kb-banner"]).build();
-    bar.append(&crate::ui::loading(crate::ui::LoadSize::Inline));
-    bar.append(&label);
-    bar.append(&cancel);
-    let banner = gtk::Revealer::builder().child(&bar).transition_type(gtk::RevealerTransitionType::SlideDown).build();
+    let banner = crate::banner::new("");
+    crate::banner::set(&banner, "", Some(&tr(MsgKey::action_cancel)));
+    banner.set_action_name(Some(&format!("app.{CANCEL_ACTION}")));
 
     let action = gio::SimpleAction::new(CANCEL_ACTION, None);
     action.connect_activate(|_, _| request_stop());
     app.add_action(&action);
 
     let notifier = GioNotifier::new(app);
-    BANNER.with(|b| *b.borrow_mut() = Some((banner.clone(), label)));
+    BANNER.with(|b| *b.borrow_mut() = Some(banner.clone()));
     let ctx = Rc::new(Ctx { notifier });
     backup_pages::set_host(BackupHost {
         start_backup: Box::new({

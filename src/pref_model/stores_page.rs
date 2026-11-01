@@ -9,7 +9,7 @@ use kuro_platform::kind::Kind;
 
 use gtk::gio;
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{Arg, MsgKey, tr, trf};
 
 use super::stores::{self, Dialog, Effect, Entry, Event, Keyed, Page};
@@ -19,6 +19,7 @@ use super::strings;
 use super::widgets::dialog as dialog_widget;
 use crate::screens::Built;
 use crate::widgets::context_menu::Item;
+use crate::widgets::row::{self, RowSpec};
 
 thread_local! {
     /// What runs after the stores or repos changed, so the available extensions are read again.
@@ -523,27 +524,10 @@ impl<T: Keyed + Send + 'static> Inner<T> {
         drop.set_selected(at as u32);
     }
 
-    fn card_row(self: &Rc<Self>, card: &Card, sources: Option<&gtk::Revealer>) -> gtk::ListBoxRow {
+    fn card_row(self: &Rc<Self>, card: &Card, sources: Option<&gtk::Revealer>) -> adw::ActionRow {
         let actions = stores::card_actions(&card.website, card.discord.as_deref());
-        let h = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        h.set_margin_start(crate::ui::ROW_PAD_H);
-        h.set_margin_end(crate::ui::ROW_PAD_H);
-        h.set_margin_top(crate::ui::ROW_PAD_V);
-        h.set_margin_bottom(crate::ui::ROW_PAD_V);
-        let tag = gtk::Image::from_icon_name("package-x-generic-symbolic");
-        h.append(&tag);
-        let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        text.set_valign(gtk::Align::Center);
-        text.set_hexpand(true);
-        let name = gtk::Label::builder().label(&card.name).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).build();
-        // a long name keeps its full text in the tooltip
-        name.set_tooltip_text(Some(&card.name));
-        text.append(&name);
-        if let Some(note) = &card.note {
-            text.append(&gtk::Label::builder().label(note).xalign(0.0).css_classes(["dim-label", "caption"]).build());
-        }
-        h.append(&text);
-
+        // the buttons at the end of the row
+        let h = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         let globe = crate::ui::icon_button("web-browser-symbolic", &self.texts.open_website);
         globe.set_sensitive(actions.globe_enabled);
         let website = card.website.clone();
@@ -578,7 +562,10 @@ impl<T: Keyed + Send + 'static> Inner<T> {
             });
             h.append(&fold);
         }
-        let row = gtk::ListBoxRow::builder().child(&h).activatable(false).build();
+        let row = row::build(RowSpec { title: &card.name, subtitle: card.note.as_deref(), icon: Some("package-x-generic-symbolic"), trailing: Some(h.upcast_ref()), on_click: None });
+        // a long name keeps its full text in the tooltip
+        row.set_title_lines(1);
+        row.set_tooltip_text(Some(&card.name));
         let (weak, card) = (Rc::downgrade(self), card.clone());
         crate::widgets::context_menu::attach(&row, move |_, _| weak.upgrade().map_or_else(Vec::new, |page| page.card_menu(&card)));
         row
@@ -874,8 +861,8 @@ mod tests {
             let section = inner.list.row_at_index(1).expect("the sources row follows the card");
             let revealer = section.child().and_downcast::<gtk::Revealer>().expect("a revealer holds the sources");
             assert!(revealer.reveals_child(), "open at first");
-            let card = inner.list.row_at_index(0).unwrap().child().and_downcast::<gtk::Box>().unwrap();
-            let fold = card.last_child().and_downcast::<gtk::ToggleButton>().expect("the chevron ends the card");
+            let card = inner.list.row_at_index(0).unwrap();
+            let fold = find_toggle(card.upcast_ref()).expect("the chevron is in the card");
             fold.set_active(false);
             assert!(!revealer.reveals_child(), "the chevron folds them");
             assert_eq!(fold.icon_name().as_deref(), Some("pan-end-symbolic"));
@@ -897,6 +884,14 @@ mod tests {
             assert_eq!(inner.filter.borrow().lang, None, "back to every language");
             assert_eq!(shown(), [true, true]);
         });
+    }
+
+    /// The first toggle button at or under `w`.
+    fn find_toggle(w: &gtk::Widget) -> Option<gtk::ToggleButton> {
+        if let Some(toggle) = w.downcast_ref::<gtk::ToggleButton>() {
+            return Some(toggle.clone());
+        }
+        std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| find_toggle(&c))
     }
 
     fn pump_until(done: impl Fn() -> bool) {

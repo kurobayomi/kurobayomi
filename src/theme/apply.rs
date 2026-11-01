@@ -1,6 +1,6 @@
 //! Installs the two stylesheets on the default display (T-49a-012, T-49b-008, T-49ba-001).
 //!
-//! The base stylesheet (`style.css`) is added once at APPLICATION priority. The palette is one
+//! The base stylesheet (`style.css`) is added once at APPLICATION priority. The tint rules are one
 //! `CssProvider`, also added once; `reapply` replaces its text and never adds a second provider.
 //! Text is parse-checked first, so a parse error keeps the previous text and is logged once (F-49-01).
 //! `apply` is not re-entrant (R-49-02): a nested request sets a pending flag and the outer apply
@@ -16,7 +16,7 @@ use gtk::{gdk, CssProvider};
 
 use kuro_prefs::ui::ThemeMode;
 
-use super::{resolve, style, Resolved, ThemeSettings};
+use super::{style, ThemeSettings};
 
 thread_local! {
     /// The tint provider and the display it was added to. Added once; only its text changes.
@@ -133,8 +133,7 @@ fn load_into(
     true
 }
 
-/// Installs the palette and the base stylesheet, once, before the first window is presented (T-49ba-001). The palette
-/// goes first: the base sheet names `kuro_*` colours that only the palette defines, so they must exist when it is parsed.
+/// Installs the tint sheet and the base stylesheet, once, before the first window is presented (T-49ba-001).
 pub fn install(display: &gdk::Display, settings: ThemeSettings) -> bool {
     let applied = set_settings(display, settings);
     let base = CssProvider::new();
@@ -152,18 +151,10 @@ fn connect_parse_log(provider: &CssProvider) {
     });
 }
 
-/// The tint text: the palette colours as `kuro_*` named colours, then the dark-aware `kb-selected` and
-/// `kb-active` rules, which cannot live in the static base sheet.
-pub fn tint_text(resolved: &Resolved) -> String {
-    format!("{}{}", resolved.tokens.define_colors_css(), style::system_rules(resolved.tokens.dark))
-}
-
-/// Resolves the settings and installs the tint sheet on `display`. The player state layer (T-49a-010)
-/// follows the system dark flag, so its rules ride on the same provider.
-pub fn apply(display: &gdk::Display, settings: &ThemeSettings, system_dark: bool) -> bool {
-    let resolved = resolve(settings, system_dark);
-    let tints = format!("{}{}", tint_text(&resolved), style::widget_rules(system_dark));
-    reapply(display, &tints)
+/// Installs the tint sheet on `display`: the dark-aware `kb-selected` and `kb-active` rules, which cannot live in the
+/// static base sheet, and the widget rules (the player state layer, T-49a-010, follows the dark flag too).
+pub fn apply(display: &gdk::Display, dark: bool) -> bool {
+    reapply(display, &format!("{}{}", style::system_rules(dark), style::widget_rules(dark)))
 }
 
 /// The libadwaita colour scheme for a mode: System follows the desktop, Light and Dark force it.
@@ -210,12 +201,11 @@ fn apply_current() -> bool {
         return false;
     };
     sync_color_scheme(settings.mode);
-    // libadwaita has already folded the mode in, so its answer stands for the desktop's under System
-    let system_dark = style_dark();
-    let dark = resolve(&settings, system_dark).tokens.dark;
+    // libadwaita has already folded the mode in, so its answer is the forced mode's, or the desktop's under System
+    let dark = style_dark();
     WINDOW_DARK.with(|m| m.set(dark));
     mark_windows();
-    apply(&display, &settings, system_dark)
+    apply(&display, dark)
 }
 
 /// Sets the palette class on one window: `kb-dark` for the dark flag.
@@ -302,8 +292,8 @@ mod tests {
         crate::testing::with_display(|| {
             let display = gdk::Display::default().expect("a display");
             assert!(build_provider(BASE_CSS).is_ok());
-            let light = tint_text(&resolve(&ThemeSettings::default(), false));
-            let dark = tint_text(&resolve(&ThemeSettings { mode: ThemeMode::DARK, ..ThemeSettings::default() }, false));
+            let light = style::system_rules(false);
+            let dark = style::system_rules(true);
 
             assert!(reapply(&display, &light));
             let first = TINTS.with(|slot| slot.borrow().as_ref().map(|(_, p)| p.clone())).expect("tint provider");

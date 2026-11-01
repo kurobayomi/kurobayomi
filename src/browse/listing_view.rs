@@ -146,6 +146,7 @@ impl ListingView {
         }
         let list = gtk::ListView::new(Some(selection), None::<gtk::ListItemFactory>);
         list.set_single_click_activate(true);
+        list.add_css_class("rich-list");
 
         // the grid or the list is the scroller's own child (never inside a Stack): a scrollable that is wrapped in a viewport
         // gets its whole natural height, builds every row at once, and GTK 4.14 then spreads rows over that height

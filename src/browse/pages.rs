@@ -828,20 +828,18 @@ pub fn migrate_entries(entries: &[MigrateEntry], error: Option<&str>, nav: Migra
     let list = crate::ui::boxed_list();
     for entry in sorted {
         let item = ListItem { id: entry.id, title: entry.title.clone(), cover: entry.cover.clone(), ..ListItem::default() };
-        let row = super::view::list_cell(Some(&item), &nav.load_cover, &super::view::always());
+        let size = super::look::SMALL;
+        let cover = super::view::cover_widget(&item, size.width, size.height, &nav.load_cover, &super::view::always());
         let (open_search, id) = (Rc::clone(&nav.open_search), entry.id);
         // a click on the row opens the migrate search; a click on the cover opens the entry and claims the click
-        let cell = row.clone();
-        let row = list_row(&cell, move || open_search(id), Vec::new);
-        if let Some(cover) = cell.first_child() {
-            let open_entry = Rc::clone(&nav.open_entry);
-            let click = gtk::GestureClick::new();
-            click.connect_released(move |gesture, _, _, _| {
-                gesture.set_state(gtk::EventSequenceState::Claimed);
-                open_entry(id);
-            });
-            cover.add_controller(click);
-        }
+        let open_entry = Rc::clone(&nav.open_entry);
+        let click = gtk::GestureClick::new();
+        click.connect_released(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            open_entry(id);
+        });
+        cover.add_controller(click);
+        let row = list_row(&super::look::list_row(Some(cover.upcast()), &item.title, None, None), move || open_search(id), Vec::new);
         list.append(&row);
     }
     // an empty boxed list would still draw its frame
@@ -1078,7 +1076,8 @@ pub(crate) mod tests {
             Some("could not load"),
             MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: Rc::new(|_, _| {}) },
         );
-        let text = all_labels(&page);
+        // an empty label is a row's blank subtitle
+        let text: Vec<_> = all_labels(&page).into_iter().filter(|t| !t.is_empty()).collect();
         // each cover shows the title's initials until its picture loads
         assert_eq!(text, ["could not load", "A", "Apple", "B", "banana", "Z", "zebra"]);
     }

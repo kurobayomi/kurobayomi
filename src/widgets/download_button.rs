@@ -84,11 +84,11 @@ fn tooltip(look: Look) -> String {
 /// The side of the drawn circle in px, the size of a symbolic icon in a flat button.
 const SIZE: i32 = 18;
 
-/// The theme accent from the style context: the app palette's primary, then the GTK accent, then the selection colour.
+/// The theme accent from the style context: the GTK accent, then the selection colour.
 #[allow(deprecated)]
 fn accent(area: &gtk::DrawingArea) -> gdk::RGBA {
     let context = area.style_context();
-    ["kuro_primary", "accent_color", "theme_selected_bg_color"].iter().find_map(|name| context.lookup_color(name)).unwrap_or_else(|| area.color())
+    ["accent_color", "theme_selected_bg_color"].iter().find_map(|name| context.lookup_color(name)).unwrap_or_else(|| area.color())
 }
 
 /// The hollow circle, and for a download in progress the wedge of its percent inside it. The panel's Downloads item draws

@@ -584,10 +584,11 @@ pub fn title_matches(title: &str, query: &str) -> bool {
     title.to_lowercase().contains(&query.trim().to_lowercase())
 }
 
-/// The text of the first heading label under `w`: the title of a `browse::look::list_row`.
+/// The title of the first libadwaita row at or under `w`: the title of a `browse::look::list_row`, or of the heading of a
+/// row that holds a list of rows. A row with none has no title.
 fn row_title_text(w: &gtk::Widget) -> Option<String> {
-    if let Some(label) = w.downcast_ref::<Label>().filter(|l| l.has_css_class("heading")) {
-        return Some(label.text().to_string());
+    if let Some(row) = w.downcast_ref::<adw::PreferencesRow>() {
+        return Some(row.title().to_string());
     }
     std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| row_title_text(&c))
 }
@@ -615,12 +616,6 @@ pub fn icon_button(icon: &str, tip: &str) -> Button {
     b.update_property(&[gtk::accessible::Property::Label(tip)]);
     b
 }
-
-/// The metrics of the hand-built list rows (covers, queue and search results: rows that are not `widgets::row`'s):
-/// 12 px sides, 8 px top and bottom, at least 48 px tall.
-pub const ROW_PAD_H: i32 = 12;
-pub const ROW_PAD_V: i32 = 8;
-pub const ROW_MIN_HEIGHT: i32 = 48;
 
 /// Title/subtitle row with an optional trailing widget (`widgets::row`, the app's one row builder).
 pub fn row(title: &str, subtitle: Option<&str>, suffix: Option<gtk::Widget>) -> adw::ActionRow {

@@ -1,17 +1,16 @@
-//! The storage entry row (T-42a-050): a cover tile, a bold title on one line, and a second line with a 12 px colour dot,
-//! the size, a separator dot and the count. A trailing delete button asks the page's confirm dialog.
+//! The storage entry row (T-42a-050): a cover tile, a 12 px colour dot, the title, and a second line with the size, a
+//! separator dot and the count. A trailing delete button asks the page's confirm dialog.
 
 use std::rc::Rc;
 
-use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Button, DrawingArea, Label, ListBoxRow, Orientation as O};
+use adw::prelude::*;
+use gtk::{Align, Button, DrawingArea};
 
 use kuro_i18n::{MsgKey, tr};
 use kuro_platform::kind::Kind;
 
 use crate::browse::look;
 use crate::updates::format::format_size;
-use crate::updates::row_texts;
 use crate::updates::storage::{Rgba, StorageRow, count_text};
 
 /// Side of the colour dot, in pixels.
@@ -35,22 +34,14 @@ fn colour_dot(colour: Rgba) -> DrawingArea {
 
 /// The row (`look::list_row`): the cover tile, the bold title, the size and count line under it, and the delete button.
 /// `on_delete` runs the confirm dialog.
-pub fn storage_row(row: &StorageRow, kind: Kind, on_delete: Rc<dyn Fn()>) -> ListBoxRow {
+pub fn storage_row(row: &StorageRow, kind: Kind, on_delete: Rc<dyn Fn()>) -> adw::ActionRow {
     let delete = Button::from_icon_name("user-trash-symbolic");
     delete.set_tooltip_text(Some(&tr(MsgKey::action_delete)));
     delete.connect_clicked(move |_| on_delete());
 
     let cover = look::row_cover(&row.title, None, look::SMALL.width, look::SMALL.height);
-    let list_row = look::list_row(Some(cover), &row.title, None, Some(delete.upcast()));
-    list_row.set_activatable(false);
-
-    let meta = GBox::new(O::Horizontal, 6);
-    meta.append(&colour_dot(row.color));
-    let size = format_size(row.size_bytes);
-    let count = count_text(kind, row.entries_count);
-    for text in [size.as_str(), "·", count.as_str()] {
-        meta.append(&Label::builder().label(text).xalign(0.0).css_classes(["dim-label", "caption"]).build());
-    }
-    row_texts(&list_row).append(&meta);
+    let meta = format!("{} · {}", format_size(row.size_bytes), count_text(kind, row.entries_count));
+    let list_row = look::list_row(Some(cover), &row.title, Some(&meta), Some(delete.upcast()));
+    list_row.add_prefix(&colour_dot(row.color));
     list_row
 }

@@ -13,8 +13,8 @@ use gtk::gdk;
 use gtk::glib;
 #[cfg(test)]
 use gtk::glib::translate::IntoGlib;
-use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Label, ListBoxRow, Orientation as O};
+use adw::prelude::*;
+use gtk::{Align, Box as GBox, Orientation as O};
 use kuro_platform::kind::Kind;
 use kuro_i18n::{MsgKey, tr};
 
@@ -278,15 +278,13 @@ impl UpcomingPage {
 
     /// One entry row: the book cover (initials until an image draws) and the title (two lines at most); activating
     /// the row (click, Enter or Space) opens the entry by id.
-    fn item(&self, entry: &Entry) -> ListBoxRow {
+    fn item(&self, entry: &Entry) -> adw::ActionRow {
         let art = look::cover_art(self.kind, entry.id, entry.source_id, entry.cover_url.clone(), true, entry.cover_last_modified);
         let cover = look::row_cover(&entry.title, Some(&art), look::MEDIUM.width, look::MEDIUM.height);
         let row = look::list_row(Some(cover), &entry.title, None, None);
         // a long title keeps its two lines
-        if let Some(title) = crate::updates::row_texts(&row).first_child().and_downcast::<Label>() {
-            title.set_wrap(true);
-            title.set_lines(2);
-        }
+        row.set_title_lines(2);
+        row.set_activatable(true);
         let (open, id) = (Rc::clone(&self.env.open), entry.id);
         crate::widgets::row_activate::on_activate(&row, move |_| open(id));
         row
@@ -370,6 +368,7 @@ fn assemble(screen: Rc<UpcomingPage>) -> GBox {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use gtk::Label;
 
     use super::*;
 
@@ -416,6 +415,14 @@ mod tests {
         all
     }
 
+    /// The first widget at or under `w` that wears `class`.
+    fn first_with_class(w: &gtk::Widget, class: &str) -> Option<gtk::Widget> {
+        if w.has_css_class(class) {
+            return Some(w.clone());
+        }
+        std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| first_with_class(&c, class))
+    }
+
     const SINGLE: Shape = Shape { two_panels: false, calendar_cap: None };
     const TWO: Shape = Shape { two_panels: true, calendar_cap: Some(360) };
 
@@ -436,8 +443,7 @@ mod tests {
             let list = rows[2].clone().downcast::<gtk::ListBox>().expect("the day's entries are a list");
             assert!(list.has_css_class("boxed-list"));
             let row = list.row_at_index(0).expect("an entry row");
-            let line = row.child().expect("the row line");
-            let cover = line.first_child().expect("the cover leads the row");
+            let cover = first_with_class(row.upcast_ref(), "kb-row-cover").expect("the cover leads the row");
             assert_eq!(cover.size_request(), (look::MEDIUM.width, look::MEDIUM.height), "the medium row cover");
             assert!(cover.has_css_class("kb-row-cover") && cover.has_css_class("kb-cover-initials"), "no stored cover: the initials");
         });

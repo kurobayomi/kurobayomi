@@ -129,7 +129,6 @@ fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     let download = DownloadButton::new(move |request| on_download(request));
     let card = GBox::new(O::Horizontal, 12);
     card.add_css_class("kb-item");
-    card.set_size_request(-1, crate::ui::ROW_MIN_HEIGHT);
     card.set_margin_start(16);
     card.set_margin_end(16);
     for w in [lead.upcast_ref::<gtk::Widget>(), text.upcast_ref(), marker.upcast_ref(), filler.upcast_ref(), bookmark.upcast_ref(), download.widget.upcast_ref()] {

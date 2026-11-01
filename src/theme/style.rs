@@ -2,9 +2,7 @@
 //! stylesheet, and the pure alpha and padding helpers of T-49b-028 and T-49b-029.
 
 
-use super::tokens::Tokens;
-
-/// The base stylesheet: GTK named colours and static rules, loaded before the palette.
+/// The base stylesheet: GTK named colours and static rules, loaded with the tint rules.
 pub const BASE_CSS: &str = include_str!("style.css");
 
 /// CSS class names for the Kurobayomi component classes.
@@ -39,12 +37,12 @@ pub fn selected_alpha(dark: bool) -> f32 {
     if dark { 0.16 } else { 0.22 }
 }
 
-/// The dark-aware rules for the GTK-theme choice: the selection tint keeps the GTK theme's own
-/// selected colour, the active tint follows the resolved dark flag (T-49b-010, T-49b-029), and the
+/// The dark-aware rules: the selection tint keeps the theme's own selected colour, the active tint follows the dark
+/// flag (amber in dark, darker amber in light; T-49b-010, T-49b-029), and the
 /// pill takes a GTK-theme stand-in for `surface_container_high` (T-49a-034). The app bar's count pill
 /// takes the same pill alpha over the window foreground.
 pub fn system_rules(dark: bool) -> String {
-    let active = Tokens::active_for(dark).to_css();
+    let active = if dark { "#ffeb3b" } else { "#ffc107" };
     // the tab pill follows the generic pill, so its alpha background wins at equal specificity
     format!(
         ".{} {{ background-color: alpha(@theme_selected_bg_color, {}); }}\n.{} {{ color: {active}; }}\n.{} {{ background-color: mix(@theme_bg_color, @theme_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@theme_fg_color, {}); }}\n.{} {{ color: @theme_selected_bg_color; }}\n.{}:hover {{ background-color: alpha(@theme_fg_color, {HOVER_ALPHA}); }}\n.{}:active {{ background-color: alpha(@theme_fg_color, {}); }}\n.{count_pill} {{ background-color: alpha(@theme_fg_color, {count_alpha}); }}\n",
@@ -121,7 +119,6 @@ pub fn ripple_rules(system_dark: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::tokens::Rgba;
 
     #[test]
     fn system_rules_follow_the_dark_flag() {
@@ -129,8 +126,8 @@ mod tests {
         let light = system_rules(false);
         assert!(dark.contains("alpha(@theme_selected_bg_color, 0.16)"));
         assert!(light.contains("alpha(@theme_selected_bg_color, 0.22)"));
-        assert!(dark.contains(&format!(".kb-active {{ color: {}; }}", Rgba::argb(0xFFFF_EB3B).to_css())));
-        assert!(light.contains(&format!(".kb-active {{ color: {}; }}", Rgba::argb(0xFFFF_C107).to_css())));
+        assert!(dark.contains(".kb-active { color: #ffeb3b; }"));
+        assert!(light.contains(".kb-active { color: #ffc107; }"));
     }
 
     // T-49a-034: the pill geometry is always on; the colour is a GTK mix.
@@ -238,10 +235,9 @@ mod base_css_tests {
         BASE_CSS.contains(rule)
     }
 
-    /// T-49ba-045: the base sheet names only GTK named colours, or a palette colour that the tint provider defines
-    /// (`kuro_<role>`), so no rule refers to a colour that does not exist.
+    /// T-49ba-045: the base sheet names only GTK named colours, so no rule refers to a colour that does not exist.
     #[test]
-    fn base_sheet_references_only_gtk_named_colours_and_palette_roles() {
+    fn base_sheet_references_only_gtk_named_colours() {
         // the GTK named colours: GTK themes define them, and so does libadwaita (its GTK 3 compatibility names), so they
         // resolve under libadwaita's own stylesheet and under distributions whose libadwaita keeps the GTK theme
         const GTK: [&str; 9] = [
@@ -264,10 +260,7 @@ mod base_css_tests {
                 rest = &rest[at + 1..];
                 continue;
             }
-            let palette = name
-                .strip_prefix("kuro_")
-                .is_some_and(|role| crate::theme::tokens::Role::ALL.iter().any(|r| r.css_name() == role));
-            assert!(GTK.contains(&name.as_str()) || palette, "undefined colour @{name} in the base sheet");
+            assert!(GTK.contains(&name.as_str()), "undefined colour @{name} in the base sheet");
             rest = &rest[at + 1..];
         }
     }
@@ -292,8 +285,6 @@ mod base_css_tests {
             (".reader-scrim", "background-color: rgba(0, 0, 0, 0.5);"),
             (".reader-text-light", "color: #ffffff;"),
             (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);"),
-            (".kb-banner", "background-color: alpha(@theme_selected_bg_color, 0.18); color: @theme_fg_color; padding: 4px 16px;"),
-            (".kb-banner.kb-banner-error", "background-color: alpha(@error_color, 0.18); padding: 16px;"),
             (".kuro-cal-day:focus-visible", "outline: 2px solid @theme_selected_bg_color;"),
             (".kuro-cal-dot", "background-color: @theme_selected_bg_color;"),
         ];

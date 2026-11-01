@@ -1,7 +1,6 @@
-//! Theme: colour tokens, scheme resolution, GTK CSS, and the thin widgets built on them.
+//! Theme: the stored mode, libadwaita's colour scheme, GTK CSS, and the thin widgets built on them.
 //!
-//! The pure parts (`tokens`, `schemes`, `baseline`, `resolve`, `css`, `dark`, `prefs`, `app_theme`,
-//! `style`, `icons`) have unit tests and no GTK calls. `apply`,
+//! The pure parts (`tokens`, `prefs`, `app_theme`, `style`, `icons`) have unit tests and no GTK calls. `apply`,
 //! `components` and the widget functions of the other modules are the GTK layer.
 //!
 //! `startup` is the single call `main.rs` makes before the first window is presented (T-49a-058).
@@ -27,25 +26,20 @@
 pub mod anim;
 pub mod app_theme;
 pub mod apply;
-pub mod baseline;
 pub mod components;
 pub mod icons;
 pub mod motion;
 pub mod prefs;
-pub mod resolve;
 pub mod size_class;
 pub mod splash;
-mod schemes;
 pub mod style;
 pub mod tokens;
 
 use kuro_prefs::ui::ThemeMode;
 
 pub use app_theme::AppTheme;
-pub use tokens::Tokens;
 
-/// Persisted theme inputs. There is no palette choice: the component colours are the default scheme's tokens and the
-/// GTK named colours stay the desktop's own, so the only choice is the mode.
+/// Persisted theme inputs. There is no palette choice: the colours are libadwaita's own, so the only choice is the mode.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ThemeSettings {
     pub mode: ThemeMode,
@@ -91,57 +85,9 @@ pub fn attach_window(window: &impl gtk::prelude::IsA<gtk::Window>) {
     });
 }
 
-/// A resolved palette, ready for CSS.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Resolved {
-    pub tokens: Tokens,
-}
-
-/// Light or dark, from the mode and the system preference. `system_dark` only counts for `SYSTEM`.
-pub fn is_dark(mode: ThemeMode, system_dark: bool) -> bool {
-    match mode {
-        ThemeMode::LIGHT => false,
-        ThemeMode::DARK => true,
-        ThemeMode::SYSTEM => system_dark,
-    }
-}
-
-/// Entry point: settings and the system dark flag in, tokens out (pure, no GTK calls, unit-tested).
-pub fn resolve(settings: &ThemeSettings, system_dark: bool) -> Resolved {
-    let dark = is_dark(settings.mode, system_dark);
-    Resolved {
-        tokens: resolve::tokens_for(&schemes::DEFAULT_SCHEME, dark),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn light_mode_ignores_system_dark() {
-        let s = ThemeSettings {
-            mode: ThemeMode::LIGHT,
-            ..ThemeSettings::default()
-        };
-        assert!(!resolve(&s, true).tokens.dark);
-    }
-
-    #[test]
-    fn dark_mode_ignores_system_light() {
-        let s = ThemeSettings {
-            mode: ThemeMode::DARK,
-            ..ThemeSettings::default()
-        };
-        assert!(resolve(&s, false).tokens.dark);
-    }
-
-    #[test]
-    fn system_mode_follows_system_dark() {
-        let s = ThemeSettings::default();
-        assert!(resolve(&s, true).tokens.dark);
-        assert!(!resolve(&s, false).tokens.dark);
-    }
 
     // T-01a-021: a change of the stored mode from anywhere is applied, with no Appearance page open.
     #[test]
