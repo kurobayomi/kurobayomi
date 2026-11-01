@@ -10,6 +10,7 @@ use kuro_domain::entries::fetch_interval::MAX_INTERVAL;
 
 use crate::entry_core::fetch_interval::{Body, RESET_WHEEL, body, initial_wheel, wheel_visible};
 use crate::ui::{self, DialogButton, DialogOpen as _, Role};
+use crate::theme::tokens::{SPACE_M};
 
 /// Opens the dialog for an entry with `interval` (its stored fetch interval) and `expected_next_update_ms`. OK calls
 /// `on_ok` with the wheel value and Reset with 0; the page stores `-wheel` (0 is automatic).
@@ -27,7 +28,7 @@ pub fn open(interval: i32, expected_next_update_ms: Option<i64>, on_ok: impl Fn(
     wheel.set_value(f64::from(initial_wheel(interval)));
     wheel.set_visible(wheel_visible(true));
 
-    let col = GBox::new(O::Vertical, 12);
+    let col = GBox::new(O::Vertical, SPACE_M);
     col.append(&Label::builder().label(text).wrap(true).xalign(0.0).build());
     col.append(&wheel);
 

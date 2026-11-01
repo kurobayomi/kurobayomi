@@ -20,6 +20,7 @@ use super::widgets::dialog as dialog_widget;
 use crate::screens::Built;
 use crate::widgets::context_menu::Item;
 use crate::widgets::row::{self, RowSpec};
+use crate::theme::tokens::{SPACE_S};
 
 thread_local! {
     /// What runs after the stores or repos changed, so the available extensions are read again.
@@ -207,7 +208,7 @@ pub fn build<T: Keyed + Send + 'static>(
     let kinds = ops.has_sources().then(|| gtk::DropDown::from_strings(&[&tr(MsgKey::label_all), &tr(MsgKey::label_anime), &tr(MsgKey::label_manga)]));
     let languages = ops.has_sources().then(|| gtk::DropDown::from_strings(&[&tr(MsgKey::source_switch_all_languages)]));
     if let (Some(kinds), Some(languages)) = (&kinds, &languages) {
-        let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let bar = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
         for (drop, tip) in [(kinds, tr(MsgKey::r#type)), (languages, tr(MsgKey::ext_info_language))] {
             drop.set_tooltip_text(Some(&tip));
             drop.update_property(&[gtk::accessible::Property::Label(&tip)]);
@@ -527,7 +528,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
     fn card_row(self: &Rc<Self>, card: &Card, sources: Option<&gtk::Revealer>) -> adw::ActionRow {
         let actions = stores::card_actions(&card.website, card.discord.as_deref());
         // the buttons at the end of the row
-        let h = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let h = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
         let globe = crate::ui::icon_button("web-browser-symbolic", &self.texts.open_website);
         globe.set_sensitive(actions.globe_enabled);
         let website = card.website.clone();
@@ -661,7 +662,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
         let ui = match dialog {
             Dialog::Add(entry) | Dialog::DeepLink(entry) => {
                 let read_only = matches!(dialog, Dialog::DeepLink(_));
-                let body = gtk::Box::new(gtk::Orientation::Vertical, 8);
+                let body = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
                 let intro = if read_only { &self.texts.deep_link_intro } else { &self.texts.add_intro };
                 if let Some(text) = intro {
                     body.append(&gtk::Label::builder().label(text).wrap(true).xalign(0.0).build());

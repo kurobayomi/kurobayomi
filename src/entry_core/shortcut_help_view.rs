@@ -8,6 +8,7 @@ use gtk::Label;
 
 use super::shortcuts::help;
 use crate::ui::{self, DialogButton, Role};
+use crate::theme::tokens::{SPACE_S, SPACE_XL};
 
 /// Whether this key opens the help dialog.
 pub fn is_help_key(key: gtk::gdk::Key) -> bool {
@@ -16,7 +17,7 @@ pub fn is_help_key(key: gtk::gdk::Key) -> bool {
 
 /// The grid of the help list: the keys on the left, what they do on the right.
 pub fn grid() -> gtk::Grid {
-    let grid = gtk::Grid::builder().row_spacing(8).column_spacing(24).build();
+    let grid = gtk::Grid::builder().row_spacing(SPACE_S).column_spacing(SPACE_XL).build();
     for (row, (keys, what)) in help().iter().enumerate() {
         let keys = Label::builder().label(keys.as_str()).xalign(0.0).css_classes(["monospace"]).build();
         let what = Label::builder().label(what.as_str()).xalign(0.0).wrap(true).build();

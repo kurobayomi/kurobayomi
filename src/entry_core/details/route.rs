@@ -28,6 +28,7 @@ use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::store::PrefStore;
 
 use crate::entry_core::constants::{FALLBACK_WIDTH, LIST_MAX_WIDTH, left_pane_width};
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XS};
 
 /// The width the page is laid out for before it has one: the window's, so a narrow window never gets the two-pane layout
 /// for a frame (its minimum width would push the window wider); the app's default size before there is a window.
@@ -314,7 +315,7 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
             }
         })),
     );
-    let list_head = GBox::new(O::Vertical, 4);
+    let list_head = GBox::new(O::Vertical, SPACE_XS);
     list_head.append(&header_row);
     list_head.append(&spinner);
     list_head.append(&empty);
@@ -410,11 +411,11 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     // the airing row spans both panes
     let airing_title = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let airing_time = Label::builder().xalign(1.0).wrap(true).css_classes(["dim-label"]).build();
-    let airing_row = GBox::new(O::Horizontal, 12);
-    airing_row.set_margin_start(16);
-    airing_row.set_margin_end(16);
-    airing_row.set_margin_top(8);
-    airing_row.set_margin_bottom(8);
+    let airing_row = GBox::new(O::Horizontal, SPACE_M);
+    airing_row.set_margin_start(SPACE_L);
+    airing_row.set_margin_end(SPACE_L);
+    airing_row.set_margin_top(SPACE_S);
+    airing_row.set_margin_bottom(SPACE_S);
     airing_row.set_visible(false);
     airing_row.append(&airing_title);
     airing_row.append(&airing_time);
@@ -422,8 +423,8 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let (fab, fab_label) = page_shell::fab_button();
     fab.set_halign(Align::End);
     fab.set_valign(Align::End);
-    fab.set_margin_end(16);
-    fab.set_margin_bottom(16);
+    fab.set_margin_end(SPACE_L);
+    fab.set_margin_bottom(SPACE_L);
     fab.set_visible(false);
 
     let column = GBox::new(O::Vertical, 0);
@@ -451,7 +452,7 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
 
     // the bottom action bar of the selection (behaviour 1.4): its rows follow the selected episodes, it is hidden
     // when nothing is selected, and it is as wide as the window narrow and half of it wide
-    let bottom_row = GBox::new(O::Horizontal, 6);
+    let bottom_row = GBox::new(O::Horizontal, SPACE_S);
     bottom_row.add_css_class("toolbar");
     bottom_row.set_halign(Align::Center);
     // the row scrolls sideways when its labels do not fit, so a narrow window is never pushed wider than itself
@@ -954,7 +955,7 @@ impl View {
         }
         for action in &rows {
             let button = Button::builder().css_classes(["flat"]).build();
-            let content = GBox::new(O::Horizontal, 6);
+            let content = GBox::new(O::Horizontal, SPACE_S);
             content.append(&gtk::Image::from_icon_name(action.icon()));
             content.append(&Label::new(Some(&tr(action.label(self.env.kind)))));
             button.set_child(Some(&content));

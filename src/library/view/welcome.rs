@@ -8,6 +8,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::pref_model::router::Destination;
 use crate::theme::icons::Icon;
+use crate::theme::tokens::{SPACE_M, SPACE_XL, SPACE_XS};
 
 /// The getting-started guide in the repository, opened by the last link.
 const GUIDE_URL: &str = "https://github.com/kurobayomi/kurobayomi/blob/main/docs/GETTING-STARTED.md";
@@ -24,10 +25,10 @@ impl Welcome {
         page.set_valign(Align::Center);
         page.set_halign(Align::Center);
         page.set_vexpand(true);
-        page.set_margin_start(24);
-        page.set_margin_end(24);
+        page.set_margin_start(SPACE_XL);
+        page.set_margin_end(SPACE_XL);
 
-        let logo = gtk::Image::builder().icon_name(Icon::LogoShadow.name()).pixel_size(128).margin_bottom(24).build();
+        let logo = gtk::Image::builder().icon_name(Icon::LogoShadow.name()).pixel_size(128).margin_bottom(SPACE_XL).build();
         page.append(&logo);
         page.append(&label(&tr(MsgKey::welcome_title), &["title-1"], 8));
         page.append(&label(&tr(MsgKey::welcome_intro), &["dim-label"], 24));
@@ -38,9 +39,9 @@ impl Welcome {
         add.connect_clicked(|_| crate::browse::mount::open_repos_to_add());
         page.append(&add);
 
-        let links = gtk::Box::new(O::Horizontal, 4);
+        let links = gtk::Box::new(O::Horizontal, SPACE_XS);
         links.set_halign(Align::Center);
-        links.set_margin_top(12);
+        links.set_margin_top(SPACE_M);
         links.append(&link(&tr(MsgKey::restore_from_backup), || {
             crate::pref_model::highlight::request(crate::pref_model::strings::label_backup());
             crate::ui::open(Destination::DataAndStorage.screen_id());
@@ -51,7 +52,7 @@ impl Welcome {
         // an AppImage updates itself at start, so the first-run screen says so and where to turn it off
         if crate::appimage_update::can_update() {
             let notice = label(&tr(MsgKey::welcome_self_update), &["dim-label", "caption"], 0);
-            notice.set_margin_top(24);
+            notice.set_margin_top(SPACE_XL);
             page.append(&notice);
         }
 

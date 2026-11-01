@@ -6,6 +6,7 @@ use adw::prelude::*;
 use gtk::{glib, Align, Box as GBox, Button, Label, ListBox, Orientation as O};
 use std::cell::OnceCell;
 use std::rc::Rc;
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XL, SPACE_XS};
 
 thread_local! {
     pub static SPEC: Spec = Spec::load();
@@ -230,8 +231,8 @@ fn pin_button() -> gtk::ToggleButton {
 pub fn switch_with_narrow_row(header: &adw::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
     let row = GBox::new(O::Horizontal, 0);
     row.set_halign(Align::Center);
-    row.set_margin_top(6);
-    row.set_margin_bottom(6);
+    row.set_margin_top(SPACE_S);
+    row.set_margin_bottom(SPACE_S);
     if let Some(stack) = switch.stack() {
         row.append(&gtk::StackSwitcher::builder().stack(&stack).build());
     }
@@ -414,7 +415,7 @@ pub fn open(id: &str) {
         // sidebar destinations switch tabs instead of stacking a second copy; a hidden page (Downloads with an empty
         // queue) shows while it is open
         pop_to_root();
-        if let Some(tabs) = nav().0.first_child().and_downcast::<gtk::Stack>() {
+        if let Some(tabs) = pages(&nav().0).first().and_then(|p| p.child()).and_downcast::<gtk::Stack>() {
             if let Some(page) = tabs.child_by_name(id) {
                 page.set_visible(true);
             }
@@ -467,10 +468,10 @@ pub fn clamp(child: &impl IsA<gtk::Widget>, max: i32) -> adw::Clamp {
 /// Clear of the download queue). One spacing and one top margin, so every page's top row looks the same; the caller sets
 /// the start inset to line up with its own content.
 pub fn pill_row() -> GBox {
-    let row = GBox::new(O::Horizontal, 8);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     row.set_halign(Align::Start);
-    row.set_margin_top(8);
-    row.set_margin_bottom(4);
+    row.set_margin_top(SPACE_S);
+    row.set_margin_bottom(SPACE_XS);
     row
 }
 
@@ -552,19 +553,24 @@ pub fn margins(w: &impl IsA<gtk::Widget>, m: i32) {
 /// Centred column of boxed lists, at most [`PAGE_WIDTH`] wide once [`scrolled`] wraps it. The spacing scale is the
 /// Library's (4, 8, 12, 16, 24): 16 px gutters, 12 px between a heading and its list, 24 px between groups.
 pub fn column() -> GBox {
-    let b = GBox::new(O::Vertical, 12);
-    b.set_margin_start(16);
-    b.set_margin_end(16);
-    b.set_margin_top(16);
-    b.set_margin_bottom(24);
+    let b = GBox::new(O::Vertical, SPACE_M);
+    b.set_margin_start(SPACE_L);
+    b.set_margin_end(SPACE_L);
+    b.set_margin_top(SPACE_L);
+    b.set_margin_bottom(SPACE_XL);
     b.add_css_class("column");
     b
 }
 
-/// A group heading over a boxed list. With the column's 12 px spacing it leaves 24 px above and 12 px below.
+/// A group heading over a boxed list. With the column's 12 px spacing it leaves 24 px above and 12 px below, except the
+/// first child of the column, which sits at the column's own top margin like any other first child (`.kb-group-heading`
+/// in style.css).
 pub fn heading(text: &str) -> Label {
-    Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["heading"]).margin_top(12).build()
+    Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["heading", GROUP_HEADING]).build()
 }
+
+/// The style class of a group heading: the stylesheet adds the extra gap above every one but the first of a column.
+pub const GROUP_HEADING: &str = "kb-group-heading";
 
 pub fn dim(text: &str) -> Label {
     Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["dim-label", "caption"]).build()
@@ -640,11 +646,11 @@ pub fn inline_spinner() -> gtk::Spinner {
 /// (it sets the text as the selection changes); this gives it the look.
 pub fn selection_header(count: &Label, on_cancel: impl Fn() + 'static, on_select_all: impl Fn() + 'static) -> GBox {
     use kuro_i18n::{tr, MsgKey};
-    let bar = GBox::new(O::Horizontal, 8);
-    bar.set_margin_start(16);
-    bar.set_margin_end(16);
-    bar.set_margin_top(8);
-    bar.set_margin_bottom(4);
+    let bar = GBox::new(O::Horizontal, SPACE_S);
+    bar.set_margin_start(SPACE_L);
+    bar.set_margin_end(SPACE_L);
+    bar.set_margin_top(SPACE_S);
+    bar.set_margin_bottom(SPACE_XS);
     let cancel = Button::with_label(&tr(MsgKey::action_cancel));
     cancel.connect_clicked(move |_| on_cancel());
     count.set_hexpand(true);
@@ -664,7 +670,7 @@ pub fn selection_header(count: &Label, on_cancel: impl Fn() + 'static, on_select
 /// instead of widening the window (a hidden bar still counts toward the window's minimum width). [`action_bar_row`] is the
 /// row the buttons sit in, for buttons added later.
 pub fn action_bar(buttons: &[Button]) -> gtk::Revealer {
-    let row = GBox::new(O::Horizontal, 6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     for b in buttons {
         row.append(b);
     }
@@ -845,7 +851,7 @@ pub const LEAD: &str = "kb-lead";
 /// actions are buttons at the end). The search toggle comes in first in the phone layout ([`search_follows_width`]).
 /// An empty box is hidden, so it takes no spacing. Call after Back and before anything else is packed at the start.
 pub fn pack_lead(header: &adw::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
-    let lead = GBox::new(O::Horizontal, 4);
+    let lead = GBox::new(O::Horizontal, SPACE_XS);
     lead.add_css_class(LEAD);
     if let Some(menu) = menu {
         lead.append(menu);
@@ -1166,12 +1172,12 @@ pub fn dialog(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Ve
 /// button: Escape, the close button or Cancel.
 pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> adw::Dialog {
     let answered = Rc::new(std::cell::Cell::new(false));
-    let col = GBox::new(O::Vertical, 12);
+    let col = GBox::new(O::Vertical, SPACE_M);
     margins(&col, 18);
     col.append(body);
-    let row = GBox::new(O::Horizontal, 6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     row.set_halign(Align::End);
-    row.set_margin_top(6);
+    row.set_margin_top(SPACE_S);
     col.append(&row);
     let win = modal(&Label::builder().label(title).css_classes(["title"]).build().upcast(), &scrolled_max(&col, 560), width, -1);
     win.set_title(title);
@@ -1246,7 +1252,7 @@ pub fn message(text: &str) -> Label {
 
 /// Shows a spec dialog. Its last button runs `on_ok` and then closes the dialog; the other buttons only close it.
 pub fn show_dialog_then(d: &Dialog, on_ok: impl Fn() + 'static) {
-    let body = GBox::new(O::Vertical, 12);
+    let body = GBox::new(O::Vertical, SPACE_M);
     if let Some(t) = &d.text {
         body.append(&message(&crate::spec::shown(t)));
     }
@@ -1377,7 +1383,7 @@ mod tests {
     #[test]
     fn the_search_leads_the_row_in_the_phone_layout_and_is_first_of_the_actions_otherwise() {
         crate::testing::with_display(|| {
-            let (lead, end) = (GBox::new(O::Horizontal, 4), GBox::new(O::Horizontal, 4));
+            let (lead, end) = (GBox::new(O::Horizontal, SPACE_XS), GBox::new(O::Horizontal, SPACE_XS));
             let (toggle, refresh) = (gtk::ToggleButton::builder().visible(true).build(), Button::builder().visible(true).build());
             end.append(&refresh);
             // a pushed page's ⋮ menu, hidden in a wide window: it leaves the lead box with nothing showing

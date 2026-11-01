@@ -10,6 +10,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::entry_core::details::layout::fab_expanded;
 use crate::ui;
+use crate::theme::tokens::{SPACE_L, SPACE_S};
 
 /// The stack of a details page with its `loading` child (a spinner) and its `missing` child (not found, with Back). The
 /// page adds its `ready` child.
@@ -37,13 +38,17 @@ pub struct ItemHeaderRow {
 pub fn item_header_row() -> ItemHeaderRow {
     let count = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let missing = Label::builder().xalign(1.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
-    let row = GBox::new(O::Horizontal, 8);
-    row.set_margin_top(6);
-    row.set_margin_bottom(6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
+    row.set_margin_top(SPACE_S);
+    row.set_margin_bottom(SPACE_S);
     // the inset of a card (`list_view`), so the count lines up with the first row
-    row.set_margin_start(16);
-    row.set_margin_end(16);
-    let download_all = Button::builder().label(&tr(MsgKey::ui_download_all)).css_classes(["flat"]).valign(gtk::Align::Center).visible(false).build();
+    row.set_margin_start(SPACE_L);
+    row.set_margin_end(SPACE_L);
+    let download_all = Button::builder().label(&tr(MsgKey::ui_download_all)).css_classes(["flat"]).valign(gtk::Align::Center).build();
+    // the row keeps the height of its button while the button is hidden, so the list starts at the same place on a page
+    // that offers Download all (manga) and on one that does not (anime)
+    row.set_size_request(-1, download_all.measure(gtk::Orientation::Vertical, -1).1);
+    download_all.set_visible(false);
     row.append(&count);
     row.append(&missing);
     row.append(&download_all);
@@ -53,7 +58,7 @@ pub fn item_header_row() -> ItemHeaderRow {
 /// The Start or Resume button: the play icon and its label. The page places it over the list.
 pub fn fab_button() -> (Button, Label) {
     let label = Label::new(None);
-    let content = GBox::new(O::Horizontal, 8);
+    let content = GBox::new(O::Horizontal, SPACE_S);
     content.append(&gtk::Image::from_icon_name("media-playback-start-symbolic"));
     content.append(&label);
     let button = Button::builder().child(&content).css_classes(["suggested-action", "pill"]).build();

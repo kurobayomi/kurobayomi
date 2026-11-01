@@ -9,7 +9,8 @@ use super::enabled::EnabledFlag;
 use super::highlight;
 use super::model::{Preference, PreferenceItem};
 use super::render;
-use super::widgets::{GROUP_SPACER, PAGE_MAX_WIDTH};
+use super::widgets::PAGE_MAX_WIDTH;
+use crate::theme::tokens::SPACE_XL;
 use crate::widgets::row;
 
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
@@ -27,7 +28,7 @@ pub fn body(tree: &[Preference]) -> Built {
 
     // the page column of `ui::column` (its gutters), with a group-sized gap between the groups
     let content = crate::ui::column();
-    content.set_spacing(GROUP_SPACER);
+    content.set_spacing(SPACE_XL);
     content.set_hexpand(true);
     let mut targets: Vec<(String, ListBoxRow)> = Vec::new();
 

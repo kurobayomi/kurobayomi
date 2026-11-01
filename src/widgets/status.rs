@@ -7,6 +7,7 @@
 
 use adw::prelude::*;
 use gtk::{Align, Orientation as O};
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 /// The size of the spinner of a loading page, in px.
 const SPINNER_PX: i32 = 48;
@@ -21,7 +22,7 @@ pub fn spinner() -> gtk::Spinner {
 /// A loading page: a large spinning spinner centred in the room it is given, with `label` under it when there is one.
 pub fn loading(label: Option<&str>) -> gtk::Widget {
     let spinner = spinner();
-    let page = gtk::Box::new(O::Vertical, 12);
+    let page = gtk::Box::new(O::Vertical, SPACE_M);
     page.set_halign(Align::Center);
     page.set_valign(Align::Center);
     page.set_hexpand(true);
@@ -44,7 +45,7 @@ pub fn page(icon: Option<&str>, title: &str, detail: Option<&str>, actions: &[gt
         page.set_description(Some(detail));
     }
     if !actions.is_empty() {
-        let row = gtk::Box::new(O::Horizontal, 8);
+        let row = gtk::Box::new(O::Horizontal, SPACE_S);
         row.set_halign(Align::Center);
         for action in actions {
             action.add_css_class("pill");

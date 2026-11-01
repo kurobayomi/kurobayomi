@@ -11,6 +11,7 @@ use crate::entry_core::header::GenreChip;
 use crate::entry_core::header_view::Handlers;
 use crate::entry_core::markdown::to_markup;
 use crate::entry_core::text::{COLLAPSED_LINES, Description, Expansion, SCRIM_PX};
+use crate::theme::tokens::{SPACE_L, SPACE_S};
 
 /// The scrim: the window background fading in over the last collapsed line.
 fn scrim(host: &gtk::Widget) -> gtk::DrawingArea {
@@ -63,10 +64,11 @@ fn genre_flow(chips: &[GenreChip], h: &Handlers) -> gtk::FlowBox {
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)
         .homogeneous(false)
-        .row_spacing(6)
-        .column_spacing(6)
+        .row_spacing(SPACE_S.unsigned_abs())
+        .column_spacing(SPACE_S.unsigned_abs())
+        .css_classes(["kb-chips"])
         .max_children_per_line(30)
-        .margin_bottom(8)
+        .margin_bottom(SPACE_S)
         .build();
     for chip in chips {
         flow.insert(&genre_chip(chip, h), -1);
@@ -132,8 +134,8 @@ pub fn build(description: &Description, expansion: Rc<Cell<Expansion>>, genres: 
 
     // the text never touches the pane's edges, on the manga and the anime page alike
     let root = GBox::new(O::Vertical, 0);
-    root.set_margin_start(16);
-    root.set_margin_end(16);
+    root.set_margin_start(SPACE_L);
+    root.set_margin_end(SPACE_L);
     root.append(&overlay);
     root.append(&caret);
     if let Some(flow) = &genres {

@@ -13,6 +13,7 @@ use crate::entry_core::description_view;
 use crate::entry_core::header::{GenreChip, HeaderModel};
 use crate::entry_core::header_view::{self, Handlers};
 use crate::entry_core::text::{Description, Expansion};
+use crate::theme::tokens::{SPACE_M};
 
 pub struct InfoBlock {
     pub root: GBox,
@@ -29,7 +30,7 @@ impl InfoBlock {
     pub fn new(action_row: ActionRow) -> Self {
         let header = GBox::new(O::Vertical, 0);
         let description = GBox::new(O::Vertical, 0);
-        let root = GBox::new(O::Vertical, 12);
+        let root = GBox::new(O::Vertical, SPACE_M);
         root.append(&header);
         root.append(&action_row.root);
         root.append(&description);

@@ -143,6 +143,8 @@ struct Inner {
     /// Starts an update of the active category; busy while a pass of this kind runs (T-26a-102).
     refresh_button: gtk::Button,
     empty: adw::StatusPage,
+    /// The spinner page shown until the first load has arrived (see [`PageState`]).
+    loading: gtk::Widget,
     global_button: gtk::Button,
     /// The action of an empty library that has a repository: open Browse (T-37a-053).
     empty_action: gtk::Button,
@@ -213,6 +215,7 @@ impl LibraryView {
             &[global_button.clone(), empty_action.clone()],
         );
         let welcome = welcome::Welcome::new();
+        let loading = crate::widgets::status::loading(None);
 
         let bar_label = gtk::Label::new(None);
         // the shared selection header goes in here by `wire_bar`, which has the handlers' weak reference
@@ -232,9 +235,12 @@ impl LibraryView {
         // a drag on the grid's empty space selects the covers it touches (issue #7)
         let drag = crate::widgets::drag_select::DragSelect::new(&scroller);
         root.append(drag.widget());
+        root.append(&loading);
         root.append(&empty);
         root.append(welcome.widget());
         root.append(&bar);
+        // before the first load only the spinner shows: the grid, the empty page and the welcome view are shown by `render`
+        PageState::Loading.show(&scroller, &loading, &empty, welcome.widget());
 
         // the library opens on the tab it was left on (T-37a-017); an id that is no longer a page falls back to the first
         let remembered = remembered_category(&deps.prefs, deps.kind);
@@ -266,6 +272,7 @@ impl LibraryView {
             list,
             refresh_button,
             empty,
+            loading,
             global_button,
             empty_action,
             welcome,
@@ -733,6 +740,37 @@ fn active_index(st: &Inner) -> usize {
     clamp_page(st.page as i64, pages.len())
 }
 
+/// Which one view fills the library page: exactly one of the four is visible at any time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PageState {
+    /// The first load has not arrived.
+    Loading,
+    /// The grid or the list of covers.
+    Grid,
+    /// Nothing to show (no match, no entries, filters), with a repository present.
+    Empty,
+    /// An empty library with no source repository yet.
+    Welcome,
+}
+
+impl PageState {
+    fn of(loaded: bool, has_items: bool, welcome: bool) -> Self {
+        match (loaded, has_items, welcome) {
+            (false, _, _) => Self::Loading,
+            (true, true, _) => Self::Grid,
+            (true, false, true) => Self::Welcome,
+            (true, false, false) => Self::Empty,
+        }
+    }
+
+    fn show(self, scroller: &gtk::ScrolledWindow, loading: &gtk::Widget, empty: &adw::StatusPage, welcome: &gtk::Box) {
+        scroller.set_visible(self == Self::Grid);
+        loading.set_visible(self == Self::Loading);
+        empty.set_visible(self == Self::Empty);
+        welcome.set_visible(self == Self::Welcome);
+    }
+}
+
 /// Redraws the toolbar, tabs, grid, empty state and selection bar from the current state.
 fn render(inner: &Rc<RefCell<Inner>>) {
     render_with(inner, false);
@@ -817,7 +855,7 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
         }
     };
 
-    let (title_label, tabs, store, scroller, empty, global, bar, bar_label, header, sel_header, download) = {
+    let (title_label, tabs, store, scroller, empty, loading, global, bar, bar_label, header, sel_header, download) = {
         let st = inner.borrow();
         (
             st.title.clone(),
@@ -825,6 +863,7 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
             st.store.clone(),
             st.scroller.clone(),
             st.empty.clone(),
+            st.loading.clone(),
             st.global_button.clone(),
             st.bar.clone(),
             st.bar_label.clone(),
@@ -870,19 +909,17 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
     };
     mirror.apply(chosen);
     let has_items = !view.items.is_empty();
-    scroller.set_visible(has_items);
+    let loaded = inner.borrow().built.is_some();
     let welcome_shown = !has_items && view.empty_action == Some(actions::EmptyLibraryAction::AddRepository);
-    empty.set_visible(!has_items && !welcome_shown);
+    let state = PageState::of(loaded, has_items, welcome_shown);
+    let welcome_widget = inner.borrow().welcome.widget().clone();
+    state.show(&scroller, &loading, &empty, &welcome_widget);
     empty.set_title(&view.empty_text);
     global.set_visible(view.show_global);
     global.set_label(&view.global_label);
-    let (action, welcome) = {
-        let st = inner.borrow();
-        (st.empty_action.clone(), st.welcome.clone())
-    };
+    let action = inner.borrow().empty_action.clone();
     action.set_visible(view.empty_action == Some(actions::EmptyLibraryAction::Browse));
     action.set_label(&tr(MsgKey::browse));
-    welcome.widget().set_visible(welcome_shown);
     bar_label.set_label(&view.bar_text);
     bar.set_reveal_child(view.bar_open);
     header.iter().for_each(|w| w.set_visible(!view.bar_open));
@@ -1386,6 +1423,52 @@ mod tests {
         prefs.last_used_anime_category.set(9).expect("write");
         assert_eq!(remembered_category(&prefs, Kind::Manga), 7);
         assert_eq!(remembered_category(&prefs, Kind::Anime), 9);
+    }
+
+    /// How many of the page's four views (grid, spinner, empty page, welcome) are visible, and which.
+    fn visible_views(inner: &Rc<RefCell<Inner>>) -> Vec<&'static str> {
+        let st = inner.borrow();
+        [("grid", st.scroller.is_visible()), ("loading", st.loading.is_visible()), ("empty", st.empty.is_visible()), ("welcome", st.welcome.widget().is_visible())]
+            .into_iter()
+            .filter_map(|(name, shown)| shown.then_some(name))
+            .collect()
+    }
+
+    #[test]
+    fn exactly_one_of_loading_grid_empty_and_welcome_shows_in_every_case() {
+        assert_eq!(PageState::of(false, false, false), PageState::Loading);
+        assert_eq!(PageState::of(false, true, true), PageState::Loading, "nothing else shows before the first load");
+        assert_eq!(PageState::of(true, true, false), PageState::Grid);
+        assert_eq!(PageState::of(true, false, true), PageState::Welcome, "no entries and no repository");
+        assert_eq!(PageState::of(true, false, false), PageState::Empty, "no entries but a repository");
+        crate::testing::with_display(|| {
+            let (scroller, loading, empty, welcome) = (gtk::ScrolledWindow::new(), crate::widgets::status::loading(None), crate::widgets::status::empty("x", "t", None), gtk::Box::new(O::Vertical, 0));
+            for (state, name) in [(PageState::Loading, "loading"), (PageState::Grid, "grid"), (PageState::Empty, "empty"), (PageState::Welcome, "welcome")] {
+                state.show(&scroller, &loading, &empty, &welcome);
+                let shown: Vec<&str> = [("grid", scroller.is_visible()), ("loading", loading.is_visible()), ("empty", empty.is_visible()), ("welcome", welcome.is_visible())]
+                    .into_iter()
+                    .filter_map(|(n, v)| v.then_some(n))
+                    .collect();
+                assert_eq!(shown, vec![name]);
+            }
+        });
+    }
+
+    #[test]
+    fn a_new_library_shows_only_the_spinner_until_the_load_arrives_and_then_one_view() {
+        crate::testing::with_display(|| {
+            let ctx = glib::MainContext::default();
+            let _owner = ctx.acquire().expect("main context");
+            let (_dir, view) = test_view(test_nav());
+            let inner = view.inner.clone();
+            assert_eq!(visible_views(&inner), vec!["loading"], "before the first load");
+            assert!(pump_until(|| inner.borrow().built.is_some()), "the worker reply arrives");
+            assert_eq!(visible_views(&inner), vec!["grid"], "one entry in the test library");
+            view.set_query("zzz");
+            assert!(pump_until(|| inner.borrow().built.as_ref().is_some_and(|b| b.distinct_count == 0)));
+            let shown = visible_views(&inner);
+            assert_eq!(shown.len(), 1, "a search with no match shows one view: {shown:?}");
+        });
     }
 
     #[test]

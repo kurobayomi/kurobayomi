@@ -29,6 +29,8 @@ use crate::entry_core::text::COLLAPSED_LINES;
 use crate::widgets::context_menu::{self, Item as MenuItem};
 use crate::widgets::download_button::{DownloadButton, Request};
 use crate::widgets::selection_mirror::SelectionMirror;
+use crate::theme::tokens::{SPACE_M};
+use crate::theme::tokens::{SPACE_L};
 
 /// A click or Enter on a row.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -122,10 +124,10 @@ fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     // the row, so a press anywhere on it opens the row; its content is inset 16 px from the edge (with the row's 2 px of
     // padding), in line with the leading slots
     let card = GBox::new(O::Horizontal, 0);
-    let body = GBox::new(O::Horizontal, 12);
+    let body = GBox::new(O::Horizontal, SPACE_M);
     body.set_hexpand(true);
-    body.set_margin_start(14);
-    body.set_margin_end(14);
+    body.set_margin_start(SPACE_L);
+    body.set_margin_end(SPACE_L);
     body.set_margin_top(2);
     body.set_margin_bottom(2);
     card.append(&body);

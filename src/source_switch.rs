@@ -18,6 +18,7 @@ use kuro_i18n::{Arg, MsgKey, tr, tr_plural, trf};
 use kuro_platform::kind::Kind;
 use kuro_prefs::source::SourcePrefs;
 use kuro_source::SourceError;
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 /// Whether the source of entry `key` is on.
 pub fn is_on(prefs: &SourcePrefs, key: &str) -> bool {
@@ -361,7 +362,7 @@ pub fn open_picker(link: &str) {
     let filter = Rc::new(std::cell::RefCell::new(SourceFilter::default()));
     let Some((list, _)) = sources_list(link, Rc::clone(&filter)) else { return };
     let repo = index.name.clone().filter(|name| !name.trim().is_empty()).unwrap_or_else(|| link.to_owned());
-    let col = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let col = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
     col.append(&crate::ui::message(&tr(MsgKey::source_switch_picker_intro)));
     let search = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).hexpand(true).build();
     col.append(&search);
@@ -438,7 +439,7 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow 
         }
         gtk::glib::Propagation::Stop
     });
-    let suffix = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let suffix = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
     suffix.append(&spinner);
     suffix.append(&switch);
     let row = crate::ui::row(&entry.name, Some(&subtitle), Some(suffix.upcast()));

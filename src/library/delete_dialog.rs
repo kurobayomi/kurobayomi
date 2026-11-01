@@ -11,6 +11,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::library::actions::DeleteChoice;
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_S};
 
 /// Shows the dialog. `on_confirm` gets the choice when OK is pressed.
 pub fn show(kind: Kind, downloads_offered: bool, on_confirm: impl Fn(DeleteChoice) + 'static) {
@@ -18,7 +19,7 @@ pub fn show(kind: Kind, downloads_offered: bool, on_confirm: impl Fn(DeleteChoic
         Kind::Manga => (MsgKey::manga_from_library, MsgKey::downloaded_chapters),
         Kind::Anime => (MsgKey::anime_from_library, MsgKey::downloaded_episodes),
     };
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let from_library = gtk::CheckButton::with_label(&tr(library_label));
     column.append(&from_library);
     let downloads = gtk::CheckButton::with_label(&tr(downloads_label));

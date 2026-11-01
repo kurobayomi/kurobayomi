@@ -9,6 +9,7 @@ use std::time::Duration;
 use adw::prelude::*;
 use gtk::glib;
 use kuro_platform::toast::{ToastFeed, Toaster, toast_channel};
+use crate::theme::tokens::{SPACE_M};
 
 // A new message replaces the one on screen (the old toast is dismissed first). The toast's close button or Escape
 // dismisses it.
@@ -24,7 +25,7 @@ pub fn busy(text: &str) -> Busy {
     let toast = LAYER.with(|l| l.borrow().clone()).map(|layer| {
         let spinner = gtk::Spinner::builder().spinning(true).width_request(24).height_request(24).build();
         let label = gtk::Label::new(Some(text));
-        let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(12).build();
+        let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(SPACE_M).build();
         row.append(&spinner);
         row.append(&label);
         let toast = adw::Toast::builder().custom_title(&row).timeout(0).build();

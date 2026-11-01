@@ -11,6 +11,7 @@ use kuro_prefs::values::PrefType;
 
 use crate::pref_model::bind::{self, Veto};
 use crate::pref_model::model::{ItemCommon, Preference, PreferenceGroup, PreferenceItem};
+use crate::theme::tokens::{SPACE_L};
 
 pub fn group(title: &str, items: Vec<PreferenceItem>) -> Preference {
     Preference::Group(PreferenceGroup::new(title, items))
@@ -89,7 +90,7 @@ pub(crate) fn logo_image(bytes: &'static [u8]) -> Option<gtk::Image> {
     let texture = gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_static(bytes)).ok()?;
     let image = gtk::Image::from_paintable(Some(&texture));
     image.set_pixel_size(24);
-    image.set_margin_end(16);
+    image.set_margin_end(SPACE_L);
     image.set_accessible_role(gtk::AccessibleRole::Presentation);
     Some(image)
 }

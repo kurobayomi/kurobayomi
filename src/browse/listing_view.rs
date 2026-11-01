@@ -36,6 +36,7 @@ use crate::widgets::selection_mirror::SelectionMirror;
 use crate::library::select::{Selectable, SelectionOf, Shown};
 use crate::widgets::context_menu::{self, Item};
 use crate::widgets::drag_select::{self, DragSelect};
+use crate::theme::tokens::{SPACE_L};
 
 /// What the listing needs from the app.
 pub struct ListingDeps {
@@ -190,8 +191,8 @@ impl ListingView {
         let footer = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let more = crate::ui::inline_spinner();
         more.set_halign(gtk::Align::Center);
-        more.set_margin_top(16);
-        more.set_margin_bottom(16);
+        more.set_margin_top(SPACE_L);
+        more.set_margin_bottom(SPACE_L);
         footer.append(&more);
         footer.set_visible(false);
         let items_page = gtk::Box::new(gtk::Orientation::Vertical, 0);

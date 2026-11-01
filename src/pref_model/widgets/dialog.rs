@@ -10,6 +10,7 @@ use gtk::{glib, Box as GBox, Button, Label, Orientation};
 use super::super::strings;
 use super::DIALOG_WIDTH;
 use crate::ui::{DialogButton, DialogOpen as _, Role};
+use crate::theme::tokens::{SPACE_L};
 
 /// A dialog built by [`show`]. The caller owns the body and decides when to close it.
 #[derive(Clone)]
@@ -58,7 +59,7 @@ pub fn show(
     on_cancel: impl Fn() + 'static,
 ) -> Dialog {
     let done = Rc::new(Cell::new(false));
-    let column = GBox::new(Orientation::Vertical, 16);
+    let column = GBox::new(Orientation::Vertical, SPACE_L);
     // the window title shows the title once; the body does not repeat it
     column.append(body);
     let error = Label::new(None);

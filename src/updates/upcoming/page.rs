@@ -11,6 +11,7 @@ use std::rc::Rc;
 use chrono::{Local, NaiveDate, Weekday};
 use gtk::gdk;
 use gtk::glib;
+use crate::theme::tokens::SPACE_S;
 #[cfg(test)]
 use gtk::glib::translate::IntoGlib;
 use adw::prelude::*;
@@ -304,11 +305,11 @@ impl UpcomingPage {
 
 /// The heading of a day (`ui::heading`) and a badge that says how many entries it has.
 fn heading(text: &str, count: u32) -> GBox {
-    let line = GBox::new(O::Horizontal, 8);
+    let line = GBox::new(O::Horizontal, SPACE_S);
     let label = crate::ui::heading(text);
-    // the margin goes on the line, so the badge sits level with the text
-    label.set_margin_top(0);
-    line.set_margin_top(12);
+    // the group gap goes on the line, so the badge sits level with the text
+    label.remove_css_class(crate::ui::GROUP_HEADING);
+    line.add_css_class(crate::ui::GROUP_HEADING);
     line.append(&label);
     line.append(&crate::browse::look::badge(&rows::badge_text(count), false));
     line

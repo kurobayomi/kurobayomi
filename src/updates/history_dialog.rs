@@ -8,6 +8,7 @@ use adw::prelude::*;
 use gtk::{Box as GBox, CheckButton, Orientation as O};
 
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_M};
 
 /// What the dialog says. `checkbox` is the label of the optional switch.
 pub struct ConfirmCopy {
@@ -21,7 +22,7 @@ pub struct ConfirmCopy {
 /// Shows the dialog. `on_ok` gets the checkbox state (false when there is no checkbox). `on_close` runs once the
 /// dialog is gone, whichever button closed it, so the screen can drop its dialog state.
 pub fn show(copy: ConfirmCopy, destructive: bool, on_ok: impl Fn(bool) + 'static, on_close: impl Fn() + 'static) {
-    let col = GBox::new(O::Vertical, 12);
+    let col = GBox::new(O::Vertical, SPACE_M);
     col.append(&crate::ui::message(&copy.text));
     let check = copy.checkbox.as_deref().map(|label| CheckButton::with_label(label));
     if let Some(check) = &check {

@@ -35,6 +35,8 @@ use crate::screens::{built, unavailable, Built};
 use crate::settings_ui::tracker_host::{self, now_ms};
 use crate::settings_ui::tracking;
 use crate::ui;
+use crate::theme::tokens::{SPACE_M};
+use crate::theme::tokens::{SPACE_S};
 
 /// The progress spin button writes this long after its last step, so a run of clicks is one write.
 const PROGRESS_SETTLE_MS: u64 = 700;
@@ -395,7 +397,7 @@ fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> adw::Acti
         });
     });
     let total = if shown.total > 0 { shown.total.to_string() } else { "?".to_owned() };
-    let suffix = GBox::new(O::Horizontal, 6);
+    let suffix = GBox::new(O::Horizontal, SPACE_S);
     suffix.append(&spin);
     suffix.append(&Label::new(Some(&format!("of {total}"))));
     let title = tr(match kind {
@@ -417,7 +419,7 @@ fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) ->
     if let Ok(day) = glib::DateTime::from_local(opened.year(), opened.month() as i32, opened.day() as i32, 0, 0, 0.0) {
         calendar.select_day(&day);
     }
-    let buttons = GBox::new(O::Horizontal, 6);
+    let buttons = GBox::new(O::Horizontal, SPACE_S);
     buttons.set_halign(Align::End);
     if remove_offered(stored) {
         let clear = Button::with_label(&tr(MsgKey::action_remove));
@@ -446,7 +448,7 @@ fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) ->
         }
     });
     buttons.append(&ok);
-    let content = GBox::new(O::Vertical, 6);
+    let content = GBox::new(O::Vertical, SPACE_S);
     ui::margins(&content, 6);
     content.append(&calendar);
     content.append(&buttons);
@@ -466,7 +468,7 @@ fn button_row(label: &str, css: &[&str], run: impl Fn() + 'static) -> gtk::ListB
 /// Stop tracking asks first. The local unlink always runs; for a tracker that can delete, a checkbox (off by default)
 /// also removes the entry from the tracker's site.
 fn confirm_stop(name: &str, bound: &Bound, deletable: bool, redraw: Rc<dyn Fn()>) {
-    let column = GBox::new(O::Vertical, 12);
+    let column = GBox::new(O::Vertical, SPACE_M);
     column.append(&Label::builder().label(tr(MsgKey::track_delete_text)).wrap(true).xalign(0.0).build());
     let also = gtk::CheckButton::builder().label(trf(MsgKey::track_delete_remote_text, &[("arg1", Arg::Str(name))])).active(remove::CHECKBOX_DEFAULT).build();
     also.set_visible(remove::checkbox_shown(deletable));

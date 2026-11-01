@@ -11,6 +11,7 @@ use crate::pref_model::model::PreferenceItem;
 use crate::settings_ui::library_csv::{self, Columns, Entry};
 use crate::settings_ui::rows::text;
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_S};
 
 pub fn row_title() -> String {
     tr(MsgKey::library_list)
@@ -68,7 +69,7 @@ fn open_dialog() {
     let boxes: [gtk::CheckButton; 4] = ["Title", "Type", "Author", "Artist"].map(|label| gtk::CheckButton::with_label(label));
     apply(&boxes, Columns::ALL);
 
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let heading = gtk::Label::new(Some(&dialog_title()));
     heading.add_css_class("heading");
     heading.set_halign(gtk::Align::Start);

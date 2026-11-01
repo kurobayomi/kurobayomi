@@ -10,7 +10,6 @@ pub mod switch;
 pub mod text;
 pub mod theme_mode;
 
-pub const GROUP_SPACER: i32 = 24;
 pub const CHECK_ROW_MIN: i32 = 48;
 pub const DIALOG_WIDTH: i32 = 360;
 pub const PAGE_MAX_WIDTH: i32 = crate::ui::PAGE_WIDTH;

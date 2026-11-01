@@ -13,6 +13,7 @@ use super::super::model::{format_subtitle, ItemCommon};
 use super::dialog::{self, Dialog};
 use crate::widgets::row::{self, set_subtitle, RowSpec};
 use super::super::strings;
+use crate::theme::tokens::{SPACE_S};
 
 /// Blank means empty after trimming whitespace (E-03).
 pub fn is_blank(text: &str) -> bool {
@@ -115,7 +116,7 @@ struct EditSpec {
 }
 
 fn open(parent: &gtk::Window, spec: EditSpec, on_ok: impl Fn(String, Dialog) + 'static) {
-    let body = GBox::new(Orientation::Vertical, 8);
+    let body = GBox::new(Orientation::Vertical, SPACE_S);
     if let Some(sub) = &spec.dialog_subtitle {
         let label = Label::new(Some(sub));
         label.set_wrap(true);

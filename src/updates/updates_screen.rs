@@ -39,6 +39,8 @@ use crate::updates::updates_dialog::confirm_bulk_delete;
 use crate::updates::updates_page::{self, BackAction, UpdatesLoad, back_action, cover_click_enabled};
 use crate::widgets::context_menu::{self, Item};
 use crate::widgets::download_button::{DownloadButton, Request};
+use crate::theme::tokens::{SPACE_M, SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 /// The icon of the empty feed.
 const EMPTY_ICON: &str = "software-update-available-symbolic";
@@ -399,7 +401,7 @@ impl UpdatesScreen {
     /// dims to 0.38.
     fn row(self: &Rc<Self>, feed_row: &FeedRow, mode: bool) -> gtk::ListBoxRow {
         let row = &feed_row.row;
-        let lead = GBox::new(O::Horizontal, 12);
+        let lead = GBox::new(O::Horizontal, SPACE_M);
         let check = CheckButton::builder().active(feed_row.selected).visible(mode).can_target(false).valign(gtk::Align::Center).build();
         lead.append(&check);
         let dot = Image::from_icon_name("media-record-symbolic");
@@ -424,7 +426,7 @@ impl UpdatesScreen {
         lead.append(&cover);
 
         // the bookmark and filler marks sit before the download indicator
-        let end = GBox::new(O::Horizontal, 4);
+        let end = GBox::new(O::Horizontal, SPACE_XS);
         if row.bookmark {
             let star = Image::from_icon_name("starred-symbolic");
             star.set_pixel_size(14);
@@ -809,7 +811,7 @@ impl UpdatesScreen {
     }
 
     fn bar_button(self: &Rc<Self>, action: BarAction, kind: Kind) -> Button {
-        let content = GBox::new(O::Horizontal, 6);
+        let content = GBox::new(O::Horizontal, SPACE_S);
         content.append(&Image::from_icon_name(bottom_bar::icon(action)));
         content.append(&Label::new(Some(&tr(bottom_bar::label(action, kind)))));
         let button = Button::new();

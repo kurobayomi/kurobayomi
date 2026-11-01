@@ -8,6 +8,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 
 use crate::ui::{DialogButton, DialogOpen as _, Role};
+use crate::theme::tokens::{SPACE_M};
 
 /// How a dialog button looks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -57,7 +58,7 @@ impl DialogSlot {
         if let Some(old) = old {
             old.close();
         }
-        let column = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
         if let Some(body) = &spec.body {
             column.append(&crate::ui::message(body));
         }

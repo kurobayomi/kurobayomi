@@ -13,6 +13,8 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::ui;
 use crate::widgets::{download_button, rail};
+use crate::theme::tokens::{SPACE_M};
+use crate::theme::tokens::{SPACE_S};
 
 /// The tab page of the download queue. Its item shows while something is queued, and while the page is open.
 pub const DOWNLOADS: &str = "download_queue";
@@ -46,17 +48,13 @@ fn queued_percents() -> (Vec<u8>, usize) {
 
 /// One panel row: the icon, the title, then `extra` (badges).
 fn nav_row(icon: &str, title: &str, extra: &[&gtk::Widget]) -> gtk::ListBoxRow {
-    let h = GBox::new(O::Horizontal, 12);
-    ui::margins(&h, rail::ROW_PAD);
+    let h = GBox::new(O::Horizontal, SPACE_M);
     h.append(&gtk::Image::from_icon_name(icon));
     h.append(&gtk::Label::builder().label(title).xalign(0.0).hexpand(true).build());
     for w in extra {
         h.append(*w);
     }
-    let row = gtk::ListBoxRow::builder().child(&h).build();
-    row.set_margin_top(rail::ITEM_SPACING / 2);
-    row.set_margin_bottom(rail::ITEM_SPACING / 2);
-    row
+    rail::row(&h)
 }
 
 /// The Updates count pill. It starts empty and follows the shared counts.
@@ -196,7 +194,7 @@ fn app_menu() -> gtk::MenuButton {
 /// property of the build, not part of the name; it also leaves the header room for the search, the menu and the
 /// Incognito icon).
 fn title() -> GBox {
-    let title = GBox::new(O::Horizontal, 6);
+    let title = GBox::new(O::Horizontal, SPACE_S);
     let names = GBox::new(O::Vertical, 0);
     names.set_valign(gtk::Align::Center);
     names.append(&gtk::Label::builder().label("Kurobayomi").css_classes(["title"]).build());
@@ -316,11 +314,11 @@ pub fn build(tabs: &gtk::Stack) -> GBox {
 /// The narrow window's bar: the same items as the panel. The places switch the tab pages, then the app menu (Incognito,
 /// Help, About and Settings).
 pub fn bottom_bar(tabs: &gtk::Stack) -> GBox {
-    let bar = GBox::new(O::Horizontal, 6);
+    let bar = GBox::new(O::Horizontal, SPACE_S);
     bar.add_css_class("kb-bottom-bar");
     bar.set_halign(gtk::Align::Center);
-    bar.set_margin_top(6);
-    bar.set_margin_bottom(6);
+    bar.set_margin_top(SPACE_S);
+    bar.set_margin_bottom(SPACE_S);
     let switcher = gtk::StackSwitcher::builder().stack(tabs).build();
     // the bar also shows over a pushed page: a tap leaves it for the tab pages, like the panel's rows
     let leave = gtk::GestureClick::new();

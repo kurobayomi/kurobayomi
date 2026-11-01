@@ -13,6 +13,7 @@ use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
 use crate::ui;
+use crate::theme::tokens::{SPACE_M};
 
 /// What the bulk button does now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -77,7 +78,7 @@ impl ScanlatorSheet {
 /// Opens the sheet. `on_ok` runs with the excluded set when OK is pressed.
 pub fn open(available: &[String], excluded: &BTreeSet<String>, on_ok: impl Fn(BTreeSet<String>) + 'static) {
     let sheet = Rc::new(RefCell::new(ScanlatorSheet::new(available, excluded)));
-    let col = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let col = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
     let title = tr(MsgKey::exclude_scanlators);
     if sheet.borrow().is_empty() {
         col.append(&ui::message(&tr(MsgKey::no_scanlators_found)));

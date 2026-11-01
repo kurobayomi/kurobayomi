@@ -15,6 +15,7 @@ use gtk::prelude::*;
 use kuro_platform::secrets::SecretStore;
 
 use crate::pref_model::widgets::dialog;
+use crate::theme::tokens::{SPACE_M};
 
 pub fn confirm_lock_change() -> String {
     tr(MsgKey::confirm_lock_change)
@@ -98,7 +99,7 @@ fn entry() -> gtk::PasswordEntry {
 }
 
 fn body(text: &str, entries: &[&gtk::PasswordEntry]) -> gtk::Box {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
     let label = gtk::Label::new(Some(text));
     label.set_wrap(true);
     label.set_xalign(0.0);

@@ -5,6 +5,8 @@ use crate::ui::*;
 use gtk::prelude::*;
 use gtk::{Align, Box as GBox, Button, Label, Orientation as O};
 use kuro_platform::kind::Kind;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 pub struct Built {
     pub content: gtk::Widget,
@@ -168,7 +170,7 @@ pub(crate) fn dialog_then_named(id: &str, dialog: &str, name: &str, on_ok: impl 
 }
 
 pub(crate) fn fab(overlay: &gtk::Overlay, label: &str, icon: &str) -> Button {
-    let h = GBox::new(O::Horizontal, 6);
+    let h = GBox::new(O::Horizontal, SPACE_S);
     h.append(&gtk::Image::from_icon_name(icon));
     h.append(&Label::new(Some(label)));
     let b = Button::builder().child(&h).css_classes(["suggested-action", "pill"]).halign(Align::End).valign(Align::End).build();
@@ -203,7 +205,7 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
         let name = if anime { "anime" } else { "manga" };
         kinds.add_titled(&b.content, Some(name), if anime { "Anime" } else { "Manga" });
         let mut rest = b.end.into_iter().peekable();
-        let actions = GBox::new(O::Horizontal, 4);
+        let actions = GBox::new(O::Horizontal, SPACE_XS);
         let bar: gtk::Widget = match rest.next_if(|w| w.is::<gtk::SearchEntry>()).and_downcast::<gtk::SearchEntry>() {
             // keys typed in this kind's content open its bar; the other kind's content is hidden and takes none
             Some(entry) => {

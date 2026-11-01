@@ -373,10 +373,28 @@ fn build_window(app: &gtk::Application) {
     // dev hooks: KUROBAYOMI_OPEN=<screen id> starts on that screen; KUROBAYOMI_SMOKE=1 opens every
     // screen, sheet and dialog once and quits (a panic or GTK critical shows up in the output)
     if let Ok(id) = std::env::var("KUROBAYOMI_OPEN") {
-        ui::open(&id);
-        if let Some(sh) = std::env::var("KUROBAYOMI_SHEET").ok().and_then(|n| ui::screen(&id).sheets.into_iter().find(|s| s.id == n)) {
-            ui::show_sheet(&sh);
-        }
+        // after the start tab is bound, so a tab id switches to that tab
+        glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+            ui::open(&id);
+            if let Some(sh) = std::env::var("KUROBAYOMI_SHEET").ok().and_then(|n| ui::screen(&id).sheets.into_iter().find(|s| s.id == n)) {
+                ui::show_sheet(&sh);
+            }
+        });
+    }
+    // dev hooks: KUROBAYOMI_ENTRY=<anime|manga>:<row id> opens that entry's page; KUROBAYOMI_SOURCE=<anime|manga>:<source id>
+    // opens that source's popular listing (screenshots of pages that a click normally reaches)
+    let hook = |name: &str| {
+        std::env::var(name).ok().and_then(|v| {
+            let (kind, id) = v.split_once(':')?;
+            Some((if kind == "anime" { kuro_platform::kind::Kind::Anime } else { kuro_platform::kind::Kind::Manga }, id.parse::<i64>().ok()?))
+        })
+    };
+    if let Some((kind, id)) = hook("KUROBAYOMI_ENTRY") {
+        screens::open_entry(kind, id);
+    }
+    if let Some((kind, source_id)) = hook("KUROBAYOMI_SOURCE") {
+        let query = kuro_domain::source::browse::BrowseQuery::Popular;
+        browse::pending::open(browse::route::BrowseRoute::BrowseSource { kind, source_id, query, migrating: false });
     }
     // KUROBAYOMI_SHOT=file.png renders the window to a PNG and quits (no focus-dependent screenshots)
     if let Ok(path) = std::env::var("KUROBAYOMI_SHOT") {

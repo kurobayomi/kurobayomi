@@ -22,6 +22,7 @@ use super::filters::SourceFilters;
 use super::grid::list_height;
 use super::header::OverflowItem;
 use super::header_bar::{HeaderDeps, SourceHeader, build as build_header, stub_header};
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S};
 #[cfg(test)]
 use super::icons::resolve;
 use super::listing::ListItem;
@@ -78,10 +79,10 @@ pub struct MigrateSourcesNav {
 pub fn migrate_sources(snapshot: &MigrateSourcesSnapshot, nav: MigrateSourcesNav) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     // the prompt and the help button head the list column, as a section heading would
-    let sort = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    sort.set_margin_start(16);
-    sort.set_margin_end(16);
-    sort.set_margin_top(12);
+    let sort = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+    sort.set_margin_start(SPACE_L);
+    sort.set_margin_end(SPACE_L);
+    sort.set_margin_top(SPACE_M);
     sort.append(&gtk::Label::builder().label(tr(MsgKey::migration_selection_prompt)).hexpand(true).xalign(0.0).wrap(true).css_classes(["dim-label"]).build());
     let help = gtk::Button::from_icon_name("help-browser-symbolic");
     help.set_tooltip_text(Some(&tr(MsgKey::label_help)));
@@ -307,8 +308,8 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
 
     // the shared top row of a page (`ui::pill_row`), as the library's categories and the download queue's actions
     let chips = crate::ui::pill_row();
-    chips.set_margin_start(16);
-    chips.set_margin_end(16);
+    chips.set_margin_start(SPACE_L);
+    chips.set_margin_end(SPACE_L);
     let mut labels = vec![tr(MsgKey::popular)];
     if supports_latest {
         labels.push(tr(MsgKey::latest));
@@ -624,7 +625,7 @@ pub struct GlobalSearchPage {
 }
 
 pub fn global_search(nav: GlobalSearchNav, ready: watch::Receiver<bool>) -> GlobalSearchPage {
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let entry = gtk::SearchEntry::new();
     entry.set_placeholder_text(Some(&tr(MsgKey::action_global_search_hint)));
     entry.set_hexpand(true);
@@ -640,9 +641,9 @@ pub fn global_search(nav: GlobalSearchNav, ready: watch::Receiver<bool>) -> Glob
     }
     let progress = gtk::ProgressBar::new();
     progress.set_visible(false);
-    let column = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).valign(gtk::Align::Start).build();
-    column.set_margin_start(16);
-    column.set_margin_end(16);
+    let column = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(SPACE_M).valign(gtk::Align::Start).build();
+    column.set_margin_start(SPACE_L);
+    column.set_margin_end(SPACE_L);
     let view = Rc::new(SearchView { column, progress, chips: Cell::new(nav.chips), nav, last: RefCell::new(None), typed: Rc::default() });
     let search = Rc::clone(&view);
     entry.connect_activate(move |entry| (search.nav.search)(entry.text().as_str()));
@@ -742,8 +743,8 @@ fn draw(entry: &gtk::SearchEntry, view: &SearchView, snapshot: &GlobalSearchSnap
 }
 
 fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>) -> gtk::Box {
-    let section = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).vexpand(false).valign(gtk::Align::Start).build();
-    let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let section = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(SPACE_S).vexpand(false).valign(gtk::Align::Start).build();
+    let header = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
     let titles = gtk::Box::new(gtk::Orientation::Vertical, 0);
     titles.set_hexpand(true);
     titles.append(&gtk::Label::builder().label(row_title(row)).xalign(0.0).css_classes(["heading"]).build());
@@ -762,12 +763,12 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
         SearchState::Loading => {
             let spinner = crate::ui::inline_spinner();
             spinner.set_halign(gtk::Align::Center);
-            spinner.set_margin_top(16);
-            spinner.set_margin_bottom(16);
+            spinner.set_margin_top(SPACE_L);
+            spinner.set_margin_bottom(SPACE_L);
             section.append(&spinner);
         }
         SearchState::Error(message) => {
-            let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let line = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
             line.append(&gtk::Image::from_icon_name("dialog-error-symbolic"));
             line.append(&gtk::Label::builder().label(message).xalign(0.0).wrap(true).css_classes(["error"]).build());
             section.append(&line);
@@ -776,7 +777,7 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
             section.append(&gtk::Label::builder().label(tr(MsgKey::no_results_found)).xalign(0.0).css_classes(["dim-label"]).build());
         }
         SearchState::Results(items) | SearchState::Refreshing(items) => {
-            let covers = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).valign(gtk::Align::Start).vexpand(false).build();
+            let covers = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(SPACE_S).valign(gtk::Align::Start).vexpand(false).build();
             for item in items {
                 let cell = super::view::grid_cell_lines(
                     Some(item),
@@ -823,7 +824,7 @@ pub struct MigrateEntriesNav {
 pub fn migrate_entries(entries: &[MigrateEntry], error: Option<&str>, nav: MigrateEntriesNav) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     if let Some(message) = error {
-        root.append(&gtk::Label::builder().label(message).margin_top(8).css_classes(["error"]).build());
+        root.append(&gtk::Label::builder().label(message).margin_top(SPACE_S).css_classes(["error"]).build());
     }
     let mut sorted: Vec<&MigrateEntry> = entries.iter().collect();
     sorted.sort_by_key(|e| e.title.to_lowercase());

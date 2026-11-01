@@ -11,6 +11,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use super::router::{self, Back, Page, Shell};
 use crate::screens::Built;
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XS};
 
 thread_local! {
     static SHELL: RefCell<Shell> = RefCell::new(Shell::default());
@@ -162,7 +163,7 @@ fn main_list(on_select: Rc<dyn Fn(&str)>) -> gtk::Widget {
     let column = crate::ui::column();
     let list = crate::ui::boxed_list();
     for entry in entries() {
-        let suffix = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let suffix = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
         for mark in update_marks(&entry.id) {
             suffix.append(&mark);
         }
@@ -194,14 +195,13 @@ pub fn split(entries: Vec<NavEntry>, current: &str) -> gtk::Widget {
     list.set_margin_top(crate::widgets::rail::PAD_V);
     list.set_margin_bottom(crate::widgets::rail::PAD_V);
     for entry in &entries {
-        let line = gtk::Box::new(gtk::Orientation::Horizontal, 12);
-        crate::ui::margins(&line, crate::widgets::rail::ROW_PAD);
+        let line = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_M);
         line.append(&gtk::Image::from_icon_name(&entry.icon));
         line.append(&gtk::Label::builder().label(&entry.title).xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).build());
         for mark in update_marks(&entry.id) {
             line.append(&mark);
         }
-        let row = gtk::ListBoxRow::builder().child(&line).build();
+        let row = crate::widgets::rail::row(&line);
         row.set_tooltip_text(entry.subtitle.as_deref());
         list.append(&row);
     }
@@ -254,10 +254,10 @@ fn pane(id: &str) -> gtk::Widget {
     let page = gtk::Box::new(gtk::Orientation::Vertical, 0);
     crate::ui::tag(&page, id);
     if !end.is_empty() {
-        let bar = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        let bar = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_XS);
         bar.set_halign(gtk::Align::End);
-        bar.set_margin_top(8);
-        bar.set_margin_end(16);
+        bar.set_margin_top(SPACE_S);
+        bar.set_margin_end(SPACE_L);
         for widget in end {
             if let Some(button) = widget.downcast_ref::<gtk::Button>() {
                 button.add_css_class("flat");

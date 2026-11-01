@@ -18,6 +18,7 @@ use tokio::sync::watch;
 
 use super::dialogs::{ButtonStyle, DialogSlot, DialogSpec};
 use super::glue::{follow_ready, keep_alive};
+use crate::theme::tokens::{SPACE_L, SPACE_S, SPACE_XS};
 
 /// The entry a stored list value stands for. A value that matches none shows nothing.
 pub fn list_label(entries: &[String], values: &[String], stored: &str) -> Option<String> {
@@ -157,7 +158,7 @@ impl Inner {
     fn add_row(self: &Rc<Self>, into: &gtk::Box, pref: &SourcePref) {
         match pref {
             SourcePref::Category { title, children } => {
-                into.append(&gtk::Label::builder().label(title).xalign(0.0).css_classes(["heading"]).margin_start(16).margin_top(16).margin_bottom(4).build());
+                into.append(&gtk::Label::builder().label(title).xalign(0.0).css_classes(["heading"]).margin_start(SPACE_L).margin_top(SPACE_L).margin_bottom(SPACE_XS).build());
                 for child in children {
                     self.add_row(into, child);
                 }
@@ -199,11 +200,11 @@ impl Inner {
 
     /// A row: title over summary, with room at the end for the control. Returns the row and its summary label.
     fn row(&self, title: &str, pref: &SourcePref) -> (gtk::Box, gtk::Label) {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 16);
-        row.set_margin_start(16);
-        row.set_margin_end(16);
-        row.set_margin_top(8);
-        row.set_margin_bottom(8);
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_L);
+        row.set_margin_start(SPACE_L);
+        row.set_margin_end(SPACE_L);
+        row.set_margin_top(SPACE_S);
+        row.set_margin_bottom(SPACE_S);
         let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
         text.set_hexpand(true);
         text.append(&gtk::Label::builder().label(title).xalign(0.0).build());

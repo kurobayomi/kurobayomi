@@ -11,6 +11,7 @@ use crate::browse::look::list_row;
 use crate::widgets::context_menu::Item;
 use kuro_domain::dates::item_row_text;
 use kuro_i18n::{MsgKey, tr};
+use crate::theme::tokens::{SPACE_XS};
 
 /// The right-click item that opens the entry's page (no catalogue key yet, as in `updates::copy`).
 pub fn open_details() -> String {
@@ -48,7 +49,7 @@ pub fn history_row(title: &str, subtitle: &str, cover: &impl IsA<gtk::Widget>, i
     });
     cover.add_controller(open);
 
-    let buttons = GBox::new(O::Horizontal, 4);
+    let buttons = GBox::new(O::Horizontal, SPACE_XS);
     if !in_library {
         let favorite = Button::from_icon_name("starred-symbolic");
         favorite.set_tooltip_text(Some(&tr(MsgKey::add_to_library)));

@@ -16,6 +16,8 @@ use crate::data;
 use crate::screens::dialog_then_named;
 use crate::ui::{boxed_list, column, icon_button, scrolled, screen, DialogButton, Role};
 use crate::watch::bind_watch;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 /// A category write that failed is a toast; the list stays as the database has it.
 fn report<T, E: std::fmt::Display>(result: Result<T, E>) {
@@ -42,7 +44,7 @@ fn duplicate_category() -> String {
 fn name_dialog(dialog: &str, initial: &str, taken: impl Fn(&str) -> bool + 'static, on_ok: impl Fn(String) + 'static) {
     let Some(spec) = screen("categories").dialogs.into_iter().find(|d| d.id == dialog) else { return };
     let labels = if spec.buttons.is_empty() { vec!["Cancel".to_owned(), "OK".to_owned()] } else { spec.buttons.clone() };
-    let body = GBox::new(O::Vertical, 6);
+    let body = GBox::new(O::Vertical, SPACE_S);
     let entry = gtk::Entry::builder().text(initial).activates_default(true).build();
     body.append(&entry);
     let error = Label::builder().css_classes(["error"]).xalign(0.0).wrap(true).visible(false).build();
@@ -141,7 +143,7 @@ impl CategoryList {
             drag.set_actions(gtk::gdk::DragAction::MOVE);
             drag.connect_prepare(move |_, _, _| Some(gtk::gdk::ContentProvider::for_value(&id.to_value())));
             handle.add_controller(drag);
-            let actions = GBox::new(O::Horizontal, 4);
+            let actions = GBox::new(O::Horizontal, SPACE_XS);
             for button in [edit.upcast_ref::<gtk::Widget>(), hide.upcast_ref(), del.upcast_ref()] {
                 actions.append(button);
             }

@@ -12,6 +12,7 @@ use super::grid::{CELL_MARGIN_PX, badge_visible, cell_alpha};
 use super::icons::{ICON_HEIGHT_PX, IconRef, SourceIcon, fallback_glyph, fetch_icon, http_get, icon_cache_root, icon_ref, load_icon, placeholder_rgba};
 use super::listing::ListItem;
 use super::primitives::EmptyAction;
+use crate::theme::tokens::{SPACE_M, SPACE_S, SPACE_XS};
 
 /// The error page of a listing: `widgets::status::error_with` with the buttons of `EmptyAction`, in the order given (icon and
 /// words, so a person who does not know the icon still reads what the button does). `on_action` runs for the button pressed.
@@ -21,7 +22,7 @@ pub fn error_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(Em
         .copied()
         .take(super::primitives::EMPTY_ACTION_LIMIT)
         .map(|action| {
-            let content = GBox::new(O::Horizontal, 6);
+            let content = GBox::new(O::Horizontal, SPACE_S);
             content.append(&Image::from_icon_name(action.icon()));
             content.append(&Label::new(Some(&action.label())));
             let button = Button::new();
@@ -144,7 +145,7 @@ pub fn source_row_with(
         icon_image(icon, icon_file).upcast()
     };
     let notes = [stub.then(|| tr(kuro_i18n::MsgKey::not_installed)), (failing && !stub).then(super::errors::not_working_badge)];
-    let trailing = GBox::new(O::Horizontal, 8);
+    let trailing = GBox::new(O::Horizontal, SPACE_S);
     for note in notes.into_iter().flatten() {
         trailing.append(&Label::builder().label(note).css_classes(["error"]).build());
     }
@@ -274,8 +275,8 @@ fn in_library_badge() -> Label {
     let badge = super::look::badge(&tr(kuro_i18n::MsgKey::in_library), true);
     badge.set_halign(Align::Start);
     badge.set_valign(Align::Start);
-    badge.set_margin_start(4);
-    badge.set_margin_top(4);
+    badge.set_margin_start(SPACE_XS);
+    badge.set_margin_top(SPACE_XS);
     badge
 }
 
@@ -307,7 +308,7 @@ pub fn grid_cell_lines(
     cover_width: i32,
     title_lines: i32,
 ) -> GBox {
-    let cell = GBox::new(O::Vertical, 4);
+    let cell = GBox::new(O::Vertical, SPACE_XS);
     for margin in [GBox::set_margin_start, GBox::set_margin_end, GBox::set_margin_top, GBox::set_margin_bottom] {
         margin(&cell, CELL_MARGIN_PX);
     }
@@ -344,7 +345,7 @@ pub fn grid_cell_lines(
 /// The cell of the list-mode listing, a cell of a `gtk::ListView` (the view's `rich-list` class gives it its insets): a
 /// small cover, the title on one line, and the In library badge at the end for favourites.
 pub fn list_cell(item: Option<&ListItem>, load: &CoverLoader, guard: &CoverGuard) -> GBox {
-    let line = GBox::new(O::Horizontal, 12);
+    let line = GBox::new(O::Horizontal, SPACE_M);
     let Some(item) = item else { return line };
     let size = super::look::SMALL;
     let cover = cover_widget(item, size.width, size.height, load, guard);

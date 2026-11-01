@@ -8,6 +8,7 @@ use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
 use kuro_backup::storage_info::{StorageRow, storage_row_with};
+use crate::theme::tokens::{SPACE_S};
 
 /// `(total, available)` bytes of the file system at `path`, or `None` when GIO cannot tell.
 fn sizes(path: &Path) -> Option<(u64, u64)> {
@@ -30,7 +31,7 @@ pub fn rows() -> Vec<StorageRow> {
 }
 
 fn row_widget(row: &StorageRow) -> gtk::ListBoxRow {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     crate::ui::margins(&column, 12);
     column.append(&gtk::Label::builder().label(row.path.display().to_string()).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::Middle).css_classes(["heading"]).build());
     if let Some(used) = row.used {

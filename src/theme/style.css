@@ -55,10 +55,10 @@ popover.menu > contents {
 }
 
 /* Main window (docs/design/main-window.md): sidebar badge, library header, cards. Theme colours only; the
- * spacing follows library::layout::SPACE_* (4, 8, 12, 16, 24). */
+ * spacing follows theme::tokens::SPACE_* (4, 8, 12, 16, 24). */
 .kb-nav-badge {
   min-width: 12px;
-  padding: 0 7px;
+  padding: 0 6px;
   border-radius: 999px;
   font-size: 0.8em;
   font-weight: 700;
@@ -82,14 +82,6 @@ popover.menu > contents {
    grid lays out the same on every GTK version. */
 gridview box {
   margin: 0;
-}
-/* the theme gives every switch button a 100 px minimum (inside its padding); the Anime | Manga switch then made each header
-   too wide for a small window. The words fit with this padding. */
-stackswitcher > button,
-stackswitcher > button.text-button {
-  min-width: 0;
-  padding-left: 10px;
-  padding-right: 10px;
 }
 /* The narrow window's bottom bar: bare icon buttons, no frame and no fill until hovered, pressed or switched on, so the tab
    buttons show the open tab with the "on" fill. The header's buttons are libadwaita's own (flat, with its hover). */
@@ -126,16 +118,35 @@ button.kb-refreshing image {
 button.kb-spin-once image {
   animation: kb-spin 700ms ease-in-out 1;
 }
+/* a switch button has a wide minimum and padding; the Anime | Manga switch then made each header too wide for a small
+   window (360 px). The words fit in their own width with 10 px on each side. */
+stackswitcher > button,
+stackswitcher > button.text-button {
+  min-width: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+/* A group heading (ui::heading) gets the gap between two groups above it, except the first of a column, which sits at the
+ * column's own top margin like any other first child (the 12 px of SPACE_M; the column's own spacing adds the other 12). */
+.column > .kb-group-heading:not(:first-child) {
+  margin-top: 12px;
+}
+/* The genre chips of an entry page: libadwaita pads every flowbox child by 3 px, which pushed the first chip right of the
+ * description's left edge and made the gaps wider than the flow box's spacing. */
+flowbox.kb-chips > flowboxchild {
+  padding: 0;
+}
 /* the small line under a title: the "nightly" of the panel's title */
 .kb-subtitle {
   font-size: 0.8em;
 }
 .kb-library-grid {
   background: none;
-  padding: 8px 12px;
+  padding: 12px;
 }
+/* one padding on every side, so the gap between two cards is the same across a row and down a column */
 .kb-library-grid > child {
-  padding: 8px 4px 12px 4px;
+  padding: 4px;
   border-radius: 12px;
 }
 .kb-card-cover {
@@ -191,12 +202,6 @@ button.kb-spin-once image {
 }
 .kb-row-cover > .kb-cover-initials-text {
   font-size: 1.1em;
-}
-
-/* The search icon of a search field sits apart from the text, as GTK's own theme draws it. Some themes (Breeze, the
- * KDE default) space the icon of a plain entry but not of a search entry. */
-entry.search > image:first-child {
-  margin-right: 6px;
 }
 
 /* Settings pages (pref_model): the flash of a highlighted row, the error line and the tracker check. */

@@ -23,6 +23,7 @@ use super::migrate_engine::MigratePlan;
 use super::migrate_flags::{self, RunGuard, options, preselected};
 use kuro_platform::kind::Kind;
 use crate::ui::{DialogButton, DialogOpen as _, Role};
+use crate::theme::tokens::{SPACE_S};
 
 /// A button of the dialog, in display order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -191,7 +192,7 @@ fn button_row(widget: &gtk::Widget) -> Option<gtk::Box> {
 /// `saved` is the bitmap the options start from. While a run is going the window refuses to close, so Escape does nothing.
 pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, saved: i32, handlers: MigrateHandlers) -> adw::Dialog {
     let plan = plan(facts, saved);
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let checks: Vec<(u32, gtk::CheckButton)> = plan
         .flags
         .iter()
@@ -204,7 +205,7 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
         .collect();
     match &plan.message {
         Some(message) => {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
             row.append(&gtk::Image::from_icon_name("dialog-error-symbolic"));
             row.append(&gtk::Label::builder().label(message).wrap(true).xalign(0.0).css_classes(["error"]).build());
             body.append(&row);

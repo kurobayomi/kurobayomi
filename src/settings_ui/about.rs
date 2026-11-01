@@ -25,6 +25,7 @@ use crate::settings_ui::changelog;
 use crate::settings_ui::clipboard::copy_to_clipboard;
 use crate::settings_ui::rows::{item, tap_item, text, TapRow};
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 pub fn version_title() -> String {
     tr(MsgKey::ext_info_version)
@@ -87,7 +88,7 @@ fn update_center_row() -> PreferenceItem {
             // the download's bar and its spinner come first, then the buttons
             let bar_spinner = crate::ui::inline_spinner();
             let bar = gtk::ProgressBar::builder().valign(gtk::Align::Center).width_request(120).build();
-            let end = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let end = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
             end.append(&bar_spinner);
             end.append(&bar);
             end.append(&spinner);
@@ -289,7 +290,7 @@ fn run_check(done: impl FnOnce(Result<Outcome, ReleaseError>) + 'static) {
 /// version, the notes (markdown) in a scrolling body, the release page when there is one, and the buttons: `primary` after
 /// Not now, or Close alone. Escape closes it.
 pub fn notes_dialog(heading: &str, version: &str, notes_markdown: &str, link: Option<&str>, primary: Option<DialogButton>) {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let icon = gtk::Image::builder().icon_name("software-update-available-symbolic").pixel_size(48).halign(gtk::Align::Center).build();
     icon.set_accessible_role(gtk::AccessibleRole::Presentation);
     column.append(&icon);
@@ -387,8 +388,10 @@ fn whats_new_row() -> PreferenceItem {
 /// The bottom row of links: the project page and the issue tracker.
 fn links_row() -> PreferenceItem {
     let build: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
-        let bar = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        let bar = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_M);
         bar.set_halign(gtk::Align::Center);
+        // the column's spacing plus this make the 24 px between two groups
+        bar.set_margin_top(SPACE_M);
         for (label, url) in [("GitHub", PROJECT_URL), (&tr(MsgKey::ui_report_an_issue), ISSUES_URL)] {
             let button = gtk::Button::with_label(label);
             button.add_css_class("flat");

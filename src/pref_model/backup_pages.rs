@@ -23,6 +23,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::backup_run::NothingInstalled;
 use crate::screens::Built;
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 /// What starts a run. The app registers it with the adapters over its databases and preferences.
 pub struct BackupHost {
@@ -232,7 +233,7 @@ pub fn restore_page() -> Option<Built> {
     let updating = Rc::new(Cell::new(false));
 
     let column = crate::ui::column();
-    let checking = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let checking = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
     checking.append(&crate::ui::inline_spinner());
     checking.append(&gtk::Label::new(Some(&crate::backup_host::shown(text::CHECKING_BACKUP))));
     column.append(&checking);
@@ -243,10 +244,10 @@ pub fn restore_page() -> Option<Built> {
     // the backup summary sits in a one-row boxed list: the same rounded card as the option lists under it
     let frame = crate::ui::boxed_list();
     frame.append(&gtk::ListBoxRow::builder().child(&card).activatable(false).build());
-    card.set_margin_start(12);
-    card.set_margin_end(12);
-    card.set_margin_top(12);
-    card.set_margin_bottom(12);
+    card.set_margin_start(SPACE_M);
+    card.set_margin_end(SPACE_M);
+    card.set_margin_top(SPACE_M);
+    card.set_margin_bottom(SPACE_M);
     column.append(&frame);
     let options_list = crate::ui::boxed_list();
     let mut checks = Vec::new();

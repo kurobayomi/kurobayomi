@@ -7,6 +7,7 @@ use gtk::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
 use crate::widgets::context_menu::{self, Item};
+use crate::theme::tokens::{SPACE_M};
 
 #[derive(Clone)]
 pub struct TabStrip {
@@ -20,7 +21,7 @@ impl TabStrip {
         // the cards start
         let row = crate::ui::pill_row();
         row.set_margin_start(crate::library::layout::CARD_EDGE);
-        row.set_margin_end(12);
+        row.set_margin_end(SPACE_M);
         let scroller = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Automatic)
             .vscrollbar_policy(gtk::PolicyType::Never)

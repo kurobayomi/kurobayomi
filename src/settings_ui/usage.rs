@@ -7,6 +7,8 @@ use std::time::Duration;
 
 use gtk::gio;
 use gtk::prelude::*;
+use crate::theme::tokens::{SPACE_L, SPACE_M};
+use crate::theme::tokens::{SPACE_S};
 
 /// How long a size query may take before its root shows no bar (T-47b-038).
 pub const SIZE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -92,11 +94,11 @@ pub fn live_rows() -> Vec<(PathBuf, Usage)> {
 }
 
 fn root_widget(root: &Path, usage: &Usage) -> gtk::ListBoxRow {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    column.set_margin_top(12);
-    column.set_margin_bottom(12);
-    column.set_margin_start(16);
-    column.set_margin_end(16);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
+    column.set_margin_top(SPACE_M);
+    column.set_margin_bottom(SPACE_M);
+    column.set_margin_start(SPACE_L);
+    column.set_margin_end(SPACE_L);
     column.append(
         &gtk::Label::builder()
             .label(root.display().to_string())

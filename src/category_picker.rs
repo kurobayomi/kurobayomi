@@ -10,6 +10,7 @@ use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
 use crate::ui::{self, DialogOpen as _};
+use crate::theme::tokens::{SPACE_S, SPACE_XS};
 
 /// The rules behind the rows: their names, how each looks, and what a click does.
 pub trait Pick {
@@ -69,7 +70,7 @@ pub fn open<M: Pick + 'static>(
         let checks: Vec<gtk::CheckButton> = names
             .iter()
             .map(|name| {
-                let check = gtk::CheckButton::builder().label(name).margin_start(8).margin_end(8).margin_top(4).margin_bottom(4).build();
+                let check = gtk::CheckButton::builder().label(name).margin_start(SPACE_S).margin_end(SPACE_S).margin_top(SPACE_XS).margin_bottom(SPACE_XS).build();
                 list.append(&gtk::ListBoxRow::builder().child(&check).build());
                 check
             })

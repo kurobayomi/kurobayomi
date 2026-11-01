@@ -14,6 +14,8 @@ use tokio::sync::watch;
 
 use super::glue::{follow_ready, keep_alive};
 use super::icons::IconCache;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 #[cfg(test)]
 use super::icons::SourceIcon;
 use super::sources::{ListInput, LOCAL_SOURCE_ID, Section, SourceRow, language_line, section_title, source_list};
@@ -179,7 +181,7 @@ impl Inner {
             let icon = state.icons.get(source.id, false, source.is_stub, file.is_some(), source.id == LOCAL_SOURCE_ID);
             (icon, file, home)
         };
-        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_XS);
         if let Some(status) = crate::recipe_sources::status(source.id) {
             actions.append(&status_dot(status));
         }
@@ -217,7 +219,7 @@ fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
         Status::Blocked => ("kb-status-blocked", tr(MsgKey::source_status_blocked)),
         Status::Broken => ("kb-status-broken", tr(MsgKey::source_status_broken)),
     };
-    let dot = gtk::Box::builder().valign(gtk::Align::Center).margin_end(6).css_classes(["kb-status", class]).tooltip_text(&text).build();
+    let dot = gtk::Box::builder().valign(gtk::Align::Center).margin_end(SPACE_S).css_classes(["kb-status", class]).tooltip_text(&text).build();
     dot.update_property(&[gtk::accessible::Property::Label(&text)]);
     dot
 }
