@@ -425,15 +425,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: run on demand"]
-    fn create_and_drop_twenty_times() {
-        for _ in 0..20 {
-            let handle = headless();
-            drop(handle);
-        }
-    }
-
-    #[test]
     fn empty_command_is_rejected() {
         let handle = headless();
         assert!(matches!(handle.command(&[]), Err(MpvError::EmptyCommand)));

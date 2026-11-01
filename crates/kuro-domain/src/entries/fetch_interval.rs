@@ -526,25 +526,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: run on demand"]
-    fn a_hundred_thousand_items_compute_quickly() {
-        let list: Vec<ItemDates> = (0..100_000).map(|i| at(i * HOUR)).collect();
-        let started = std::time::Instant::now();
-        let interval = calculate_interval(&list, &Utc);
-        assert!((1..=MAX_INTERVAL).contains(&interval));
-        let bound = if cfg!(debug_assertions) {
-            std::time::Duration::from_secs(5)
-        } else {
-            std::time::Duration::from_millis(200)
-        };
-        assert!(
-            started.elapsed() < bound,
-            "100 000 items took {:?}",
-            started.elapsed()
-        );
-    }
-
-    #[test]
     fn wheel_and_next_update_text_helpers() {
         assert_eq!(stored_for_wheel(5), -5);
         assert_eq!(

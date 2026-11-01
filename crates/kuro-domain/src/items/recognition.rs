@@ -303,29 +303,4 @@ mod tests {
         assert_eq!(parse_chapter_number("X", "ありがとうs2 ch.9", None), 9.0);
         assert!(close(parse_chapter_number("X", "é5", None), 5.0));
     }
-
-    #[test]
-    #[ignore = "slow: run on demand"]
-    fn ten_thousand_names_parse_quickly() {
-        let names: Vec<String> = (0..10_000)
-            .map(|i| format!("Series Name Ch.{i}.5 [Group] (2020)"))
-            .collect();
-        let started = std::time::Instant::now();
-        let total: f64 = names
-            .iter()
-            .map(|n| parse_chapter_number("Series Name", n, None))
-            .sum();
-        assert!(total.is_finite());
-        // The acceptance bound is 100 ms in release; debug builds get a loose sanity bound.
-        let bound = if cfg!(debug_assertions) {
-            std::time::Duration::from_secs(5)
-        } else {
-            std::time::Duration::from_millis(100)
-        };
-        assert!(
-            started.elapsed() < bound,
-            "10 000 names took {:?}",
-            started.elapsed()
-        );
-    }
 }

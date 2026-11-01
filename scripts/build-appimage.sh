@@ -98,8 +98,8 @@ if [ -n "${FFMPEG_PREFIX:-}" ]; then
 fi
 
 # The GTK plugin's launcher hook forces `GTK_THEME=Adwaita:<light|dark>` (so the app ignores the user's GTK theme) and
-# `GDK_BACKEND=x11` (so it runs through XWayland on a Wayland desktop). Both are removed: the app follows the user's theme
-# and uses the session's own display protocol. The check fails the build if a plugin update brings either line back.
+# `GDK_BACKEND=x11` (so it runs through XWayland on a Wayland desktop). Both are removed: libadwaita draws the app and
+# follows the desktop's light or dark setting itself, and the app uses the session's own display protocol. The check fails the build if a plugin update brings either line back.
 hook="$appdir/apprun-hooks/linuxdeploy-plugin-gtk.sh"
 sed -i -e '/^COLOR_SCHEME=/,/^APPIMAGE_GTK_THEME=/d' -e '/^export GTK_THEME=/d' -e '/^export GDK_BACKEND=/d' "$hook"
 if grep -qE '^export (GTK_THEME|GDK_BACKEND)=|APPIMAGE_GTK_THEME' "$hook"; then

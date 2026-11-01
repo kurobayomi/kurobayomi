@@ -16,7 +16,7 @@
 
 Kurobayomi is a native desktop app, written in Rust with GTK4, that follows the model of
 [Aniyomi](https://github.com/aniyomiorg/aniyomi): a library, a reader, a video player, sources you add yourself, and
-progress tracking. It follows your GTK theme and draws its own icons, so it looks right on any desktop.
+progress tracking. It is built on libadwaita, follows your desktop's light or dark setting and draws its own icons, so it looks the same on any desktop.
 
 The name is *kurobako* (黒箱, "black box") plus *-yomi* ("reading").
 

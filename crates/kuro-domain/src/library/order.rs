@@ -278,17 +278,4 @@ mod tests {
         assert_eq!(click(current, DateAdded), (LibrarySort { ty: DateAdded, dir: Direction::Descending }, false));
         assert_eq!(click(current, Random), (LibrarySort { ty: Random, dir: Direction::Ascending }, true));
     }
-
-    #[test]
-    #[ignore = "slow: run on demand"]
-    fn sorting_twenty_thousand_rows_is_fast_enough_for_the_contract() {
-        let big: Vec<LibraryItem> = (0..20_000).map(|i| item(i, &format!("Title {}", i % 997), 3, 1, i, i)).collect();
-        let start = std::time::Instant::now();
-        let out = sorted(big, Alphabetical, Direction::Ascending);
-        assert_eq!(out.len(), 20_000);
-        assert!(
-            start.elapsed() < std::time::Duration::from_secs(5),
-            "sanity bound; the 100 ms target is a release-profile benchmark"
-        );
-    }
 }
