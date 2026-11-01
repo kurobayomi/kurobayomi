@@ -11,9 +11,9 @@ mod backup_run;
 mod backup_schedule;
 mod bind;
 mod cache_limit;
+mod banner;
 mod category_picker;
 mod duplicate_dialog;
-mod clamp;
 mod cli;
 // the thumbnail renderer is called by the cover loader, which does not exist yet
 mod feed;
@@ -266,7 +266,7 @@ fn build_window(app: &gtk::Application) {
     outer.append(&row);
     outer.append(&bottom);
     // the toast layer sits over the whole window (T-12a-014)
-    let overlay = gtk::Overlay::new();
+    let overlay = adw::ToastOverlay::new();
     overlay.set_child(Some(&outer));
     net_client::set_toaster(toast::attach(&overlay));
     adw::prelude::AdwApplicationWindowExt::set_content(&adw_win, Some(&overlay));

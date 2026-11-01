@@ -70,7 +70,7 @@ pub fn body(tree: &[Preference]) -> Built {
     let scrolled = ScrolledWindow::new();
     scrolled.set_hscrollbar_policy(PolicyType::Never);
     scrolled.set_vexpand(true);
-    scrolled.set_child(Some(&crate::clamp::clamp(&content, PAGE_MAX_WIDTH)));
+    scrolled.set_child(Some(&crate::ui::clamp(&content, PAGE_MAX_WIDTH)));
 
     if let Some(key) = pending {
         let titles: Vec<&str> = targets.iter().map(|(t, _)| t.as_str()).collect();

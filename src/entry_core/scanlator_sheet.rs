@@ -4,11 +4,12 @@
 //! otherwise; OK hands the excluded set back, Cancel and any other way out write nothing. With no scanlators the sheet
 //! says so and offers only Cancel. A stale excluded name (one no chapter has any more) is kept through OK.
 
+use crate::ui::DialogOpen as _;
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
 use crate::ui;
@@ -80,7 +81,7 @@ pub fn open(available: &[String], excluded: &BTreeSet<String>, on_ok: impl Fn(BT
     let title = tr(MsgKey::exclude_scanlators);
     if sheet.borrow().is_empty() {
         col.append(&ui::message(&tr(MsgKey::no_scanlators_found)));
-        ui::dialog(&title, &col, 360, vec![ui::DialogButton::cancel(tr(MsgKey::action_cancel))]).present();
+        ui::dialog(&title, &col, 360, vec![ui::DialogButton::cancel(tr(MsgKey::action_cancel))]).open();
         return;
     }
     let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -134,7 +135,7 @@ pub fn open(available: &[String], excluded: &BTreeSet<String>, on_ok: impl Fn(BT
         ui::DialogButton::cancel(tr(MsgKey::action_cancel)),
         ui::DialogButton::new(tr(MsgKey::action_ok), ui::Role::Suggested, move || on_ok(sheet.borrow().confirm())),
     ];
-    ui::dialog(&title, &col, 360, buttons).present();
+    ui::dialog(&title, &col, 360, buttons).open();
 }
 
 #[cfg(test)]

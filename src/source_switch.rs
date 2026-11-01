@@ -7,11 +7,12 @@
 //! A source is known by its numeric id once it has loaded; `source_keys` remembers which entry each id came from, so a
 //! source that is off now is still recognised by its titles.
 
+use crate::ui::DialogOpen as _;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_extensions::repo::{Entry, Index, Status};
 use kuro_i18n::{Arg, MsgKey, tr, tr_plural, trf};
 use kuro_platform::kind::Kind;
@@ -287,7 +288,7 @@ pub fn confirm_off(key: String, name: &str, done: impl Fn(bool) + 'static) {
     }
     let done = Rc::new(done);
     let (cancelled, confirmed) = (Rc::clone(&done), done);
-    let body = crate::ui::message(&tr_plural(MsgKey::source_switch_off_body, count, &[]));
+    let body = tr_plural(MsgKey::source_switch_off_body, count, &[]);
     let title = trf(MsgKey::source_switch_off_title, &[("source", Arg::Str(name))]);
     let buttons = vec![
         crate::ui::DialogButton::cancel(tr(MsgKey::action_cancel)),
@@ -296,7 +297,7 @@ pub fn confirm_off(key: String, name: &str, done: impl Fn(bool) + 'static) {
             confirmed(true);
         }),
     ];
-    crate::ui::dialog_or_dismiss(&title, &body, 420, buttons, move || cancelled(false)).present();
+    crate::ui::alert(&title, &body, buttons, move || cancelled(false)).open();
 }
 
 /// When source `source_id` is off: shows "This source is off" with a Turn on button, which turns it on and then runs
@@ -376,7 +377,7 @@ pub fn open_picker(link: &str) {
     let window = crate::ui::dialog(&title, &col, 480, vec![crate::ui::DialogButton::new(tr(MsgKey::action_ok), crate::ui::Role::Suggested, || {})]);
     // type to search, as GNOME lists do: typing anywhere in the dialog goes to the search field
     search.set_key_capture_widget(Some(&window));
-    window.present();
+    window.open();
 }
 
 /// What a picker row is found by: the source's name, language, kind and description.

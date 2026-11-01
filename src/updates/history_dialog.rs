@@ -3,7 +3,8 @@
 //! so the remove dialog with its "Reset all" checkbox is built here. Escape closes the dialog. A modal window has no scrim, so a click outside it cannot cancel; the parent window is blocked instead.
 
 
-use gtk::prelude::*;
+use crate::ui::DialogOpen as _;
+use adw::prelude::*;
 use gtk::{Box as GBox, CheckButton, Orientation as O};
 
 use crate::ui::{DialogButton, Role};
@@ -35,9 +36,6 @@ pub fn show(copy: ConfirmCopy, destructive: bool, on_ok: impl Fn(bool) + 'static
         on_ok(check.as_ref().is_some_and(CheckButton::is_active));
     });
     let win = crate::ui::dialog(&copy.title, &col, 420, vec![DialogButton::cancel(&copy.cancel), confirm]);
-    win.connect_close_request(move |_| {
-        on_close();
-        gtk::glib::Propagation::Proceed
-    });
-    win.present();
+    win.connect_closed(move |_| on_close());
+    win.open();
 }

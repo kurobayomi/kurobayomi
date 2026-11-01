@@ -357,12 +357,18 @@ pub(crate) mod alone {
         all
     }
 
-    /// The toast overlay of a test: the label the toast presenter writes to.
-    pub fn toast_label() -> gtk::Label {
-        let overlay = gtk::Overlay::new();
-        crate::toast::attach(&overlay);
-        let revealer = overlay.last_child().and_downcast::<gtk::Revealer>().expect("the toast revealer");
-        revealer.child().and_then(|bar| bar.first_child()).and_downcast::<gtk::Label>().expect("the toast label")
+    /// The toast layer of a test: `text()` is the title of the toast on screen.
+    pub struct ToastText;
+
+    impl ToastText {
+        pub fn text(&self) -> String {
+            crate::toast::current().and_then(|t| t.title()).map(|t| t.to_string()).unwrap_or_default()
+        }
+    }
+
+    pub fn toast_label() -> ToastText {
+        crate::toast::attach(&adw::ToastOverlay::new());
+        ToastText
     }
 }
 

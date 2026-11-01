@@ -4,12 +4,12 @@
 //! `max(number, its progress)`, the tracker's own update moves Plan to Reading and Completed at the known total, and
 //! offline or failed writes go to the retry queue.
 
+use crate::ui::DialogOpen as _;
 use kuro_i18n::{MsgKey, tr};
 use kuro_platform::kind::Kind;
 use kuro_track::policy::{AutoTrackState, MarkReadPlan, auto_update_allowed};
 use kuro_track::prefs::TrackPrefs;
 
-use gtk::prelude::GtkWindowExt;
 
 use super::actions;
 use super::auto_track::{self, Marking};
@@ -63,12 +63,12 @@ pub fn marked(kind: Kind, entry_id: i64, read: bool, numbers: &[f64], incognito:
         MarkReadPlan::Nothing => {}
         MarkReadPlan::Apply { update_to, .. } => send_and_tell(kind, entry_id, update_to),
         MarkReadPlan::Prompt { update_to, banner } => {
-            let body = crate::ui::message(&kuro_track::messages::english(&banner));
+            let body = kuro_track::messages::english(&banner);
             let buttons = vec![
                 crate::ui::DialogButton::cancel(&tr(MsgKey::action_cancel)),
                 crate::ui::DialogButton::new(&tr(MsgKey::ext_update), crate::ui::Role::Suggested, move || send_and_tell(kind, entry_id, update_to)),
             ];
-            crate::ui::dialog(&tr(MsgKey::ui_update_tracker), &body, 360, buttons).present();
+            crate::ui::alert(&tr(MsgKey::ui_update_tracker), &body, buttons, || {}).open();
         }
     }
 }

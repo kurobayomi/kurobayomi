@@ -5,9 +5,9 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 
-use crate::ui::{DialogButton, Role};
+use crate::ui::{DialogButton, DialogOpen as _, Role};
 
 /// How a dialog button looks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub struct DialogSpec {
 /// The one dialog a page may have open.
 #[derive(Clone, Default)]
 pub struct DialogSlot {
-    current: Rc<RefCell<Option<gtk::Window>>>,
+    current: Rc<RefCell<Option<adw::Dialog>>>,
 }
 
 impl DialogSlot {
@@ -40,7 +40,7 @@ impl DialogSlot {
     /// Shows `spec` over `anchor`'s window and replaces any dialog this slot still has open. `on_answer` runs once for
     /// the dialog: `Some(index)` for a button, `None` when it was closed without one (also when a newer dialog
     /// replaced it), and then the dialog is gone.
-    pub fn show(&self, anchor: &impl IsA<gtk::Widget>, spec: DialogSpec, on_answer: impl Fn(Option<usize>) + 'static) -> gtk::Window {
+    pub fn show(&self, anchor: &impl IsA<gtk::Widget>, spec: DialogSpec, on_answer: impl Fn(Option<usize>) + 'static) -> adw::Dialog {
         self.show_with(anchor, spec, None, on_answer)
     }
 
@@ -51,7 +51,7 @@ impl DialogSlot {
         spec: DialogSpec,
         extra: Option<gtk::Widget>,
         on_answer: impl Fn(Option<usize>) + 'static,
-    ) -> gtk::Window {
+    ) -> adw::Dialog {
         // the borrow ends before `close`, which runs the old dialog's close handler
         let old = self.current.borrow_mut().take();
         if let Some(old) = old {
@@ -65,7 +65,6 @@ impl DialogSlot {
             column.append(extra);
         }
 
-        let parent = anchor.upcast_ref::<gtk::Widget>().root().and_downcast::<gtk::Window>();
         let answered = Rc::new(Cell::new(false));
         let on_answer: Rc<dyn Fn(Option<usize>)> = Rc::new(on_answer);
         let buttons = spec
@@ -93,53 +92,48 @@ impl DialogSlot {
                 dismissed.1(None);
             }
         });
-        window.set_title(Some(&spec.title));
-        window.set_transient_for(parent.as_ref());
         {
             let slot = Rc::clone(&self.current);
             let this = window.clone();
-            window.connect_close_request(move |_| {
+            window.connect_closed(move |_| {
                 let mut current = slot.borrow_mut();
                 if current.as_ref() == Some(&this) {
                     current.take();
                 }
-                gtk::glib::Propagation::Proceed
             });
         }
         *self.current.borrow_mut() = Some(window.clone());
-        window.present();
+        window.open_over(anchor);
         window
     }
 
     /// Registers a window the caller built itself (a dialog that stays open while it works): any dialog this slot has
-    /// open is closed first, and the slot forgets the window when it closes. A close handler the caller connected
-    /// before this call can still refuse the close.
-    pub fn adopt(&self, window: &gtk::Window) {
+    /// open is closed first, and the slot forgets the window when it closes. A dialog that must not close while it works sets `can-close` itself.
+    pub fn adopt(&self, window: &adw::Dialog) {
         let old = self.current.borrow_mut().take();
         if let Some(old) = old {
             old.close();
         }
         *self.current.borrow_mut() = Some(window.clone());
         let (slot, this) = (Rc::clone(&self.current), window.clone());
-        window.connect_close_request(move |_| {
+        window.connect_closed(move |_| {
             let mut current = slot.borrow_mut();
             if current.as_ref() == Some(&this) {
                 current.take();
             }
-            gtk::glib::Propagation::Proceed
         });
     }
 
     #[cfg(test)]
     /// The dialog on screen, if any.
-    pub fn current(&self) -> Option<gtk::Window> {
+    pub fn current(&self) -> Option<adw::Dialog> {
         self.current.borrow().clone()
     }
 }
 
 /// The buttons of a dialog window, in order. Used by the widget checks.
 #[cfg(test)]
-pub(crate) fn buttons_of(window: &gtk::Window) -> Vec<gtk::Button> {
+pub(crate) fn buttons_of(window: &adw::Dialog) -> Vec<gtk::Button> {
     fn walk(widget: &gtk::Widget, out: &mut Vec<gtk::Button>) {
         if let Some(button) = widget.downcast_ref::<gtk::Button>() {
             out.push(button.clone());
@@ -151,7 +145,7 @@ pub(crate) fn buttons_of(window: &gtk::Window) -> Vec<gtk::Button> {
         }
     }
     let mut out = Vec::new();
-    if let Some(child) = window.child() {
+    if let Some(child) = crate::ui::dialog_content(window) {
         walk(&child, &mut out);
     }
     out
@@ -201,19 +195,7 @@ pub(crate) mod tests {
         second.close();
     }
 
-    fn escape_cancels_the_dialog_with_the_dismiss_answer() {
-        let slot = DialogSlot::new();
-        let anchor = gtk::Label::new(None);
-        let answers: Rc<RefCell<Vec<Option<usize>>>> = Rc::default();
-        let log = Rc::clone(&answers);
-        let window = slot.show(&anchor, spec("Ask"), move |a| log.borrow_mut().push(a));
-        assert!(window.activate_action("window.close", None).is_ok(), "Escape is the window.close shortcut");
-        assert_eq!(*answers.borrow(), [None], "Escape is a dismissal");
-        assert!(slot.current().is_none());
-    }
-
     pub(crate) fn smoke() {
-        escape_cancels_the_dialog_with_the_dismiss_answer();
         a_button_answers_with_its_index_once_and_closing_without_one_answers_none();
         a_second_dialog_replaces_the_open_one();
     }

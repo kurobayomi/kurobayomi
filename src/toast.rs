@@ -1,51 +1,46 @@
 //! The app's one notification bar (T-12a-014 presenter). `kuro_platform::toast` queues the messages; this shows them one
-//! at a time at the bottom centre of the main window, each for its length, in GTK's own `app-notification` style. The
-//! entry pages' Undo and Retry prompts use it too (`entry_core::message::Notice`). GTK objects stay on the main thread.
+//! at a time at the bottom centre of the main window, each for its length, as `adw::Toast`s of one `adw::ToastOverlay`.
+//! The entry pages' Undo and Retry prompts use it too (`entry_core::message::Notice`). GTK objects stay on the main thread.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use adw::prelude::*;
 use gtk::glib;
-use gtk::prelude::*;
 use kuro_platform::toast::{ToastFeed, Toaster, toast_channel};
 
-// A new message replaces the one on screen. Clicking the toast or pressing Escape dismisses it.
+// A new message replaces the one on screen (the old toast is dismissed first). The toast's close button or Escape
+// dismisses it.
 //
-// Manual verification (no display in CI): the toast never takes keyboard focus. The label is neither
-// focusable nor focus-targetable and the Escape handler is a capture-phase controller that grabs nothing, so
-// with a text entry focused, showing a toast leaves the caret in the entry and typing still goes to it.
+// Manual verification (no display in CI): the toast never takes keyboard focus. The Escape handler is a capture-phase
+// controller that grabs nothing, so with a text entry focused, showing a toast leaves the caret in the entry.
 
 static GLOBAL: std::sync::OnceLock<Toaster> = std::sync::OnceLock::new();
 
-thread_local! {
-    /// The overlay that [`busy`] adds its spinner card to (set by [`attach`]).
-    static OVERLAY: std::cell::RefCell<Option<gtk::Overlay>> = const { std::cell::RefCell::new(None) };
-}
-
-/// A centred spinner card with `text` over the main window until the returned guard is dropped: the "Loading..."
+/// A toast that shows a spinner and `text` over the main window until the returned guard is dropped: the "Loading..."
 /// state of an action that waits for the network. Without an overlay (tests without a window) it does nothing.
 pub fn busy(text: &str) -> Busy {
-    let card = OVERLAY.with(|o| o.borrow().clone()).map(|overlay| {
-        let spinner = gtk::Spinner::builder().spinning(true).width_request(32).height_request(32).build();
+    let toast = LAYER.with(|l| l.borrow().clone()).map(|layer| {
+        let spinner = gtk::Spinner::builder().spinning(true).width_request(24).height_request(24).build();
         let label = gtk::Label::new(Some(text));
-        let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(12).margin_top(14).margin_bottom(14).margin_start(18).margin_end(18).build();
+        let row = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(12).build();
         row.append(&spinner);
         row.append(&label);
-        let card = gtk::Frame::builder().child(&row).halign(gtk::Align::Center).valign(gtk::Align::Center).css_classes(["app-notification", "osd"]).can_target(false).build();
-        overlay.add_overlay(&card);
-        (overlay, card)
+        let toast = adw::Toast::builder().custom_title(&row).timeout(0).build();
+        layer.overlay.add_toast(toast.clone());
+        toast
     });
-    Busy(card)
+    Busy(toast)
 }
 
-/// Removes the spinner card of [`busy`] when dropped.
-pub struct Busy(Option<(gtk::Overlay, gtk::Frame)>);
+/// Dismisses the toast of [`busy`] when dropped.
+pub struct Busy(Option<adw::Toast>);
 
 impl Drop for Busy {
     fn drop(&mut self) {
-        if let Some((overlay, card)) = self.0.take() {
-            overlay.remove_overlay(&card);
+        if let Some(toast) = self.0.take() {
+            toast.dismiss();
         }
     }
 }
@@ -57,17 +52,11 @@ pub fn notify(text: impl Into<String>) {
     }
 }
 
-/// The toast layer: a label and an action button in one bar, shown by [`Layer::show`]. One per window ([`attach`]).
+/// The toast layer: the overlay and the toast on screen. One per window ([`attach`]).
 struct Layer {
-    label: gtk::Label,
-    action: gtk::Button,
-    /// Dismisses a toast that waits for its action; a plain toast times out or is dismissed with a click.
-    close: gtk::Button,
-    /// What the action button runs now; replaced with each toast.
-    on_action: RefCell<Option<Rc<dyn Fn()>>>,
-    revealer: gtk::Revealer,
-    /// Counts shown toasts; a timer only hides the toast it was started for.
-    generation: Cell<u64>,
+    overlay: adw::ToastOverlay,
+    /// The plain toast or prompt shown last; a new one dismisses it first.
+    current: RefCell<Option<adw::Toast>>,
 }
 
 thread_local! {
@@ -76,39 +65,42 @@ thread_local! {
 
 impl Layer {
     fn dismiss(&self) {
-        self.generation.set(self.generation.get() + 1);
-        self.revealer.set_reveal_child(false);
+        // the borrow ends before `dismiss`, whose `dismissed` signal reads `current`
+        let old = self.current.borrow_mut().take();
+        if let Some(toast) = old {
+            toast.dismiss();
+        }
     }
 
     /// Shows `text`, replacing the toast on screen. `duration` None keeps it until dismissed or replaced.
     fn show(self: &Rc<Self>, text: &str, duration: Option<Duration>, action: Option<(&str, Rc<dyn Fn()>)>) {
-        let mine = self.generation.get() + 1;
-        self.generation.set(mine);
-        self.label.set_text(text);
-        match action {
-            Some((label, run)) => {
-                self.action.set_label(label);
-                self.action.set_visible(true);
-                self.close.set_visible(true);
-                *self.on_action.borrow_mut() = Some(run);
-            }
-            None => {
-                self.action.set_visible(false);
-                self.close.set_visible(false);
-                *self.on_action.borrow_mut() = None;
-            }
-        }
-        self.revealer.set_reveal_child(true);
-        if let Some(duration) = duration {
+        self.dismiss();
+        let secs = duration.map_or(0, |d| d.as_millis().div_ceil(1000).max(1) as u32);
+        let toast = adw::Toast::builder().title(text).use_markup(false).timeout(secs).build();
+        if let Some((label, run)) = action {
+            toast.set_button_label(Some(label));
             let this = Rc::downgrade(self);
-            glib::timeout_add_local_once(duration, move || {
+            toast.connect_button_clicked(move |t| {
                 if let Some(this) = this.upgrade() {
-                    if this.generation.get() == mine {
-                        this.revealer.set_reveal_child(false);
+                    let mine = this.current.borrow().as_ref() == Some(t);
+                    if mine {
+                        this.current.borrow_mut().take();
                     }
                 }
+                run();
             });
         }
+        let this = Rc::downgrade(self);
+        toast.connect_dismissed(move |t| {
+            if let Some(this) = this.upgrade() {
+                let mine = this.current.borrow().as_ref() == Some(t);
+                if mine {
+                    this.current.borrow_mut().take();
+                }
+            }
+        });
+        *self.current.borrow_mut() = Some(toast.clone());
+        self.overlay.add_toast(toast);
     }
 }
 
@@ -123,7 +115,7 @@ pub fn notify_for(text: &str, duration: Duration) {
 }
 
 /// A toast with one action button (Undo, Retry): `run` runs when it is pressed, and the toast goes away. `duration`
-/// None keeps the toast until the user dismisses it (a click on the text or Escape) or another toast replaces it.
+/// None keeps the toast until the user dismisses it (its close button or Escape) or another toast replaces it.
 /// Must run on the GTK main thread; dropped when no layer is attached.
 pub fn notify_action(text: &str, action_label: &str, duration: Option<Duration>, run: impl Fn() + 'static) {
     if let Some(layer) = LAYER.with(|l| l.borrow().clone()) {
@@ -132,56 +124,18 @@ pub fn notify_action(text: &str, action_label: &str, duration: Option<Duration>,
     }
 }
 
-/// Adds the toast layer to `overlay` and starts the presenter on the main context. Returns the sender that
-/// producers use. Call once, from the GTK main thread.
-pub fn attach(overlay: &gtk::Overlay) -> Toaster {
+/// Starts the toast presenter on `overlay` (the main window's `adw::ToastOverlay`) and on the main context. Returns the
+/// sender that producers use. Call once, from the GTK main thread.
+pub fn attach(overlay: &adw::ToastOverlay) -> Toaster {
     let (toaster, feed) = toast_channel();
-    let label = gtk::Label::builder().wrap(true).max_width_chars(60).hexpand(true).xalign(0.0).focusable(false).can_focus(false).build();
-    let action = gtk::Button::builder().css_classes(["flat"]).visible(false).focusable(false).can_focus(false).focus_on_click(false).build();
-    let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["flat"]).visible(false).focusable(false).can_focus(false).focus_on_click(false).build();
-    let bar = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(6).css_classes(["app-notification", "osd"]).margin_bottom(24).margin_start(12).margin_end(12).build();
-    bar.append(&label);
-    bar.append(&action);
-    bar.append(&close);
-    let revealer = gtk::Revealer::builder()
-        .child(&bar)
-        .halign(gtk::Align::Center)
-        .valign(gtk::Align::End)
-        .transition_type(gtk::RevealerTransitionType::SlideUp)
-        .focusable(false)
-        .can_focus(false)
-        .build();
-    let layer = Rc::new(Layer { label: label.clone(), action: action.clone(), close: close.clone(), on_action: RefCell::new(None), revealer: revealer.clone(), generation: Cell::new(0) });
-
-    let click = gtk::GestureClick::new();
-    click.connect_pressed({
-        let layer = layer.clone();
-        move |_, _, _, _| layer.dismiss()
-    });
-    label.add_controller(click);
-
-    action.connect_clicked({
-        let layer = layer.clone();
-        move |_| {
-            let run = layer.on_action.borrow_mut().take();
-            layer.dismiss();
-            if let Some(run) = run {
-                run();
-            }
-        }
-    });
-
-    close.connect_clicked({
-        let layer = layer.clone();
-        move |_| layer.dismiss()
-    });
+    let layer = Rc::new(Layer { overlay: overlay.clone(), current: RefCell::new(None) });
 
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     keys.connect_key_pressed({
         let layer = layer.clone();
         move |_, key, _, _| {
-            if key == gtk::gdk::Key::Escape && layer.revealer.reveals_child() {
+            if key == gtk::gdk::Key::Escape && layer.current.borrow().is_some() {
                 layer.dismiss();
                 glib::Propagation::Stop
             } else {
@@ -191,8 +145,6 @@ pub fn attach(overlay: &gtk::Overlay) -> Toaster {
     });
     overlay.add_controller(keys);
 
-    overlay.add_overlay(&revealer);
-    OVERLAY.with(|o| *o.borrow_mut() = Some(overlay.clone()));
     LAYER.with(|l| *l.borrow_mut() = Some(layer.clone()));
     glib::spawn_future_local(present(feed, layer, toaster.clone()));
     let _ = GLOBAL.set(toaster.clone());
@@ -208,25 +160,17 @@ async fn present(feed: ToastFeed, layer: Rc<Layer>, keep_open: Toaster) {
     drop(keep_open);
 }
 
+/// The toast on screen, for tests.
+#[cfg(test)]
+pub(crate) fn current() -> Option<adw::Toast> {
+    LAYER.with(|l| l.borrow().clone()).and_then(|layer| layer.current.borrow().clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use kuro_platform::toast::ToastLength;
-
-    /// The first widget below `root` that is a `T`.
-    fn find<T: IsA<gtk::Widget>>(root: &gtk::Widget) -> Option<T> {
-        if let Some(found) = root.downcast_ref::<T>() {
-            return Some(found.clone());
-        }
-        let mut child = root.first_child();
-        while let Some(c) = child {
-            if let Some(found) = find::<T>(&c) {
-                return Some(found);
-            }
-            child = c.next_sibling();
-        }
-        None
-    }
+    use std::cell::Cell;
 
     fn pump(ms: u64) {
         let until = std::time::Instant::now() + std::time::Duration::from_millis(ms);
@@ -236,76 +180,77 @@ mod tests {
         }
     }
 
-    // T-47b-052, E73: one toast at a time in a Revealer over the overlay; a new one replaces the visible one and
-    // the last one hides after its 2 s. No libadwaita widget is involved.
+    fn title() -> Option<String> {
+        current().and_then(|t| t.title()).map(|t| t.to_string())
+    }
+
+    // T-47b-052, E73: one toast at a time in an adw::ToastOverlay; a new one replaces the visible one and the last one
+    // times out after its 2 s.
     #[test]
-    fn a_new_toast_replaces_the_visible_one_and_the_last_hides_after_two_seconds() {
+    fn a_new_toast_replaces_the_visible_one_and_the_last_times_out_after_two_seconds() {
         crate::testing::with_display(|| {
             assert_eq!(ToastLength::Short.duration(), std::time::Duration::from_secs(2));
-            let overlay = gtk::Overlay::new();
+            let overlay = adw::ToastOverlay::new();
             let toaster = attach(&overlay);
-            let revealer: gtk::Revealer = find(overlay.upcast_ref()).expect("the toast revealer");
-            let label: gtk::Label = find(revealer.upcast_ref()).expect("the toast label");
-            assert!(!revealer.reveals_child(), "nothing shows before the first toast");
-            assert_eq!(revealer.halign(), gtk::Align::Center);
-            assert_eq!(revealer.valign(), gtk::Align::End, "bottom centre");
+            assert!(current().is_none(), "nothing shows before the first toast");
 
             toaster.show("first", ToastLength::Short);
-            pump(1000);
-            assert!(revealer.reveals_child());
-            assert_eq!(label.text(), "first");
+            pump(300);
+            assert_eq!(title().as_deref(), Some("first"));
+            assert_eq!(current().expect("toast").timeout(), 2);
             toaster.show("second", ToastLength::Short);
             pump(100);
-            assert_eq!(label.text(), "second", "a new toast replaces the visible one");
+            assert_eq!(title().as_deref(), Some("second"), "a new toast replaces the visible one");
 
-            // the first toast's 2 s run out here; they must not hide the second one
-            pump(1200);
-            assert!(revealer.reveals_child(), "the first toast's timer does not hide the second");
-            pump(1200);
-            assert!(!revealer.reveals_child(), "hidden 2 s after the last toast");
+            // the first toast was dismissed; it must not clear the second one
+            pump(1000);
+            assert_eq!(title().as_deref(), Some("second"));
+            pump(2500);
+            assert!(current().is_none(), "gone 2 s after the last toast");
         });
     }
 
-    // One notification bar for the whole app: GTK's own `app-notification` look, centred at the bottom, and the entry
-    // pages' Undo and Retry prompts go through it. A prompt shows its button and a close button; pressing the button
-    // runs it once and hides the bar; a new toast replaces it.
+    // The entry pages' Undo and Retry prompts go through the same layer. A prompt has its button; pressing it runs it
+    // once and clears the toast; a new toast replaces the prompt.
     #[test]
-    fn the_one_layer_is_app_notification_styled_and_runs_an_action_once() {
+    fn a_prompt_runs_its_action_once_and_a_new_toast_replaces_it() {
         crate::testing::with_display(|| {
-            let overlay = gtk::Overlay::new();
+            let overlay = adw::ToastOverlay::new();
             attach(&overlay);
-            let revealer: gtk::Revealer = find(overlay.upcast_ref()).expect("the toast revealer");
-            let bar = revealer.child().expect("the bar");
-            assert!(bar.has_css_class("app-notification"), "GTK's own notification style");
-            let buttons: Vec<gtk::Button> = {
-                let mut out = Vec::new();
-                let mut child = bar.first_child();
-                while let Some(c) = child {
-                    out.extend(c.downcast_ref::<gtk::Button>().cloned());
-                    child = c.next_sibling();
-                }
-                out
-            };
-            let (action, close) = (&buttons[0], &buttons[1]);
-            assert!(!action.is_visible() && !close.is_visible(), "a plain toast has no buttons");
+            notify_for("plain", Duration::from_secs(2));
+            assert_eq!(current().expect("toast").button_label(), None, "a plain toast has no button");
 
             let runs = Rc::new(Cell::new(0));
             let count = Rc::clone(&runs);
             notify_action("Delete downloaded chapters?", "Delete", None, move || count.set(count.get() + 1));
-            assert!(revealer.reveals_child() && action.is_visible() && close.is_visible());
-            assert_eq!(action.label().as_deref(), Some("Delete"));
-            action.emit_clicked();
+            let toast = current().expect("the prompt");
+            assert_eq!(toast.button_label().as_deref(), Some("Delete"));
+            assert_eq!(toast.timeout(), 0, "a prompt without a duration stays until dismissed");
+            toast.emit_by_name::<()>("button-clicked", &[]);
             assert_eq!(runs.get(), 1);
-            assert!(!revealer.reveals_child(), "the action hides the bar");
-            action.emit_clicked();
-            assert_eq!(runs.get(), 1, "and it runs once");
+            assert!(current().is_none(), "the action clears the toast");
 
             notify_action("Retry?", "Retry", None, || {});
             notify_for("plain", Duration::from_secs(2));
-            assert!(!action.is_visible(), "a new toast replaces the prompt and its button");
-            notify_action("Retry?", "Retry", None, || {});
-            close.emit_clicked();
-            assert!(!revealer.reveals_child(), "the close button dismisses a prompt");
+            assert_eq!(current().expect("toast").button_label(), None, "a new toast replaces the prompt and its button");
+        });
+    }
+
+    // busy() adds a toast with a spinner and dismisses it when the guard drops.
+    #[test]
+    fn busy_holds_a_spinner_toast_until_dropped() {
+        crate::testing::with_display(|| {
+            let overlay = adw::ToastOverlay::new();
+            attach(&overlay);
+            let guard = busy("Loading");
+            let toast = guard.0.clone().expect("the busy toast");
+            assert!(toast.custom_title().is_some() && toast.timeout() == 0);
+            let dismissed = Rc::new(Cell::new(false));
+            let flag = Rc::clone(&dismissed);
+            toast.connect_dismissed(move |_| flag.set(true));
+            drop(guard);
+            pump(500);
+            assert!(dismissed.get(), "dropping the guard dismisses the toast");
         });
     }
 }

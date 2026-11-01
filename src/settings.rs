@@ -1,4 +1,5 @@
 // Settings pages that are not plain preference lists (the main list and shell are in pref_model).
+use crate::ui::DialogOpen as _;
 use kuro_i18n::{MsgKey, tr};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -177,7 +178,7 @@ fn after_clear(_kind: Kind, removed: usize) {
         });
     });
     let body = crate::ui::message(&tr(MsgKey::ui_this_can_take_a_while_the_app_stays_usable_b));
-    crate::ui::dialog(&tr(MsgKey::ui_compact_the_database_to_free_the_space), &body, 420, vec![DialogButton::cancel(&tr(MsgKey::action_not_now)), compact]).present();
+    crate::ui::dialog(&tr(MsgKey::ui_compact_the_database_to_free_the_space), &body, 420, vec![DialogButton::cancel(&tr(MsgKey::action_not_now)), compact]).open();
 }
 
 /// Advanced > "Clear WebView data" (T-12a-034): the toast text for the outcome of `clear_data`.

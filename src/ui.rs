@@ -2,7 +2,7 @@
 use kuro_i18n::{MsgKey, tr};
 use crate::spec::{value_str, Dialog, Group, Item, Screen, Sheet, Spec};
 use adw::prelude::NavigationPageExt;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{glib, Align, Box as GBox, Button, Label, ListBox, Orientation as O};
 use std::cell::OnceCell;
 use std::rc::Rc;
@@ -460,7 +460,10 @@ pub fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
     gtk::ScrolledWindow::builder().child(&child).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build()
 }
 
-pub use crate::clamp::clamp;
+/// `child` at most `max` px wide, centred; narrower windows shrink it down to its own minimum.
+pub fn clamp(child: &impl IsA<gtk::Widget>, max: i32) -> adw::Clamp {
+    adw::Clamp::builder().maximum_size(max).tightening_threshold(max).child(child).build()
+}
 
 /// The row of buttons at the top of a page, under its header: choices (the library's categories) or actions (Resume and
 /// Clear of the download queue). One spacing and one top margin, so every page's top row looks the same; the caller sets
@@ -1138,21 +1141,46 @@ pub fn groups_into(col: &GBox, groups: &[Group]) {
 
 // ---------- sheets & dialogs ----------
 
-pub fn modal(title: &gtk::Widget, content: &impl IsA<gtk::Widget>, w: i32, h: i32) -> gtk::Window {
+/// Opens an `adw::Dialog` over the main window, or over the widget the caller names.
+pub trait DialogOpen {
+    fn open(&self);
+    fn open_over(&self, parent: &impl IsA<gtk::Widget>);
+}
+
+impl<T: IsA<adw::Dialog>> DialogOpen for T {
+    fn open(&self) {
+        match window_opt() {
+            Some(win) => self.open_over(&win),
+            None => self.upcast_ref::<adw::Dialog>().present(None::<&gtk::Widget>),
+        }
+    }
+
+    fn open_over(&self, parent: &impl IsA<gtk::Widget>) {
+        match parent.root() {
+            Some(root) => self.upcast_ref::<adw::Dialog>().present(Some(root.upcast_ref::<gtk::Widget>())),
+            None => self.open(),
+        }
+    }
+}
+
+/// The `content` that [`modal`] put under the header of `dialog`.
+pub fn dialog_content(dialog: &adw::Dialog) -> Option<gtk::Widget> {
+    dialog.child()?.downcast::<adw::ToolbarView>().ok()?.content()
+}
+
+/// A content dialog: `content` under a header bar that carries `title`, `w` px wide and `h` px tall (`h` below 1 follows
+/// the content). Escape and the header's close button close it. Open it with [`DialogOpen::open`].
+pub fn modal(title: &gtk::Widget, content: &impl IsA<gtk::Widget>, w: i32, h: i32) -> adw::Dialog {
     let header = adw::HeaderBar::new();
-    header.set_decoration_layout(Some(&decoration(false)));
     header.set_title_widget(Some(title));
-    let win = gtk::Window::builder()
-        .transient_for(&window())
-        .modal(true)
-        .default_width(w)
-        .default_height(h)
-        .titlebar(&header)
-        .child(content)
-        .build();
-    // the 1px outline of `style.css`, so the dialog's edge shows over a dark window behind it
-    win.add_css_class("kb-dialog");
-    win
+    let toolbar = adw::ToolbarView::new();
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(content));
+    let dialog = adw::Dialog::builder().content_width(w).child(&toolbar).build();
+    if h > 0 {
+        dialog.set_content_height(h);
+    }
+    dialog
 }
 
 pub fn show_sheet(sheet: &Sheet) {
@@ -1167,7 +1195,7 @@ pub fn show_sheet(sheet: &Sheet) {
     } else {
         Label::builder().label(crate::spec::shown(&sheet.title)).css_classes(["title"]).build().upcast()
     };
-    modal(&title, &stack, 520, 620).present();
+    modal(&title, &stack, 520, 620).open();
 }
 
 pub fn show_dialog(d: &Dialog) {
@@ -1212,16 +1240,16 @@ impl DialogButton {
     }
 }
 
-/// The one dialog of the app: a title bar, `body` with the standard margins (it scrolls once it is taller than the
-/// screen allows), and the buttons in a row at the bottom right. The window is as tall as its content, the main button
+/// The one content dialog of the app (`adw::Dialog`): a header bar, `body` with the standard margins (it scrolls once it is taller than the
+/// screen allows), and the buttons in a row at the bottom right. The dialog is as tall as its content, the main button
 /// is the default (Enter), and Escape closes it. Every dialog is built here, so they all look and behave the same.
-pub fn dialog(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>) -> gtk::Window {
+pub fn dialog(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>) -> adw::Dialog {
     dialog_or_dismiss(title, body, width, buttons, || {})
 }
 
 /// [`dialog`] that runs `on_dismiss` once when it closes any way other than through a button that is not a Cancel
 /// button: Escape, the close button or Cancel.
-pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> gtk::Window {
+pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> adw::Dialog {
     let answered = Rc::new(std::cell::Cell::new(false));
     let col = GBox::new(O::Vertical, 12);
     margins(&col, 18);
@@ -1231,7 +1259,7 @@ pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, 
     row.set_margin_top(6);
     col.append(&row);
     let win = modal(&Label::builder().label(title).css_classes(["title"]).build().upcast(), &scrolled_max(&col, 560), width, -1);
-    win.set_resizable(false);
+    win.set_title(title);
     for b in buttons {
         let button = Button::with_label(&b.label);
         match b.role {
@@ -1251,16 +1279,49 @@ pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, 
         });
         row.append(&button);
     }
-    let escape = gtk::ShortcutController::new();
-    escape.add_shortcut(gtk::Shortcut::new(gtk::ShortcutTrigger::parse_string("Escape"), Some(gtk::NamedAction::new("window.close"))));
-    win.add_controller(escape);
-    win.connect_close_request(move |_| {
+    win.connect_closed(move |_| {
         if !answered.get() {
             on_dismiss();
         }
-        glib::Propagation::Proceed
     });
     win
+}
+
+/// A confirm dialog of text (`adw::AlertDialog`): `heading`, one paragraph and one response per button, in the order
+/// given. The main button (`Suggested` or `Destructive`) is the default, Escape counts as the Cancel button, and
+/// `on_dismiss` runs once when it closes any way other than through a button that is not a Cancel button. A button's
+/// `run` result is ignored: an alert always closes (use [`dialog`] for a button that keeps its dialog open).
+pub fn alert(heading: &str, text: &str, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> adw::AlertDialog {
+    let dialog = adw::AlertDialog::builder().heading(heading).body(text).build();
+    let mut actions = Vec::new();
+    for (i, b) in buttons.into_iter().enumerate() {
+        let id = i.to_string();
+        dialog.add_response(&id, &b.label);
+        match b.role {
+            Role::Normal => {}
+            Role::Suggested => {
+                dialog.set_response_appearance(&id, adw::ResponseAppearance::Suggested);
+                dialog.set_default_response(Some(&id));
+            }
+            Role::Destructive => {
+                dialog.set_response_appearance(&id, adw::ResponseAppearance::Destructive);
+                dialog.set_default_response(Some(&id));
+            }
+        }
+        if b.dismisses {
+            dialog.set_close_response(&id);
+        }
+        actions.push((b.run, b.dismisses));
+    }
+    dialog.connect_response(None, move |_, id| {
+        match id.parse::<usize>().ok().and_then(|i| actions.get(i)) {
+            Some((run, false)) => {
+                run();
+            }
+            _ => on_dismiss(),
+        }
+    });
+    dialog
 }
 
 /// A dialog of text: [`dialog`] with one wrapped paragraph as its body.
@@ -1291,7 +1352,7 @@ pub fn show_dialog_then(d: &Dialog, on_ok: impl Fn() + 'static) {
             DialogButton::new(&crate::spec::shown(l), role, move || on_ok())
         })
         .collect();
-    dialog(&crate::spec::shown(&d.title), &body, 420, buttons).present();
+    dialog(&crate::spec::shown(&d.title), &body, 420, buttons).open();
 }
 
 fn norm(s: &str) -> String {
@@ -1480,6 +1541,14 @@ mod tests {
     }
 
     /// Every widget at or below `root`.
+    /// Lets the main loop run, so a closing dialog finishes its animation and reports `closed`.
+    fn pump_until_closed() {
+        let until = std::time::Instant::now() + std::time::Duration::from_millis(600);
+        while std::time::Instant::now() < until {
+            glib::MainContext::default().iteration(false);
+        }
+    }
+
     fn all(root: &gtk::Widget, out: &mut Vec<gtk::Widget>) {
         out.push(root.clone());
         let mut child = root.first_child();
@@ -1505,16 +1574,15 @@ mod tests {
                 let buttons = vec![DialogButton::cancel("Cancel"), DialogButton::new("Add", Role::Suggested, move || ran.set(ran.get() + 1))];
                 dialog_or_dismiss("Add category", &message("Body"), 380, buttons, move || dismissed.set(dismissed.get() + 1))
             };
-            let buttons_of = |win: &gtk::Window| {
+            let buttons_of = |win: &adw::Dialog| {
                 let mut found = Vec::new();
-                all(win.upcast_ref(), &mut found);
+                all(&dialog_content(win).expect("content"), &mut found);
                 found.into_iter().filter_map(|w| w.downcast::<Button>().ok()).filter(|b| b.label().is_some()).collect::<Vec<_>>()
             };
 
-            // a window that was never shown has nothing to close, so each one is presented like the app does
+            // a dialog that was never shown has nothing to close, so each one is opened like the app does
             let win = open();
-            win.present();
-            assert!(!win.is_resizable() && win.is_modal());
+            win.open();
             let buttons = buttons_of(&win);
             assert_eq!(buttons.iter().map(|b| b.label().unwrap().to_string()).collect::<Vec<_>>(), ["Cancel", "Add"]);
             assert!(buttons[1].has_css_class("suggested-action"));
@@ -1523,13 +1591,15 @@ mod tests {
             assert_eq!((ran.get(), dismissed.get()), (1, 0), "the answer runs and is not a dismiss");
 
             let win = open();
-            win.present();
+            win.open();
             buttons_of(&win)[0].emit_clicked();
+            pump_until_closed();
             assert_eq!((ran.get(), dismissed.get()), (1, 1), "Cancel dismisses");
 
             let win = open();
-            win.present();
+            win.open();
             win.close();
+            pump_until_closed();
             assert_eq!((ran.get(), dismissed.get()), (1, 2), "the close button dismisses");
         });
     }

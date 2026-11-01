@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
 /// How often the sources of the banner state are read.
@@ -44,31 +44,30 @@ impl BannerKind {
     }
 }
 
-/// One revealer per banner. `update` shows and hides them; the reveal is an animated slide, so the banner is visible
-/// on the frame after the state changes.
+/// One `adw::Banner` per banner. `update` reveals and hides them; the reveal is an animated slide, so the banner is
+/// visible on the frame after the state changes.
 pub struct Banners {
     pub widget: gtk::Box,
-    revealers: Vec<(BannerKind, gtk::Revealer)>,
+    banners: Vec<(BannerKind, adw::Banner)>,
 }
 
 impl Banners {
     pub fn new() -> Self {
         let widget = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        let revealers = BannerKind::ALL
+        let banners = BannerKind::ALL
             .into_iter()
             .map(|kind| {
-                let label = gtk::Label::builder().label(kind.text()).css_classes(["kb-banner"]).hexpand(true).build();
-                let revealer = gtk::Revealer::builder().transition_type(gtk::RevealerTransitionType::SlideDown).child(&label).build();
-                widget.append(&revealer);
-                (kind, revealer)
+                let banner = crate::banner::new(&kind.text());
+                widget.append(&banner);
+                (kind, banner)
             })
             .collect();
-        Self { widget, revealers }
+        Self { widget, banners }
     }
 
     pub fn update(&self, state: BannerState) {
-        for (kind, revealer) in &self.revealers {
-            revealer.set_reveal_child(kind.on(state));
+        for (kind, banner) in &self.banners {
+            banner.set_revealed(kind.on(state));
         }
     }
 }

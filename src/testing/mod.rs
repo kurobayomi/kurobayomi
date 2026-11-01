@@ -90,15 +90,17 @@ pub fn nav() -> (adw::NavigationView, gtk::ApplicationWindow) {
     use gtk::prelude::*;
 
     thread_local! {
-        static NAV: (gtk::Application, gtk::ApplicationWindow, adw::NavigationView) = {
-            let app = gtk::Application::builder()
+        static NAV: (adw::Application, gtk::ApplicationWindow, adw::NavigationView) = {
+            let app = adw::Application::builder()
                 .application_id("io.github.anas1412.KurobayomiTest")
                 .flags(gtk::gio::ApplicationFlags::NON_UNIQUE)
                 .build();
             app.register(gtk::gio::Cancellable::NONE).expect("register the test application");
-            let window = gtk::ApplicationWindow::new(&app);
+            // an `adw::ApplicationWindow`, as the app's: dialogs open inside it
+            let adw_window = adw::ApplicationWindow::new(&app);
             let nav = adw::NavigationView::new();
-            window.set_child(Some(&nav));
+            adw::prelude::AdwApplicationWindowExt::set_content(&adw_window, Some(&nav));
+            let window: gtk::ApplicationWindow = adw_window.upcast();
             crate::ui::nav_init(&nav, &window);
             (app, window, nav)
         };

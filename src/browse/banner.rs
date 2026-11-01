@@ -5,8 +5,6 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::Duration;
 
-use gtk::prelude::*;
-
 use super::primitives::ToastDuration;
 
 /// The text, the button and the duration of one banner.
@@ -28,64 +26,48 @@ pub fn hide_after(duration: ToastDuration) -> Option<Duration> {
 
 type Action = Rc<RefCell<Option<Box<dyn Fn()>>>>;
 
-/// The banner widget: a revealer over a label and a button. Each `show` takes a new generation, so a timer started by an
-/// earlier message cannot hide a newer one.
+/// The banner widget: an `adw::Banner` with an optional button. Each `show` takes a new generation, so a timer started by
+/// an earlier message cannot hide a newer one.
 #[derive(Clone)]
 pub struct InfoBanner {
-    revealer: gtk::Revealer,
-    label: gtk::Label,
-    button: gtk::Button,
+    banner: adw::Banner,
     action: Action,
     generation: Rc<Cell<u64>>,
 }
 
 impl InfoBanner {
     pub fn new() -> Self {
-        let label = gtk::Label::new(None);
-        label.set_wrap(true);
-        label.set_xalign(0.0);
-        label.set_hexpand(true);
-        let button = gtk::Button::new();
-        button.set_visible(false);
+        let banner = crate::banner::new("");
         let action: Action = Rc::new(RefCell::new(None));
         let pressed = Rc::clone(&action);
-        button.connect_clicked(move |_| {
+        banner.connect_button_clicked(move |_| {
             if let Some(run) = pressed.borrow().as_ref() {
                 run();
             }
         });
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        row.add_css_class("kb-banner");
-        row.append(&label);
-        row.append(&button);
-        let revealer = gtk::Revealer::new();
-        revealer.set_transition_type(gtk::RevealerTransitionType::SlideDown);
-        revealer.set_child(Some(&row));
-        Self { revealer, label, button, action, generation: Rc::new(Cell::new(0)) }
+        Self { banner, action, generation: Rc::new(Cell::new(0)) }
     }
 
     /// The widget to place in the page.
-    pub fn widget(&self) -> &gtk::Revealer {
-        &self.revealer
+    pub fn widget(&self) -> &adw::Banner {
+        &self.banner
     }
 
     /// Shows `spec` and runs `on_action` when its button is pressed. A timed banner hides itself when its time is up.
     pub fn show(&self, spec: &BannerSpec, on_action: Option<Box<dyn Fn()>>) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
-        self.label.set_text(&spec.message);
         match (&spec.action, on_action) {
             (Some(text), Some(run)) => {
-                self.button.set_label(text);
-                self.button.set_visible(true);
+                crate::banner::set(&self.banner, &spec.message, Some(text));
                 *self.action.borrow_mut() = Some(run);
             }
             _ => {
-                self.button.set_visible(false);
+                crate::banner::set(&self.banner, &spec.message, None);
                 *self.action.borrow_mut() = None;
             }
         }
-        self.revealer.set_reveal_child(true);
+        self.banner.set_revealed(true);
         if let Some(after) = hide_after(spec.duration) {
             let banner = self.clone();
             gtk::glib::timeout_add_local_once(after, move || {
@@ -99,7 +81,7 @@ impl InfoBanner {
     /// Hides the banner now and cancels any pending timeout.
     pub fn hide(&self) {
         self.generation.set(self.generation.get() + 1);
-        self.revealer.set_reveal_child(false);
+        self.banner.set_revealed(false);
     }
 }
 

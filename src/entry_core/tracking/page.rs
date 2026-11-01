@@ -6,6 +6,7 @@
 //! [`open_sheet`] before the page is pushed, and the search page reads the same entry and the tracker its Search button
 //! named. A bind, an edit or a stop tells the details page, so its Tracking button follows.
 
+use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -476,7 +477,7 @@ fn confirm_stop(name: &str, bound: &Bound, deletable: bool, redraw: Rc<dyn Fn()>
             }
         }),
     ];
-    ui::dialog(&trf(MsgKey::track_delete_title, &[("arg1", Arg::Str(name))]), &column, 400, buttons).present();
+    ui::dialog(&trf(MsgKey::track_delete_title, &[("arg1", Arg::Str(name))]), &column, 400, buttons).open();
 }
 
 /// Writes one edit to `tracker` at once. A success tells the details page and redraws the rows; a failure is a toast.

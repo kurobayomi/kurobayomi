@@ -2,6 +2,7 @@
 //! "downloaded" are independent boxes, OK needs one checked, and the downloaded box is left out when a local entry is
 //! selected. The rules are `actions::DeleteChoice` and `actions::downloads_checkbox_offered`.
 
+use crate::ui::DialogOpen as _;
 use std::rc::Rc;
 
 use gtk::prelude::*;
@@ -37,5 +38,5 @@ pub fn show(kind: Kind, downloads_offered: bool, on_confirm: impl Fn(DeleteChoic
         on_confirm(choice);
         true
     });
-    crate::ui::dialog(&tr(MsgKey::action_remove), &column, 360, vec![DialogButton::cancel(tr(MsgKey::action_cancel)), ok]).present();
+    crate::ui::dialog(&tr(MsgKey::action_remove), &column, 360, vec![DialogButton::cancel(tr(MsgKey::action_cancel)), ok]).open();
 }

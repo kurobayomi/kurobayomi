@@ -7,6 +7,7 @@
 //! the labels of the debug-info page's own groups. The Check for updates row runs its own copy of the manual check so it
 //! knows when the check ends: a spinner shows while it runs and a second tap is ignored (T-47a-094). Aniyomi's "no
 //! longer supported" toast belongs to an Android API level; Linux has no such rule, so the row has no EOL branch.
+use crate::ui::DialogOpen as _;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -325,7 +326,7 @@ pub fn notes_dialog(heading: &str, version: &str, notes_markdown: &str, link: Op
         Some(primary) => vec![DialogButton::cancel(tr(MsgKey::action_not_now)), primary],
         None => vec![DialogButton::cancel(&tr(MsgKey::action_close))],
     };
-    crate::ui::dialog(heading, &column, 520, buttons).present();
+    crate::ui::dialog(heading, &column, 520, buttons).open();
 }
 
 /// The update page of a newer stable release. Decision (T-47ba-032): there is no in-place install for a stable build

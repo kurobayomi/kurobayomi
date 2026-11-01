@@ -13,7 +13,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Duration;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Align, Box as GBox, Button, Label, Orientation as O, glib};
 use kuro_data::anime_relation::AnimeRelationGroup;
 use kuro_data::entry::SeasonEntry;
@@ -204,7 +204,7 @@ struct View {
     /// The one dialog slot (T-39b-030) and the window that shows it. `dialog_gen` names the request on screen, so the
     /// close of a window that a newer request replaced is ignored.
     dialogs: RefCell<DialogSlot>,
-    dialog_window: RefCell<Option<gtk::Window>>,
+    dialog_window: RefCell<Option<adw::Dialog>>,
     dialog_gen: Cell<u64>,
     seasons: SeasonGrid,
     /// What the season grid shows: its cells, columns, whether the size is fixed, and the width bucket.
@@ -1071,15 +1071,14 @@ impl View {
 
     /// Keeps the window of request `id`. Its close, however it happens, dismisses the slot unless the window said
     /// otherwise (`dismiss_on_close` false: the category dialog reports its own OK and dismiss).
-    fn adopt(self: &Rc<Self>, id: u64, window: &gtk::Window, dismiss_on_close: bool) {
+    fn adopt(self: &Rc<Self>, id: u64, window: &adw::Dialog, dismiss_on_close: bool) {
         *self.dialog_window.borrow_mut() = Some(window.clone());
         if dismiss_on_close {
             let weak = Rc::downgrade(self);
-            window.connect_close_request(move |_| {
+            window.connect_closed(move |_| {
                 if let Some(view) = weak.upgrade() {
                     view.dismiss_dialog(id);
                 }
-                glib::Propagation::Proceed
             });
         }
     }
@@ -1788,8 +1787,7 @@ mod tests {
             for (error, retry) in [(DetailError::Http(503), true), (DetailError::SourceNotInstalled, false)] {
                 let backend = Arc::new(Failing(error.clone(), Default::default()));
                 let runner = Rc::new(runner::spawn(rt.handle(), store.clone(), PrefStore::in_memory(), backend.clone(), EntryLoadContext::default()));
-                let host = gtk::Overlay::new();
-                crate::toast::attach(&host);
+                crate::toast::attach(&adw::ToastOverlay::new());
                 let page = assemble(Rc::clone(&runner), true, Env { backend: backend.clone(), ..env_of(&store) });
                 runner.send(EntryCmd::Load { entry_id: id });
                 let stack = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::Stack>().ok()).find(|s| s.child_by_name("ready").is_some()).expect("the page has a stack");
@@ -1799,18 +1797,13 @@ mod tests {
                     "the page has no notification bar of its own"
                 );
                 runner.send(EntryCmd::Refresh { entry_id: id });
-                let snack = descendants(host.upcast_ref())
-                    .into_iter()
-                    .filter_map(|w| w.downcast::<gtk::Revealer>().ok())
-                    .find(|r| r.child().is_some_and(|c| c.has_css_class("app-notification")))
-                    .expect("the notification layer");
-                assert!(pump(&ctx, || snack.reveals_child()), "{error:?}: the failed refresh shows a notification");
-                let action = snack.child().and_then(|bar| bar.first_child()).and_then(|label| label.next_sibling()).and_downcast::<Button>().expect("the action button");
-                assert_eq!(action.is_visible(), retry, "{error:?}: Retry only when there is something to retry");
+                assert!(pump(&ctx, || crate::toast::current().is_some()), "{error:?}: the failed refresh shows a notification");
+                let toast = crate::toast::current().expect("the notification");
+                assert_eq!(toast.button_label().is_some(), retry, "{error:?}: Retry only when there is something to retry");
                 if retry {
-                    assert_eq!(action.label().as_deref(), Some(tr(MsgKey::action_retry).as_str()));
+                    assert_eq!(toast.button_label().as_deref(), Some(tr(MsgKey::action_retry).as_str()));
                     let before = backend.1.load(Ordering::SeqCst);
-                    action.emit_clicked();
+                    toast.emit_by_name::<()>("button-clicked", &[]);
                     assert!(pump(&ctx, || backend.1.load(Ordering::SeqCst) > before), "Retry sends the refresh to the runner");
                 }
                 runner.send(EntryCmd::Shutdown);
@@ -1831,8 +1824,7 @@ mod tests {
             let (_dir, store, id) = super::super::store::fixture::with_episodes(true, true, 0, 0);
             let backend = Arc::new(Failing(DetailError::NoEpisodes, Default::default()));
             let runner = Rc::new(runner::spawn(rt.handle(), store.clone(), PrefStore::in_memory(), backend.clone(), EntryLoadContext::default()));
-            let host = gtk::Overlay::new();
-            crate::toast::attach(&host);
+            crate::toast::attach(&adw::ToastOverlay::new());
             let page = assemble(Rc::clone(&runner), true, Env { backend: backend.clone(), ..env_of(&store) });
             runner.send(EntryCmd::Load { entry_id: id });
             let stack = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::Stack>().ok()).find(|s| s.child_by_name("ready").is_some()).expect("the page has a stack");
@@ -1844,8 +1836,7 @@ mod tests {
             while std::time::Instant::now() < until {
                 ctx.iteration(false);
             }
-            let layer = descendants(host.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::Revealer>().ok()).find(|r| r.child().is_some_and(|c| c.has_css_class("app-notification"))).expect("the notification layer");
-            assert!(!layer.reveals_child(), "nothing pops up for an empty list");
+            assert!(crate::toast::current().is_none(), "nothing pops up for an empty list");
             // the list head is a row of the list view, so it exists once the page has a size
             let window = gtk::Window::builder().default_width(900).default_height(700).child(&page).build();
             window.present();

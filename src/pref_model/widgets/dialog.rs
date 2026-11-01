@@ -4,17 +4,17 @@
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{glib, Box as GBox, Button, Label, Orientation};
 
 use super::super::strings;
 use super::DIALOG_WIDTH;
-use crate::ui::{DialogButton, Role};
+use crate::ui::{DialogButton, DialogOpen as _, Role};
 
 /// A dialog built by [`show`]. The caller owns the body and decides when to close it.
 #[derive(Clone)]
 pub struct Dialog {
-    pub window: gtk::Window,
+    pub window: adw::Dialog,
     pub confirm: Option<Button>,
     error: Label,
     done: Rc<Cell<bool>>,
@@ -37,7 +37,7 @@ impl Dialog {
     /// Closes the dialog after an accepted write. The cancel callback does not run.
     pub fn finish(&self) {
         self.done.set(true);
-        self.window.destroy();
+        self.window.force_close();
     }
 }
 
@@ -48,9 +48,9 @@ pub fn is_enter(key: gtk::gdk::Key) -> bool {
 
 /// Builds and shows a dialog. `confirm` is the confirm label, or `None` for a Cancel-only dialog.
 /// `on_confirm` gets the dialog so it can run a veto and call [`Dialog::finish`] on acceptance.
-/// `on_cancel` runs once, on Escape, Cancel or the window close button, never after `finish`.
+/// `on_cancel` runs once, on Escape, Cancel or the close button, never after `finish`.
 pub fn show(
-    parent: &impl IsA<gtk::Window>,
+    parent: &impl IsA<gtk::Widget>,
     title: &str,
     body: &impl IsA<gtk::Widget>,
     confirm: Option<&str>,
@@ -86,10 +86,8 @@ pub fn show(
             on_cancel();
         }
     });
-    window.set_title(Some(title));
-    window.set_transient_for(Some(parent));
     // the confirm button is the last button of the window: its row comes last
-    let confirm_button = confirm.and_then(|_| last_button(window.child()?.upcast_ref()));
+    let confirm_button = confirm.and_then(|_| last_button(&crate::ui::dialog_content(&window)?));
     let dialog = Dialog { window: window.clone(), confirm: confirm_button.clone(), error, done };
     let _ = cell.set(dialog.clone());
 
@@ -106,7 +104,7 @@ pub fn show(
     });
     window.add_controller(keys);
 
-    window.present();
+    window.open_over(parent);
     dialog
 }
 
@@ -143,11 +141,11 @@ mod tests {
             let (_, parent) = crate::testing::nav();
             let body = Label::new(Some("Some text"));
             let dialog = show(&parent, "Pick one", &body, Some("OK"), |_| {}, || {});
-            assert_eq!(dialog.window.title().as_deref(), Some("Pick one"));
-            let content = dialog.window.child().expect("the dialog content");
+            assert_eq!(dialog.window.title(), "Pick one");
+            let content = crate::ui::dialog_content(&dialog.window).expect("the dialog content");
             assert_eq!(labels_reading(&content, "Pick one"), 0);
             assert_eq!(labels_reading(&content, "Some text"), 1);
-            dialog.window.destroy();
+            dialog.window.force_close();
         });
     }
 

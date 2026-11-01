@@ -23,13 +23,6 @@ popover.menu > contents {
   background-color: @theme_base_color;
 }
 
-/* Dialog windows (ui::modal): a 1px outline in the theme's border colour. Some themes (Breeze) give a dialog only a
- * dark shadow, which vanishes over a dark window behind it (user, 2026-10-12). */
-window.kb-dialog.csd {
-  outline: 1px solid @borders;
-  outline-offset: -1px;
-}
-
 /* Dragged or selected download card (T-49ba-027): draggable_card_foreground, alpha 0.08. */
 .kb-draggable.kb-dragged,
 .kb-draggable:selected {

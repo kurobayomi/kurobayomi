@@ -2,6 +2,7 @@
 //! Create and Restore pages start their runs through, shows the restore banner and notifications, and owns the one
 //! stop path of a running restore. The work itself is in `backup_run`.
 
+use crate::ui::DialogOpen as _;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -241,9 +242,7 @@ fn ask_before_closing(win: &gtk::ApplicationWindow) {
         DialogButton::new(shown(text::CANCEL_AND_CLOSE), Role::Normal, move || cancel_and_close(CloseChoice::CancelAndClose)),
     ];
     let title = shown(text::RESTORING_BACKUP);
-    let dialog = crate::ui::dialog_or_dismiss(&title, &gtk::Box::new(gtk::Orientation::Vertical, 0), 360, buttons, move || keep(CloseChoice::KeepRunning));
-    dialog.set_transient_for(Some(win));
-    dialog.present();
+    crate::ui::alert(&title, "", buttons, move || keep(CloseChoice::KeepRunning)).open_over(win);
 }
 
 #[cfg(test)]

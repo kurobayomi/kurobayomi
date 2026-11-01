@@ -60,11 +60,14 @@ mod tests {
     }
 
     #[test]
-    fn a_dialog_window_has_its_header_bar_as_its_titlebar() {
+    fn a_dialog_has_its_header_bar_above_its_content() {
         crate::testing::with_display(|| {
             let _ = crate::testing::nav();
-            let window = crate::ui::modal(&gtk::Label::new(Some("Title")).upcast(), &gtk::Label::new(Some("Body")), 200, 100);
-            assert!(window.titlebar().is_some_and(|bar| bar.is::<adw::HeaderBar>()), "a dialog has its header bar");
+            let dialog = crate::ui::modal(&gtk::Label::new(Some("Title")).upcast(), &gtk::Label::new(Some("Body")), 200, 100);
+            let toolbar = adw::prelude::AdwDialogExt::child(&dialog).and_downcast::<adw::ToolbarView>().expect("a dialog is a toolbar view");
+            let header = crate::screens::alone::descendants(toolbar.upcast_ref()).into_iter().find_map(|w| w.downcast::<adw::HeaderBar>().ok());
+            assert!(header.is_some(), "a dialog has its header bar");
+            assert!(crate::ui::dialog_content(&dialog).is_some_and(|c| c.is::<gtk::Label>()), "the content sits under it");
         });
     }
 

@@ -2,6 +2,7 @@
 //! and a click outside the sheet dismiss it. The reader settings are a native window (`settings_window`). The confirm
 //! prompt uses the shared dialog. No libadwaita.
 
+use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -149,7 +150,5 @@ pub fn confirm(parent: &impl IsA<gtk::Window>, message: &str, on_ok: impl FnOnce
             on_ok();
         }
     });
-    let dialog = crate::ui::dialog(message, &gtk::Box::new(gtk::Orientation::Vertical, 0), 360, vec![DialogButton::cancel(strings::action_cancel()), ok]);
-    dialog.set_transient_for(Some(parent.as_ref()));
-    dialog.present();
+    crate::ui::alert(message, "", vec![DialogButton::cancel(strings::action_cancel()), ok], || {}).open_over(parent.as_ref());
 }

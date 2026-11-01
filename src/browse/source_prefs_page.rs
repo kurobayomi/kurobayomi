@@ -364,6 +364,7 @@ pub(crate) mod tests {
     use kuro_prefs::store::PrefStore;
 
     use super::*;
+    use adw::prelude::*;
 
     fn declared() -> Vec<SourcePref> {
         let strings = |items: &[&str]| items.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
@@ -465,8 +466,8 @@ pub(crate) mod tests {
         // list: choosing an entry only selects it; Cancel writes nothing, OK writes it
         click(&rows[1]);
         let window = page.inner.dialogs.current().expect("the list dialog");
-        assert_eq!(window.title().map(|t| t.to_string()).as_deref(), Some("Size"), "the dialog title is the row title");
-        let radios = all::<gtk::CheckButton>(&window.child().expect("child"));
+        assert_eq!(window.title(), "Size", "the dialog title is the row title");
+        let radios = all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"));
         assert_eq!(radios.len(), 2);
         assert_eq!(crate::browse::dialogs::buttons_of(&window).len(), 2, "OK and Cancel");
         radios[1].set_active(true);
@@ -477,7 +478,7 @@ pub(crate) mod tests {
         assert!(page.inner.dialogs.current().is_none());
         click(&rows[1]);
         let window = page.inner.dialogs.current().expect("the list dialog");
-        all::<gtk::CheckButton>(&window.child().expect("child"))[1].set_active(true);
+        all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"))[1].set_active(true);
         crate::browse::dialogs::buttons_of(&window)[0].emit_clicked();
         assert_eq!(prefs.get_string("size").as_deref(), Some("l"));
         assert!(page.inner.dialogs.current().is_none());
@@ -486,7 +487,7 @@ pub(crate) mod tests {
         // multi choice: OK writes the set
         click(&rows[2]);
         let window = page.inner.dialogs.current().expect("the multi dialog");
-        let checks = all::<gtk::CheckButton>(&window.child().expect("child"));
+        let checks = all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"));
         assert!(checks[0].is_active() && !checks[1].is_active(), "the declared default is preselected");
         checks[1].set_active(true);
         checks[0].set_active(false);
@@ -496,7 +497,7 @@ pub(crate) mod tests {
         // text: the field has the input hints, Cancel writes nothing, OK writes the text
         click(&rows[3]);
         let window = page.inner.dialogs.current().expect("the text dialog");
-        let entry = all::<gtk::Entry>(&window.child().expect("child")).remove(0);
+        let entry = all::<gtk::Entry>(&crate::ui::dialog_content(&window).expect("child")).remove(0);
         assert_eq!(entry.text().as_str(), "example.org");
         assert_eq!(entry.input_hints(), gtk::InputHints::NO_SPELLCHECK | gtk::InputHints::PRIVATE);
         entry.set_text("mirror.test");
@@ -504,7 +505,7 @@ pub(crate) mod tests {
         assert_eq!(prefs.get_string("host"), None, "Cancel stores nothing");
         click(&rows[3]);
         let window = page.inner.dialogs.current().expect("dialog");
-        all::<gtk::Entry>(&window.child().expect("child")).remove(0).set_text("mirror.test");
+        all::<gtk::Entry>(&crate::ui::dialog_content(&window).expect("child")).remove(0).set_text("mirror.test");
         crate::browse::dialogs::buttons_of(&window)[0].emit_clicked();
         assert_eq!(prefs.get_string("host").as_deref(), Some("mirror.test"));
 

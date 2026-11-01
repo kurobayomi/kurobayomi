@@ -9,11 +9,11 @@ use kuro_i18n::{Arg, MsgKey, tr, tr_plural, trf};
 use kuro_domain::entries::fetch_interval::MAX_INTERVAL;
 
 use crate::entry_core::fetch_interval::{Body, RESET_WHEEL, body, initial_wheel, wheel_visible};
-use crate::ui::{self, DialogButton, Role};
+use crate::ui::{self, DialogButton, DialogOpen as _, Role};
 
 /// Opens the dialog for an entry with `interval` (its stored fetch interval) and `expected_next_update_ms`. OK calls
 /// `on_ok` with the wheel value and Reset with 0; the page stores `-wheel` (0 is automatic).
-pub fn open(interval: i32, expected_next_update_ms: Option<i64>, on_ok: impl Fn(i32) + 'static) -> gtk::Window {
+pub fn open(interval: i32, expected_next_update_ms: Option<i64>, on_ok: impl Fn(i32) + 'static) -> adw::Dialog {
     let now = chrono::Utc::now().timestamp_millis();
     let text = match body(interval, expected_next_update_ms, now) {
         Body::Expected(days) => trf(
@@ -41,6 +41,6 @@ pub fn open(interval: i32, expected_next_update_ms: Option<i64>, on_ok: impl Fn(
         DialogButton::new(tr(MsgKey::action_ok), Role::Suggested, move || on_ok(wheel.value_as_int())),
     ];
     let window = ui::dialog(&tr(MsgKey::pref_library_update_smart_update), &col, 400, buttons);
-    window.present();
+    window.open();
     window
 }

@@ -218,11 +218,14 @@ impl UpcomingPage {
             self.calendar_slot.remove(&child);
         }
         let calendar = self.calendar.widget();
-        if calendar.parent().is_some() {
-            calendar.unparent();
+        if let Some(parent) = calendar.parent() {
+            match parent.downcast_ref::<adw::Clamp>() {
+                Some(clamp) => clamp.set_child(None::<&gtk::Widget>),
+                None => calendar.unparent(),
+            }
         }
         match shape.calendar_cap {
-            Some(max) => self.calendar_slot.append(&crate::clamp::clamp(calendar, max)),
+            Some(max) => self.calendar_slot.append(&crate::ui::clamp(calendar, max)),
             None => self.calendar_slot.append(calendar),
         }
         self.calendar_slot.set_valign(if shape.two_panels { Align::Start } else { Align::Fill });
@@ -449,7 +452,7 @@ mod tests {
             assert_eq!(page.paned.start_child().as_ref(), Some(page.calendar_slot.upcast_ref()), "the calendar is the start panel");
             assert_eq!(children(&page.content).len(), 3 * 2, "the list has no calendar row");
             let cap = page.calendar_slot.first_child().expect("the capped calendar");
-            assert_eq!(cap.type_().name(), "KurobayomiClamp", "the width is capped in the medium band");
+            assert_eq!(cap.type_().name(), "AdwClamp", "the width is capped in the medium band");
             assert_eq!(cap.first_child().as_ref(), Some(page.calendar.widget().upcast_ref()));
             page.apply_shape(Shape { two_panels: true, calendar_cap: None }, 1000);
             assert_eq!(page.calendar_slot.first_child().as_ref(), Some(page.calendar.widget().upcast_ref()), "uncapped above 840 px");
