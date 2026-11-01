@@ -102,8 +102,9 @@ stackswitcher > button.text-button {
 /* Top-bar and bottom-bar buttons are bare icons (user, 2026-10-14): no frame and no fill until hovered, pressed or switched
    on. One rule for every page's header (search, refresh, sort, menus, back) and for the narrow window's bottom bar, whose
    tab buttons show the open tab with the "on" fill. The header's Anime | Manga switch keeps its segmented look and a
-   suggested or destructive button keeps its colour. */
-headerbar button.image-button:not(.suggested-action):not(.destructive-action),
+   suggested or destructive button keeps its colour. The window buttons are left out: themes such as Breeze draw their
+   icons as the background, which this rule would erase. */
+headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close),
 headerbar menubutton > button.image-button,
 .kb-bottom-bar button {
   background: none;
@@ -119,18 +120,18 @@ window.kb-narrow headerbar menubutton > button.image-button {
   padding-right: 4px;
 }
 /* the hover fill is strong enough to see on a dark theme (8% was not), and eases in */
-headerbar button.image-button:not(.suggested-action):not(.destructive-action),
+headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close),
 headerbar menubutton > button.image-button,
 .kb-bottom-bar button {
   transition: background 120ms ease;
 }
-headerbar button.image-button:not(.suggested-action):not(.destructive-action):hover,
+headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close):hover,
 headerbar menubutton > button.image-button:hover,
 .kb-bottom-bar button:hover {
   background: alpha(currentColor, 0.14);
 }
-headerbar button.image-button:not(.suggested-action):not(.destructive-action):active,
-headerbar button.image-button:not(.suggested-action):not(.destructive-action):checked,
+headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close):active,
+headerbar button.image-button:not(.suggested-action):not(.destructive-action):not(.minimize):not(.maximize):not(.close):checked,
 headerbar menubutton > button.image-button:active,
 headerbar menubutton > button.image-button:checked,
 .kb-bottom-bar button:active,
