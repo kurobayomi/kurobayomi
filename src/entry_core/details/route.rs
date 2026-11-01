@@ -314,7 +314,7 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let (episode_spec, season_spec) = (list_options::item_spec(kind), list_options::season_spec());
     let options = ViewOptions::new(&list_options::tooltip(), &episode_spec.sections());
     let bulk = bulk_menu(&late, kind);
-    let page_shell::ItemHeaderRow { row: header_row, count, missing, search } = page_shell::item_header_row(options.widget.upcast_ref(), &bulk);
+    let page_shell::ItemHeaderRow { row: header_row, count, missing, search } = page_shell::item_header_row(options.widget.upcast_ref(), &bulk, &stack);
     // the refresh spinner of the list head: inline size, spinning only while a refresh runs
     let spinner = ui::inline_spinner();
     spinner.set_spinning(false);

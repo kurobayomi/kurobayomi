@@ -36,24 +36,13 @@ pub struct ItemHeaderRow {
     pub search: gtk::SearchEntry,
 }
 
-/// `options` is the list options button and `bulk` the menu button of the bulk actions, both made by the page.
-pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton) -> ItemHeaderRow {
+/// `options` is the list options button and `bulk` the menu button of the bulk actions, both made by the page. `page` is
+/// where typing opens the search (`ui::search_row`).
+pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton, page: &impl IsA<gtk::Widget>) -> ItemHeaderRow {
     let count = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let missing = Label::builder().xalign(1.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
-    let toggle = gtk::ToggleButton::builder().icon_name("system-search-symbolic").tooltip_text(tr(MsgKey::action_search)).build();
-    let entry = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).hexpand(true).build();
-    let bar = gtk::SearchBar::builder().child(&entry).build();
-    bar.connect_entry(&entry);
-    toggle.bind_property("active", &bar, "search-mode-enabled").bidirectional().sync_create().build();
-    // closing the search clears it, so the list shows every row again
-    bar.connect_search_mode_enabled_notify({
-        let entry = entry.clone();
-        move |bar| {
-            if !bar.is_search_mode() {
-                entry.set_text("");
-            }
-        }
-    });
+    let entry = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).build();
+    let (bar, toggle) = ui::search_row(&entry, page);
     let linked = GBox::builder().css_classes(["linked"]).valign(gtk::Align::Center).build();
     linked.append(options);
     linked.append(&toggle);
