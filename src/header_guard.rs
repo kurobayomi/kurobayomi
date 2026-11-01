@@ -25,7 +25,7 @@ mod tests {
     ];
 
     fn assert_has_header(what: &str, page: &gtk::Widget) {
-        let found = crate::screens::alone::descendants(page).iter().any(|w| w.is::<gtk::HeaderBar>());
+        let found = crate::screens::alone::descendants(page).iter().any(|w| w.is::<adw::HeaderBar>());
         assert!(found, "{what} is pushed without a header bar, so the window cannot be dragged or closed from it");
     }
 
@@ -63,7 +63,7 @@ mod tests {
         crate::testing::with_display(|| {
             let _ = crate::testing::nav();
             let window = crate::ui::modal(&gtk::Label::new(Some("Title")).upcast(), &gtk::Label::new(Some("Body")), 200, 100);
-            assert!(window.titlebar().is_some_and(|bar| bar.is::<gtk::HeaderBar>()), "a dialog has its header bar");
+            assert!(window.titlebar().is_some_and(|bar| bar.is::<adw::HeaderBar>()), "a dialog has its header bar");
         });
     }
 

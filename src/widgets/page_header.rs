@@ -87,7 +87,7 @@ pub fn page_position(page: i32, total: i32) -> Option<String> {
 
 /// The header with Back on the left (`on_back`) and `title` in the centre. The right side is left to the caller: the
 /// first widget it packs with `pack_end` sits at the far right.
-pub fn header(title: &impl IsA<gtk::Widget>, on_back: impl Fn() + 'static) -> gtk::HeaderBar {
+pub fn header(title: &impl IsA<gtk::Widget>, on_back: impl Fn() + 'static) -> adw::HeaderBar {
     let header = crate::ui::header_bar();
     crate::ui::window_buttons(&header);
     header.set_title_widget(Some(title.upcast_ref()));
@@ -101,7 +101,7 @@ pub fn header(title: &impl IsA<gtk::Widget>, on_back: impl Fn() + 'static) -> gt
 /// The top bar of the reader and the player, one format for both: Back, the two-line title (the series over the item)
 /// centred, and nothing clickable in it. The caller packs its own buttons on the right and may add a detail to the
 /// second line (the reader's page position).
-pub fn media_header(title: &MediaTitle, on_back: impl Fn() + 'static) -> (gtk::HeaderBar, TwoLineTitle) {
+pub fn media_header(title: &MediaTitle, on_back: impl Fn() + 'static) -> (adw::HeaderBar, TwoLineTitle) {
     let two_lines = two_line_title(title);
     (header(&two_lines.root, on_back), two_lines)
 }

@@ -558,7 +558,7 @@ fn watch_left(page: &gtk::Box, shared: &Shared, area: &gtk::GLArea) {
 /// Fullscreen shows only the video: the header follows the window's fullscreen state, so it hides on entering and is
 /// back on leaving (Escape, the fullscreen button, the window manager). The window is known only once the page is
 /// mapped, so the connection is made then, once per mapping, and dropped on unmap.
-fn watch_fullscreen(page: &gtk::Box, header: &gtk::HeaderBar) {
+fn watch_fullscreen(page: &gtk::Box, header: &adw::HeaderBar) {
     let link: Rc<RefCell<Option<(gtk::Window, glib::SignalHandlerId)>>> = Rc::default();
     let header = header.downgrade();
     {

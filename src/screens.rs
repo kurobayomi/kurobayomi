@@ -65,7 +65,7 @@ pub fn build(id: &str) -> GBox {
         Some(b) => {
             // a page with its own one-row header (the kind pages) is used as it is
             let p = match b.content.clone().downcast::<GBox>() {
-                Ok(own) if own.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>()) => own,
+                Ok(own) if own.first_child().is_some_and(|w| w.is::<adw::HeaderBar>()) => own,
                 _ => page(&crate::spec::shown(&s.title), &b.content, b.end, true),
             };
             tag(&p, id);
@@ -462,7 +462,7 @@ mod tests {
             let mut all = vec![page.clone().upcast::<gtk::Widget>()];
             shown(page.upcast_ref(), &mut all);
             let count = |f: &dyn Fn(&gtk::Widget) -> bool| all.iter().filter(|w| f(w)).count();
-            assert_eq!(count(&|w| w.is::<gtk::HeaderBar>()), 1, "one header row");
+            assert_eq!(count(&|w| w.is::<adw::HeaderBar>()), 1, "one header row");
             assert_eq!(count(&|w| w.is::<gtk::ListBoxRow>()), 0, "no made-up queue rows");
             assert_eq!(count(&|w| w.downcast_ref::<Label>().is_some_and(|l| l.label() == "No downloads")), 1);
             assert_eq!(count(&|w| w.downcast_ref::<Button>().is_some_and(|b| b.label().as_deref() == Some("Library"))), 1, "one action");
@@ -476,7 +476,7 @@ mod tests {
     fn the_library_header_is_one_row_with_each_control_once() {
         crate::testing::with_display(|| {
             let page = kind_page([view("anime grid"), view("manga grid")], false);
-            assert!(page.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>()), "the header row comes first");
+            assert!(page.first_child().is_some_and(|w| w.is::<adw::HeaderBar>()), "the header row comes first");
             let bars = page.first_child().and_then(|w| w.next_sibling()).and_then(|row| row.next_sibling()).expect("the search bars follow the header and its narrow switch row");
             assert!(bars.is::<gtk::Stack>() && bars.next_sibling().is_some_and(|w| w.next_sibling().is_none()), "then the views");
             let mut all = vec![];

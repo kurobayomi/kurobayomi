@@ -510,7 +510,7 @@ mod tests {
             stack.set_visible_child(&base);
             let page = assemble(page(&Rc::default()));
             crate::ui::push(&page);
-            let title = page.first_child().and_downcast::<gtk::HeaderBar>().and_then(|bar| bar.title_widget()).and_downcast::<Label>().expect("the title");
+            let title = page.first_child().and_downcast::<adw::HeaderBar>().and_then(|bar| bar.title_widget()).and_downcast::<Label>().expect("the title");
             assert_eq!(title.label(), "Upcoming");
             assert_eq!(page.widget_name(), "screen:upcoming");
             assert_eq!(crate::ui::page_stack().1, 1, "the page is on show");

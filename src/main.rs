@@ -218,22 +218,19 @@ fn build_ui(app: &gtk::Application) {
 fn build_window(app: &gtk::Application) {
     // the theme is applied before the first widget is built (T-36a-061)
     shell::Shell::build(theme::startup).build_widget().expect("the theme was applied by Shell::build");
-    let win = gtk::ApplicationWindow::builder()
+    let adw_win = adw::ApplicationWindow::builder()
         .application(app)
         .title(channel::APP_NAME)
         .default_width(1180)
         .default_height(780)
         .build();
+    // the rest of the shell takes the GTK window it is
+    let win: gtk::ApplicationWindow = adw_win.clone().upcast();
     // dev hook: KUROBAYOMI_SIZE=WxH opens at that size, set before any page is built so they lay out for it
     if let Some((w, h)) = std::env::var("KUROBAYOMI_SIZE").ok().and_then(|v| v.split_once('x').map(|(w, h)| (w.parse().unwrap_or(1180), h.parse().unwrap_or(780)))) {
         win.set_default_size(w, h);
     }
-    // each page brings its own header bar, so the window titlebar stays empty. It is hidden, not just empty: GTK gives a
-    // visible titlebar widget the theme's titlebar height (the built-in `.titlebar:not(headerbar)` min-height), which
-    // shows as an empty band above the app's header. A hidden one takes no space and GTK does not add a default one.
-    let titlebar = GBox::new(O::Horizontal, 0);
-    titlebar.set_visible(false);
-    win.set_titlebar(Some(&titlebar));
+    // each page brings its own header bar; an AdwApplicationWindow has no titlebar of its own
 
     // [sidebar | content nav stack], plus a bottom tab bar that replaces the sidebar when narrow
     let nav = gtk::Stack::new();
@@ -271,7 +268,7 @@ fn build_window(app: &gtk::Application) {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&outer));
     net_client::set_toaster(toast::attach(&overlay));
-    win.set_child(Some(&overlay));
+    adw::prelude::AdwApplicationWindowExt::set_content(&adw_win, Some(&overlay));
     // the app-state banners above everything: indexing and downloaded only (T-36a-018)
     let banners = std::rc::Rc::new(shell::banners::Banners::new());
     outer.prepend(&banners.widget);
@@ -476,7 +473,7 @@ fn tabs() -> gtk::Stack {
         let Some(b) = screens::body(&n.id) else { continue };
         // a page that starts with its own one-row header (Library, Updates, History, Browse) is used as it is; the
         // sidebar already names the tab, so it carries no title
-        let own_header = b.content.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>());
+        let own_header = b.content.first_child().is_some_and(|w| w.is::<adw::HeaderBar>());
         let page: gtk::Widget = if own_header { b.content } else { ui::page(&spec::shown(&ui::screen(&n.id).title), &b.content, b.end, false).upcast() };
         tabs.add_titled(&page, Some(&n.id), &spec::shown(&n.title)).set_icon_name(&n.icon);
     }

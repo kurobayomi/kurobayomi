@@ -185,11 +185,11 @@ pub fn quiet_menu(menu: gtk::MenuButton) -> gtk::MenuButton {
 
 /// A header bar of the main window. Every one joins one vertical size group, so the sidebar's bar and the page's bar
 /// next to it are always the same height, whatever the page puts in its own bar (a search entry is taller than a title).
-pub fn header_bar() -> gtk::HeaderBar {
+pub fn header_bar() -> adw::HeaderBar {
     thread_local! {
         static SAME_HEIGHT: gtk::SizeGroup = gtk::SizeGroup::new(gtk::SizeGroupMode::Vertical);
     }
-    let header = gtk::HeaderBar::new();
+    let header = adw::HeaderBar::new();
     SAME_HEIGHT.with(|group| group.add_widget(&header));
     header
 }
@@ -201,7 +201,7 @@ thread_local! {
 
 /// The window buttons of a content header (the right part of the layout), with the pin just before them. Call it before
 /// packing anything else at the end, so the pin sits next to the window buttons.
-pub fn window_buttons(header: &gtk::HeaderBar) {
+pub fn window_buttons(header: &adw::HeaderBar) {
     header.set_decoration_layout(Some(&decoration(false)));
     header.pack_end(&pin_button());
 }
@@ -238,7 +238,7 @@ fn pin_button() -> gtk::ToggleButton {
 /// row, as phone apps put tabs under the toolbar. It also moves there while the sidebar shows once the header runs short
 /// of room ([`switch_fits`]): a switch kept in a full header would set the window's minimum width above that breakpoint,
 /// and the window could never get narrow. Append the returned row right under the header.
-pub fn switch_with_narrow_row(header: &gtk::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
+pub fn switch_with_narrow_row(header: &adw::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
     let row = GBox::new(O::Horizontal, 0);
     row.set_halign(Align::Center);
     row.set_margin_top(6);
@@ -905,7 +905,7 @@ pub const LEAD: &str = "kb-lead";
 /// Packs a page's lead box, with a pushed page's ⋮ menu (user, 2026-10-14), after Back. A tab page has no ⋮ menu (its
 /// actions are buttons at the end). The search toggle comes in first in the phone layout ([`search_follows_width`]).
 /// An empty box is hidden, so it takes no spacing. Call after Back and before anything else is packed at the start.
-pub fn pack_lead(header: &gtk::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
+pub fn pack_lead(header: &adw::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
     let lead = GBox::new(O::Horizontal, 4);
     lead.add_css_class(LEAD);
     if let Some(menu) = menu {
@@ -936,7 +936,7 @@ fn put_search(toggle: &gtk::Widget, lead: &GBox, end: &GBox, narrow: bool) {
 /// A page's search toggle: first in `lead` (the start of the header) in the phone layout, below
 /// `shell::layout::WIDE_MIN_WIDTH_PX`, and first in `end` (its actions at the end) in a wider window (user, 2026-10-25).
 /// Either box is hidden while empty, so it takes no spacing.
-pub fn search_follows_width(header: &gtk::HeaderBar, toggle: &gtk::Widget, lead: &GBox, end: &GBox) {
+pub fn search_follows_width(header: &adw::HeaderBar, toggle: &gtk::Widget, lead: &GBox, end: &GBox) {
     let place = {
         let (toggle, lead, end) = (toggle.clone(), lead.clone(), end.clone());
         move |narrow: bool| put_search(&toggle, &lead, &end, narrow)
@@ -1148,7 +1148,7 @@ pub fn groups_into(col: &GBox, groups: &[Group]) {
 // ---------- sheets & dialogs ----------
 
 pub fn modal(title: &gtk::Widget, content: &impl IsA<gtk::Widget>, w: i32, h: i32) -> gtk::Window {
-    let header = gtk::HeaderBar::new();
+    let header = adw::HeaderBar::new();
     header.set_decoration_layout(Some(&decoration(false)));
     header.set_title_widget(Some(title));
     let win = gtk::Window::builder()
@@ -1550,7 +1550,7 @@ mod tests {
     fn a_sidebar_page_has_no_title_and_a_pushed_page_has_its_title_and_back() {
         crate::testing::with_display(|| {
             let root = page("Updates", &GBox::new(O::Vertical, 0), vec![], false);
-            let header = root.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row");
+            let header = root.first_child().and_downcast::<adw::HeaderBar>().expect("the header row");
             assert!(!labels(header.upcast_ref()).iter().any(|l| l == "Updates"), "the sidebar names the tab");
             assert!(header.title_widget().is_some(), "an empty title widget keeps GTK from showing the window title");
             let pushed = page("Appearance", &GBox::new(O::Vertical, 0), vec![], true);
@@ -1568,7 +1568,7 @@ mod tests {
             let search = gtk::SearchEntry::new();
             let refresh = icon_button("view-refresh-symbolic", "Refresh");
             let p = page("Updates", &GBox::new(O::Vertical, 0), vec![search.clone().upcast(), refresh.upcast()], false);
-            let header = p.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row");
+            let header = p.first_child().and_downcast::<adw::HeaderBar>().expect("the header row");
             let bar = header.next_sibling().and_downcast::<gtk::SearchBar>().expect("the bar sits under the header");
             assert!(search.is_ancestor(&bar) && !search.is_ancestor(&header), "the entry is in the bar, not the header");
             let mut w = Vec::new();

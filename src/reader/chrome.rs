@@ -211,7 +211,7 @@ pub struct TopBarActions {
 
 /// The top bar before a chapter is known (the page list is loading, or the load failed): Back and the window buttons,
 /// with no title. The reader always has a bar, so the window can be dragged while it loads.
-pub fn build_bare_top_bar(on_back: impl Fn() + 'static) -> gtk::HeaderBar {
+pub fn build_bare_top_bar(on_back: impl Fn() + 'static) -> adw::HeaderBar {
     page_header::header(&gtk::Box::new(gtk::Orientation::Horizontal, 0), on_back)
 }
 
@@ -219,7 +219,7 @@ pub fn build_bare_top_bar(on_back: impl Fn() + 'static) -> gtk::HeaderBar {
 /// left, the manga over the chapter and its page position centred (a plain title, as the player's), and
 /// the bookmark and the menu on the right. The bar is never hidden. The menu's actions come from the page's
 /// [`ACTION_GROUP`]; the returned title takes the page position.
-pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (gtk::HeaderBar, page_header::TwoLineTitle) {
+pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (adw::HeaderBar, page_header::TwoLineTitle) {
     let TopBarActions { on_back, on_bookmark, on_chapters } = actions;
     let (header, title) = page_header::media_header(&page_header::MediaTitle::new(&bar.manga_title, &bar.chapter_name), on_back);
 

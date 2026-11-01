@@ -289,7 +289,7 @@ mod tests {
                 end: vec![gtk::SearchEntry::new().upcast(), crate::ui::icon_button("edit-clear-all-symbolic", "Clear history").upcast()],
             };
             let (page, stack) = tab_page([view("anime list"), view("manga list")]);
-            let header = page.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row comes first");
+            let header = page.first_child().and_downcast::<adw::HeaderBar>().expect("the header row comes first");
             assert!(header.next_sibling().and_then(|row| row.next_sibling()).and_then(|bars| bars.next_sibling()).is_some_and(|w| w == stack), "then the narrow switch row, the search bars, then the two kinds");
             assert_eq!(kind_of(stack.visible_child_name().as_deref()), Kind::Anime, "Anime shows first");
             stack.set_visible_child_name(MANGA);

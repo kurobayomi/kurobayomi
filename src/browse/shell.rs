@@ -296,7 +296,7 @@ pub(crate) mod tests {
             .map(|page| page.expect("page").name().map(|n| n.to_string()).unwrap_or_default())
             .collect();
         assert_eq!(names, ["0", "1"], "anime sources, manga sources");
-        let header = shell.root.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row comes first");
+        let header = shell.root.first_child().and_downcast::<adw::HeaderBar>().expect("the header row comes first");
         let mut all = Vec::new();
         walk(header.upcast_ref(), &mut all);
         assert_eq!(all.iter().filter(|w| w.is::<gtk::SearchEntry>()).count(), 0, "the entry is in the bar, not the header");

@@ -71,8 +71,8 @@ pub fn fab_button() -> (Button, Label) {
 
 /// The header bar and title label of a page built with `ui::page`, and a Back button packed at its start. Back clears a
 /// selection before it pops, so the page wires it, not `ui::page`.
-pub fn header_with_back(page: &GBox) -> (Option<gtk::HeaderBar>, Option<Label>, Button) {
-    let header = page.first_child().and_downcast::<gtk::HeaderBar>();
+pub fn header_with_back(page: &GBox) -> (Option<adw::HeaderBar>, Option<Label>, Button) {
+    let header = page.first_child().and_downcast::<adw::HeaderBar>();
     let title = header.as_ref().and_then(|h| h.title_widget()).and_downcast::<Label>();
     let back = Button::from_icon_name("go-previous-symbolic");
     back.set_tooltip_text(Some(&tr(MsgKey::action_webview_back)));
@@ -126,7 +126,7 @@ pub fn fab_label_shown(scroll: &Cell<(f64, bool)>, adj: &gtk::Adjustment) -> boo
 
 /// Fades the title and the header bar background with the scroll in the one-column layout, where the info block
 /// (`info_height` tall) is the first thing of the list. `keep_title` shows the title whatever the scroll.
-pub fn fade_header(title: Option<&Label>, bar: Option<&gtk::HeaderBar>, narrow: bool, value: f64, info_height: i32, keep_title: bool) {
+pub fn fade_header(title: Option<&Label>, bar: Option<&adw::HeaderBar>, narrow: bool, value: f64, info_height: i32, keep_title: bool) {
     let first_visible = value < f64::from(info_height);
     if let Some(label) = title {
         label.set_opacity(if keep_title || title_opaque(narrow, first_visible) { 1.0 } else { 0.0 });

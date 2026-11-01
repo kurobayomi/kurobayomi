@@ -2146,7 +2146,7 @@ mod tests {
             let screen = open(deps, &crate::reader::launch::open_gate(), toaster, || {});
             let root: gtk::Widget = screen.root.clone().upcast();
             let bars = crate::screens::alone::descendants(&root);
-            assert!(bars.iter().any(|w| w.is::<gtk::HeaderBar>()), "the reader shows its header bar while the chapter loads");
+            assert!(bars.iter().any(|w| w.is::<adw::HeaderBar>()), "the reader shows its header bar while the chapter loads");
         });
     }
 

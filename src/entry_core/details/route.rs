@@ -172,7 +172,7 @@ struct View {
     bottom_row: GBox,
     stack: gtk::Stack,
     title: Option<Label>,
-    header_bar: Option<gtk::HeaderBar>,
+    header_bar: Option<adw::HeaderBar>,
     toolbar: Vec<gtk::Widget>,
     list: Rc<ItemList>,
     scroller: gtk::ScrolledWindow,
