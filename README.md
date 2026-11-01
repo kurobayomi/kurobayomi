@@ -140,10 +140,10 @@ A Flatpak is planned.
 
 ### From source
 
-You need a recent stable Rust, GTK 4.14 or newer, and libmpv (on Arch: `pacman -S gtk4 mpv`; on Fedora:
-`dnf install gtk4-devel mpv-libs-devel`; on Ubuntu 24.04: `apt install libgtk-4-dev libmpv-dev`). On Windows, build in
+You need a recent stable Rust, GTK 4.14 or newer, libadwaita 1.5 or newer, and libmpv (on Arch: `pacman -S gtk4 libadwaita mpv`; on Fedora:
+`dnf install gtk4-devel libadwaita-devel mpv-libs-devel`; on Ubuntu 24.04: `apt install libgtk-4-dev libadwaita-1-dev libmpv-dev`). On Windows, build in
 the [MSYS2](https://www.msys2.org/) UCRT64 shell after
-`pacman -S git mingw-w64-ucrt-x86_64-{toolchain,rust,pkgconf,cmake,nasm,gtk4,mpv,dav1d,libarchive}`.
+`pacman -S git mingw-w64-ucrt-x86_64-{toolchain,rust,pkgconf,cmake,nasm,gtk4,libadwaita,mpv,dav1d,libarchive}`.
 
 ```bash
 git clone https://github.com/kurobayomi/kurobayomi.git

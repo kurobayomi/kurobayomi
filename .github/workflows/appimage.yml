@@ -135,7 +135,7 @@ jobs:
           install: git
           pacboy: >-
             toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
-            gtk4:p mpv:p dav1d:p libarchive:p
+            gtk4:p libadwaita:p mpv:p dav1d:p libarchive:p
 
       - name: Cache the build
         uses: Swatinem/rust-cache@v2

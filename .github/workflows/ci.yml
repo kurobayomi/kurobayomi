@@ -107,7 +107,7 @@ jobs:
           install: git
           pacboy: >-
             toolchain:p rust:p pkgconf:p cmake:p nasm:p
-            gtk4:p mpv:p dav1d:p libarchive:p
+            gtk4:p libadwaita:p mpv:p dav1d:p libarchive:p
 
       # the build folder between runs; saved after a failed run too, since test failures leave a good build behind
       - name: Cache the build

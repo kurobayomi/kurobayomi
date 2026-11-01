@@ -26,7 +26,7 @@ RUN rm -f /etc/dpkg/dpkg.cfg.d/excludes
 RUN apt-get update \
  && apt-get install -y \
       build-essential pkg-config ca-certificates curl git gh xz-utils zstd \
-      libgtk-4-dev libwebkitgtk-6.0-dev libdav1d-dev libmpv-dev \
+      libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev libdav1d-dev libmpv-dev \
       ripgrep desktop-file-utils libxml2-utils nodejs \
       patchelf glib-networking dconf-gsettings-backend file zsync \
       nasm libgnutls28-dev libxml2-dev libva-dev libvdpau-dev libdrm-dev zlib1g-dev libbz2-dev \

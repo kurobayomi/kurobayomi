@@ -77,7 +77,7 @@ jobs:
       #   run: |
       #     mkdir -p ~/apt-archives/partial
       #     sudo apt-get update
-      #     sudo apt-get install -y -o Dir::Cache::Archives="$HOME/apt-archives" build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev libdav1d-dev libmpv-dev patchelf glib-networking dconf-gsettings-backend desktop-file-utils file zsync \
+      #     sudo apt-get install -y -o Dir::Cache::Archives="$HOME/apt-archives" build-essential pkg-config libgtk-4-dev libadwaita-1-dev libwebkitgtk-6.0-dev libdav1d-dev libmpv-dev patchelf glib-networking dconf-gsettings-backend desktop-file-utils file zsync \
       #       nasm libgnutls28-dev libxml2-dev libva-dev libvdpau-dev libdrm-dev zlib1g-dev libbz2-dev
 
       - name: Update Rust
@@ -165,7 +165,7 @@ jobs:
           install: git
           pacboy: >-
             toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
-            gtk4:p mpv:p dav1d:p libarchive:p
+            gtk4:p libadwaita:p mpv:p dav1d:p libarchive:p
 
       - name: Cache the build
         uses: Swatinem/rust-cache@v2
