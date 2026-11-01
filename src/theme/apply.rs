@@ -230,7 +230,7 @@ fn mark_windows() {
     }
 }
 
-/// Marks a window created after the last apply (called from `mod::attach_window`).
+/// Marks a window created after the last apply (called from `main::build_window`).
 pub fn mark_new_window(window: &gtk::Window) {
     mark_window(window);
 }

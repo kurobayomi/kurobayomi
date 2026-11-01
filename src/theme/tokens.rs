@@ -1,4 +1,4 @@
-//! The alpha, duration and window-size constants of the theme, and the text styles the guard tests read.
+//! The alpha and duration constants of the theme, and the text styles the guard tests read.
 //!
 //! Dp values are CSS px at scale 1; GTK does the scaling, so no constant is multiplied here.
 
@@ -6,10 +6,6 @@
 
 pub const RIPPLE_ALPHA: f32 = 0.10;
 pub const SCROLLBAR_FADE_MS: u32 = 250;
-
-/// Window-size class breakpoints, dp (`WindowSize.kt`): medium from 600, expanded from 840.
-pub const MEDIUM_WIDTH_WINDOW_SIZE: f32 = 600.0;
-pub const EXPANDED_WIDTH_WINDOW_SIZE: f32 = 840.0;
 
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
 #[cfg(test)]

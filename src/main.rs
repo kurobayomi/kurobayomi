@@ -256,15 +256,21 @@ fn build_window(app: &gtk::Application) {
     let home = host.home_tabs(prefs.ui.start_screen.get());
     shell::tabs::bind(&tabs, &home);
     let sep = gtk::Separator::new(O::Vertical);
+    // the sidebar and its separator: the narrow breakpoint hides each of them, the immersive rule hides this box
+    let side = GBox::new(O::Horizontal, 0);
+    side.append(&sidebar);
+    side.append(&sep);
     let row = GBox::new(O::Horizontal, 0);
-    row.append(&sidebar);
-    row.append(&sep);
+    row.append(&side);
     row.append(&nav);
+    // the bottom bar stands in for the sidebar: hidden until the narrow breakpoint shows it
     let bottom = shell::sidebar::bottom_bar(&tabs);
+    bottom.set_visible(false);
+    shell::layout::add_narrow_breakpoint(&adw_win, &[sidebar.upcast_ref(), sep.upcast_ref()], &[bottom.upcast_ref()]);
+    let content = adw::ToolbarView::builder().content(&row).vexpand(true).build();
+    content.add_bottom_bar(&bottom);
     let outer = GBox::new(O::Vertical, 0);
-    row.set_vexpand(true);
-    outer.append(&row);
-    outer.append(&bottom);
+    outer.append(&content);
     // the toast layer sits over the whole window (T-12a-014)
     let overlay = adw::ToastOverlay::new();
     overlay.set_child(Some(&outer));
@@ -296,17 +302,11 @@ fn build_window(app: &gtk::Application) {
 
     // reader/player are immersive: no sidebar or tab bar while they're on screen
     let refresh = {
-        let win = win.clone();
+        let (side, content) = (side.clone(), content.clone());
         move || {
             let immersive = ui::visible_page_name().is_some_and(|name| matches!(name.as_str(), "screen:reader" | "screen:player"));
-            let (width, _) = window_size::size_of(&win);
-            let chrome = shell::layout::chrome_for(width, win.is_maximized());
-            let shown = shell::layout::visibility(chrome, immersive);
-            sidebar.set_visible(shown.sidebar);
-            // a narrow window packs its header buttons tighter (`style.css`, `.kb-narrow`)
-            if shown.bottom_bar { win.add_css_class("kb-narrow") } else { win.remove_css_class("kb-narrow") }
-            sep.set_visible(shown.sidebar);
-            bottom.set_visible(shown.bottom_bar);
+            side.set_visible(!immersive);
+            content.set_reveal_bottom_bars(!immersive);
         }
     };
     let r = refresh.clone();
@@ -320,14 +320,8 @@ fn build_window(app: &gtk::Application) {
             ui::close_searches(&page);
         }
     });
-    let r = refresh.clone();
-    win.connect_default_width_notify(move |_| r());
-    let r = refresh.clone();
-    win.connect_default_height_notify(move |_| r());
-    let r = refresh.clone();
-    win.connect_maximized_notify(move |_| r());
     window_size::watch(&win);
-    theme::attach_window(&win);
+    theme::apply::mark_new_window(win.upcast_ref());
     local_flow::ui::attach(&win);
     refresh();
     win.present();

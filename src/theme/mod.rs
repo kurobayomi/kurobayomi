@@ -30,7 +30,6 @@ pub mod components;
 pub mod icons;
 pub mod motion;
 pub mod prefs;
-pub mod size_class;
 pub mod splash;
 pub mod style;
 pub mod tokens;
@@ -51,12 +50,6 @@ impl Default for ThemeSettings {
     }
 }
 
-thread_local! {
-    /// The window's size class, updated by `attach_window`. `Compact` until the first layout.
-    static WINDOW_CLASS: std::cell::Cell<size_class::WindowClass> =
-        const { std::cell::Cell::new(size_class::WindowClass::Compact) };
-}
-
 /// Installs the theme before the first window: the icon bundle, the stored choice (read from the
 /// preference store), the stylesheets and the portal follower (T-49a-058).
 pub fn startup() {
@@ -74,15 +67,6 @@ pub fn startup() {
 /// only while the Appearance page is open (T-01a-021). The apply is a no-op when the mode is already the applied one.
 fn follow_mode(pref: &kuro_prefs::pref::Pref<ThemeMode>) {
     crate::pref_model::bind::follow(pref, || true, crate::pref_model::widgets::theme_mode::apply);
-}
-
-/// Tracks the window's size class and records each change (T-49a-058). Call once the window exists.
-pub fn attach_window(window: &impl gtk::prelude::IsA<gtk::Window>) {
-    apply::mark_new_window(window.as_ref());
-    size_class::attach(window, |class| {
-        WINDOW_CLASS.with(|c| c.set(class));
-        tracing::debug!(?class, "window size class changed");
-    });
 }
 
 #[cfg(test)]
