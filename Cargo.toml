@@ -4,6 +4,10 @@ version = "0.2.8"
 edition = "2024"
 
 [features]
+# the WASM host for repository sources (wasmtime, about half of a clean build); on by default. `cargo fast` builds the
+# app without it for UI work: the app then starts with no repository sources (.cargo/config.toml aliases)
+default = ["wasm"]
+wasm = ["kuro-extensions/wasm"]
 # the built-in updater; off by default (it sets `updater_enabled` in `app_info`)
 updater = ["kuro-core/updater"]
 
@@ -23,7 +27,7 @@ kuro-platform = { path = "crates/kuro-platform" }
 kuro-prefs = { path = "crates/kuro-prefs" }
 kuro-source = { path = "crates/kuro-source" }
 kuro-source-scrape = { path = "crates/kuro-source-scrape" }
-kuro-extensions = { path = "crates/kuro-extensions" }
+kuro-extensions = { path = "crates/kuro-extensions", default-features = false }
 kuro-backup = { path = "crates/kuro-backup" }
 kuro-local = { path = "crates/kuro-local" }
 kuro-images = { path = "crates/kuro-images" }
