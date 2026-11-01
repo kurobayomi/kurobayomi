@@ -23,7 +23,7 @@ use gtk::{Align, Box as GBox, Label, Orientation as O, gio, glib, pango};
 use kuro_platform::kind::Kind;
 use kuro_i18n::{MsgKey, tr};
 
-use crate::entry_core::list_model::{DOT_SIZE, Diff, RowAction, RowItem, changed_span, diff, row_alpha, row_menu};
+use crate::entry_core::list_model::{DOT_SIZE, Diff, RowAction, RowItem, changed_span, diff, row_menu};
 use crate::entry_core::selection::Mods;
 use crate::entry_core::text::COLLAPSED_LINES;
 use crate::widgets::context_menu::{self, Item as MenuItem};
@@ -105,7 +105,7 @@ struct RowWidgets {
     slot: GBox,
 }
 
-fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
+fn row_widgets(kind: Kind, on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     let lead = gtk::Image::builder().width_request(16).halign(Align::Center).valign(Align::Center).build();
     let title = Label::builder().xalign(0.0).ellipsize(pango::EllipsizeMode::End).single_line_mode(true).build();
     let subtitle = Label::builder().xalign(0.0).ellipsize(pango::EllipsizeMode::End).single_line_mode(true).css_classes(["dim-label", "caption"]).build();
@@ -117,9 +117,9 @@ fn row_widgets(on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     text.append(&subtitle);
     text.append(&summary);
     let marker = Label::builder().xalign(0.0).hexpand(true).visible(false).css_classes(["dim-label", "caption"]).build();
-    let bookmark = gtk::Image::builder().icon_name("starred-symbolic").css_classes(["chapter-primary"]).valign(Align::Center).build();
+    let bookmark = gtk::Image::builder().icon_name("bookmark-filled-symbolic").css_classes(["accent"]).valign(Align::Center).build();
     let filler = Label::builder().label(tr(MsgKey::filler)).css_classes(["caption", "episode-tertiary"]).valign(Align::Center).build();
-    let download = DownloadButton::new(move |request| on_download(request));
+    let download = DownloadButton::new(kind, move |request| on_download(request));
     // the list's own row (a `row` node of libadwaita) draws the hover, the focus ring and the selection. The card fills
     // the row, so a press anywhere on it opens the row; its content is inset 16 px from the edge (with the row's 2 px of
     // padding), in line with the leading slots
@@ -175,14 +175,15 @@ impl RowWidgets {
         } else {
             self.lead.set_icon_name(None);
         }
-        set_class(&self.lead, "chapter-primary", row.selected || !row.read);
+        set_class(&self.lead, "accent", row.selected || !row.read);
         self.title.set_label(&row.title);
         self.subtitle.set_label(&row.subtitle);
         self.subtitle.set_visible(!row.subtitle.is_empty());
         self.summary.set_visible(row.summary.is_some());
         self.summary.set_label(row.summary.as_deref().unwrap_or(""));
         self.summary.set_lines(if row.summary_expanded { -1 } else { COLLAPSED_LINES });
-        self.text.set_opacity(row_alpha(row.read));
+        // a read row's title takes the built-in dim look; its second line is dim already
+        set_class(&self.title, "dim-label", row.read);
         self.bookmark.set_visible(row.bookmark);
         self.filler.set_visible(row.filler);
         self.download.widget.set_visible(row.indicator);
@@ -281,7 +282,7 @@ impl ItemList {
                         }
                     })
                 };
-                let widgets = Rc::new(row_widgets(on_download));
+                let widgets = Rc::new(row_widgets(kind, on_download));
                 // set by a long press, so the release that ends it does not also open the row
                 let long_pressed = Rc::new(std::cell::Cell::new(false));
                 let left = gtk::GestureClick::builder().button(1).build();
@@ -598,22 +599,27 @@ mod tests {
         assert!(matches!(&*first.borrow::<Item>(), Item::Row(r) if r.id == 1));
     }
 
-    /// One display test: a chapter and an episode draw the same row, a read one is dimmed with no dot, a marker shows
+    /// One display test: a chapter and an episode draw the same row, a read one takes the dim look with no dot, a marker shows
     /// only its line, and a local item has no download button.
     #[test]
     fn chapters_and_episodes_draw_the_same_row() {
         crate::testing::with_display(|| {
-            let widgets = row_widgets(Rc::new(|_: Request| {}));
-            let chapter = RowItem { subtitle: "2024-01-02 \u{2022} Group".into(), indicator: true, indicator_enabled: true, ..RowItem::new(1, "Chapter 1".into()) };
+            let widgets = row_widgets(Kind::Manga, Rc::new(|_: Request| {}));
+            let chapter = RowItem { subtitle: "2024-01-02 \u{b7} Group".into(), indicator: true, indicator_enabled: true, ..RowItem::new(1, "Chapter 1".into()) };
             widgets.show_row(&chapter);
             assert_eq!(widgets.lead.icon_name().as_deref(), Some("media-record-symbolic"), "the unread dot");
+            assert!(widgets.lead.has_css_class("accent") && !widgets.title.has_css_class("dim-label"), "in the accent colour, with a normal title");
+            assert!(widgets.subtitle.has_css_class("caption"), "the second line is a caption");
             assert!(widgets.download.widget.is_visible() && widgets.subtitle.is_visible());
             assert_eq!(widgets.stack.widget_name().as_str(), "row:1");
             let episode = RowItem { read: true, filler: true, bookmark: true, ..RowItem::new(2, "Episode 2".into()) };
             widgets.show_row(&episode);
             assert_eq!(widgets.lead.icon_name(), None, "no dot on a seen episode");
-            assert!((widgets.text.opacity() - 0.38).abs() < 0.01, "a seen episode is dimmed");
-            assert!(widgets.filler.is_visible() && widgets.bookmark.is_visible());
+            assert!(widgets.title.has_css_class("dim-label") && widgets.subtitle.has_css_class("dim-label"), "a seen episode takes the dim look");
+            assert!(!widgets.lead.has_css_class("accent"), "and no accent dot");
+            assert!(widgets.filler.is_visible() && widgets.bookmark.is_visible(), "the bookmark icon shows on a bookmarked row");
+            widgets.show_row(&RowItem { bookmark: false, ..episode.clone() });
+            assert!(!widgets.bookmark.is_visible());
             assert!(!widgets.download.widget.is_visible(), "no download button without an indicator");
             assert!(!widgets.subtitle.is_visible(), "an empty second line takes no space");
             widgets.show_row(&RowItem::marker("1-4".into(), 2, "Missing 2 chapters".into()));
@@ -764,6 +770,40 @@ mod tests {
             menu().expect("the menu").activate_action(&format!("ctx.item{select}"), None).expect("the Select item");
             assert!(pump(&ctx, || selects() == 2), "Select from the menu reached the page");
             window.close();
+        });
+    }
+
+    /// Enter on the focused row opens it (a plain press, with the modifiers held).
+    #[test]
+    fn enter_on_the_focused_row_presses_it() {
+        crate::testing::with_display(|| {
+            let ctx = glib::MainContext::default();
+            let pressed: Rc<RefCell<Vec<(i64, Press)>>> = Rc::default();
+            let list = ItemList::new(
+                Kind::Manga,
+                Callbacks {
+                    on_row: Rc::new({
+                        let pressed = Rc::clone(&pressed);
+                        move |id: i64, press: Press| pressed.borrow_mut().push((id, press))
+                    }),
+                    on_menu: Rc::new(|_: i64, _: RowAction| {}),
+                    on_download: Rc::new(|_: i64, _: Request| {}),
+                    on_summary: Rc::new(|_: i64| {}),
+                },
+            );
+            list.sync(rows(3));
+            let window = gtk::Window::builder().default_width(600).default_height(400).child(&list.widget).build();
+            window.present();
+            let enter = |state: ModifierType| {
+                let model = list.widget.observe_controllers();
+                let keys = (0..model.n_items()).find_map(|i| model.item(i).and_downcast::<gtk::EventControllerKey>()).expect("the list's key controller");
+                keys.emit_by_name::<bool>("key-pressed", &[&gtk::gdk::Key::Return, &0u32, &state])
+            };
+            list.focus_row(2);
+            assert!(crate::entry_core::page_shell::test_util::pump(&ctx, || list.focused_id() == Some(2)), "the row holds focus");
+            assert!(enter(ModifierType::CONTROL_MASK), "Enter is consumed on a row");
+            assert_eq!(*pressed.borrow(), [(2, Press { alt: false, mods: Mods { shift: false, ctrl: true } })]);
+            window.destroy();
         });
     }
 

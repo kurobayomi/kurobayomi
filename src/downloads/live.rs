@@ -11,6 +11,7 @@ use gtk::glib;
 use gtk::prelude::*;
 use kuro_downloads::DownloadState;
 use kuro_downloads::queue::{CancelTarget, Snapshot};
+use kuro_downloads::state::RunState;
 use kuro_downloads::service::Downloads;
 use kuro_downloads::unit::QueuedUnit;
 use kuro_platform::kind::Kind;
@@ -52,6 +53,25 @@ pub fn cancel(kind: Kind, id: i64) {
             tracing::warn!(%error, id, "the download was not cancelled");
         }
     });
+}
+
+/// Whether `kind`'s queue is running (not paused). Without a download service nothing is paused.
+pub fn lane_running(kind: Kind) -> bool {
+    downloads().is_none_or(|downloads| downloads.snapshot().run(kind) == RunState::Running)
+}
+
+/// Pauses `kind`'s queue: the running unit goes back to the queue. The download manager pauses a whole queue, not one unit.
+pub fn pause(kind: Kind) {
+    if let Some(downloads) = downloads() {
+        downloads.pause(kind);
+    }
+}
+
+/// Starts `kind`'s queue again (the queue page's Resume), which also retries the units that failed.
+pub fn resume(kind: Kind) {
+    if let Some(downloads) = downloads() {
+        downloads.start(kind);
+    }
 }
 
 /// Calls `on_change` on the GTK thread for every unit whose queue state or percent changed, and once more when it left

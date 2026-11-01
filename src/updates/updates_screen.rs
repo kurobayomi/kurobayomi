@@ -760,11 +760,11 @@ impl UpdatesScreen {
         }
     }
 
-    /// The download button of a row (`widgets::download_button`): a click starts, retries, cancels, or offers Delete. It
+    /// The download button of a row (`widgets::download_button`): a click starts, retries, or opens its Pause, Cancel or Delete menu. It
     /// is off while selecting, as the cover tap is.
     fn download_button(self: &Rc<Self>, feed_row: &FeedRow, mode: bool) -> gtk::Button {
         let (weak, id) = (Rc::downgrade(self), feed_row.row.item_id);
-        let button = DownloadButton::new(move |request| {
+        let button = DownloadButton::new(self.kind, move |request| {
             let action = match request {
                 Request::Start => DownloadAction::Start,
                 Request::Cancel => DownloadAction::Cancel,

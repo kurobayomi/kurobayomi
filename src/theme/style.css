@@ -245,7 +245,8 @@ flowbox.kb-chips > flowboxchild {
   background-image: linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);
 }
 
-/* Chapter and episode rows: the theme's selection colour for the unread dot, the bookmark and the filler mark. */
+/* The theme's selection colour for the filler mark of an episode row and the header's chapter marks. The unread dot and the
+ * bookmark of a row use libadwaita's own `accent` class. */
 .chapter-primary,
 .episode-tertiary {
   color: @theme_selected_bg_color;

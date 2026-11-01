@@ -55,7 +55,7 @@ use super::season_tile::{SeasonFacts, SeasonItem, continue_episode, season_facts
 use super::set_default::{self, Scope};
 use crate::entry_core::selection::RowClick;
 use super::info::header_model;
-use super::layout::{bottom_bar_width, two_pane};
+use super::layout::two_pane;
 use super::model::{EntryModel, EntryLoadContext};
 use super::refresh::refresh_snack;
 use super::remote::{LiveSources, RemoteAnimeBackend};
@@ -160,8 +160,6 @@ struct View {
     env: Env,
     show_airing: bool,
     refresh_button: Button,
-    /// "Download all", in the head of the list (not a menu): queues every unseen or unread item.
-    download_all: Button,
     /// The page actions in the top bar; each hidden while the entry on show does not offer it, and all of them in the
     /// phone layout, where the ⋮ menu below stands in for them.
     overflow_buttons: Vec<(OverflowItem, Button)>,
@@ -282,12 +280,41 @@ fn overflow_sections(late: &Rc<RefCell<Weak<View>>>) -> Vec<Vec<crate::ui::MenuE
     vec![ACTIONS.into_iter().map(entry).collect()]
 }
 
+/// The menu of the list's bulk actions, at the end of the list header: Download all (offered only when the app can queue
+/// this entry's items) and a jump to the first unread one. Its entries read the page when the menu opens.
+fn bulk_menu(late: &Rc<RefCell<Weak<View>>>, kind: Kind) -> gtk::MenuButton {
+    let (run, shown) = (Rc::clone(late), Rc::clone(late));
+    let download_all = crate::ui::MenuEntry::new(tr(MsgKey::ui_download_all), move || {
+        if let Some(view) = run.borrow().upgrade() {
+            view.run_download(DownloadAmount::AllUnread);
+        }
+    })
+    .when(move || shown.borrow().upgrade().is_some_and(|view| view.model.borrow().as_ref().is_some_and(|m| view.can_download(m))));
+    let run = Rc::clone(late);
+    let jump = crate::ui::MenuEntry::new(tr(crate::entry_core::wording::jump_to_unread(kind)), move || {
+        if let Some(view) = run.borrow().upgrade() {
+            view.jump_to_unread();
+        }
+    });
+    let button = crate::ui::menu_button(vec![vec![download_all, jump]]).expect("the menu has entries");
+    // a menu of the list, not of the page: the horizontal dots, and not the page's ⋮
+    button.set_icon_name("view-more-horizontal-symbolic");
+    button.set_tooltip_text(Some(&tr(MsgKey::action_menu_overflow_description)));
+    button.remove_css_class(ui::MORE_MENU);
+    button
+}
+
 fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let kind = env.kind;
     let stack = page_shell::state_stack();
 
-    // the list head: the item header row, the refresh spinner and the empty line
-    let page_shell::ItemHeaderRow { row: header_row, count, missing, download_all } = page_shell::item_header_row();
+    // the list head: the item header row, the refresh spinner and the empty line. The list options (sort and filter) and the
+    // bulk menu sit in the header row, so they are made first; the menu's items reach the page through `late`.
+    let late: Rc<RefCell<Weak<View>>> = Rc::default();
+    let (episode_spec, season_spec) = (list_options::item_spec(kind), list_options::season_spec());
+    let options = ViewOptions::new(&list_options::tooltip(), &episode_spec.sections());
+    let bulk = bulk_menu(&late, kind);
+    let page_shell::ItemHeaderRow { row: header_row, count, missing, search } = page_shell::item_header_row(options.widget.upcast_ref(), &bulk);
     // the refresh spinner of the list head: inline size, spinning only while a refresh runs
     let spinner = ui::inline_spinner();
     spinner.set_spinning(false);
@@ -437,7 +464,6 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
 
     // the selection header, the one of Library and Updates: Cancel, the count, Select all. The view does not exist yet, so the
     // buttons reach it through `late`, set once it is built. Ctrl+I still inverts the selection.
-    let late: Rc<RefCell<Weak<View>>> = Rc::default();
     let bar_count = Label::new(None);
     let selecting = |edit: fn(&mut EntryModel, &[i64], &[i64])| {
         let late = Rc::clone(&late);
@@ -450,14 +476,10 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let bar_row = crate::ui::selection_header(&bar_count, selecting(|m, _, _| m.selection.clear()), selecting(|m, _, full| m.selection.set_all(full, true)));
     let bar = gtk::Revealer::builder().child(&bar_row).transition_type(gtk::RevealerTransitionType::SlideDown).build();
 
-    // the bottom action bar of the selection (behaviour 1.4): its rows follow the selected episodes, it is hidden
-    // when nothing is selected, and it is as wide as the window narrow and half of it wide
-    let bottom_row = GBox::new(O::Horizontal, SPACE_S);
-    bottom_row.add_css_class("toolbar");
-    bottom_row.set_halign(Align::Center);
-    // the row scrolls sideways when its labels do not fit, so a narrow window is never pushed wider than itself
-    let bottom_scroll = gtk::ScrolledWindow::builder().child(&bottom_row).vscrollbar_policy(gtk::PolicyType::Never).hscrollbar_policy(gtk::PolicyType::Automatic).propagate_natural_height(true).build();
-    let bottom = gtk::Revealer::builder().child(&bottom_scroll).transition_type(gtk::RevealerTransitionType::SlideUp).build();
+    // the bottom action bar of the selection (behaviour 1.4), the one of Library and Updates: its buttons follow the selected
+    // episodes, and it is hidden when nothing is selected
+    let bottom = crate::ui::action_bar(&[]);
+    let bottom_row = crate::ui::action_bar_row(&bottom);
 
     let ready = GBox::new(O::Vertical, 0);
     ready.append(&bar);
@@ -465,16 +487,14 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     ready.append(&bottom);
     stack.add_named(&ready, Some("ready"));
 
-    let (episode_spec, season_spec) = (list_options::item_spec(kind), list_options::season_spec());
-    let options = ViewOptions::new(&list_options::tooltip(), &episode_spec.sections());
     let refresh_button = crate::ui::refresh_button(&tr(MsgKey::action_webview_refresh));
     // the header row every page shares (`ui::HeaderActions`); the page actions are buttons showing the items
-    // `overflow_menu::items` gives for this entry and its source (T-39a-075), and Download all is in the head of the list
+    // `overflow_menu::items` gives for this entry and its source (T-39a-075). Sort and filter, and the bulk actions such as
+    // Download all, are in the head of the list
     let overflow_buttons = overflow_buttons(&late);
     let toolbar = crate::ui::HeaderActions {
         refresh: Some(refresh_button.clone().upcast()),
         extra: overflow_buttons.iter().map(|(_, button)| button.clone().upcast()).collect(),
-        options: Some(options.widget.clone().upcast()),
         menu: overflow_sections(&late),
         ..Default::default()
     }
@@ -491,7 +511,6 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
         env,
         show_airing,
         refresh_button: refresh_button.clone(),
-        download_all: download_all.clone(),
         overflow_buttons,
         overflow_button,
         actions_narrow: Cell::new(narrow_window()),
@@ -585,7 +604,14 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
             }
         },
     );
-    download_all.connect_clicked(on_view(|v| v.run_download(DownloadAmount::AllUnread)));
+    search.connect_search_changed({
+        let weak = weak.clone();
+        move |entry| {
+            if let Some(view) = weak.upgrade() {
+                view.search_changed(entry.text().as_str());
+            }
+        }
+    });
     *late.borrow_mut() = weak.clone();
     // the page actions follow the window between buttons and the ⋮ menu (`View::sync_actions`)
     page.add_tick_callback({
@@ -886,7 +912,8 @@ impl View {
         }
         let lines = self.list_rows(m);
         let seasons_entry = m.entry.fetch_type() == FetchType::Seasons;
-        let none_shown = if seasons_entry { m.seasons.is_empty() } else { lines.is_empty() };
+        // a search that finds nothing is not an empty entry: the count says so, with no Retry
+        let none_shown = if seasons_entry { m.seasons.is_empty() } else { lines.is_empty() && m.search.is_empty() };
         self.list.sync(lines);
         self.show_seasons(m, seasons_entry);
         let header = m.item_header();
@@ -918,15 +945,13 @@ impl View {
             m.tracking_count as i64,
             self.env.backend.is_http_source(m.entry.source),
         ));
-        // a local or stub source has no downloads to queue (`isLocalOrStub`, T-39b-059)
-        let local_or_stub = m.is_local() || self.env.backend.source_info(m.entry.source).stub;
-        self.download_all.set_visible(menu_visible(local_or_stub, self.env.backend.has_download_handler()));
         self.sync_actions();
         // the button stays while nothing is selected, and is disabled when no episode is unseen (T-EPS-NEXT-1)
         let fab = m.fab();
         self.fab.set_visible(!m.selection.is_active());
         self.fab.set_sensitive(m.next_unseen().is_some());
-        self.fab_label.set_label(&tr(fab.label()));
+        // the button names its target: "Resume Chapter 1196", "Start Episode 1"
+        self.fab_label.set_label(&fab.text(&m.fab_target().unwrap_or_default()));
         self.update_fab();
         self.bar.set_reveal_child(m.selection.is_active());
         let selected = m.selection.count_in(&m.processed_ids());
@@ -954,10 +979,10 @@ impl View {
             self.bottom_row.remove(&child);
         }
         for action in &rows {
-            let button = Button::builder().css_classes(["flat"]).build();
             let content = GBox::new(O::Horizontal, SPACE_S);
             content.append(&gtk::Image::from_icon_name(action.icon()));
             content.append(&Label::new(Some(&tr(action.label(self.env.kind)))));
+            let button = Button::new();
             button.set_child(Some(&content));
             let weak = Rc::downgrade(self);
             let action = *action;
@@ -968,16 +993,7 @@ impl View {
             });
             self.bottom_row.append(&button);
         }
-        match bottom_bar_width(self.width.get()) {
-            Some(width) => {
-                self.bottom_row.set_width_request(width);
-                self.bottom_row.set_halign(Align::Center);
-            }
-            None => {
-                self.bottom_row.set_width_request(-1);
-                self.bottom_row.set_halign(Align::Fill);
-            }
-        }
+        crate::ui::no_sticky_focus(&self.bottom_row);
         self.bottom.set_reveal_child(!rows.is_empty());
     }
 
@@ -1388,6 +1404,29 @@ impl View {
         }
     }
 
+    /// The app can queue this entry's items: not for a local or stub source, and not without a download handler
+    /// (`isLocalOrStub`, T-39b-059).
+    fn can_download(&self, m: &EntryModel) -> bool {
+        let local_or_stub = m.is_local() || self.env.backend.source_info(m.entry.source).stub;
+        menu_visible(local_or_stub, self.env.backend.has_download_handler())
+    }
+
+    /// A change of the search text: the list shows the rows that hold it.
+    fn search_changed(self: &Rc<Self>, text: &str) {
+        if let Some(m) = self.model.borrow_mut().as_mut() {
+            m.search = text.to_owned();
+        }
+        self.render();
+    }
+
+    /// The list menu's jump: scrolls to the first item still to read or watch, the one the Resume button opens.
+    fn jump_to_unread(&self) {
+        let next = self.model.borrow().as_ref().and_then(EntryModel::next_unseen);
+        if let Some(id) = next {
+            self.list.focus_row(id);
+        }
+    }
+
     /// Download all (`download_menu::targets`): queues every unseen or unread item of the displayed list.
     fn run_download(&self, amount: DownloadAmount) {
         let (entry_id, ids) = {
@@ -1481,8 +1520,7 @@ impl View {
     /// local or stub source, and not without a download handler (`isLocalOrStub`, T-39b-059).
     fn list_rows(&self, m: &EntryModel) -> Vec<crate::entry_core::list_model::RowItem> {
         let mut rows = m.lines();
-        let can_download = !m.is_local() && !self.env.backend.source_info(m.entry.source).stub && self.env.backend.has_download_handler();
-        if !can_download {
+        if !self.can_download(m) {
             for row in &mut rows {
                 row.indicator = false;
             }
@@ -1933,8 +1971,12 @@ mod tests {
             assert!(labels.iter().any(|t| t == "Tracking"), "the tracking button has its callback");
             let webview = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).find(|l| l.label() == "Browser").and_then(|l| l.ancestor(Button::static_type()));
             assert!(webview.is_some_and(|b| !b.is_visible()), "Browser shows for an HTTP source only");
-            let download = buttons.iter().find(|b| b.label().as_deref() == Some("Download all")).expect("the Download all button exists");
-            assert!(!download.is_visible(), "no download handler, no Download all");
+            // Download all is an entry of the list's bulk menu now, with the jump to the first unseen episode; the page has no
+            // button of that name
+            assert!(!buttons.iter().any(|b| b.label().as_deref() == Some("Download all")), "Download all is a menu entry, not a header button");
+            let bulk = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::MenuButton>().ok()).find(|b| b.tooltip_text().as_deref() == Some("More options")).expect("the list's bulk menu");
+            let bulk_labels = crate::widgets::view_options::menu_labels(&bulk.menu_model().expect("the bulk menu"));
+            assert_eq!(bulk_labels, ["Download all", "Jump to first unseen"]);
             assert!(buttons.iter().any(|b| b.tooltip_text().as_deref() == Some("Refresh") && b.is_sensitive()), "the refresh button");
             for menu in descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::MenuButton>().ok()) {
                 if let Some(model) = menu.menu_model() {
@@ -1947,7 +1989,7 @@ mod tests {
             assert!(min <= 360, "no horizontal minimum above 360 px, got {min}");
             let left = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::ScrolledWindow>().ok()).find(|w| w.width_request() == crate::entry_core::constants::LEFT_PANE_WIDTH).expect("the left pane");
             assert!(!left.is_visible(), "no left pane in one column");
-            // one list options menu in the top bar, with the episode options; the count row is no button
+            // one list options menu, in the list head, with the episode options; the count row is no button
             let options: Vec<gtk::MenuButton> = descendants(page.upcast_ref())
                 .into_iter()
                 .filter_map(|w| w.downcast::<gtk::MenuButton>().ok())
@@ -2012,6 +2054,88 @@ mod tests {
             assert!(pump(&ctx, || stack.visible_child_name().as_deref() == Some("missing")), "a missing row ends in the missing state");
             let has_back = descendants(missing.upcast_ref()).iter().filter_map(|w| w.clone().downcast::<Button>().ok()).any(|b| b.label().as_deref() == Some("Back"));
             assert!(has_back, "the missing state offers Back");
+        });
+    }
+
+    /// The page of `episodes` episodes (`seen` of them seen), loaded and drawn in a window `width` px wide.
+    fn shown_page(ctx: &glib::MainContext, rt: &tokio::runtime::Runtime, episodes: usize, seen: usize, width: i32) -> (GBox, gtk::Window, Rc<EntryRunner>) {
+        let (dir, store, id) = super::super::store::fixture::with_episodes(true, true, episodes, seen);
+        std::mem::forget(dir);
+        let runner = Rc::new(runner::spawn(rt.handle(), store.clone(), PrefStore::in_memory(), Arc::new(Stub), EntryLoadContext::default()));
+        let page = assemble(Rc::clone(&runner), true, env_of(&store));
+        let window = gtk::Window::builder().default_width(width).default_height(700).child(&page).build();
+        window.present();
+        runner.send(EntryCmd::Load { entry_id: id });
+        let list = descendants(page.upcast_ref()).into_iter().find_map(|w| w.downcast::<gtk::ListView>().ok()).expect("the list view");
+        let leading = if two_pane(width) { 1 } else { 2 };
+        assert!(pump(ctx, || list.model().is_some_and(|m| m.n_items() as usize == leading + episodes)), "the list shows its rows");
+        (page, window, runner)
+    }
+
+    fn labels_of(page: &GBox) -> Vec<String> {
+        descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).filter(|l| l.is_mapped()).map(|l| l.label().to_string()).collect()
+    }
+
+    /// Resume button, search, jump and selection: the button names the first unseen episode, the search narrows the list,
+    /// the jump is in the bulk menu, and a selection swaps the button for the bottom action bar of its own actions.
+    #[test]
+    fn the_resume_button_the_search_and_the_selection_bar() {
+        crate::testing::with_display(|| {
+            let ctx = glib::MainContext::default();
+            let _owner = ctx.acquire().expect("main context");
+            let rt = kuro_core::runtime::build().expect("runtime");
+            let (page, window, runner) = shown_page(&ctx, &rt, 3, 1, 1000);
+            let fab = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).find(|b| b.has_css_class("pill") && descendants(b.upcast_ref()).iter().any(|w| w.downcast_ref::<gtk::Image>().is_some_and(|i| i.icon_name().as_deref() == Some("media-playback-start-symbolic")))).expect("the Resume pill");
+            let fab_text = || descendants(fab.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).map(|l| l.label().to_string()).collect::<String>();
+            assert_eq!(fab_text(), "Resume Episode 2", "the exact target: the first unseen episode");
+
+            // the search toggle opens the bar; text in it narrows the list (the head is the one leading row)
+            let list = descendants(page.upcast_ref()).into_iter().find_map(|w| w.downcast::<gtk::ListView>().ok()).expect("the list view");
+            let toggle = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::ToggleButton>().ok()).find(|t| t.icon_name().as_deref() == Some("system-search-symbolic")).expect("the search toggle");
+            let entry = descendants(page.upcast_ref()).into_iter().find_map(|w| w.downcast::<gtk::SearchEntry>().ok()).expect("the search entry");
+            toggle.set_active(true);
+            entry.set_text("Episode 3");
+            assert!(pump(&ctx, || list.model().is_some_and(|m| m.n_items() == 2)), "one episode matches");
+            assert!(pump(&ctx, || labels_of(&page).iter().any(|t| t == "1 episode")), "the count follows the search: {:?}", labels_of(&page));
+            assert_eq!(fab_text(), "Resume Episode 2", "a search never moves the button");
+            toggle.set_active(false);
+            assert!(pump(&ctx, || list.model().is_some_and(|m| m.n_items() == 4)), "closing the search shows every episode again");
+            assert_eq!(entry.text().as_str(), "", "and clears it");
+
+            // a long press on a row selects it: the bar shows its actions, the button hides, and Cancel undoes both
+            let card = || {
+                descendants(page.upcast_ref()).into_iter().find(|w| w.widget_name().starts_with("row:") && w.is_visible()).and_then(|w| w.downcast::<gtk::Stack>().ok()).and_then(|stack| stack.visible_child())
+            };
+            let card = card().expect("a row");
+            let model = card.observe_controllers();
+            let controllers: Vec<gtk::EventController> = (0..model.n_items()).filter_map(|i| model.item(i).and_downcast::<gtk::EventController>()).collect();
+            let press = controllers.iter().filter_map(|c| c.downcast_ref::<gtk::GestureClick>()).find(|g| g.button() == 1).expect("a click gesture").clone();
+            let long = controllers.iter().find_map(|c| c.downcast_ref::<gtk::GestureLongPress>().cloned()).expect("the long press");
+            press.emit_by_name::<()>("pressed", &[&1i32, &4.0f64, &4.0f64]);
+            long.emit_by_name::<()>("pressed", &[&4.0f64, &4.0f64]);
+            let bar = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<gtk::Revealer>().ok()).find(|r| descendants(r.upcast_ref()).iter().any(|w| w.is::<gtk::ActionBar>())).expect("the bottom action bar");
+            assert!(pump(&ctx, || bar.is_child_revealed()), "a selection reveals the bar");
+            let bar_buttons = || descendants(bar.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).flat_map(|b| descendants(b.upcast_ref())).filter_map(|w| w.downcast::<Label>().ok()).map(|l| l.label().to_string()).collect::<Vec<_>>();
+            assert!(bar_buttons().iter().any(|t| t == "Bookmark episode") && bar_buttons().iter().any(|t| t == "Mark as watched" || t == "Mark as unwatched"), "the bar offers the selection's actions: {:?}", bar_buttons());
+            assert!(labels_of(&page).iter().any(|t| t == "1 selected"), "the header shows the count: {:?}", labels_of(&page));
+            assert!(!fab.is_visible(), "no Resume button while selecting");
+            let cancel = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).find(|b| b.label().as_deref() == Some("Cancel") && b.is_mapped()).expect("the header's Cancel");
+            cancel.emit_clicked();
+            assert!(pump(&ctx, || !bar.is_child_revealed() && fab.is_visible()), "Cancel clears the selection: the bar goes and the button comes back");
+
+            // Space on the focused row flips it into the selection, as a long press does
+            let row = || descendants(page.upcast_ref()).into_iter().find(|w| w.widget_name().starts_with("row:") && w.is_visible()).expect("a row");
+            assert!(pump(&ctx, || {
+                let row = row();
+                row.grab_focus() || row.parent().is_some_and(|item| item.grab_focus())
+            }));
+            let page_controllers = page.observe_controllers();
+            let keys = (0..page_controllers.n_items()).find_map(|i| page_controllers.item(i).and_downcast::<gtk::EventControllerKey>()).expect("the page's key controller");
+            keys.emit_by_name::<bool>("key-pressed", &[&gtk::gdk::Key::space, &0u32, &gtk::gdk::ModifierType::empty()]);
+            assert!(pump(&ctx, || bar.is_child_revealed() && !fab.is_visible()), "Space selects the focused row");
+            runner.send(EntryCmd::Shutdown);
+            window.set_child(None::<&gtk::Widget>);
+            window.close();
         });
     }
 }

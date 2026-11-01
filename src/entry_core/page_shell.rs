@@ -24,35 +24,54 @@ pub fn state_stack() -> gtk::Stack {
     stack
 }
 
-/// The item header over the list (`ItemHeader`): the count and the missing warning. It is a plain row: the list
-/// options live in the one menu button of the top bar (`list_options`). `row` has the width and inset of the list's cards,
-/// so on a wide window the count stays over the first card instead of at the window's edge.
+/// The item header over the list (`ItemHeader`): the count and the missing warning, then one linked group (the list
+/// options, which hold sort and filter, and a search toggle) and the menu of the list's bulk actions. A search bar under
+/// the row opens with the toggle. `row` has the width and inset of the list's cards, so on a wide window the count stays
+/// over the first card instead of at the window's edge.
 pub struct ItemHeaderRow {
     pub row: gtk::Widget,
     pub count: Label,
     pub missing: Label,
-    /// "Download all", at the right end of the row; the page shows it for an entry that can queue downloads.
-    pub download_all: Button,
+    /// The text field of the search bar; the page reads its changes.
+    pub search: gtk::SearchEntry,
 }
 
-pub fn item_header_row() -> ItemHeaderRow {
+/// `options` is the list options button and `bulk` the menu button of the bulk actions, both made by the page.
+pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton) -> ItemHeaderRow {
     let count = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let missing = Label::builder().xalign(1.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
-    let row = GBox::new(O::Horizontal, SPACE_S);
-    row.set_margin_top(SPACE_S);
-    row.set_margin_bottom(SPACE_S);
+    let toggle = gtk::ToggleButton::builder().icon_name("system-search-symbolic").tooltip_text(tr(MsgKey::action_search)).build();
+    let entry = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).hexpand(true).build();
+    let bar = gtk::SearchBar::builder().child(&entry).build();
+    bar.connect_entry(&entry);
+    toggle.bind_property("active", &bar, "search-mode-enabled").bidirectional().sync_create().build();
+    // closing the search clears it, so the list shows every row again
+    bar.connect_search_mode_enabled_notify({
+        let entry = entry.clone();
+        move |bar| {
+            if !bar.is_search_mode() {
+                entry.set_text("");
+            }
+        }
+    });
+    let linked = GBox::builder().css_classes(["linked"]).valign(gtk::Align::Center).build();
+    linked.append(options);
+    linked.append(&toggle);
+    let line = GBox::new(O::Horizontal, SPACE_S);
+    line.set_margin_top(SPACE_S);
+    line.set_margin_bottom(SPACE_S);
     // the inset of a card (`list_view`), so the count lines up with the first row
-    row.set_margin_start(SPACE_L);
-    row.set_margin_end(SPACE_L);
-    let download_all = Button::builder().label(&tr(MsgKey::ui_download_all)).css_classes(["flat"]).valign(gtk::Align::Center).build();
-    // the row keeps the height of its button while the button is hidden, so the list starts at the same place on a page
-    // that offers Download all (manga) and on one that does not (anime)
-    row.set_size_request(-1, download_all.measure(gtk::Orientation::Vertical, -1).1);
-    download_all.set_visible(false);
-    row.append(&count);
-    row.append(&missing);
-    row.append(&download_all);
-    ItemHeaderRow { row: crate::ui::clamp(&row, crate::entry_core::constants::LIST_MAX_WIDTH).upcast(), count, missing, download_all }
+    line.set_margin_start(SPACE_L);
+    line.set_margin_end(SPACE_L);
+    bulk.set_valign(gtk::Align::Center);
+    for w in [count.upcast_ref::<gtk::Widget>(), missing.upcast_ref(), linked.upcast_ref(), bulk.upcast_ref()] {
+        line.append(w);
+    }
+    ui::no_sticky_focus(&line);
+    let column = GBox::new(O::Vertical, 0);
+    column.append(&line);
+    column.append(&bar);
+    ItemHeaderRow { row: crate::ui::clamp(&column, crate::entry_core::constants::LIST_MAX_WIDTH).upcast(), count, missing, search: entry }
 }
 
 /// The Start or Resume button: the play icon and its label. The page places it over the list.

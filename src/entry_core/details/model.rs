@@ -87,6 +87,8 @@ pub struct EntryModel {
     pub season_extras: HashMap<i64, SeasonExtra>,
     /// The scanlators of a manga's chapters and the excluded ones; empty for an anime.
     pub scanlators: super::store::Scanlators,
+    /// The text of the list's search: only the rows whose title or scanlator holds it show. Empty shows every row.
+    pub search: String,
 }
 
 impl EntryModel {
@@ -142,6 +144,7 @@ impl EntryModel {
             tracking_count,
             season_extras: HashMap::new(),
             scanlators: store.scanlators(entry_id)?,
+            search: String::new(),
         }))
     }
 
@@ -208,10 +211,16 @@ impl EntryModel {
 
     /// The filtered and sorted list. A local entry counts every episode as downloaded.
     pub fn processed(&self) -> Vec<Item> {
-        match self.filters() {
+        let mut shown = match self.filters() {
             Some(filters) => apply_filters(self.episodes.clone(), &filters, self.is_local(), |e| self.downloaded.contains(&e.id)),
             None => self.episodes.clone(),
+        };
+        let needle = self.search.trim().to_lowercase();
+        if !needle.is_empty() {
+            let number = self.entry.display_mode() == item::DISPLAY_NUMBER;
+            shown.retain(|e| super::episode_row::title(e, number).to_lowercase().contains(&needle) || e.scanlator.as_deref().is_some_and(|s| s.to_lowercase().contains(&needle)));
         }
+        shown
     }
 
     /// The selected episodes, in stored order.
@@ -313,6 +322,13 @@ impl EntryModel {
             }
         };
         next_unseen_in(&ascending)
+    }
+
+    /// What the FAB opens, as its label names it: "Chapter 1196", or the item's name when it has no number.
+    pub fn fab_target(&self) -> Option<String> {
+        let id = self.next_unseen()?;
+        let ep = self.episodes.iter().find(|e| e.id == id)?;
+        Some(if ep.number >= 0.0 { super::episode_row::title(ep, true) } else { ep.name.clone() })
     }
 
     /// The FAB reads the unfiltered list (behaviour 9).
@@ -486,6 +502,19 @@ mod tests {
         assert_eq!(load(&store, id).next_unseen(), Some(by_number(3.0)), "descending: findLast of the display list is the oldest unseen (T-EPS-NEXT-2)");
         let (_dir, store, id) = with_episodes(true, true, 2, 2);
         assert_eq!(load(&store, id).next_unseen(), None);
+    }
+
+    #[test]
+    fn the_search_narrows_the_list_and_never_moves_the_resume_target() {
+        let (_dir, store, id) = with_episodes(true, true, 12, 3);
+        let mut model = load(&store, id);
+        assert_eq!(model.fab_target().as_deref(), Some("Episode 4"), "the first unseen item, named by its number");
+        model.search = " EPISODE 1".into();
+        let titles: Vec<String> = model.lines().into_iter().map(|r| r.title).collect();
+        assert_eq!(titles, ["Episode 12", "Episode 11", "Episode 10", "Episode 1"], "a search hides rows and adds no missing marker");
+        assert_eq!(model.fab_target().as_deref(), Some("Episode 4"));
+        model.search = "no such".into();
+        assert!(model.lines().is_empty());
     }
 
     #[test]

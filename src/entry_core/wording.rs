@@ -73,6 +73,14 @@ pub fn mark_previous(kind: Kind) -> MsgKey {
     }
 }
 
+/// The label of the list menu's jump to the first item still to read or watch.
+pub fn jump_to_unread(kind: Kind) -> MsgKey {
+    match kind {
+        Kind::Manga => MsgKey::action_jump_to_unread,
+        Kind::Anime => MsgKey::action_jump_to_unseen,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use kuro_i18n::tr;
@@ -83,6 +91,7 @@ mod tests {
     fn each_kind_reads_in_its_own_words() {
         assert_ne!(tr(none_found(Kind::Manga)), tr(none_found(Kind::Anime)));
         assert_ne!(tr(mark_done(Kind::Manga, true)), tr(mark_done(Kind::Anime, true)));
+        assert_eq!((tr(jump_to_unread(Kind::Manga)), tr(jump_to_unread(Kind::Anime))), ("Jump to first unread".to_owned(), "Jump to first unseen".to_owned()));
         assert!(tr(bookmark(Kind::Manga, true)).contains("chapter") && tr(bookmark(Kind::Anime, true)).contains("episode"));
     }
 }

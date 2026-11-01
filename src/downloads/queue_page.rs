@@ -123,8 +123,8 @@ impl Page {
 
     fn row(&self, item: &QueueItem) -> adw::ActionRow {
         let (downloads, kind, id) = (self.downloads.clone(), item.kind, item.item_id);
-        // a click on a queued or running row cancels it, and on a failed row starts its queue again
-        let button = DownloadButton::new(move |request| match request {
+        // the menu of a queued or running row cancels it (Pause and Resume it runs itself), and a click on a failed row starts its queue again
+        let button = DownloadButton::new(kind, move |request| match request {
             Request::Cancel => live::cancel(kind, id),
             Request::Start => downloads.start(kind),
             Request::Delete => {}

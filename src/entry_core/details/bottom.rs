@@ -96,8 +96,8 @@ impl BottomAction {
     /// The icon of the row.
     pub fn icon(self) -> &'static str {
         match self {
-            Self::Bookmark => "starred-symbolic",
-            Self::RemoveBookmark => "non-starred-symbolic",
+            Self::Bookmark => "bookmark-new-symbolic",
+            Self::RemoveBookmark => "bookmark-filled-symbolic",
             Self::Fillermark => "emblem-important-symbolic",
             Self::RemoveFillermark => "list-remove-symbolic",
             Self::MarkViewed => "object-select-symbolic",
