@@ -77,7 +77,7 @@ fn update_center_row() -> PreferenceItem {
         build: Rc::new(|| {
             let button = gtk::Button::new();
             button.set_valign(gtk::Align::Center);
-            let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let spinner = crate::ui::inline_spinner();
             let pause = crate::ui::icon_button("media-playback-pause-symbolic", &tr(MsgKey::action_pause));
             let cancel = crate::ui::icon_button("window-close-symbolic", &tr(MsgKey::action_cancel));
             for download_button in [&pause, &cancel] {
@@ -85,7 +85,7 @@ fn update_center_row() -> PreferenceItem {
                 download_button.add_css_class("flat");
             }
             // the download's bar and its spinner come first, then the buttons
-            let bar_spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let bar_spinner = crate::ui::inline_spinner();
             let bar = gtk::ProgressBar::builder().valign(gtk::Align::Center).width_request(120).build();
             let end = gtk::Box::new(gtk::Orientation::Horizontal, 6);
             end.append(&bar_spinner);
@@ -363,7 +363,7 @@ pub fn check_row() -> PreferenceItem {
         return text(&app_update::check_row_title(), None, false);
     }
     let spinner: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
-        let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+        let spinner = crate::ui::inline_spinner();
         spinner.set_visible(false);
         spinner.upcast()
     });

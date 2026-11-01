@@ -40,8 +40,7 @@ pub fn page(kind: Kind) -> Option<(gtk::Widget, gtk::SearchEntry, Vec<gtk::Widge
     let column = crate::ui::column();
     let list = crate::ui::boxed_list();
     // the app's empty state (icon, line), as the library and history show theirs
-    let (empty, _) = look::empty_state("folder-download-symbolic", &tr(MsgKey::ui_no_downloads_are_queued), &[]);
-    empty.set_vexpand(true);
+    let empty = crate::widgets::status::empty("folder-download-symbolic", &tr(MsgKey::ui_no_downloads_are_queued), None);
     column.append(&list);
     column.append(&empty);
     let search = crate::ui::list_search(&list);
@@ -79,7 +78,7 @@ struct Page {
     kind: Kind,
     downloads: Downloads,
     list: gtk::ListBox,
-    empty: gtk::Box,
+    empty: adw::StatusPage,
     /// The header's Pause/Resume and Clear queue buttons.
     run: gtk::Button,
     clear: gtk::Button,

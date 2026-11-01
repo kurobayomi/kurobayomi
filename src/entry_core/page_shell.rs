@@ -5,7 +5,7 @@
 use std::cell::Cell;
 
 use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Button, Label, Orientation as O};
+use gtk::{Box as GBox, Button, Label, Orientation as O};
 use kuro_i18n::{MsgKey, tr};
 
 use crate::entry_core::details::layout::fab_expanded;
@@ -15,18 +15,10 @@ use crate::ui;
 /// page adds its `ready` child.
 pub fn state_stack() -> gtk::Stack {
     let stack = gtk::Stack::new();
-    let spinner = ui::loading(ui::LoadSize::Page);
-    let loading = GBox::new(O::Vertical, 12);
-    loading.set_halign(Align::Center);
-    loading.set_valign(Align::Center);
-    loading.append(&spinner);
-    loading.append(&Label::new(Some(&tr(MsgKey::loading))));
-    stack.add_named(&loading, Some("loading"));
-    let missing_page = ui::status("dialog-error-symbolic", &tr(MsgKey::no_results_found));
+    stack.add_named(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))), Some("loading"));
     let back_missing = Button::with_label(&tr(MsgKey::action_webview_back));
-    back_missing.set_halign(Align::Center);
     back_missing.connect_clicked(|_| ui::pop());
-    missing_page.append(&back_missing);
+    let missing_page = crate::widgets::status::error_with(&tr(MsgKey::no_results_found), None, std::slice::from_ref(&back_missing));
     stack.add_named(&missing_page, Some("missing"));
     stack
 }

@@ -233,7 +233,7 @@ pub fn restore_page() -> Option<Built> {
 
     let column = crate::ui::column();
     let checking = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    checking.append(&crate::ui::loading(crate::ui::LoadSize::Inline));
+    checking.append(&crate::ui::inline_spinner());
     checking.append(&gtk::Label::new(Some(&crate::backup_host::shown(text::CHECKING_BACKUP))));
     column.append(&checking);
     let choose = gtk::Button::with_label(&tr(MsgKey::file_select_backup));

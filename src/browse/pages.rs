@@ -91,11 +91,14 @@ pub fn migrate_sources(snapshot: &MigrateSourcesSnapshot, nav: MigrateSourcesNav
     root.append(&sort);
 
     if let Some(message) = &snapshot.error {
-        root.append(&super::look::error_state(message, Some(Rc::clone(&nav.retry))));
+        root.append(&crate::widgets::status::error(message, None, Some({
+            let retry = Rc::clone(&nav.retry);
+            move || retry()
+        })));
         return root;
     }
     if snapshot.sources.is_empty() {
-        root.append(&super::look::empty_state("view-list-symbolic", &snapshot.empty_text, &[]).0);
+        root.append(&crate::widgets::status::empty("view-list-symbolic", &snapshot.empty_text, None));
         return root;
     }
     let column = crate::ui::column();
@@ -216,7 +219,7 @@ fn stub_page(listing: &ListingDeps, on_back: Rc<dyn Fn()>) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     root.append(&stub_header(&listing.source_name, on_back));
     let label = stub_source_label(&listing.source_name, &listing.source_lang, listing.source_id);
-    root.append(&super::look::empty_state("dialog-warning-symbolic", &trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&label))]), &[]).0);
+    root.append(&crate::widgets::status::empty("dialog-warning-symbolic", &trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&label))]), None));
     root
 }
 
@@ -757,7 +760,7 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
     section.append(&header);
     match &row.state {
         SearchState::Loading => {
-            let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let spinner = crate::ui::inline_spinner();
             spinner.set_halign(gtk::Align::Center);
             spinner.set_margin_top(16);
             spinner.set_margin_bottom(16);

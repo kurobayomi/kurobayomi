@@ -12,11 +12,9 @@ use gtk::prelude::*;
 use kuro_domain::source::model::Source;
 use kuro_i18n::{MsgKey, tr};
 
-use super::banner::{BannerSpec, InfoBanner};
 use super::directory::source_or_stub;
 use super::pages::{MigrateEntriesNav, MigrateEntry, migrate_entries};
 use super::pending;
-use super::primitives::ToastDuration;
 use super::route::BrowseRoute;
 use kuro_platform::kind::Kind;
 use super::view::file_cover_loader;
@@ -28,7 +26,7 @@ pub enum Body {
     Entries(Vec<MigrateEntry>),
     /// The source has no favourites: `empty_screen`.
     Empty,
-    /// The read failed: the `internal_error` banner over the empty screen.
+    /// The read failed: the `internal_error` error page, with Retry.
     Failed,
 }
 
@@ -63,29 +61,25 @@ pub struct MigrateEnv {
 pub struct MigrateEntriesView {
     root: gtk::Stack,
     env: MigrateEnv,
-    banner: InfoBanner,
     list: gtk::Box,
     shown: RefCell<Vec<MigrateEntry>>,
+    /// Reads the favourites again: the Retry of the error page, set by [`load`].
+    retry: RefCell<Option<Rc<dyn Fn()>>>,
 }
 
 impl MigrateEntriesView {
     pub fn new(env: MigrateEnv) -> Rc<Self> {
         let root = gtk::Stack::new();
-        root.add_named(&crate::ui::loading(crate::ui::LoadSize::Page), Some("loading"));
+        root.add_named(&crate::widgets::status::loading(None), Some("loading"));
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         list.set_vexpand(true);
         root.add_named(&list, Some("list"));
-        let empty = super::look::empty_state("view-list-symbolic", &tr(MsgKey::empty_screen), &[]).0;
-        let banner = InfoBanner::new();
         let failed = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        failed.append(banner.widget());
-        failed.append(&empty);
         root.add_named(&failed, Some("failed"));
-        let empty_only = super::look::empty_state("view-list-symbolic", &tr(MsgKey::empty_screen), &[]).0;
-        root.add_named(&empty_only, Some("empty"));
+        root.add_named(&crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None), Some("empty"));
         root.set_vexpand(true);
         root.set_visible_child_name("loading");
-        Rc::new(Self { root, env, banner, list, shown: RefCell::new(Vec::new()) })
+        Rc::new(Self { root, env, list, shown: RefCell::new(Vec::new()), retry: RefCell::new(None) })
     }
 
     pub fn widget(&self) -> &gtk::Stack {
@@ -104,7 +98,14 @@ impl MigrateEntriesView {
             Body::Loading => self.root.set_visible_child_name("loading"),
             Body::Empty => self.root.set_visible_child_name("empty"),
             Body::Failed => {
-                self.banner.show(&BannerSpec { message: tr(MsgKey::internal_error), action: None, duration: ToastDuration::Indefinite }, None);
+                let retry = self.retry.borrow().clone();
+                let page = crate::widgets::status::error(&tr(MsgKey::internal_error), None, retry.map(|retry| move || retry()));
+                if let Some(failed) = self.root.child_by_name("failed").and_downcast::<gtk::Box>() {
+                    while let Some(old) = failed.first_child() {
+                        failed.remove(&old);
+                    }
+                    failed.append(&page);
+                }
                 self.root.set_visible_child_name("failed");
             }
             Body::Entries(entries) => {
@@ -131,6 +132,13 @@ impl MigrateEntriesView {
 
 /// Reads the favourites of a source off the GTK thread and shows them.
 pub fn load(view: &Rc<MigrateEntriesView>, read: Arc<dyn Fn() -> Result<Vec<MigrateEntry>, String> + Send + Sync>) {
+    let again = (Rc::downgrade(view), Arc::clone(&read));
+    *view.retry.borrow_mut() = Some(Rc::new(move || {
+        if let Some(view) = again.0.upgrade() {
+            view.root.set_visible_child_name("loading");
+            load(&view, Arc::clone(&again.1));
+        }
+    }));
     let view = Rc::clone(view);
     gtk::glib::spawn_future_local(async move {
         let result = gtk::gio::spawn_blocking(move || read()).await.unwrap_or_else(|_| Err("the favourites read was cancelled".to_owned()));
@@ -237,7 +245,7 @@ pub(crate) mod tests {
         (MigrateEntriesView::new(env), log)
     }
 
-    fn the_view_is_a_spinner_then_the_rows_the_empty_screen_or_the_error_banner() {
+    fn the_view_is_a_spinner_then_the_rows_the_empty_screen_or_the_error_page() {
         let (view, _) = view();
         assert_eq!(view.widget().visible_child_name().as_deref(), Some("loading"));
         view.set(Ok(vec![MigrateEntry { id: 2, title: "zeta".into(), cover: None }, MigrateEntry { id: 1, title: "Alpha".into(), cover: None }]));
@@ -247,11 +255,12 @@ pub(crate) mod tests {
         assert!(alpha.is_some() && zeta.is_some() && alpha < zeta, "rows sort by title without case: {text:?}");
         view.set(Ok(Vec::new()));
         assert_eq!(view.widget().visible_child_name().as_deref(), Some("empty"));
-        let text = labels(view.widget().visible_child().expect("child").upcast_ref());
+        // the status page also holds its empty description label
+        let text: Vec<String> = labels(view.widget().visible_child().expect("child").upcast_ref()).into_iter().filter(|t| !t.is_empty()).collect();
         assert_eq!(text, [tr(MsgKey::empty_screen)], "E: Well, this is awkward");
         view.set(Err("db closed".into()));
         assert_eq!(view.widget().visible_child_name().as_deref(), Some("failed"));
-        assert!(labels(view.widget().visible_child().expect("child").upcast_ref()).contains(&tr(MsgKey::internal_error)), "the banner says the internal error");
+        assert!(labels(view.widget().visible_child().expect("child").upcast_ref()).contains(&tr(MsgKey::internal_error)), "the error page says the internal error");
     }
 
     fn a_row_opens_the_migrate_search_with_its_title() {
@@ -262,7 +271,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn smoke() {
-        the_view_is_a_spinner_then_the_rows_the_empty_screen_or_the_error_banner();
+        the_view_is_a_spinner_then_the_rows_the_empty_screen_or_the_error_page();
         a_row_opens_the_migrate_search_with_its_title();
     }
 }

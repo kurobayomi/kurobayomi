@@ -1,6 +1,5 @@
 //! The one banner of the app: an `adw::Banner` with a plain-text title and an optional button. The app-state banners of
-//! the shell (`shell::banners`), the info banner of the browse pages (`browse::banner`) and the restore banner of the
-//! window (`backup_host`) all build and fill it here.
+//! the shell (`shell::banners`) and the restore banner of the window (`backup_host`) both build and fill it here.
 
 /// A hidden banner reading `title`. `title` is plain text, never markup.
 pub fn new(title: &str) -> adw::Banner {

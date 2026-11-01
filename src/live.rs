@@ -74,7 +74,7 @@ fn name_dialog(dialog: &str, initial: &str, taken: impl Fn(&str) -> bool + 'stat
 struct CategoryList {
     kind: Kind,
     list: ListBox,
-    empty: GBox,
+    empty: adw::StatusPage,
 }
 
 /// Whether a user category other than `except` already has the trimmed name `new` (the same exact-name rule the
@@ -170,7 +170,7 @@ impl CategoryList {
 pub fn categories_content(kind: Kind) -> crate::screens::Built {
     let add = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::action_add_category));
     add.connect_clicked(move |_| add_category(kind));
-    let (empty, _) = crate::browse::look::empty_state("tag-symbolic", &screen("categories").empty.unwrap_or_default(), std::slice::from_ref(&add));
+    let empty = crate::widgets::status::empty_with("tag-symbolic", &screen("categories").empty.unwrap_or_default(), None, std::slice::from_ref(&add));
     let column = column();
     column.append(&boxed_list());
     column.append(&empty);

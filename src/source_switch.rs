@@ -400,7 +400,7 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow 
     }
     let switch = gtk::Switch::builder().active(is_on(prefs, &entry.id)).valign(gtk::Align::Center).build();
     switch.update_property(&[gtk::accessible::Property::Label(&entry.name)]);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+    let spinner = crate::ui::inline_spinner();
     spinner.set_visible(false);
     let (key, name) = (entry.id.clone(), entry.name.clone());
     let spinner_weak = spinner.downgrade();

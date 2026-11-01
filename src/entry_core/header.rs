@@ -231,23 +231,6 @@ pub fn genre_chips(genres: Option<&[String]>) -> Vec<GenreChip> {
         .collect()
 }
 
-/// How the chips are laid out: not at all when there are none, one horizontal row while the description is collapsed,
-/// and a wrapping block once it is expanded (E-70, E-71).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GenreLayout {
-    Hidden,
-    Row,
-    Wrap,
-}
-
-pub fn genre_layout(chips: usize, expanded: bool) -> GenreLayout {
-    match (chips, expanded) {
-        (0, _) => GenreLayout::Hidden,
-        (_, false) => GenreLayout::Row,
-        (_, true) => GenreLayout::Wrap,
-    }
-}
-
 #[cfg(test)]
 mod genre_tests {
     use super::*;
@@ -257,13 +240,6 @@ mod genre_tests {
         assert!(genre_chips(None).is_empty());
         assert!(genre_chips(Some(&[])).is_empty());
         assert!(genre_chips(Some(&["  ".to_owned()])).is_empty(), "blank genres are dropped");
-    }
-
-    #[test]
-    fn the_chips_hide_when_empty_stay_in_one_row_collapsed_and_wrap_expanded() {
-        assert_eq!(genre_layout(0, true), GenreLayout::Hidden);
-        assert_eq!(genre_layout(3, false), GenreLayout::Row);
-        assert_eq!(genre_layout(3, true), GenreLayout::Wrap);
     }
 
     #[test]

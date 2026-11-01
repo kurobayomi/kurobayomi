@@ -7,14 +7,11 @@ pub const BASE_CSS: &str = include_str!("style.css");
 
 /// CSS class names for the Kurobayomi component classes.
 pub mod class {
-    pub const SURFACE: &str = "kb-surface";
-    pub const SELECTED: &str = "kb-selected";
     pub const ACTIVE: &str = "kb-active";
     pub const PILL: &str = "kb-pill";
     pub const PLAYER_RIPPLE: &str = "kb-player-ripple";
     pub const TAB_PILL: &str = "kb-tab-pill";
     pub const HIT_TARGET: &str = "kb-hit-target";
-    pub const NOINDICATION: &str = "kb-noindication";
     pub const INFO_BAR: &str = "kb-info-bar";
     pub const DRAGGED: &str = "kb-dragged";
     pub const FAST_THUMB: &str = "kb-fast-thumb";
@@ -28,34 +25,19 @@ pub mod class {
     pub const COUNT_PILL: &str = "kuro-count-pill";
 }
 
-/// Alpha of the onSurface state layer under a hovered clickable surface; a press uses
-/// `RIPPLE_ALPHA` (the Compose ripple defaults, T-49b-021).
-pub const HOVER_ALPHA: f32 = 0.08;
-
-/// Alpha of the selected-row tint: 0.16 in dark, 0.22 in light (`selectedBackground`, M1).
-pub fn selected_alpha(dark: bool) -> f32 {
-    if dark { 0.16 } else { 0.22 }
-}
-
-/// The dark-aware rules: the selection tint keeps the theme's own selected colour, the active tint follows the dark
-/// flag (amber in dark, darker amber in light; T-49b-010, T-49b-029), and the
+/// The dark-aware rules: the active tint follows the dark flag (amber in dark, darker amber in light; T-49b-010, T-49b-029), and the
 /// pill takes a GTK-theme stand-in for `surface_container_high` (T-49a-034). The app bar's count pill
 /// takes the same pill alpha over the window foreground.
 pub fn system_rules(dark: bool) -> String {
     let active = if dark { "#ffeb3b" } else { "#ffc107" };
     // the tab pill follows the generic pill, so its alpha background wins at equal specificity
     format!(
-        ".{} {{ background-color: alpha(@theme_selected_bg_color, {}); }}\n.{} {{ color: {active}; }}\n.{} {{ background-color: mix(@theme_bg_color, @theme_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@theme_fg_color, {}); }}\n.{} {{ color: @theme_selected_bg_color; }}\n.{}:hover {{ background-color: alpha(@theme_fg_color, {HOVER_ALPHA}); }}\n.{}:active {{ background-color: alpha(@theme_fg_color, {}); }}\n.{count_pill} {{ background-color: alpha(@theme_fg_color, {count_alpha}); }}\n",
-        class::SELECTED,
-        selected_alpha(dark),
+        ".{} {{ color: {active}; }}\n.{} {{ background-color: mix(@theme_bg_color, @theme_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@theme_fg_color, {}); }}\n.{} {{ color: @theme_selected_bg_color; }}\n.{count_pill} {{ background-color: alpha(@theme_fg_color, {count_alpha}); }}\n",
         class::ACTIVE,
         class::PILL,
         class::TAB_PILL,
         crate::widgets::tabs::pill_alpha(dark),
         class::PRIMARY_ICON,
-        class::SURFACE,
-        class::SURFACE,
-        crate::theme::tokens::RIPPLE_ALPHA,
         count_pill = class::COUNT_PILL,
         count_alpha = crate::widgets::tabs::pill_alpha(dark),
     )
@@ -84,14 +66,12 @@ pub fn widget_static_rules() -> String {
     format!(
         "\
 .{filled} {{ background-color: @theme_selected_bg_color; color: @theme_selected_fg_color; min-width: 58px; min-height: 40px; border-radius: 999px; padding: 0 24px; }}
-.{filled}:hover {{ box-shadow: 0 1px 2px alpha(black, 0.3); }}
 .{filled}:disabled {{ background-color: alpha(@theme_selected_bg_color, 0.12); color: alpha(@theme_fg_color, 0.38); }}
 .{text} {{ background: none; color: @theme_selected_bg_color; padding: 0 12px; }}
 .{text}:disabled {{ color: alpha(@theme_fg_color, 0.38); }}
 .{sheet} {{ background-color: @popover_bg_color; border-radius: 28px 28px 0 0; padding: 24px; }}
 .{pill} {{ padding: 1px 6px; border-radius: 999px; }}
 .{hit} {{ min-width: 48px; min-height: 48px; }}
-.{noind}:hover, .{noind}:active {{ background-image: none; background-color: transparent; }}
 .{info_bar} {{ border-top: 1px solid alpha(@theme_fg_color, 0.12); padding: 8px 0 16px 0; }}
 ",
         filled = class::BUTTON_FILLED,
@@ -99,7 +79,6 @@ pub fn widget_static_rules() -> String {
         sheet = class::SHEET,
         pill = class::PILL,
         hit = class::HIT_TARGET,
-        noind = class::NOINDICATION,
         info_bar = class::INFO_BAR,
     )
 }
@@ -124,8 +103,6 @@ mod tests {
     fn system_rules_follow_the_dark_flag() {
         let dark = system_rules(true);
         let light = system_rules(false);
-        assert!(dark.contains("alpha(@theme_selected_bg_color, 0.16)"));
-        assert!(light.contains("alpha(@theme_selected_bg_color, 0.22)"));
         assert!(dark.contains(".kb-active { color: #ffeb3b; }"));
         assert!(light.contains(".kb-active { color: #ffc107; }"));
     }
@@ -138,12 +115,13 @@ mod tests {
         assert!(system_rules(true).contains(".kb-pill { background-color: mix(@theme_bg_color"));
     }
 
-    // T-49b-021: an indicated surface has a hover and a press background; .kb-noindication has none.
+    // hover and press come from libadwaita: the app's rules draw none
     #[test]
-    fn clickable_surface_has_hover_and_press_backgrounds() {
-        assert!(system_rules(false).contains(".kb-surface:hover { background-color: alpha(@theme_fg_color, 0.08); }"));
-        assert!(system_rules(false).contains(".kb-surface:active { background-color: alpha(@theme_fg_color, 0.1); }"));
-        assert!(widget_static_rules().contains(".kb-noindication:hover, .kb-noindication:active { background-image: none; background-color: transparent; }"));
+    fn the_generated_rules_draw_no_hover_state() {
+        for dark in [false, true] {
+            let rules = format!("{}{}{}", system_rules(dark), widget_static_rules(), fast_thumb_rules());
+            assert!(!rules.contains(":hover") && !rules.contains(":active"), "dark={dark}");
+        }
     }
 
     // T-49b-022: the tab pill rule comes after the generic pill rule, so its alpha background wins.
@@ -163,7 +141,7 @@ mod tests {
 
     #[test]
     fn base_stylesheet_leaves_dark_aware_rules_to_the_generated_css() {
-        assert!(!BASE_CSS.contains(".kb-active") && !BASE_CSS.contains(".kb-selected"));
+        assert!(!BASE_CSS.contains(".kb-active"));
     }
 
     #[test]

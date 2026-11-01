@@ -199,8 +199,8 @@ pub fn build<T: Keyed + Send + 'static>(
     subscribe: impl FnOnce(Box<dyn Fn(Vec<T>)>),
 ) -> (Built, StoresPage<T>) {
     let stack = gtk::Stack::new();
-    stack.add_named(&crate::ui::loading(crate::ui::LoadSize::Page), Some("loading"));
-    stack.add_named(&crate::ui::status("dialog-information-symbolic", &texts.empty), Some("empty"));
+    stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
+    stack.add_named(&crate::widgets::status::empty("dialog-information-symbolic", &texts.empty, None), Some("empty"));
     let list = crate::ui::boxed_list();
     let column = crate::ui::column();
     // a page of repositories filters their sources by kind and language, with the search

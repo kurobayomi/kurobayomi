@@ -13,10 +13,9 @@ use super::icons::{ICON_HEIGHT_PX, IconRef, SourceIcon, fallback_glyph, fetch_ic
 use super::listing::ListItem;
 use super::primitives::EmptyAction;
 
-/// A centred message with its action buttons, in the order given: `look::empty_state_with` with the buttons of
-/// `EmptyAction` (icon and words, so a person who does not know the icon still reads what the button does).
-/// `on_action` runs for the button pressed.
-pub fn empty_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(EmptyAction) + Clone + 'static) -> GBox {
+/// The error page of a listing: `widgets::status::error_with` with the buttons of `EmptyAction`, in the order given (icon and
+/// words, so a person who does not know the icon still reads what the button does). `on_action` runs for the button pressed.
+pub fn error_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(EmptyAction) + Clone + 'static) -> adw::StatusPage {
     let buttons: Vec<Button> = actions
         .iter()
         .copied()
@@ -33,7 +32,7 @@ pub fn empty_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(Em
             button
         })
         .collect();
-    super::look::empty_state("dialog-error-symbolic", message, &buttons).0
+    crate::widgets::status::error_with(message, None, &buttons)
 }
 
 /// The icon of a row, 40 px square. A built-in glyph is tinted with the error colour for a stub or an untrusted

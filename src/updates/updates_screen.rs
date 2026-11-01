@@ -361,24 +361,33 @@ impl UpdatesScreen {
             diet::LIBRARY_DATE_FORMAT,
             kuro_i18n::current_locale().tag,
         );
-        let mut current: Option<ListBox> = None;
+        // each list with the rows the feed has selected: libadwaita draws their selected fill
+        let mut lists: Vec<(ListBox, Vec<gtk::ListBoxRow>)> = Vec::new();
         for item in items {
             match item {
                 ListRow::Header(text) => {
                     self.col.append(&crate::ui::heading(&text));
                     let list = crate::ui::boxed_list();
                     self.col.append(&list);
-                    current = Some(list);
+                    lists.push((list, Vec::new()));
                 }
                 ListRow::Item(i) => {
-                    let list = current.get_or_insert_with(|| {
+                    if lists.is_empty() {
                         let list = crate::ui::boxed_list();
                         self.col.append(&list);
-                        list
-                    });
-                    list.append(&self.row(&rows[i], mode));
+                        lists.push((list, Vec::new()));
+                    }
+                    let Some((list, picked)) = lists.last_mut() else { continue };
+                    let row = self.row(&rows[i], mode);
+                    list.append(&row);
+                    if rows[i].selected {
+                        picked.push(row);
+                    }
                 }
             }
+        }
+        for (list, picked) in lists {
+            crate::widgets::selection_mirror::mirror_list_box(&list, picked);
         }
         if let Some(footer) = updates_page::limit_footer(all.len()) {
             self.col.append(&crate::ui::dim(&footer));
@@ -441,9 +450,6 @@ impl UpdatesScreen {
         list_row.set_subtitle_lines(1);
         list_row.set_widget_name(&feed::row_name(row.item_id));
         list_row.set_opacity(updates_page::row_alpha(row.done));
-        if feed_row.selected {
-            list_row.add_css_class(crate::theme::style::class::SELECTED);
-        }
         self.attach_gestures(list_row.upcast_ref(), row.item_id);
         list_row.upcast()
     }

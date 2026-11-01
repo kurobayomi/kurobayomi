@@ -105,11 +105,7 @@ pub struct SearchEnv {
 
 /// The error state of a page that cannot search.
 fn error_state(text: &str) -> gtk::Widget {
-    let label = gtk::Label::new(Some(text));
-    label.set_wrap(true);
-    label.set_valign(gtk::Align::Center);
-    label.set_vexpand(true);
-    label.upcast()
+    crate::widgets::status::error(text, None, None::<fn()>).upcast()
 }
 
 #[cfg(test)]

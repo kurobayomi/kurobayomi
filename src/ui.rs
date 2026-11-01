@@ -630,28 +630,10 @@ pub fn row_title(text: &str) -> Label {
     Label::builder().label(text).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build()
 }
 
-/// The two spinner sizes of the app: inside a button or a row, and as the state of a whole page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LoadSize {
-    Inline,
-    Page,
-}
-
-/// A spinning spinner. `Inline` is 16 px, for a button or a row. `Page` is 48 px and centred, filling its parent: the
-/// "loading" state of a page.
-pub fn loading(size: LoadSize) -> gtk::Spinner {
-    let px = match size {
-        LoadSize::Inline => 16,
-        LoadSize::Page => 48,
-    };
-    let spinner = gtk::Spinner::builder().spinning(true).width_request(px).height_request(px).build();
-    if size == LoadSize::Page {
-        spinner.set_halign(Align::Center);
-        spinner.set_valign(Align::Center);
-        spinner.set_hexpand(true);
-        spinner.set_vexpand(true);
-    }
-    spinner
+/// A small spinning spinner (16 px) for inside a button or a row. The loading state of a whole page is
+/// `widgets::status::loading`.
+pub fn inline_spinner() -> gtk::Spinner {
+    gtk::Spinner::builder().spinning(true).width_request(16).height_request(16).build()
 }
 
 /// The bar of a page in selection mode, under its header: Cancel, the count, Select all. `count` is the caller's label
@@ -711,18 +693,6 @@ pub fn action_bar_row(bar: &gtk::Revealer) -> GBox {
         None
     }
     bar.child().as_ref().and_then(find).expect("an action bar has its row")
-}
-
-/// An empty state in the Library's look (docs/design/main-window.md): a large dim icon over the message. A caller with
-/// one matching action appends its button to the returned box.
-pub fn status(icon: &str, text: &str) -> GBox {
-    let b = GBox::new(O::Vertical, 12);
-    b.set_valign(Align::Center);
-    b.set_halign(Align::Center);
-    b.set_vexpand(true);
-    b.append(&gtk::Image::builder().icon_name(icon).pixel_size(64).css_classes(["dim-label"]).build());
-    b.append(&Label::builder().label(text).wrap(true).justify(gtk::Justification::Center).css_classes(["kb-empty-title"]).build());
-    b
 }
 
 pub fn linked(labels: &[String], active: usize) -> GBox {
@@ -1390,7 +1360,7 @@ pub fn generic(s: &Screen) -> GBox {
     let content: gtk::Widget = if s.groups.is_empty() {
         let b = GBox::new(O::Vertical, 0);
         b.append(&col);
-        b.append(&status("dialog-information-symbolic", &crate::spec::shown(s.empty.as_deref().unwrap_or(&s.title))));
+        b.append(&crate::widgets::status::empty("dialog-information-symbolic", &crate::spec::shown(s.empty.as_deref().unwrap_or(&s.title)), None));
         b.upcast()
     } else {
         scrolled(&col).upcast()

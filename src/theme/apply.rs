@@ -151,7 +151,7 @@ fn connect_parse_log(provider: &CssProvider) {
     });
 }
 
-/// Installs the tint sheet on `display`: the dark-aware `kb-selected` and `kb-active` rules, which cannot live in the
+/// Installs the tint sheet on `display`: the dark-aware `kb-active` rule, which cannot live in the
 /// static base sheet, and the widget rules (the player state layer, T-49a-010, follows the dark flag too).
 pub fn apply(display: &gdk::Display, dark: bool) -> bool {
     reapply(display, &format!("{}{}", style::system_rules(dark), style::widget_rules(dark)))

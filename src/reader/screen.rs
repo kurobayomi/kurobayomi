@@ -769,7 +769,7 @@ pub fn open_with(
 
     let viewer = gtk::Box::new(gtk::Orientation::Vertical, 0);
     viewer.set_vexpand(true);
-    let loading = gtk::Spinner::builder().halign(gtk::Align::Center).valign(gtk::Align::Center).spinning(true).build();
+    let loading = crate::widgets::status::loading(None);
     let stack = gtk::Stack::new();
     stack.set_vexpand(true);
     stack.add_named(&loading, Some(PAGE_LOADING));

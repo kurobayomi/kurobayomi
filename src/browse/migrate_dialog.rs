@@ -132,7 +132,6 @@ impl Dialog {
         self.body.set_opacity(if running { 0.3 } else { 1.0 });
         self.body.set_sensitive(!running);
         self.spinner.set_visible(running);
-        self.spinner.set_spinning(running);
         self.row.set_visible(!running);
         // Escape and the close button do nothing while a run goes
         if let Some(window) = self.window.upgrade() {
@@ -214,7 +213,7 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
     }
     let error = gtk::Label::builder().visible(false).wrap(true).xalign(0.0).max_width_chars(50).css_classes(["error"]).build();
     body.append(&error);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
+    let spinner = crate::widgets::status::spinner();
     spinner.set_visible(false);
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&body));
@@ -417,11 +416,11 @@ pub(crate) mod tests {
         let checks = all::<gtk::CheckButton>(&window);
         assert_eq!(checks.iter().map(|c| c.is_active()).collect::<Vec<_>>(), [true, false, false, false, false], "only the saved bit starts ticked");
         let buttons = buttons_of(&window);
-        let spinner = all::<gtk::Spinner>(&window).remove(0);
+        let spinner = all::<gtk::Spinner>(&window).into_iter().next().expect("the spinner");
         assert!(!spinner.get_visible(), "no spinner before a run");
         buttons[1].emit_clicked();
         assert_eq!(*rig.log.borrow(), ["run replace=false flags=1"]);
-        assert!(spinner.get_visible() && spinner.is_spinning(), "T-41a-035: the spinner shows while the run goes");
+        assert!(spinner.get_visible(), "T-41a-035: the spinner shows while the run goes");
         assert!(buttons.iter().all(|b| !b.is_visible()), "and the buttons are hidden");
         let body = checks[0].parent().expect("body");
         assert!((body.opacity() - 0.3).abs() < 0.01, "the options sit under a 70 % cover");

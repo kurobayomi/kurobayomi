@@ -192,9 +192,9 @@ fn search_page(player_only: bool) -> Option<Built> {
     let results = crate::ui::boxed_list();
     results.set_visible(false);
     col.append(&results);
-    let hint = crate::ui::status("system-search-symbolic", &tr(MsgKey::ui_type_to_search_every_setting));
+    let hint = crate::widgets::status::empty("system-search-symbolic", &tr(MsgKey::ui_type_to_search_every_setting), None);
     col.append(&hint);
-    let empty = crate::ui::status("system-search-symbolic", &tr(MsgKey::no_results_found));
+    let empty = crate::widgets::status::empty("system-search-symbolic", &tr(MsgKey::no_results_found), None);
     empty.set_visible(false);
     col.append(&empty);
 

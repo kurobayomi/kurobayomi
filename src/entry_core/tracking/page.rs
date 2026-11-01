@@ -211,7 +211,7 @@ fn connect_section(root: &GBox, tracker: TrackerId, waiting: bool) {
 fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
     let Some(entry) = entry() else { return };
     let slot = GBox::new(O::Vertical, 0);
-    slot.append(&ui::dim(&tr(MsgKey::loading)));
+    slot.append(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))));
     root.append(&slot);
     let again = redraw(root);
     let (weak, tracker, id, kind) = (slot.downgrade(), Arc::clone(tracker), entry.id, entry.kind);
@@ -228,7 +228,12 @@ fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
             clear(&slot);
             match result {
                 Ok(bound) => slot.append(&tracker_list(&entry, tracker.as_ref(), bound, again)),
-                Err(err) => slot.append(&ui::dim(&english(&kuro_track::dialog::failure_message(&err)))),
+                Err(err) => {
+                    let retry = Rc::clone(&again);
+                    let page = crate::widgets::status::error(&english(&kuro_track::dialog::failure_message(&err)), None, Some(move || retry()));
+                    page.add_css_class("compact");
+                    slot.append(&page);
+                }
             }
         },
     );
@@ -554,8 +559,10 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
     }
     let token = generation.get() + 1;
     generation.set(token);
-    say(status, "Searching…");
-    let (kind, latest, shown_status, shown_results, entry) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone());
+    say(status, "");
+    clear(results);
+    results.append(&crate::widgets::status::loading(Some("Searching…")));
+    let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), query.clone(), Rc::clone(generation)));
     crate::source_bridge::call_on_main(
         async move { search_hits(tracker.as_ref(), kind, &query).await },
         move |result| {
@@ -564,12 +571,16 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
             }
             clear(&shown_results);
             match result {
-                Ok(found) if found.is_empty() => say(&shown_status, &kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found)),
-                Ok(found) => {
-                    say(&shown_status, "");
-                    shown_results.append(&hits_list(&entry, found));
+                Ok(found) if found.is_empty() => shown_results.append(&crate::widgets::status::empty("system-search-symbolic", &kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found), None)),
+                Ok(found) => shown_results.append(&hits_list(&entry, found)),
+                Err(err) => {
+                    let (shown, status, results) = (again.clone(), shown_status.clone(), shown_results.clone());
+                    shown_results.append(&crate::widgets::status::error(
+                        &english(&kuro_track::dialog::failure_message(&err)),
+                        None,
+                        Some(move || run_search(&shown.0, shown.1.clone(), &status, &results, &shown.2)),
+                    ));
                 }
-                Err(err) => say(&shown_status, &english(&kuro_track::dialog::failure_message(&err))),
             }
         },
     );

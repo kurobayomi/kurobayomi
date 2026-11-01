@@ -39,6 +39,7 @@ use crate::library::load;
 use crate::library::query::{Built, Facts};
 use crate::library::select::Selection;
 use crate::library::worker::{Gate, Job, Reply, Worker};
+use crate::widgets::selection_mirror::SelectionMirror;
 use crate::widgets::context_menu::{self, Item};
 
 /// What the view reads from the app: storage, preferences and the lookups that live outside storage.
@@ -115,10 +116,11 @@ struct Inner {
     query: Option<String>,
     search_turn: u64,
     selection: Selection,
-    /// What the grid shows now: the entry id of each cell (`None` for the global search row) and the ids that were
-    /// selected. A selection change then rebinds only the cards whose selected state changed, not every card.
+    /// What the grid shows now: the entry id of each cell (`None` for the global search row). A selection change then keeps
+    /// the cards and only moves GTK's selection (`selection_mirror`).
     shown_ids: Vec<Option<i64>>,
-    shown_selected: std::collections::HashSet<i64>,
+    /// GTK's selection of the grid and the list: the entries the page has selected, so libadwaita draws the selected fill.
+    selection_mirror: Rc<SelectionMirror>,
     /// The view options menu button of the page header; its dot shows while a filter is on (T-37a-056).
     options: options::Options,
     /// The logged-in trackers of the last load, so a render never asks the secret store again.
@@ -140,8 +142,7 @@ struct Inner {
     list: gtk::ListView,
     /// Starts an update of the active category; busy while a pass of this kind runs (T-26a-102).
     refresh_button: gtk::Button,
-    empty: gtk::Box,
-    empty_label: gtk::Label,
+    empty: adw::StatusPage,
     global_button: gtk::Button,
     /// The action of an empty library that has a repository: open Browse (T-37a-053).
     empty_action: gtk::Button,
@@ -183,17 +184,14 @@ impl LibraryView {
         let options = options::Options::new(deps.kind);
 
         let tabs = tabs::TabStrip::new();
-        let grid = gtk::GridView::new(
-            Some(gtk::NoSelection::new(Some(store.clone()))),
-            Some(gtk::SignalListItemFactory::new()),
-        );
+        // the grid and the list share one selection model, which mirrors the page's selection
+        let selection = gtk::MultiSelection::new(Some(store.clone()));
+        let selection_mirror = SelectionMirror::new(&selection);
+        let grid = gtk::GridView::new(Some(selection.clone()), Some(gtk::SignalListItemFactory::new()));
         grid.set_vexpand(true);
         grid.set_single_click_activate(false);
         grid.add_css_class("kb-library-grid");
-        let list = gtk::ListView::new(
-            Some(gtk::NoSelection::new(Some(store.clone()))),
-            Some(gtk::SignalListItemFactory::new()),
-        );
+        let list = gtk::ListView::new(Some(selection), Some(gtk::SignalListItemFactory::new()));
         list.set_vexpand(true);
         list.set_single_click_activate(false);
         // the shared page scroller: it scrolls down only, so a wide grid never shows a sideways scrollbar
@@ -205,12 +203,13 @@ impl LibraryView {
         empty_action.add_css_class("suggested-action");
         empty_action.set_visible(false);
         // the shared empty state; the message and the two actions are set by `render`
-        let (empty, empty_label) = crate::browse::look::empty_state(
+        let empty = crate::widgets::status::empty_with(
             match deps.kind {
                 Kind::Anime => "video-x-generic-symbolic",
                 Kind::Manga => "accessories-dictionary-symbolic",
             },
             "",
+            None,
             &[global_button.clone(), empty_action.clone()],
         );
         let welcome = welcome::Welcome::new();
@@ -251,7 +250,7 @@ impl LibraryView {
             search_turn: 0,
             selection: Selection::default(),
             shown_ids: Vec::new(),
-            shown_selected: std::collections::HashSet::new(),
+            selection_mirror,
             options,
             logged_in: BTreeSet::new(),
             last_resume: HashMap::new(),
@@ -267,7 +266,6 @@ impl LibraryView {
             list,
             refresh_button,
             empty,
-            empty_label,
             global_button,
             empty_action,
             welcome,
@@ -819,7 +817,7 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
         }
     };
 
-    let (title_label, tabs, store, scroller, empty, empty_label, global, bar, bar_label, header, sel_header, download) = {
+    let (title_label, tabs, store, scroller, empty, global, bar, bar_label, header, sel_header, download) = {
         let st = inner.borrow();
         (
             st.title.clone(),
@@ -827,7 +825,6 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
             st.store.clone(),
             st.scroller.clone(),
             st.empty.clone(),
-            st.empty_label.clone(),
             st.global_button.clone(),
             st.bar.clone(),
             st.bar_label.clone(),
@@ -857,31 +854,26 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
     show_mode_view(inner);
     let ids: Vec<Option<i64>> = view.grid_cells.iter().map(|cell| if let Cell::Item(item) = cell { Some(item.row.id) } else { None }).collect();
     let selected: std::collections::HashSet<i64> = inner.borrow().selection.ids().iter().copied().collect();
-    let (same_cards, before) = {
+    let same_cards = {
         let st = inner.borrow();
-        (selection_only && st.shown_ids == ids && store.n_items() as usize == ids.len(), st.shown_selected.clone())
+        selection_only && st.shown_ids == ids && store.n_items() as usize == ids.len()
     };
-    if same_cards {
-        for (position, id) in ids.iter().enumerate() {
-            if id.is_some_and(|id| selected.contains(&id) != before.contains(&id)) {
-                // a new object at the position, so the grid rebinds this card (the same object would keep its widget)
-                store.splice(position as u32, 1, &[glib::BoxedAnyObject::new(view.grid_cells[position].clone())]);
-            }
-        }
-    } else {
+    if !same_cards {
         let objects: Vec<glib::BoxedAnyObject> = view.grid_cells.iter().cloned().map(glib::BoxedAnyObject::new).collect();
         store.splice(0, store.n_items(), objects.as_slice());
     }
-    {
+    let chosen = ids.iter().enumerate().filter(|(_, id)| id.is_some_and(|id| selected.contains(&id))).map(|(position, _)| position as u32).collect();
+    let mirror = {
         let mut st = inner.borrow_mut();
         st.shown_ids = ids;
-        st.shown_selected = selected;
-    }
+        st.selection_mirror.clone()
+    };
+    mirror.apply(chosen);
     let has_items = !view.items.is_empty();
     scroller.set_visible(has_items);
     let welcome_shown = !has_items && view.empty_action == Some(actions::EmptyLibraryAction::AddRepository);
     empty.set_visible(!has_items && !welcome_shown);
-    empty_label.set_label(&view.empty_text);
+    empty.set_title(&view.empty_text);
     global.set_visible(view.show_global);
     global.set_label(&view.global_label);
     let (action, welcome) = {
@@ -1136,13 +1128,9 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         }
         Cell::Item(item) => item,
     };
-    let (mode, selected, show_continue_pref) = {
+    let (mode, show_continue_pref) = {
         let st = inner.borrow();
-        (
-            st.deps.prefs.display_mode.get(),
-            st.selection.contains(item.row.id),
-            diet::LIBRARY_CONTINUE_BUTTON,
-        )
+        (st.deps.prefs.display_mode.get(), diet::LIBRARY_CONTINUE_BUTTON)
     };
     let show_continue = actions::continue_visible(show_continue_pref, &item.row);
     let art = cover_art(&inner.borrow(), &item);
@@ -1167,9 +1155,9 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
     };
     let card = if mode == kuro_prefs::library::LibraryDisplayMode::List {
         let row_height = list_row_height(&inner.borrow());
-        card::build_list(&item, selected, show_continue, row_height, &extras)
+        card::build_list(&item, show_continue, row_height, &extras)
     } else {
-        card::build(&item, mode, selected, show_continue, &extras)
+        card::build(&item, mode, show_continue, &extras)
     };
     list_item.set_child(Some(&card.root));
     crate::widgets::drag_select::mark(&card.root, Some(item.row.id));
@@ -1432,7 +1420,7 @@ mod tests {
             let search_done = pump_until(|| inner.borrow().built.as_ref().is_some_and(|b| b.distinct_count == 0));
             assert!(search_done, "a search with no match empties the page");
             assert_eq!(inner.borrow().store.n_items(), 0);
-            assert_eq!(inner.borrow().empty_label.label().as_str(), "No results found");
+            assert_eq!(inner.borrow().empty.title().as_str(), "No results found");
 
             // Escape typed in the header's search entry arrives as stop-search and clears the query
             view.controls().0.emit_by_name::<()>("stop-search", &[]);

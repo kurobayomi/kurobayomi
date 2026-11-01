@@ -30,8 +30,9 @@ use super::listing::{ListItem, ListedPage, Listing, PageLoader};
 use super::prefs::BrowsePrefs;
 use super::primitives::{EmptyAction, ToastAction, ToastDuration, ToastSpec, stub_source_label};
 use super::tasks::{PageTasks, Tagged};
-use super::view::{CoverGuard, CoverLoader, empty_state, grid_cell, list_cell};
+use super::view::{CoverGuard, CoverLoader, error_state, grid_cell, list_cell};
 use crate::library::keys;
+use crate::widgets::selection_mirror::SelectionMirror;
 use crate::library::select::{Selectable, SelectionOf, Shown};
 use crate::widgets::context_menu::{self, Item};
 use crate::widgets::drag_select::{self, DragSelect};
@@ -89,8 +90,8 @@ struct Inner {
     /// The covers picked for a bulk action (issue #7): Ctrl+click, Shift+click, press and hold, Ctrl+A or a drag, by the
     /// Library's rules (`library::select`). A new listing starts with none.
     selection: RefCell<SelectionOf<ListItem>>,
-    /// The ids drawn selected now: a change rebinds only the cells whose state changed.
-    shown_selected: RefCell<HashSet<i64>>,
+    /// GTK's selection of the grid and the list: the covers picked, so libadwaita draws the selected fill.
+    selection_mirror: Rc<SelectionMirror>,
     /// Runs after every change of the selection (the page's selection bar).
     on_selection: RefCell<Option<Rc<dyn Fn()>>>,
 }
@@ -138,7 +139,8 @@ impl ListingView {
     /// A listing that starts with `query` and the filters its search runs with (a browse page opened on a search).
     pub fn with_filters(deps: ListingDeps, query: BrowseQuery, filters: FilterList) -> Self {
         let store = gtk::gio::ListStore::new::<glib::BoxedAnyObject>();
-        let selection = gtk::NoSelection::new(Some(store.clone()));
+        let selection = gtk::MultiSelection::new(Some(store.clone()));
+        let selection_mirror = SelectionMirror::new(&selection);
         let grid = gtk::GridView::new(Some(selection.clone()), None::<gtk::ListItemFactory>);
         grid.set_single_click_activate(true);
         for set in [gtk::GridView::set_margin_start, gtk::GridView::set_margin_end, gtk::GridView::set_margin_top, gtk::GridView::set_margin_bottom] {
@@ -170,24 +172,23 @@ impl ListingView {
                     }
                 });
             });
-            super::look::empty_state("dialog-information-symbolic", &tr(MsgKey::source_switch_off), std::slice::from_ref(&turn_on)).0
+            crate::widgets::status::empty_with("dialog-information-symbolic", &tr(MsgKey::source_switch_off), None, std::slice::from_ref(&turn_on))
         } else {
-            super::look::empty_state(
+            crate::widgets::status::empty(
                 "dialog-warning-symbolic",
                 &trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&stub_source_label(&deps.source_name, &deps.source_lang, deps.source_id)))]),
-                &[],
+                None,
             )
-            .0
         };
-        let empty = super::look::empty_state("view-list-symbolic", &tr(MsgKey::empty_screen), &[]).0;
+        let empty = crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None);
         let stack = gtk::Stack::new();
-        stack.add_named(&crate::ui::loading(crate::ui::LoadSize::Page), Some("spinner"));
+        stack.add_named(&crate::widgets::status::loading(None), Some("spinner"));
         stack.add_named(&stub, Some("stub"));
         stack.add_named(&error_slot, Some("error"));
         stack.add_named(&empty, Some("empty"));
         // the items, and under them a loading row while a later page loads
         let footer = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        let more = crate::ui::loading(crate::ui::LoadSize::Inline);
+        let more = crate::ui::inline_spinner();
         more.set_halign(gtk::Align::Center);
         more.set_margin_top(16);
         more.set_margin_bottom(16);
@@ -225,7 +226,7 @@ impl ListingView {
             list,
             scroller,
             selection: RefCell::new(SelectionOf::default()),
-            shown_selected: RefCell::new(HashSet::new()),
+            selection_mirror,
             on_selection: RefCell::new(None),
         });
         drag.attach(&inner.grid, drag_hooks(&inner));
@@ -448,21 +449,11 @@ impl Inner {
         self.redraw_selection();
     }
 
-    /// A new object at each position whose selected state changed, so the view binds that cell again; then the page hears
-    /// of the change.
+    /// Puts GTK's selection on the picked covers; then the page hears of the change.
     fn redraw_selection(self: &Rc<Self>) {
         let now: HashSet<i64> = self.selection.borrow().ids().iter().copied().collect();
-        let before = self.shown_selected.replace(now.clone());
-        for index in 0..self.store.n_items() {
-            let Some(item) = self.item_at(index) else { continue };
-            if now.contains(&item.id) == before.contains(&item.id) {
-                continue;
-            }
-            let slot = self.listing.borrow().slots().get(index as usize).cloned();
-            if let Some(slot) = slot {
-                self.store.splice(index, 1, &[glib::BoxedAnyObject::new(slot)]);
-            }
-        }
+        let chosen = (0..self.store.n_items()).filter(|index| self.item_at(*index).is_some_and(|item| now.contains(&item.id))).collect();
+        self.selection_mirror.apply(chosen);
         let notify = self.on_selection.borrow().clone();
         if let Some(notify) = notify {
             notify();
@@ -654,7 +645,7 @@ impl Inner {
                 self.clear(&self.error_slot);
                 let weak = Rc::downgrade(self);
                 let on_action = Rc::clone(&self.deps.on_action);
-                self.error_slot.append(&empty_state(&message, &actions, move |action| {
+                self.error_slot.append(&error_state(&message, &actions, move |action| {
                     match (action, weak.upgrade()) {
                         (EmptyAction::Retry, Some(inner)) => inner.retry(),
                         _ => on_action(action),
@@ -712,13 +703,11 @@ impl Inner {
     }
 }
 
-/// The selection side of a drawn cover: its look, its id for a drag, and the click and long press that select it.
+/// The selection side of a drawn cover: its id for a drag, and the click and long press that select it. Its selected look is
+/// the cell's own (`redraw_selection`).
 fn bind_cell(page: &Weak<Inner>, cell: &gtk::Box, item: Option<ListItem>) {
     drag_select::mark(cell, item.as_ref().map(|item| item.id));
     let Some(item) = item else { return };
-    if page.upgrade().is_some_and(|inner| inner.selection.borrow().contains(item.id)) {
-        cell.add_css_class("kb-card-selected");
-    }
     // a click that selects claims the press, so the view does not also open the entry; the release does the selecting.
     // A long press (mouse or touch) selects instead, as in the Library, and the release that ends it does nothing more.
     let long_pressed = Rc::new(Cell::new(false));

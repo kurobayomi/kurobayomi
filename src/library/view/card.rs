@@ -89,8 +89,8 @@ fn title_label(text: &str, class: &str) -> gtk::Label {
     label
 }
 
-/// Builds the grid card of `item`. `selected` marks it; `show_continue` adds the continue button.
-pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, selected: bool, show_continue: bool, extras: &Extras) -> Card {
+/// Builds the grid card of `item`; `show_continue` adds the continue button. Its selected state is the grid cell's own.
+pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, extras: &Extras) -> Card {
     let model = layout::card_model(item, mode, extras.kind, extras.season_parent);
     let width = extras.width;
     let overlay = gtk::Overlay::new();
@@ -125,9 +125,6 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, selected: bool, show_
     let root = gtk::Box::new(O::Vertical, SPACE_S);
     root.set_size_request(width, -1);
     root.set_halign(Align::Center);
-    if selected {
-        root.add_css_class("kb-card-selected");
-    }
     root.append(&overlay);
     if model.title_place == TitlePlace::Below {
         root.append(&title_label(&model.title, "kb-card-title"));
@@ -137,7 +134,7 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, selected: bool, show_
 
 /// Builds the List mode row of `item` (T-37a-021): a small 2:3 cover, the title, the badges, then the continue
 /// button. `row_height` comes from `layout::list_row_height`.
-pub fn build_list(item: &LibraryItem, selected: bool, show_continue: bool, row_height: f64, extras: &Extras) -> Card {
+pub fn build_list(item: &LibraryItem, show_continue: bool, row_height: f64, extras: &Extras) -> Card {
     let model = layout::card_model(item, LibraryDisplayMode::List, extras.kind, extras.season_parent);
     let height = (row_height.round() as i32 - 2 * SPACE_XS).max(40);
     let overlay = gtk::Overlay::new();
@@ -150,11 +147,6 @@ pub fn build_list(item: &LibraryItem, selected: bool, show_continue: bool, row_h
     root.set_size_request(-1, row_height.round() as i32);
     root.set_margin_start(layout::SPACE_L);
     root.set_margin_end(layout::SPACE_L);
-    if selected {
-        root.add_css_class("kb-card-selected");
-        // a selected row of the list view also takes the selected-row tint (T-49b-029)
-        root.add_css_class(crate::theme::style::class::SELECTED);
-    }
     root.append(&overlay);
     let title = title_label(&model.title, "kb-card-title");
     title.set_hexpand(true);
@@ -202,7 +194,7 @@ mod tests {
     fn a_card_without_a_cover_shows_initials_worded_badges_and_the_title_below() {
         crate::testing::with_display(|| {
             let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX };
-            let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, false, &extras);
+            let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &extras);
             let mut text = vec![];
             labels(&card.root, &mut text);
             assert_eq!(text, ["CC", "6", "Local", "Core Concepts"]);
@@ -217,26 +209,14 @@ mod tests {
     }
 
     #[test]
-    fn t_49b_029_a_selected_list_row_takes_the_selected_tint_and_an_unselected_one_none() {
-        crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX };
-            let selected = build_list(&local_anime(), true, false, 76.0, &extras);
-            assert!(selected.root.has_css_class("kb-selected") && selected.root.has_css_class("kb-card-selected"));
-            let plain = build_list(&local_anime(), false, false, 76.0, &extras);
-            assert!(!plain.root.has_css_class("kb-selected"));
-        });
-    }
-
-    #[test]
     fn the_cover_only_grid_has_no_title_and_the_compact_grid_puts_it_on_the_cover() {
         crate::testing::with_display(|| {
             let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX };
-            let bare = build(&local_anime(), LibraryDisplayMode::CoverOnlyGrid, false, true, &extras);
+            let bare = build(&local_anime(), LibraryDisplayMode::CoverOnlyGrid, true, &extras);
             let mut text = vec![];
             labels(&bare.root, &mut text);
             assert!(!text.iter().any(|t| t == "Core Concepts"));
-            let compact = build(&local_anime(), LibraryDisplayMode::CompactGrid, true, false, &extras);
-            assert!(compact.root.has_css_class("kb-card-selected"));
+            let compact = build(&local_anime(), LibraryDisplayMode::CompactGrid, false, &extras);
             assert!(compact.root.first_child().and_then(|c| c.next_sibling()).is_none(), "nothing under the cover");
             let mut text = vec![];
             labels(&compact.root, &mut text);

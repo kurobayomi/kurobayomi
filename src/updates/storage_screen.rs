@@ -92,7 +92,7 @@ impl StorageScreen {
 
             let scanning = GBox::new(O::Horizontal, 8);
             scanning.set_halign(Align::Center);
-            scanning.append(&crate::ui::loading(crate::ui::LoadSize::Inline));
+            scanning.append(&crate::ui::inline_spinner());
             scanning.append(&Label::new(Some(&copy::storage_scanning())));
 
             let list = crate::ui::boxed_list();

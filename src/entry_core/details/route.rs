@@ -185,8 +185,7 @@ struct View {
     count: Label,
     missing: Label,
     spinner: gtk::Spinner,
-    empty: GBox,
-    empty_label: Label,
+    empty: adw::StatusPage,
     airing_row: GBox,
     airing_title: Label,
     airing_time: Label,
@@ -289,12 +288,12 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     // the list head: the item header row, the refresh spinner and the empty line
     let page_shell::ItemHeaderRow { row: header_row, count, missing, download_all } = page_shell::item_header_row();
     // the refresh spinner of the list head: inline size, spinning only while a refresh runs
-    let spinner = ui::loading(ui::LoadSize::Inline);
+    let spinner = ui::inline_spinner();
     spinner.set_spinning(false);
     spinner.set_halign(Align::Center);
     let weak_view: Rc<RefCell<Weak<View>>> = Rc::default();
     // nothing listed: the list says so, with Retry (a refresh that finds nothing raises no notification)
-    let (empty, empty_label) = list_view::empty_list(&tr(crate::entry_core::wording::none_found(kind)), {
+    let empty = list_view::empty_list(&tr(crate::entry_core::wording::none_found(kind)), {
         let weak = Rc::clone(&weak_view);
         move || {
             if let Some(view) = weak.borrow().upgrade() {
@@ -510,7 +509,6 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
         missing,
         spinner,
         empty,
-        empty_label,
         airing_row,
         airing_title,
         airing_time,
@@ -835,10 +833,17 @@ impl View {
         let two = two_pane(width);
         // the left pane is a share of the page, so it and the header's cover in it grow with the window
         let pane_resized = two && self.panes.set_width(left_pane_width(width));
-        // beside the pane the list starts at the pane's edge instead of floating centred in a wide right side (user,
-        // 2026-10-25): the room past its widest goes to the right
-        let spare = if two { (width - self.panes.width() - 1 - LIST_MAX_WIDTH).max(0) } else { 0 };
-        self.list.widget.set_margin_end(spare);
+        // the list is at most LIST_MAX_WIDTH wide, so a row's hover, focus ring and selected fill end where its content does.
+        // Beside the pane it starts at the pane's edge instead of floating centred in a wide right side (user, 2026-10-25):
+        // the room past its widest goes to the right. Alone it is centred.
+        let (start, end) = if two {
+            (0, (width - self.panes.width() - 1 - LIST_MAX_WIDTH).max(0))
+        } else {
+            let side = ((width - LIST_MAX_WIDTH) / 2).max(0);
+            (side, side)
+        };
+        self.list.widget.set_margin_start(start);
+        self.list.widget.set_margin_end(end);
         if self.two_pane.get() == Some(two) {
             // the layout is the same, but the automatic columns of the season grid follow the width (T-39a-034), and so does
             // the header's cover in either layout
@@ -902,7 +907,7 @@ impl View {
         ui::set_refreshing(&self.refresh_button, m.flow.refreshing);
         self.refresh_button.set_sensitive(!m.flow.refreshing && !m.selection.is_active());
         self.empty.set_visible(none_shown && !m.flow.refreshing);
-        self.empty_label.set_label(&tr(if seasons_entry { MsgKey::no_seasons_error } else { crate::entry_core::wording::none_found(self.env.kind) }));
+        self.empty.set_title(&tr(if seasons_entry { MsgKey::no_seasons_error } else { crate::entry_core::wording::none_found(self.env.kind) }));
         // the anime and manga statuses share the SAnime/SManga completed code (2)
         self.info.action_row.apply(&RowState::of_entry(
             m.entry.favorite,
@@ -1911,6 +1916,10 @@ mod tests {
             let list = all.iter().find_map(|w| w.clone().downcast::<gtk::ListView>().ok()).expect("the list view");
             // at 360 px the page is one column: the info block and the list head are the first two rows of the list
             let window = gtk::Window::builder().default_width(360).default_height(700).child(&page).build();
+            // measured as the app draws it: the app's stylesheet, and the class the app's breakpoint gives a window this
+            // narrow, which packs the header buttons tighter (`shell::layout`)
+            crate::theme::apply::install(&gtk::gdk::Display::default().expect("a display"), crate::theme::ThemeSettings::default());
+            window.add_css_class("kb-narrow");
             window.present();
             assert!(pump(&ctx, || list.model().is_some_and(|m| m.n_items() == 5)), "two leading rows and three episodes");
             for _ in 0..20 {

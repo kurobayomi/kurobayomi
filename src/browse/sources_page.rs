@@ -223,15 +223,8 @@ fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
 }
 
 /// The loading state of a Sources tab: the page spinner with its "Loading sources…" line under it.
-fn loading_sources() -> gtk::Box {
-    let page = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    page.set_halign(gtk::Align::Center);
-    page.set_valign(gtk::Align::Center);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
-    spinner.set_vexpand(false);
-    page.append(&spinner);
-    page.append(&gtk::Label::new(Some(&super::texts::loading_sources())));
-    page
+fn loading_sources() -> gtk::Widget {
+    crate::widgets::status::loading(Some(&super::texts::loading_sources()))
 }
 
 /// The right-click menu of a source row: Open (its Popular listing), Open website when the source has a site, and for a
@@ -266,10 +259,10 @@ fn section_list(column: &gtk::Box, list: &mut Option<gtk::ListBox>) -> gtk::List
 }
 
 /// The empty Sources tab: no source is listed yet, so its one action opens the repository list.
-pub(super) fn sources_empty() -> gtk::Box {
+pub(super) fn sources_empty() -> adw::StatusPage {
     let repos = gtk::Button::with_label(&tr(MsgKey::label_extension_repos));
     repos.connect_clicked(move |_| super::mount::open_repos());
-    super::look::empty_state("system-search-symbolic", &tr(MsgKey::source_empty_screen), std::slice::from_ref(&repos)).0
+    crate::widgets::status::empty_with("system-search-symbolic", &tr(MsgKey::source_empty_screen), None, std::slice::from_ref(&repos))
 }
 
 #[cfg(test)]

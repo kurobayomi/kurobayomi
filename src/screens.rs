@@ -154,7 +154,7 @@ pub(crate) fn unavailable(id: &str) -> Option<Built> {
 
 fn empty_built(id: &str) -> Built {
     let text = screen(id).empty.unwrap_or_else(|| kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found));
-    Built { content: crate::browse::look::empty_state("system-search-symbolic", &text, &[]).0.upcast(), end: vec![] }
+    Built { content: crate::widgets::status::empty("system-search-symbolic", &text, None).upcast(), end: vec![] }
 }
 
 /// Opens the spec dialog `dialog` of screen `id`, its text naming `name` where it has `%s` (the delete-category
@@ -276,7 +276,7 @@ fn downloads_view(kind: Kind) -> Built {
     }
     let library = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::label_library));
     library.connect_clicked(|_| open("library"));
-    let (page, _) = crate::browse::look::empty_state("folder-download-symbolic", &screen("download_queue").empty.unwrap_or_default(), std::slice::from_ref(&library));
+    let page = crate::widgets::status::empty_with("folder-download-symbolic", &screen("download_queue").empty.unwrap_or_default(), None, std::slice::from_ref(&library));
     // nothing to filter, so no search
     Built { content: page.upcast(), end: vec![] }
 }

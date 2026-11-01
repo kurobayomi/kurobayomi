@@ -96,10 +96,9 @@ impl SourcePrefsPage {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let scroller = gtk::ScrolledWindow::builder().child(&column).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build();
         let stack = gtk::Stack::new();
-        stack.add_named(&crate::ui::loading(crate::ui::LoadSize::Page), Some("loading"));
+        stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
         stack.add_named(&scroller, Some("list"));
-        let empty = super::look::empty_state("view-list-symbolic", &tr(MsgKey::empty_screen), &[]).0;
-        stack.add_named(&empty, Some("empty"));
+        stack.add_named(&crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None), Some("empty"));
         stack.set_vexpand(true);
         stack.set_visible_child_name("loading");
         let inner = Rc::new(Inner {

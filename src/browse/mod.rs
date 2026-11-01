@@ -24,7 +24,6 @@
 //!   `production_env` of `browse_screen`, `migrate_screen`, `search_screen` and `source_prefs_screen`, and the `mount`
 //!   shell. Passing them in needs `screens::build` (not in this lane) to hand them down.
 
-pub mod banner;
 pub mod browse_screen;
 pub mod content;
 pub mod deep_link;

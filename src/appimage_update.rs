@@ -548,7 +548,7 @@ fn set(next: Status) {
 /// A small spinner that turns while the self-update checks or downloads, for any place that shows it is busy (the
 /// sidebar's Settings row and the About row of Settings).
 pub fn busy_spinner() -> gtk::Spinner {
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+    let spinner = crate::ui::inline_spinner();
     let weak = spinner.downgrade();
     watch(move |status| {
         let Some(spinner) = weak.upgrade() else { return false };
