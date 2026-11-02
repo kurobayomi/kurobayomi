@@ -1,4 +1,4 @@
-//! `kuro_platform::notifier::Notifier` for the library crates (downloads, backup and restore, incognito). It hands every
+//! `kuro_platform::notifier::Notifier` for the library crates (downloads, backup and restore). It hands every
 //! notice to the app's one notifier (`misc::notify`) as a [`Post`], so these notices pass the same mute check, content
 //! rules and pacing as all the others, and keep their clicks and buttons.
 
@@ -75,12 +75,12 @@ mod tests {
             title: "Backup created".into(),
             body: None,
             low_priority: true,
-            tap: Some(Tap::App("app.incognito-off".into())),
+            tap: Some(Tap::App("app.show-library".into())),
             buttons: vec![("Open folder".into(), Tap::Reveal(log.clone())), ("Show anime".into(), Tap::Downloads(Kind::Anime))],
             timeout: Some(Duration::from_secs(30)),
         };
         let post = post(&notice);
-        assert_eq!(post.tap, Some(Target::Named { action: "app.incognito-off".into(), target: None }));
+        assert_eq!(post.tap, Some(Target::Named { action: "app.show-library".into(), target: None }));
         assert_eq!(post.buttons[0].1, Target::Action(AppAction::RevealFile { path: log }));
         assert_eq!(post.buttons[1].1, Target::Action(AppAction::OpenAnimeDownloads));
         assert!(post.low_priority && post.body.is_none());

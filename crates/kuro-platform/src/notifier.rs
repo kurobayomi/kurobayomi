@@ -27,7 +27,7 @@ pub enum Tap {
     OpenUrl(String),
     /// The downloads page of a kind.
     Downloads(Kind),
-    /// An application action by its detailed name (`app.incognito-off`).
+    /// An application action by its detailed name (`app.show-library`).
     App(String),
 }
 
@@ -55,7 +55,7 @@ pub const APP_NAME: &str = "Kurobayomi";
 ///
 /// When `hide_content` is set and the notice is `sensitive` (library-update, download and similar notices), the
 /// title keeps only `app_name` and the body is replaced by `generic`, the category's generic text. Other notices
-/// are sent unchanged, so incognito and crash notices pass `sensitive = false`.
+/// are sent unchanged, so crash notices pass `sensitive = false`.
 #[allow(clippy::too_many_arguments)]
 pub fn send(
     notifier: &dyn Notifier,

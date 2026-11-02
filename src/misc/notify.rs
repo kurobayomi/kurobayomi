@@ -1,7 +1,7 @@
 //! The one desktop notifier of the app. Every notice goes out here as a [`Post`]: the update passes' notices built below
 //! (the large-queue warning, the per-entry "new chapters / episodes" notice, the "N update(s) failed" notice, the summary
 //! and the progress), the app update's, the reader's saved and shared pictures, and every notice the library crates send
-//! through the platform `Notifier` (downloads, backup and restore, incognito), which `gio_notifier` turns into a `Post`.
+//! through the platform `Notifier` (downloads, backup and restore), which `gio_notifier` turns into a `Post`.
 //!
 //! Any thread may send; [`attach`] shows the posts on the main thread, where the one delivery applies the same rules to
 //! every notice:

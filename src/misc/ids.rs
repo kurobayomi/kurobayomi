@@ -32,7 +32,6 @@ pub fn channel(id: &str) -> &'static str {
         MANGA_WARNING_ID | ANIME_WARNING_ID | MANGA_ERROR_ID | ANIME_ERROR_ID => "downloader_error_channel",
         ID_BACKUP_PROGRESS | ID_RESTORE_PROGRESS => "backup_restore_progress_channel",
         ID_BACKUP_RESULT | ID_RESTORE_RESULT | ID_AUTO_WARNING => "backup_restore_complete_channel_v2",
-        kuro_platform::incognito::CHANNEL_ID => kuro_platform::incognito::CHANNEL_ID,
         _ => "common_channel",
     }
 }
@@ -102,11 +101,10 @@ mod tests {
         let distinct: std::collections::BTreeSet<_> = FIXED.iter().collect();
         assert_eq!(distinct.len(), FIXED.len(), "two producers share a slot");
         let channels = kuro_platform::notifications::CATEGORIES.map(|c| c.channel_id);
-        for id in FIXED.iter().copied().chain([kuro_platform::incognito::notification_key().as_str()]) {
+        for id in FIXED.iter().copied() {
             assert!(channels.contains(&channel(id)), "{id}");
         }
         assert_eq!(channel(&new_items(Kind::Anime, 3)), "new_chapters_episodes_channel", "the switch in Settings mutes these");
         assert_eq!(channel(&library_summary(Kind::Manga)), "new_chapters_episodes_channel");
-        assert_eq!(channel(&kuro_platform::incognito::notification_key()), "incognito_mode_channel");
     }
 }
