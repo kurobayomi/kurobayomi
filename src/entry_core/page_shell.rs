@@ -24,8 +24,8 @@ pub fn state_stack() -> gtk::Stack {
     stack
 }
 
-/// The item header over the list (`ItemHeader`): the count and the missing warning, then one linked group (the list
-/// options, which hold sort and filter, and a search toggle) and the menu of the list's bulk actions. A search bar under
+/// The item header over the list (`ItemHeader`): the count and the missing warning, then the list options (sort and
+/// filter), a search toggle and the menu of the list's bulk actions, as separate buttons. A search bar under
 /// the row opens with the toggle. `row` has the width and inset of the list's cards, so on a wide window the count stays
 /// over the first card instead of at the window's edge.
 pub struct ItemHeaderRow {
@@ -46,17 +46,18 @@ pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton, page: &imp
     // the page's single-letter keys (F list options, R refresh, W browser) need the letters, so typing does not open the
     // search here; Ctrl+F, the toggle and Escape still do
     bar.set_key_capture_widget(None::<&gtk::Widget>);
-    let linked = GBox::builder().css_classes(["linked"]).valign(gtk::Align::Center).build();
-    linked.append(options);
-    linked.append(&toggle);
     let line = GBox::new(O::Horizontal, SPACE_S);
     line.set_margin_top(SPACE_S);
     line.set_margin_bottom(SPACE_S);
     // the inset of a card (`list_view`), so the count lines up with the first row
     line.set_margin_start(SPACE_L);
     line.set_margin_end(SPACE_L);
-    bulk.set_valign(gtk::Align::Center);
-    for w in [count.upcast_ref::<gtk::Widget>(), missing.upcast_ref(), linked.upcast_ref(), bulk.upcast_ref()] {
+    // separate buttons, not a linked group: the list options button sits in an overlay (its dot), which a linked group
+    // cannot round, so the pair looked broken
+    for w in [options, toggle.upcast_ref(), bulk.upcast_ref()] {
+        w.set_valign(gtk::Align::Center);
+    }
+    for w in [count.upcast_ref::<gtk::Widget>(), missing.upcast_ref(), options, toggle.upcast_ref(), bulk.upcast_ref()] {
         line.append(w);
     }
     ui::no_sticky_focus(&line);
