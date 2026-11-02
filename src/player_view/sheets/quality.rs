@@ -20,7 +20,7 @@ use kuro_source::anime::{
     AnimeSource, Hoster, HosterState, NO_HOSTER_LIST, SEpisode, Video, best_video, http_hosters, load_hoster, resolve_once,
 };
 
-use super::super::{Media, Shared, source, stored_text};
+use super::super::{Media, Shared, source};
 use super::Choice;
 
 /// A server and a video title: the choice the session keeps.
@@ -375,8 +375,7 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
             match answer {
                 Ok(Some(resolved)) => {
                     set_last(Some(pick));
-                    let preferred = stored_text("pref_subtitle_lang");
-                    let preferred_audio = stored_text("pref_audio_lang");
+                    let (preferred, preferred_audio) = super::super::preferred_languages(shared.borrow().episode_id);
                     reload(&shared, source::media_of(resolved, title, &preferred, &preferred_audio));
                 }
                 Ok(None) => crate::toast::notify(tr(MsgKey::video_list_empty_error)),

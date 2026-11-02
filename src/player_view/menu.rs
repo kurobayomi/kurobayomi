@@ -51,7 +51,7 @@ pub fn track_sections(shared: &Shared) -> Vec<(String, Vec<Choice>)> {
 /// One track row. Choosing it selects the track in mpv under `property` (`aid` or `sid`).
 fn choice(shared: &Shared, property: &'static str, track: VideoTrack, selected: i64) -> Choice {
     let title = track_label(track.id, &track.name, track.language.as_deref());
-    let (shared, id) = (Rc::clone(shared), track.id);
+    let (shared, id, language) = (Rc::clone(shared), track.id, track.language.clone());
     Choice {
         title,
         subtitle: None,
@@ -61,6 +61,8 @@ fn choice(shared: &Shared, property: &'static str, track: VideoTrack, selected: 
             if let Err(e) = shared.borrow().playback.mpv().set_track(property, id) {
                 tracing::warn!(error = %e, property, "player: the track was not selected");
             }
+            // the next episodes of this anime start with the same language
+            super::remember_track(shared.borrow().episode_id, property, language.as_deref());
         }),
     }
 }

@@ -121,9 +121,8 @@ fn open_in(data_dir: std::path::PathBuf, media: Media, episode_id: i64, start_ms
         data_dir,
         ..PlayerPrefs::default()
     };
-    // the kept preferences: the preferred subtitle and audio languages (mpv's `slang` and `alang`)
-    prefs.sub.lang = stored_text("pref_subtitle_lang");
-    prefs.audio.lang = stored_text("pref_audio_lang");
+    // the preferred subtitle and audio languages (mpv's `slang` and `alang`): the anime's own, else the Settings
+    (prefs.sub.lang, prefs.audio.lang) = preferred_languages(episode_id);
     prepare_mpv_dir(&prefs);
     kuro_platform::locale::use_c_numeric_locale();
     let mpv = match MpvHandle::create(&startup_settings(&prefs)) {
@@ -712,6 +711,38 @@ fn player_prefs() -> Option<kuro_prefs::player::PlayerPrefs> {
     crate::data::is_installed().then(|| kuro_prefs::player::PlayerPrefs::new(crate::data::app().base.store().clone()))
 }
 
+/// The track languages of the anime that `episode_id` belongs to; `None` before the app data exists or for a row that
+/// cannot be read.
+fn anime_tracks(episode_id: i64) -> Option<kuro_prefs::player::AnimeTrackPrefs> {
+    if !crate::data::is_installed() {
+        return None;
+    }
+    let app = crate::data::app();
+    let episode = kuro_data::item::ItemRepo::new(std::sync::Arc::clone(&app.db)).by_id(episode_id).ok().flatten()?;
+    Some(kuro_prefs::player::AnimeTrackPrefs::new(app.base.store().clone(), episode.entry_id))
+}
+
+/// The subtitle and audio languages to pick first for `episode_id`: the ones its anime remembers from a track picked in
+/// the player, else the Settings languages.
+fn preferred_languages(episode_id: i64) -> (String, String) {
+    match anime_tracks(episode_id) {
+        Some(tracks) => (tracks.subtitle_lang().get(), tracks.audio_lang().get()),
+        None => (stored_text("pref_subtitle_lang"), stored_text("pref_audio_lang")),
+    }
+}
+
+/// A track picked in the player: its language is kept for the anime (`aid` audio, `sid` subtitles). A track with no
+/// language, or Off, changes nothing.
+fn remember_track(episode_id: i64, property: &str, language: Option<&str>) {
+    let (Some(tracks), Some(language)) = (anime_tracks(episode_id), language.filter(|l| !l.trim().is_empty())) else {
+        return;
+    };
+    let pref = if property == "aid" { tracks.audio_lang() } else { tracks.subtitle_lang() };
+    if let Err(e) = pref.set(language.to_owned()) {
+        tracing::warn!(error = %e, "player: the track language was not kept");
+    }
+}
+
 /// The default quality of the settings (`pref_player_default_quality`): 1080 by default and before the app data exists.
 fn default_quality() -> i32 {
     player_prefs().map_or(1080, |p| p.default_quality.get())
@@ -907,18 +938,18 @@ fn retry(shared: &Shared) {
 /// Session start (T-45b-053): the remembered volume is written to mpv when the stored value is not negative.
 fn restore_volume(playback: &Playback) {
     let Some(prefs) = player_prefs() else { return };
-    if let Some(volume) = kuro_player::remember::value_to_restore(prefs.player_volume_value.get())
+    if let Some(volume) = kuro_player::remember::value_to_restore(prefs.player_volume_value.get(), prefs.player_volume_last.get())
         && let Err(e) = playback.set_volume(f64::from(volume))
     {
         tracing::warn!(error = %e, "player: the remembered volume was not applied");
     }
 }
 
-/// A volume change: stored under `player_volume_value`.
+/// A volume change: kept as the last one used (`player_volume_last`), never as the chosen start level.
 fn remember_volume(playback: &Playback) {
     let Some(prefs) = player_prefs() else { return };
     if let Some(value) = kuro_player::remember::value_to_store(playback.volume() as f32) {
-        if let Err(e) = prefs.player_volume_value.set(value) {
+        if let Err(e) = prefs.player_volume_last.set(value) {
             tracing::warn!(error = %e, "player: the volume was not stored");
         }
     }

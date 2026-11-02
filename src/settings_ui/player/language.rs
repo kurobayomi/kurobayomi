@@ -23,7 +23,7 @@ pub fn language_row(title: &str, pref: &Pref<String>) -> PreferenceItem {
 }
 
 fn entries(stored: &str) -> Vec<Entry> {
-    let mut entries = vec![(String::new(), "Automatic".to_owned())];
+    let mut entries = vec![(String::new(), kuro_i18n::tr(kuro_i18n::MsgKey::language_automatic))];
     entries.extend(CODES.iter().map(|code| (code.to_string(), kuro_i18n::names::native_name(code))));
     if !stored.is_empty() && !CODES.contains(&stored) {
         entries.push((stored.to_owned(), stored.to_owned()));

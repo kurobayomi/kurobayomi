@@ -294,6 +294,9 @@ define_prefs! {
     "pref_two_pages", Normal, Int, 0, "reader", "two_pages";
     "manga_two_pages_{id}", Normal, Int, 0, "reader.manga_two_pages", "";
     "pref_adaptive_direction", Normal, Int, 2, "reader", "adaptive_direction";
+    "player_volume_last", Normal, Float, -1.0f32, "player", "player_volume_last";
+    "anime_audio_lang_{id}", Normal, Str, "", "player.anime_audio_lang", "";
+    "anime_subtitle_lang_{id}", Normal, Str, "", "player.anime_subtitle_lang", "";
 }
 
 /// Keys of features this desktop app does not have, and of settings the settings diet cut (docs/design/settings-diet.md).
@@ -697,7 +700,7 @@ mod tests {
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
         // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
         // (`MangaReaderPrefs`), then two pages side by side (`pref_two_pages`) and its value for one manga
-        assert_eq!(REGISTRY.len(), rows.len() + 19);
+        assert_eq!(REGISTRY.len(), rows.len() + 22);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
         assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
         assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");
@@ -714,6 +717,8 @@ mod tests {
         assert_eq!(REGISTRY[rows.len() + 16].key, "pref_two_pages");
         assert_eq!(REGISTRY[rows.len() + 17].key, "manga_two_pages_{id}");
         assert_eq!(REGISTRY[rows.len() + 18].key, "pref_adaptive_direction");
+        assert_eq!(REGISTRY[rows.len() + 19].key, "player_volume_last");
+        assert_eq!(REGISTRY[rows.len() + 21].key, "anime_subtitle_lang_{id}");
         let mut pinned = 0;
         for (meta, (key, store, kind, default)) in REGISTRY.iter().zip(&rows) {
             assert_eq!(meta.key, key);

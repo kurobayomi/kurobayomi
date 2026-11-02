@@ -21,7 +21,7 @@
   {
    "id": "settings_player",
    "title": "Player",
-   "subtitle": "Languages, default volume, autoplay",
+   "subtitle": "Languages, quality, volume, autoplay, controls",
    "icon": "video-display-symbolic"
   },
   {

@@ -5184,6 +5184,9 @@ ui_open_containing_folder = Open its folder
 ui_open_title_page = Open the title's page
 ui_volume = Volume
 ui_leave_fullscreen = Leave fullscreen
+settings_player_languages = Languages
+settings_player_playback = Playback
+language_automatic = Automatic
 
 # source: kurobayomi
 track_auto_title = Track new titles automatically

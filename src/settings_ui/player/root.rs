@@ -63,29 +63,33 @@ fn quality_options() -> Vec<(i32, String)> {
     QUALITIES.iter().map(|h| (*h, crate::player_view::quality_label(*h))).collect()
 }
 
-/// The root page rows: the kept settings, the mini player when the display allows it, and the links.
+/// The root page rows, in three groups: Languages (the default for every anime; a track picked in the player is kept
+/// for its anime), Playback and Controls.
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     let p = &prefs.player;
     let store = prefs.store();
     let subtitles = Pref::new(store.clone(), "pref_subtitle_lang", String::new());
     let audio = Pref::new(store.clone(), "pref_audio_lang", String::new());
-    let tree = vec![group(
-        "",
-        vec![
-            language::language_row(&tr(MsgKey::ui_subtitle_language), &subtitles),
-            language::language_row(&tr(MsgKey::ui_audio_language), &audio),
-            crate::settings_ui::rows::int_choice(&tr(MsgKey::player_default_quality), &p.default_quality, &quality_options(), true),
-            volume_row(&p.player_volume_value),
-            switch(&tr(MsgKey::ui_autoplay_next_episode), &p.autoplay_enabled, true),
-            crate::settings_ui::rows::auto_hide_bars(&prefs.base),
-        ],
-    )];
-    tree
+    vec![
+        group(
+            &tr(MsgKey::settings_player_languages),
+            vec![language::language_row(&tr(MsgKey::ui_subtitle_language), &subtitles), language::language_row(&tr(MsgKey::ui_audio_language), &audio)],
+        ),
+        group(
+            &tr(MsgKey::settings_player_playback),
+            vec![
+                crate::settings_ui::rows::int_choice(&tr(MsgKey::player_default_quality), &p.default_quality, &quality_options(), true),
+                volume_row(&p.player_volume_value),
+                switch(&tr(MsgKey::ui_autoplay_next_episode), &p.autoplay_enabled, true),
+            ],
+        ),
+        group(&tr(MsgKey::pref_category_controls), vec![crate::settings_ui::rows::auto_hide_bars(&prefs.base)]),
+    ]
 }
 
 fn search_button() -> gtk::Widget {
     let button = crate::ui::icon_button("system-search-symbolic", &tr(MsgKey::action_search));
-    button.update_property(&[gtk::accessible::Property::Label("Search")]);
+    button.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::action_search))]);
     button.connect_clicked(|_| {
         if let Some(page) = search::player_page() {
             crate::ui::push(&crate::ui::page(&tr(MsgKey::action_search_settings), &page.content, page.end, true));
@@ -106,12 +110,24 @@ mod tests {
     use kuro_prefs::store::PrefStore;
 
     #[test]
-    fn the_root_holds_the_kept_settings_and_auto_hide() {
+    fn the_root_groups_languages_playback_and_controls() {
         let prefs = Prefs::in_memory();
-        let tree = page_rows(&prefs);
-        let Preference::Group(first) = &tree[0] else { panic!("group") };
-        let titles: Vec<&str> = first.items.iter().map(|i| i.title()).collect();
-        assert_eq!(titles, ["Subtitle language", "Audio language", "Default quality", &volume_title(), "Autoplay next episode", "Hide the bars automatically"]);
+        let groups: Vec<(String, Vec<String>)> = page_rows(&prefs)
+            .iter()
+            .map(|entry| {
+                let Preference::Group(group) = entry else { panic!("group") };
+                (group.title.clone(), group.items.iter().map(|i| i.title().to_owned()).collect())
+            })
+            .collect();
+        let row = |titles: &[&str]| titles.iter().map(|t| (*t).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            groups,
+            [
+                ("Languages".to_owned(), row(&["Subtitle language", "Audio language"])),
+                ("Playback".to_owned(), row(&["Default quality", &volume_title(), "Autoplay next episode"])),
+                ("Controls".to_owned(), row(&["Hide the bars automatically"])),
+            ]
+        );
     }
 
     #[test]
