@@ -54,7 +54,6 @@ pub enum Icon {
     DownloadCircle,
     DoneMarkPrevious,
     OverflowVertical,
-    Glasses,
     ReaderDefault,
     ReaderLtr,
     ReaderRtl,
@@ -76,7 +75,7 @@ pub enum Icon {
 impl Icon {
     #[cfg(test)]
     /// Every variant, in declaration order.
-    pub const ALL: [Icon; 49] = [
+    pub const ALL: [Icon; 48] = [
         Icon::Close,
         Icon::Play,
         Icon::Pause,
@@ -110,7 +109,6 @@ impl Icon {
         Icon::DownloadCircle,
         Icon::DoneMarkPrevious,
         Icon::OverflowVertical,
-        Icon::Glasses,
         Icon::ReaderDefault,
         Icon::ReaderLtr,
         Icon::ReaderRtl,
@@ -164,7 +162,6 @@ impl Icon {
             Icon::DownloadCircle => "kb-download-circle-symbolic",
             Icon::DoneMarkPrevious => "kb-done-previous-symbolic",
             Icon::OverflowVertical => "kb-overflow-vertical-symbolic",
-            Icon::Glasses => "kb-glasses-symbolic",
             Icon::ReaderDefault => "kb-reader-default-symbolic",
             Icon::ReaderLtr => "kb-reader-ltr-symbolic",
             Icon::ReaderRtl => "kb-reader-rtl-symbolic",
@@ -200,7 +197,6 @@ impl Icon {
             Icon::DownloadCircle => "scalable/actions/kb-download-circle-symbolic.svg",
             Icon::DoneMarkPrevious => "scalable/actions/kb-done-previous-symbolic.svg",
             Icon::OverflowVertical => "scalable/actions/kb-overflow-vertical-symbolic.svg",
-            Icon::Glasses => "scalable/actions/kb-glasses-symbolic.svg",
             Icon::ReaderDefault => "scalable/actions/kb-reader-default-symbolic.svg",
             Icon::ReaderLtr => "scalable/actions/kb-reader-ltr-symbolic.svg",
             Icon::ReaderRtl => "scalable/actions/kb-reader-rtl-symbolic.svg",

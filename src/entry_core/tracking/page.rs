@@ -55,6 +55,8 @@ thread_local! {
     static ON_CHANGE: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
     /// The tracker the search page searches: the one whose Search button opened it.
     static SEARCH_TRACKER: Cell<TrackerId> = const { Cell::new(TrackerId::ANILIST) };
+    /// The search page's "Track privately" switch: a result tapped while it is on is bound privately.
+    static SEARCH_PRIVATE: Cell<bool> = const { Cell::new(false) };
 }
 
 fn search_tracker() -> TrackerId {
@@ -149,6 +151,15 @@ pub fn search() -> Option<Built> {
     let status = ui::dim("");
     let results = GBox::new(O::Vertical, 0);
     column.append(&field);
+    SEARCH_PRIVATE.with(|on| on.set(false));
+    let supports_private = tracker_host::host().and_then(|host| host.manager.get(search_tracker())).is_some_and(|t| t.supports_private_tracking());
+    if supports_private {
+        let row = crate::widgets::row::switch(&tr(MsgKey::action_toggle_private_on), None, None, false);
+        row.connect_active_notify(|row| SEARCH_PRIVATE.with(|on| on.set(row.is_active())));
+        let list = ui::boxed_list();
+        list.append(&row);
+        column.append(&list);
+    }
     column.append(&status);
     column.append(&results);
 
@@ -284,6 +295,8 @@ struct Shown {
     finish: i64,
     url: String,
     deletable: bool,
+    /// Whether the entry is hidden from the public list there, or `None` when the tracker has no private tracking.
+    private: Option<bool>,
 }
 
 /// The text of a status label key, from the app's catalogue.
@@ -310,6 +323,7 @@ fn shown(tracker: &dyn Tracker, bound: &Bound) -> Option<Shown> {
                 finish: track.finish_date,
                 url: track.remote_url.clone(),
                 deletable: tracker.as_deletable_anime().is_some(),
+                private: tracker.supports_private_tracking().then_some(track.private),
             }
         }
         Bound::Manga(track) => {
@@ -327,6 +341,7 @@ fn shown(tracker: &dyn Tracker, bound: &Bound) -> Option<Shown> {
                 finish: track.finish_date,
                 url: track.remote_url.clone(),
                 deletable: tracker.as_deletable_manga().is_some(),
+                private: tracker.supports_private_tracking().then_some(track.private),
             }
         }
     })
@@ -370,7 +385,13 @@ fn edit_rows(list: &ListBox, entry: &Entry, shown: Shown, bound: Bound, redraw: 
     list.append(&ui::row(&tr(MsgKey::score), None, Some(score.upcast())));
 
     list.append(&date_row(true, shown.start, shown.finish, Rc::clone(&write)));
-    list.append(&date_row(false, shown.finish, shown.start, write));
+    list.append(&date_row(false, shown.finish, shown.start, Rc::clone(&write)));
+
+    if let Some(private) = shown.private {
+        let row = crate::widgets::row::switch(&tr(MsgKey::action_toggle_private_on), None, None, private);
+        row.connect_active_notify(move |row| write(Edit::Private(row.is_active())));
+        list.append(&row);
+    }
 
     if !shown.url.is_empty() {
         let url = shown.url.clone();
@@ -498,6 +519,7 @@ fn write_edit(entry: &Entry, tracker: TrackerId, edit: Edit, redraw: Rc<dyn Fn()
                 Edit::Score(label) => AnimeEdit::Score(label),
                 Edit::StartDate(ms) => AnimeEdit::StartDate(ms),
                 Edit::FinishDate(ms) => AnimeEdit::FinishDate(ms),
+                Edit::Private(on) => AnimeEdit::Private(on),
             };
             finish(actions::edit_anime(entry.id, tracker, edit), failure, redraw);
         }
@@ -508,6 +530,7 @@ fn write_edit(entry: &Entry, tracker: TrackerId, edit: Edit, redraw: Rc<dyn Fn()
                 Edit::Score(label) => MangaEdit::Score(label),
                 Edit::StartDate(ms) => MangaEdit::StartDate(ms),
                 Edit::FinishDate(ms) => MangaEdit::FinishDate(ms),
+                Edit::Private(on) => MangaEdit::Private(on),
             };
             finish(actions::edit_manga(entry.id, tracker, edit), failure, redraw);
         }
@@ -622,9 +645,9 @@ fn bind(entry: Entry, hit: Found) {
         crate::toast::notify(tracking::not_ready());
         return;
     };
-    let tracker = search_tracker();
+    let (tracker, private) = (search_tracker(), SEARCH_PRIVATE.with(Cell::get));
     crate::source_bridge::call_on_main(
-        async move { bind_hit(&ctx, tracker, &entry, hit).await },
+        async move { bind_hit(&ctx, tracker, &entry, hit, private).await },
         |result| match result {
             Ok(()) => {
                 ui::pop();
@@ -637,17 +660,21 @@ fn bind(entry: Entry, hit: Found) {
 }
 
 /// The bind of the add flow for one result: the remote bind, the stored row and the progress sync (`bind_anime`).
-async fn bind_hit(ctx: &TrackCtx, id: TrackerId, entry: &Entry, hit: Found) -> Result<(), TrackError> {
+/// `private` is kept only by a tracker with private tracking.
+async fn bind_hit(ctx: &TrackCtx, id: TrackerId, entry: &Entry, hit: Found, private: bool) -> Result<(), TrackError> {
     let tracker = ctx.trackers.get(id).ok_or(TrackError::UnknownTracker(id.0))?;
+    let private = private && tracker.supports_private_tracking();
     match hit {
         Found::Anime(mut hit) => {
             let api = tracker.as_anime().ok_or(TrackError::UnknownTracker(id.0))?;
             hit.anime_id = entry.id;
+            hit.private = private;
             bind_anime(ctx, entry.id, api, hit.to_track(), now_ms()).await?;
         }
         Found::Manga(mut hit) => {
             let api = tracker.as_manga().ok_or(TrackError::UnknownTracker(id.0))?;
             hit.manga_id = entry.id;
+            hit.private = private;
             bind_manga(ctx, entry.id, api, hit.to_track(), now_ms()).await?;
         }
     }

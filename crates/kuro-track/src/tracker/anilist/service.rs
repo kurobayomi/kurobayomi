@@ -100,7 +100,9 @@ pub async fn update_anime(
 }
 
 /// Bind of a manga to the local entry (`p1-behavior.md` 10.3). A remote entry copies the personal fields,
-/// keeps the local `private` (E-18), and is saved. No remote entry adds it, and the new id becomes `library_id`.
+/// keeps the local `private` (E-18) unless the remote entry is private, which stays private (a bind, auto-track's
+/// included, never makes a hidden entry public), and is saved. No remote entry adds it, and the new id becomes
+/// `library_id`.
 pub async fn bind_manga(
     api: &AniList,
     t: &mut MangaTrack,
@@ -109,6 +111,7 @@ pub async fn bind_manga(
     match api.find_manga_entry(t.remote_id).await? {
         Some(remote) => {
             copy_personal_from_manga(t, &remote, false);
+            t.private |= remote.private;
             t.library_id = remote.library_id;
             if t.status != MangaStatus::Completed.to_db() {
                 let rereading = t.status == MangaStatus::Rereading.to_db();
@@ -142,6 +145,7 @@ pub async fn bind_anime(
     match api.find_anime_entry(t.remote_id).await? {
         Some(remote) => {
             copy_personal_from_anime(t, &remote, false);
+            t.private |= remote.private;
             t.library_id = remote.library_id;
             if t.status != AnimeStatus::Completed.to_db() {
                 let rewatching = t.status == AnimeStatus::Rewatching.to_db();
@@ -468,7 +472,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn t_28a_025_bind_found_copies_remote_and_keeps_local_private() -> TestResult {
+    async fn t_28a_025_bind_found_copies_remote_and_keeps_a_private_remote_private() -> TestResult {
         let (api, fake) = client(vec![ok(FIND_FOUND), ok(UPDATE_OK)]);
         let mut t = manga(MangaStatus::PlanToRead, 0.0, 40);
         t.library_id = None;
@@ -477,9 +481,22 @@ mod tests {
         assert_eq!(t.last_chapter_read, 12.0, "copies progress");
         assert_eq!(t.score, 85.0, "copies score");
         assert_eq!(t.status, MangaStatus::Rereading.to_db(), "copies status");
-        assert!(!t.private, "E-18: local private kept");
+        assert!(t.private, "the remote entry is private, so a public bind does not expose it");
+        assert_eq!(body(&fake, 1)["variables"]["private"], json!(true), "the save keeps it private");
         assert_eq!(t.library_id, Some(9100));
         assert_eq!(fake.calls(), 2, "find then save, no add");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn t_28a_025_bind_found_keeps_a_local_private_choice_over_a_public_remote() -> TestResult {
+        let (api, fake) = client(vec![ok(FIND_ANIME), ok(UPDATE_OK)]);
+        let mut t = anime(AnimeStatus::PlanToWatch, 0.0, 12);
+        t.library_id = None;
+        t.private = true;
+        bind_anime(&api, &mut t, false).await?;
+        assert!(t.private, "E-18: the local private choice is kept");
+        assert_eq!(body(&fake, 1)["variables"]["private"], json!(true));
         Ok(())
     }
 

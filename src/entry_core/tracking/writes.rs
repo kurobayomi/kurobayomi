@@ -13,6 +13,8 @@ pub enum Edit {
     /// Epoch milliseconds of local midnight, or `0` to remove the date (E-DATE-3).
     StartDate(i64),
     FinishDate(i64),
+    /// Hidden from the public list on the site (trackers with private support only).
+    Private(bool),
 }
 
 /// The date a remove-date confirm stores: `0`, which clears the date (E-DATE-3, behaviour 8.6).

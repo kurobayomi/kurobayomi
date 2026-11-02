@@ -27,7 +27,6 @@ ACTION_ICONS = [
     ("kb-done-previous-symbolic", "ic_done_prev_24dp.xml"),
     ("kb-download-circle-symbolic", "ic_download_item_24dp.xml"),
     ("kb-forward-10-symbolic", "ic_forward_10_24dp.xml"),
-    ("kb-glasses-symbolic", "ic_glasses_24dp.xml"),
     ("kb-overflow-vertical-symbolic", "ic_overflow_24dp.xml"),
     ("kb-seek-triangle-symbolic", "ic_play_seek_triangle.xml"),
     ("kb-reader-default-symbolic", "ic_reader_default_24dp.xml"),

@@ -23,8 +23,8 @@ struct State {
 pub const TOGGLE_NAME: &str = "incognito";
 /// The check item as the app menu names it.
 pub const TOGGLE_ACTION: &str = "app.incognito";
-/// The incognito icon of the panel title and the sidebar: Aniyomi's glasses.
-pub const ICON: &str = crate::theme::icons::Icon::Glasses.name();
+/// The incognito icon of the sidebar row: an eye with a line through it.
+pub const ICON: &str = "view-conceal-symbolic";
 
 thread_local! {
     static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
