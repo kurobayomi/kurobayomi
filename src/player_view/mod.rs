@@ -63,6 +63,7 @@ use crate::widgets::page_header;
 const TICK: Duration = Duration::from_millis(250);
 
 /// What the player plays: a file or a source's stream with its request headers and side tracks.
+#[derive(Clone)]
 struct Media {
     /// The path or URL `loadfile` gets.
     target: String,
@@ -72,7 +73,7 @@ struct Media {
     headers: Option<String>,
     /// The stream's request headers, which a side subtitle file is fetched with into the subtitle cache.
     track_headers: Vec<(String, String)>,
-    /// `audio-add` and `sub-add` commands, sent once mpv has loaded the stream.
+    /// `audio-add` and `sub-add` commands, sent each time mpv has loaded the stream (a Retry loads it again).
     tracks: Vec<Vec<String>>,
 }
 
@@ -297,19 +298,24 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     area.set_vexpand(true);
     area.set_auto_render(false);
 
-    let play = gtk::Button::from_icon_name("media-playback-start-symbolic");
+    let play = crate::ui::icon_button("media-playback-start-symbolic", &play_tooltip(true));
     let previous = crate::ui::icon_button("media-skip-backward-symbolic", &tr(MsgKey::action_previous_episode));
     let next = crate::ui::icon_button("media-skip-forward-symbolic", &tr(MsgKey::action_next_episode));
     let seek = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.001);
     seek.set_hexpand(true);
     seek.set_draw_value(false);
+    let seek_label = key_hint(&tr(MsgKey::single_action_seek), &[gdk::Key::Left, gdk::Key::Right]);
+    seek.set_tooltip_text(Some(&seek_label));
+    seek.update_property(&[gtk::accessible::Property::Label(&seek_label)]);
     let time = gtk::Label::new(None);
     time.add_css_class("numeric");
-    let volume = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, VOLUME_MAX, 1.0);
+    // GTK's volume button: the icon follows the level, a click opens the slider, the wheel changes it
+    let volume = gtk::ScaleButton::new(0.0, VOLUME_MAX, 1.0, &VOLUME_ICONS);
     volume.set_value(VOLUME_MAX);
-    volume.set_width_request(120);
-    volume.set_draw_value(false);
-    let fullscreen = gtk::Button::from_icon_name("view-fullscreen-symbolic");
+    let volume_label = key_hint(&tr(MsgKey::ui_volume), &[gdk::Key::Up, gdk::Key::Down, gdk::Key::m]);
+    volume.set_tooltip_text(Some(&volume_label));
+    volume.update_property(&[gtk::accessible::Property::Label(&volume_label)]);
+    let fullscreen = crate::ui::icon_button("view-fullscreen-symbolic", &fullscreen_tooltip(false));
     let servers = sheets::quality::Servers::default();
     let skip = skip_button::Ui::new(shared);
 
@@ -320,6 +326,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&area));
+    skip.place_above(&bar);
     overlay.add_overlay(skip.widget());
     // the episode list floats over the video's right side (the reader's chapter list)
     let episodes = ChapterPanel::new(tr(MsgKey::episodes), tr(MsgKey::player_episode_list_search));
@@ -329,6 +336,17 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     // shown from the first frame until mpv knows the duration: the stream, its audio and its subtitles take a moment
     let loading = gtk::Spinner::builder().spinning(true).halign(gtk::Align::Center).valign(gtk::Align::Center).width_request(48).height_request(48).can_target(false).build();
     overlay.add_overlay(&loading);
+    // a video that cannot play says so over the video, with Retry (the shared error page)
+    let failure = crate::widgets::status::error(&tr(MsgKey::player_hoster_failed), None, Some({
+        let shared = Rc::downgrade(shared);
+        move || {
+            if let Some(shared) = shared.upgrade() {
+                retry(&shared);
+            }
+        }
+    }));
+    failure.set_visible(false);
+    overlay.add_overlay(&failure);
     overlay.set_vexpand(true);
 
     let title = shared.borrow().media.title.clone();
@@ -369,7 +387,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     let enabled = crate::data::is_installed() && crate::data::app().base.auto_hide_bars.get();
     let hiding = auto_hide::AutoHide::attach(enabled, &page, &overlay, &header, &bar, &area);
     page.append(&overlay);
-    watch_fullscreen(&page, &header);
+    watch_fullscreen(&page, &header, &fullscreen);
 
     wire_gl(&area, shared, start);
     watch_left(&page, shared, &area);
@@ -425,13 +443,16 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     }
     {
         let shared = Rc::clone(shared);
-        volume.connect_change_value(move |_, _, value| {
+        volume.connect_value_changed(move |_, value| {
             let player = shared.borrow();
+            // the tick writes mpv's level back to the button: only a change the user made goes to mpv and is kept
+            if (player.playback.volume() - value).abs() < 0.5 {
+                return;
+            }
             if let Err(e) = player.playback.set_volume(value) {
                 tracing::warn!(error = %e, "player: volume change failed");
             }
             remember_volume(&player.playback);
-            glib::Propagation::Proceed
         });
     }
     {
@@ -485,7 +506,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
         controls::Parts { page: &page, area: &area, previous: &previous, next: &next },
         shared,
     );
-    start_ticks(&page, &two_lines, &hiding, &play, &seek, &time, &volume, &loading, &skip, shared);
+    start_ticks(&page, &two_lines, &hiding, Bar { play: &play, seek: &seek, time: &time, volume: &volume, loading: &loading, failure: &failure }, &skip, shared);
     page
 }
 
@@ -559,22 +580,31 @@ fn watch_left(page: &gtk::Box, shared: &Shared, area: &gtk::GLArea) {
 /// Fullscreen shows only the video: the header follows the window's fullscreen state, so it hides on entering and is
 /// back on leaving (Escape, the fullscreen button, the window manager). The window is known only once the page is
 /// mapped, so the connection is made then, once per mapping, and dropped on unmap.
-fn watch_fullscreen(page: &gtk::Box, header: &adw::HeaderBar) {
+fn watch_fullscreen(page: &gtk::Box, header: &adw::HeaderBar, button: &gtk::Button) {
     let link: Rc<RefCell<Option<(gtk::Window, glib::SignalHandlerId)>>> = Rc::default();
-    let header = header.downgrade();
+    let (header, button) = (header.downgrade(), button.downgrade());
+    // the header hides in fullscreen, and the button turns into Leave fullscreen
+    let follow = move |window: &gtk::Window| {
+        let on = window.is_fullscreen();
+        if let Some(header) = header.upgrade() {
+            header.set_visible(!on);
+        }
+        if let Some(button) = button.upgrade() {
+            button.set_icon_name(if on { "view-restore-symbolic" } else { "view-fullscreen-symbolic" });
+            let label = fullscreen_tooltip(on);
+            button.set_tooltip_text(Some(&label));
+            button.update_property(&[gtk::accessible::Property::Label(&label)]);
+        }
+    };
     {
         let link = Rc::clone(&link);
         page.connect_map(move |page| {
-            let (Some(window), Some(header), false) = (window_of(page), header.upgrade(), link.borrow().is_some()) else {
+            let (Some(window), false) = (window_of(page), link.borrow().is_some()) else {
                 return;
             };
-            header.set_visible(!window.is_fullscreen());
-            let weak = header.downgrade();
-            let id = window.connect_fullscreened_notify(move |window| {
-                if let Some(header) = weak.upgrade() {
-                    header.set_visible(!window.is_fullscreen());
-                }
-            });
+            follow(&window);
+            let follow = follow.clone();
+            let id = window.connect_fullscreened_notify(move |window| follow(window));
             *link.borrow_mut() = Some((window, id));
         });
     }
@@ -815,6 +845,38 @@ fn play_source_episode(shared: &Shared, episode_id: i64) {
     }
 }
 
+/// The icons of the volume button: muted, full, then the levels between (GTK's order).
+const VOLUME_ICONS: [&str; 4] = ["audio-volume-muted-symbolic", "audio-volume-high-symbolic", "audio-volume-low-symbolic", "audio-volume-medium-symbolic"];
+
+/// `label (keys)`, the keys in GTK's own (translated) names: "Fullscreen (F)", "Volume (Up, Down, M)".
+fn key_hint(label: &str, keys: &[gdk::Key]) -> String {
+    let names: Vec<String> = keys.iter().map(|key| gtk::accelerator_get_label(*key, gdk::ModifierType::empty()).to_string()).collect();
+    format!("{label} ({})", names.join(", "))
+}
+
+/// Play or Pause, with its key.
+fn play_tooltip(paused: bool) -> String {
+    key_hint(&tr(if paused { MsgKey::action_play } else { MsgKey::action_pause }), &[gdk::Key::space])
+}
+
+/// Fullscreen or Leave fullscreen, with its keys.
+fn fullscreen_tooltip(fullscreen: bool) -> String {
+    if fullscreen {
+        key_hint(&tr(MsgKey::ui_leave_fullscreen), &[gdk::Key::f, gdk::Key::Escape])
+    } else {
+        key_hint(&tr(MsgKey::pref_fullscreen), &[gdk::Key::f, gdk::Key::F11])
+    }
+}
+
+/// Retry from the error page: the episode loads again from the start of what was asked.
+fn retry(shared: &Shared) {
+    let (media, episode_id) = {
+        let player = shared.borrow();
+        (player.media.clone(), player.episode_id)
+    };
+    shared.borrow_mut().play(media, episode_id);
+}
+
 /// Session start (T-45b-053): the remembered volume is written to mpv when the stored value is not negative.
 fn restore_volume(playback: &Playback) {
     let Some(prefs) = player_prefs() else { return };
@@ -838,8 +900,19 @@ fn remember_volume(playback: &Playback) {
 /// Reads mpv on a timer. Each tick drains mpv's events, saves progress when due and refreshes the controls and the skip
 /// button. A failed file is a toast, and the end of an episode plays the next one when autoplay is on. The header hides
 /// only in fullscreen (`watch_fullscreen`). The timer stops once the page is gone or closed.
-fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<auto_hide::AutoHide>, play: &gtk::Button, seek: &gtk::Scale, time: &gtk::Label, volume: &gtk::Scale, loading: &gtk::Spinner, skip: &skip_button::Ui, shared: &Shared) {
-    let loading = loading.clone();
+/// The widgets the tick keeps up to date.
+struct Bar<'a> {
+    play: &'a gtk::Button,
+    seek: &'a gtk::Scale,
+    time: &'a gtk::Label,
+    volume: &'a gtk::ScaleButton,
+    loading: &'a gtk::Spinner,
+    failure: &'a adw::StatusPage,
+}
+
+fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<auto_hide::AutoHide>, bar: Bar, skip: &skip_button::Ui, shared: &Shared) {
+    let Bar { play, seek, time, volume, loading, failure } = bar;
+    let (loading, failure) = (loading.clone(), failure.clone());
     let opened = std::time::Instant::now();
     let page = page.downgrade();
     // the title follows the episode (the next one plays in place)
@@ -865,7 +938,7 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
                         failed = true;
                     }
                     MpvEvent::FileLoaded => {
-                        let tracks = std::mem::take(&mut player.media.tracks);
+                        let tracks = player.media.tracks.clone();
                         let prepare = sub_cache::preparer(player.episode_id, &player.media.track_headers);
                         player.playback.add_tracks(&tracks, prepare);
                         player.skip.file_loaded();
@@ -897,9 +970,7 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
         };
         shared.borrow().awake.sync_for(!snapshot.paused && !ended, &tr(MsgKey::ui_playing_video));
         skip_button::tick(&shared, &skip);
-        if failed {
-            crate::toast::notify(tr(MsgKey::player_hoster_failed));
-        }
+
         if ended && autoplay_next() {
             play_adjacent(&shared, Step::Next, false);
         }
@@ -908,15 +979,28 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
             title_bar.set_title(&title);
             *shown_title.borrow_mut() = title;
         }
-        play.set_icon_name(if snapshot.paused { "media-playback-start-symbolic" } else { "media-playback-pause-symbolic" });
+        let icon = if snapshot.paused { "media-playback-start-symbolic" } else { "media-playback-pause-symbolic" };
+        if play.icon_name().as_deref() != Some(icon) {
+            play.set_icon_name(icon);
+            let label = play_tooltip(snapshot.paused);
+            play.set_tooltip_text(Some(&label));
+            play.update_property(&[gtk::accessible::Property::Label(&label)]);
+        }
         hiding.tick(snapshot.paused);
         // loading until mpv knows the duration; an idle mpv after the first seconds means the load failed, so stop
         let idle = shared.borrow().playback.mpv().get_flag("idle-active") == Some(true);
         let waiting = snapshot.duration_s <= 0.0 && !(idle && opened.elapsed() > std::time::Duration::from_secs(3));
         // a quality or server switch shows the spinner while its stream resolves and loads
-        let waiting = waiting || shared.borrow().resolving;
+        let resolving = shared.borrow().resolving;
+        let waiting = waiting || resolving;
         loading.set_visible(waiting);
         loading.set_spinning(waiting);
+        // a playback error, or a file mpv gave up on, shows the error page until a video plays again
+        if failed || (!waiting && snapshot.duration_s <= 0.0) {
+            failure.set_visible(true);
+        } else if snapshot.duration_s > 0.0 || resolving {
+            failure.set_visible(false);
+        }
         seek.set_sensitive(drags_enabled(snapshot.duration_s));
         seek.set_value(f64::from(fraction(snapshot.position_s, snapshot.duration_s)));
         time.set_label(&format!(

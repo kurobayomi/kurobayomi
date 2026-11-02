@@ -5182,6 +5182,8 @@ ui_open_downloads_folder = Open the downloads folder
 # source: kurobayomi
 ui_open_containing_folder = Open its folder
 ui_open_title_page = Open the title's page
+ui_volume = Volume
+ui_leave_fullscreen = Leave fullscreen
 
 # source: kurobayomi
 track_auto_title = Track new titles automatically

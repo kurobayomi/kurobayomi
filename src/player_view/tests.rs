@@ -258,3 +258,50 @@ fn fullscreen_and_escape_act_on_the_window_that_holds_the_player() {
         window.set_visible(was_visible);
     });
 }
+
+/// The control bar is one capsule of seven controls, each named for screen readers (with its key), and no error page
+/// covers a video that plays. `KB_PLAYER_SHOT=<file.png>` saves a picture of the window. Needs a display and ffmpeg.
+#[test]
+fn the_control_bar_names_every_control_and_a_playing_video_shows_no_error() {
+    crate::testing::with_display(|| {
+        use gtk::prelude::*;
+        let dir = TempDir::new().unwrap();
+        let Some(clip) = make_clip(dir.path()) else {
+            return;
+        };
+        let (_stack, window) = crate::testing::nav();
+        let was_visible = window.is_visible();
+        window.set_default_size(1280, 720);
+        window.present();
+        let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("Clip", "Episode 1"), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+        let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
+        pump_for(1500);
+        let page = crate::ui::visible_child().expect("the player page");
+        let mut all = Vec::new();
+        let mut stack = vec![page.clone()];
+        while let Some(w) = stack.pop() {
+            stack.extend(std::iter::successors(w.first_child(), |c| c.next_sibling()));
+            all.push(w);
+        }
+        let bar = all.iter().find(|w| w.has_css_class("osd") && w.has_css_class("toolbar")).expect("the control bar");
+        let controls: Vec<gtk::Widget> = std::iter::successors(bar.first_child(), |c| c.next_sibling()).collect();
+        assert_eq!(controls.len(), 7, "previous, play, next, seek, time, volume, fullscreen");
+        for control in controls.iter().filter(|c| !c.is::<gtk::Label>()) {
+            assert!(control.tooltip_text().is_some_and(|t| !t.is_empty()), "{} has a tooltip", control.type_().name());
+        }
+        let failure = all.iter().find(|w| w.is::<adw::StatusPage>()).expect("the error page");
+        assert!(!failure.is_visible(), "a video that plays shows no error");
+        if let Ok(path) = std::env::var("KB_PLAYER_SHOT") {
+            let paintable = gtk::WidgetPaintable::new(Some(&window));
+            let snap = gtk::Snapshot::new();
+            paintable.snapshot(&snap, f64::from(window.width()), f64::from(window.height()));
+            if let (Some(node), Some(renderer)) = (snap.to_node(), window.renderer()) {
+                renderer.render_texture(node, None).save_to_png(path).unwrap();
+            }
+        }
+        crate::ui::pop();
+        drop(shared);
+        pump_for(300);
+        window.set_visible(was_visible);
+    });
+}

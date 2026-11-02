@@ -80,9 +80,20 @@ impl Ui {
         revealer.set_child(Some(&button));
         revealer.set_halign(gtk::Align::End);
         revealer.set_valign(gtk::Align::End);
-        revealer.set_margin_end(16);
-        revealer.set_margin_bottom(84);
+        revealer.set_margin_end(crate::widgets::osd::MARGIN);
         Self { revealer, button }
+    }
+
+    /// Keeps the button just above `bar` (the control bar, on the same overlay): its bottom margin is the bar's height
+    /// and the bar's margins, measured once the bar is on screen.
+    pub fn place_above(&self, bar: &gtk::Box) {
+        let revealer = self.revealer.downgrade();
+        bar.connect_map(move |bar| {
+            let (_, height, _, _) = bar.measure(gtk::Orientation::Vertical, -1);
+            if let Some(revealer) = revealer.upgrade() {
+                revealer.set_margin_bottom(height + 2 * crate::widgets::osd::MARGIN);
+            }
+        });
     }
 
     /// The widget to add over the video.
