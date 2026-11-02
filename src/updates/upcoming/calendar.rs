@@ -116,14 +116,6 @@ pub fn moving_forward(from: (i32, u32), to: (i32, u32)) -> bool {
     to > from
 }
 
-/// Whether the point `(x, y)` of a `width` by `height` cell lies in the circle that is its click area (U§2.2): the
-/// circle through the middle of the cell with the shorter side as its diameter.
-pub fn in_circle(x: f64, y: f64, width: f64, height: f64) -> bool {
-    let radius = width.min(height) / 2.0;
-    let (dx, dy) = (x - width / 2.0, y - height / 2.0);
-    dx * dx + dy * dy <= radius * radius
-}
-
 /// A past day is dimmed; today and the future are not (E-C16).
 pub fn is_past(day: NaiveDate, today: NaiveDate) -> bool {
     day < today
@@ -243,15 +235,5 @@ mod tests {
         assert!(moving_forward((2026, 12), (2027, 1)));
         assert!(!moving_forward((2026, 10), (2026, 9)));
         assert!(!moving_forward((2027, 1), (2026, 12)));
-    }
-
-    #[test]
-    fn the_click_area_is_a_circle_not_the_square_cell() {
-        assert!(in_circle(20.0, 20.0, 40.0, 40.0), "the middle");
-        assert!(in_circle(1.0, 20.0, 40.0, 40.0), "the left edge of the circle");
-        assert!(!in_circle(2.0, 2.0, 40.0, 40.0), "a corner of the cell is outside the circle");
-        assert!(!in_circle(39.5, 39.5, 40.0, 40.0));
-        assert!(in_circle(30.0, 5.0, 60.0, 40.0), "a wide cell uses the shorter side as the diameter");
-        assert!(!in_circle(5.0, 20.0, 60.0, 40.0));
     }
 }

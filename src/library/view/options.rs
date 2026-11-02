@@ -1,6 +1,6 @@
 //! The library's view options (user decision 2026-10-12), on the shared menu button of `widgets::view_options`:
 //! "Show only" checks, "Sort by" radios with "Reverse order", then the look sections shared with a source's page
-//! (`widgets::view_look`). Every change is written at once; the button shows a dot while a Show only filter is on. A
+//! (`widgets::view_look`). Every change is written at once; the button turns the accent colour while a Show only filter is on. A
 //! filter is include-or-off: there is no exclude state (`load::include_only`).
 
 use std::cell::{Cell, RefCell};
@@ -148,8 +148,8 @@ fn current_sort(st: &Inner) -> (Option<i64>, LibrarySort) {
 /// The library's menu on the shared view-options button (`widgets::view_options`). Cheap to clone.
 #[derive(Clone)]
 pub(super) struct Options {
-    /// What the page header shows: the menu button with the dot over it.
-    pub widget: gtk::Overlay,
+    /// What the page header shows: the menu button.
+    pub widget: gtk::MenuButton,
     menu: ViewOptions,
     /// Whether the menu lists the tracker items; the menu is rebuilt when this changes.
     has_tracker: Rc<Cell<bool>>,
@@ -216,7 +216,7 @@ impl Options {
         });
     }
 
-    /// Brings the checks, radios and the dot in line with what is stored, and lists the tracker items only while a
+    /// Brings the checks, radios and the filter mark in line with what is stored, and lists the tracker items only while a
     /// tracker is logged in. Runs on every render, without a borrow of the view held.
     pub fn sync(inner: &Rc<RefCell<Inner>>) {
         let (options, kind, prefs, logged_in, downloaded_only, sort) = {
@@ -245,8 +245,8 @@ impl Options {
     }
 
     #[cfg(test)]
-    pub fn dot_visible(&self) -> bool {
-        self.menu.dot_visible()
+    pub fn marked(&self) -> bool {
+        self.menu.marked()
     }
 }
 

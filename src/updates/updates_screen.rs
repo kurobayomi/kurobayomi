@@ -408,7 +408,8 @@ impl UpdatesScreen {
         dot.set_pixel_size(8);
         dot.add_css_class("accent");
         dot.set_valign(gtk::Align::Center);
-        dot.set_visible(!row.done);
+        // a done row keeps the dot's room, so its cover and title line up with the unread rows
+        dot.set_opacity(if row.done { 0.0 } else { 1.0 });
         lead.append(&dot);
 
         let art = look::cover_art(self.kind, row.entry_id, row.source_id, row.thumbnail_url.clone(), true, row.cover_last_modified);

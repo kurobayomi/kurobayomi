@@ -14,14 +14,6 @@
   background-color: @theme_selected_bg_color;
   color: @theme_selected_fg_color;
 }
-/* The dot over a view options button while a Show only filter is on (widgets/view_options.rs). */
-.kb-dot {
-  min-width: 6px;
-  min-height: 6px;
-  margin: 5px;
-  border-radius: 999px;
-  background-color: @theme_selected_bg_color;
-}
 .kb-library-context {
   font-weight: 600;
   color: alpha(@theme_fg_color, 0.7);
@@ -74,11 +66,6 @@ stackswitcher > button.text-button {
 .column > .kb-group-heading:not(:first-child) {
   margin-top: 12px;
 }
-/* The genre chips of an entry page: libadwaita pads every flowbox child by 3 px, which pushed the first chip right of the
- * description's left edge and made the gaps wider than the flow box's spacing. */
-flowbox.kb-chips > flowboxchild {
-  padding: 0;
-}
 .kb-library-grid {
   background: none;
   padding: 12px;
@@ -93,12 +80,6 @@ flowbox.kb-chips > flowboxchild {
   background-color: alpha(@theme_fg_color, 0.06);
 }
 /* Hover, press, focus and the selected fill of a cover card are libadwaita's own (`gridview > child`). */
-/* The box a drag on a grid's or a list's empty space draws (widgets/drag_select.rs): every item it touches is selected. */
-.kb-drag-band {
-  background-color: alpha(@theme_selected_bg_color, 0.18);
-  border: 1px solid alpha(@theme_selected_bg_color, 0.7);
-  border-radius: 4px;
-}
 .kb-cover-initials {
   background-color: alpha(@theme_selected_bg_color, 0.22);
 }
@@ -184,21 +165,7 @@ listview.kb-item-list {
   background: none;
 }
 
-/* Upcoming calendar (updates/upcoming/calendar_view.rs): a circular day cell with a today ring and event dots. */
-.kuro-cal-day {
-  border-radius: 9999px;
-  border: 1px solid transparent;
-}
-.kuro-cal-day:hover {
-  background-color: alpha(currentColor, 0.08);
-}
-.kuro-cal-day:focus-visible {
-  outline: 2px solid @theme_selected_bg_color;
-  outline-offset: -2px;
-}
-.kuro-cal-today {
-  border-color: currentColor;
-}
+/* Upcoming calendar (updates/upcoming/calendar_view.rs): a day's event dots. The day itself is a round flat button. */
 .kuro-cal-dot {
   background-color: @theme_selected_bg_color;
   border-radius: 9999px;

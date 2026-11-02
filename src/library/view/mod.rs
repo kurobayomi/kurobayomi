@@ -1512,10 +1512,10 @@ mod tests {
             let options = inner.borrow().options.clone();
             options.group().activate_action("watching", None);
             assert_eq!(inner.borrow().deps.prefs.filter_unread.get(), kuro_prefs::tristate::TriState::ENABLED_IS);
-            assert!(pump_until(|| options.dot_visible()), "the dot shows while a Show only filter is on");
+            assert!(pump_until(|| options.marked()), "the button is marked while a Show only filter is on");
             options.group().activate_action("watching", None);
             assert_eq!(inner.borrow().deps.prefs.filter_unread.get(), kuro_prefs::tristate::TriState::DISABLED);
-            assert!(pump_until(|| !options.dot_visible()), "and hides once it is off");
+            assert!(pump_until(|| !options.marked()), "and hides once it is off");
             options.group().activate_action("mode", Some(&"list".to_variant()));
             assert_eq!(inner.borrow().deps.prefs.display_mode.get(), kuro_prefs::library::LibraryDisplayMode::List);
             assert!(pump_until(|| is_list_mode(&inner.borrow()) && inner.borrow().scroller.child() == Some(inner.borrow().list.clone().upcast::<gtk::Widget>())), "List mode shows the list");

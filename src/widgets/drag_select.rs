@@ -1,9 +1,10 @@
 //! Drag to select (issue #7), for a cover grid or an item list. A press on the view's empty space (not on an item's own
-//! press area) followed by a drag draws a translucent box, and every item on screen that the box touches is selected.
+//! press area) followed by a drag draws a box in the theme's rubber band style, and every item on screen that the box
+//! touches is selected.
 //!
 //! The helper holds no selection of its own: it asks the page whether an id is selected and flips one through the page's
-//! own toggle, the call a Ctrl+click makes, so the page's selection stays the only one (never GTK's selection model or its
-//! rubberband). Ctrl held at the press keeps what was selected; otherwise the drag replaces it. An item the box leaves
+//! own toggle, the call a Ctrl+click makes, so the page's selection stays the only one (never GTK's selection model, whose
+//! own rubber band would select through it). Ctrl held at the press keeps what was selected; otherwise the drag replaces it. An item the box leaves
 //! again goes back to what it was before the drag. A press that does not move past `THRESHOLD` stays a plain click.
 //!
 //! Known limit: only the items on screen are hit; the view does not scroll while dragging.
@@ -13,7 +14,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use gtk::prelude::*;
-use gtk::{gdk, graphene};
+use gtk::{gdk, glib, graphene};
 
 /// Marks an item's own press area (`mark`): a drag never starts on it.
 const ITEM_CLASS: &str = "kb-drag-item";
@@ -96,13 +97,12 @@ struct Drag {
 #[derive(Clone)]
 pub struct DragSelect {
     overlay: gtk::Overlay,
-    band: gtk::Box,
+    band: Band,
 }
 
 impl DragSelect {
     pub fn new(child: &impl IsA<gtk::Widget>) -> Self {
-        let band = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        band.add_css_class("kb-drag-band");
+        let band: Band = glib::Object::new();
         band.set_can_target(false);
         band.set_halign(gtk::Align::Start);
         band.set_valign(gtk::Align::Start);
@@ -247,6 +247,34 @@ fn items_on_screen(view: &gtk::Widget) -> Vec<(i64, Rect)> {
     }
     out.sort_by(|a, b| a.1.y.total_cmp(&b.1.y).then(a.1.x.total_cmp(&b.1.x)));
     out
+}
+
+/// The drawn box: a bare widget under GTK's `rubberband` style node, so the theme draws it as it draws the rubber band of
+/// its own list and grid views.
+mod band {
+    use gtk::glib;
+    use gtk::subclass::prelude::*;
+
+    #[derive(Default)]
+    pub struct Band;
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for Band {
+        const NAME: &'static str = "KuroDragBand";
+        type Type = super::Band;
+        type ParentType = gtk::Widget;
+
+        fn class_init(class: &mut Self::Class) {
+            class.set_css_name("rubberband");
+        }
+    }
+
+    impl ObjectImpl for Band {}
+    impl WidgetImpl for Band {}
+}
+
+glib::wrapper! {
+    pub struct Band(ObjectSubclass<band::Band>) @extends gtk::Widget, @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 #[cfg(test)]

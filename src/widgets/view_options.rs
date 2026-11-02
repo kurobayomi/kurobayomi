@@ -1,7 +1,7 @@
 //! The one view-options menu of the app (user decision 2026-10-12, like Nautilus's): a `gtk::MenuButton` with a native
 //! `gio::Menu` of stateful actions, built from a small description. A [`Section`] holds toggles (boolean actions), radio
 //! groups (one string action per group, each item carries its value), plain actions and submenus. A `filter` section
-//! ("Show only") puts a dot on the button while any of its toggles is on.
+//! ("Show only") turns the button the accent colour (libadwaita's `accent` class) while any of its toggles is on.
 //!
 //! A pick sets the action's state at once and reports a [`Pick`]; the owner writes it and later calls `set_toggle` /
 //! `set_radio` with what is stored, so the menu always ends up showing the store. The library, the details pages
@@ -49,7 +49,7 @@ impl Item {
     }
 }
 
-/// A titled (or untitled) block of the menu. `filter` marks the "Show only" block whose toggles light the dot.
+/// A titled (or untitled) block of the menu. `filter` marks the "Show only" block whose toggles mark the button.
 pub struct Section {
     pub title: Option<String>,
     pub filter: bool,
@@ -61,7 +61,7 @@ impl Section {
         Section { title: Some(title.into()), filter: false, items }
     }
 
-    /// A "Show only" block: any toggle of it that is on lights the dot.
+    /// A "Show only" block: any toggle of it that is on marks the button.
     pub fn filter(title: impl Into<String>, items: Vec<Item>) -> Self {
         Section { title: Some(title.into()), filter: true, items }
     }
@@ -80,7 +80,7 @@ pub enum Pick {
     Action(&'static str),
 }
 
-/// The toggle names of the filter sections, submenus included: the ones that light the dot.
+/// The toggle names of the filter sections, submenus included: the ones that mark the button.
 pub fn filter_names(sections: &[Section]) -> Vec<&'static str> {
     fn walk(items: &[Item], out: &mut Vec<&'static str>) {
         for item in items {
@@ -124,7 +124,8 @@ fn bool_state(action: &gio::SimpleAction) -> bool {
 }
 
 struct Inner {
-    dot: gtk::Box,
+    /// The menu button, weakly: it keeps this state alive, not the other way round.
+    button: glib::WeakRef<gtk::MenuButton>,
     actions: RefCell<HashMap<&'static str, gio::SimpleAction>>,
     /// The toggles of the filter sections in the current menu.
     filters: RefCell<Vec<&'static str>>,
@@ -136,10 +137,12 @@ struct Inner {
 }
 
 impl Inner {
-    fn refresh_dot(&self) {
+    fn refresh_mark(&self) {
         let actions = self.actions.borrow();
         let on = self.extra.get() || self.filters.borrow().iter().any(|name| actions.get(name).is_some_and(bool_state));
-        self.dot.set_visible(on);
+        if let Some(button) = self.button.upgrade() {
+            if on { button.add_css_class("accent") } else { button.remove_css_class("accent") }
+        }
     }
 
     /// Reports a pick. The handler is copied out first, so it may call back into the menu.
@@ -151,11 +154,11 @@ impl Inner {
     }
 }
 
-/// The button with its dot, and the actions behind the menu. Cheap to clone (GObjects and one `Rc`).
+/// The button and the actions behind the menu. Cheap to clone (GObjects and one `Rc`).
 #[derive(Clone)]
 pub struct ViewOptions {
-    /// What a header shows: the menu button with the dot over its corner.
-    pub widget: gtk::Overlay,
+    /// What a header shows: the menu button.
+    pub widget: gtk::MenuButton,
     button: gtk::MenuButton,
     group: gio::SimpleActionGroup,
     inner: Rc<Inner>,
@@ -168,17 +171,8 @@ impl ViewOptions {
         let button = crate::ui::quiet_menu(gtk::MenuButton::builder().icon_name("view-sort-descending-symbolic").tooltip_text(tooltip).build());
         button.update_property(&[gtk::accessible::Property::Label(tooltip)]);
         button.insert_action_group(GROUP, Some(&group));
-        // the dot sits over the button's corner and never takes a click
-        let dot = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        dot.add_css_class("kb-dot");
-        dot.set_halign(gtk::Align::End);
-        dot.set_valign(gtk::Align::Start);
-        dot.set_can_target(false);
-        dot.set_visible(false);
-        let widget = gtk::Overlay::new();
-        widget.set_child(Some(&button));
-        widget.add_overlay(&dot);
-        let inner = Rc::new(Inner { dot, actions: RefCell::default(), filters: RefCell::default(), extra: Cell::new(false), handler: RefCell::default(), customs: RefCell::default() });
+        let widget = button.clone();
+        let inner = Rc::new(Inner { button: button.downgrade(), actions: RefCell::default(), filters: RefCell::default(), extra: Cell::new(false), handler: RefCell::default(), customs: RefCell::default() });
         // the actions reach the menu's state weakly, so the button keeps it alive: a caller may drop this value once the
         // button is placed
         let keep = Rc::clone(&inner);
@@ -206,7 +200,7 @@ impl ViewOptions {
         *self.inner.filters.borrow_mut() = filter_names(sections);
         self.button.set_menu_model(Some(&menu));
         self.place_customs();
-        self.inner.refresh_dot();
+        self.inner.refresh_mark();
     }
 
     /// Gives the custom slot `id` the widget `build` makes, now and each time the menu is rebuilt.
@@ -250,7 +244,7 @@ impl ViewOptions {
             let Some(inner) = weak.upgrade() else { return };
             let on = !bool_state(action);
             action.set_state(&on.to_variant());
-            inner.refresh_dot();
+            inner.refresh_mark();
             inner.emit(Pick::Toggle(name, on));
         });
         action
@@ -294,7 +288,7 @@ impl ViewOptions {
         if let Some(action) = self.action(name) {
             action.set_state(&on.to_variant());
         }
-        self.inner.refresh_dot();
+        self.inner.refresh_mark();
     }
 
     /// Shows the stored value of a radio group; a value no radio has leaves every radio of the group off.
@@ -304,10 +298,10 @@ impl ViewOptions {
         }
     }
 
-    /// Lights the dot for a filter the menu has no toggle for (it opens elsewhere, such as the scanlator list).
+    /// Marks the button for a filter the menu has no toggle for (it opens elsewhere, such as the scanlator list).
     pub fn set_extra_filter(&self, on: bool) {
         self.inner.extra.set(on);
-        self.inner.refresh_dot();
+        self.inner.refresh_mark();
     }
 
     /// Greys an item out (or back in). A disabled toggle still shows its state.
@@ -344,8 +338,8 @@ impl ViewOptions {
     }
 
     #[cfg(test)]
-    pub fn dot_visible(&self) -> bool {
-        self.inner.dot.is_visible()
+    pub fn marked(&self) -> bool {
+        self.button.has_css_class("accent")
     }
 }
 
@@ -409,14 +403,14 @@ mod tests {
     }
 
     #[test]
-    fn only_the_toggles_of_a_filter_section_light_the_dot() {
+    fn only_the_toggles_of_a_filter_section_mark_the_button() {
         assert_eq!(filter_names(&sections()), vec!["unread", "downloaded"]);
         let nested = vec![Section::filter("Show only", vec![Item::submenu("More", vec![Item::toggle("deep", "Deep")]), Item::action("x", "X")])];
         assert_eq!(filter_names(&nested), vec!["deep"]);
     }
 
     #[test]
-    fn picks_report_and_set_the_state_and_the_dot_follows_the_filters() {
+    fn picks_report_and_set_the_state_and_the_mark_follows_the_filters() {
         crate::testing::with_display(|| {
             let options = ViewOptions::new("View options", &sections());
             let picks: Rc<RefCell<Vec<Pick>>> = Rc::default();
@@ -424,9 +418,9 @@ mod tests {
                 let picks = Rc::clone(&picks);
                 move |pick| picks.borrow_mut().push(pick)
             });
-            assert!(!options.dot_visible());
+            assert!(!options.marked());
             options.group().activate_action("unread", None);
-            assert!(options.toggle("unread") && options.dot_visible(), "a Show only toggle lights the dot");
+            assert!(options.toggle("unread") && options.marked(), "a Show only toggle marks the button");
             options.group().activate_action("reverse", None);
             options.group().activate_action("sort", Some(&"date".to_variant()));
             options.group().activate_action("default", None);
@@ -436,18 +430,18 @@ mod tests {
             );
             assert_eq!(options.radio("sort").as_deref(), Some("date"));
             options.set_toggle("unread", false);
-            assert!(!options.dot_visible(), "reverse is not a filter");
+            assert!(!options.marked(), "reverse is not a filter");
             // the stored state is shown without a pick, and survives a rebuilt menu
             options.set_toggle("downloaded", true);
             options.set_enabled("downloaded", false);
             options.set_sections(&sections());
-            assert!(options.toggle("downloaded") && options.dot_visible());
+            assert!(options.toggle("downloaded") && options.marked());
             assert_eq!(picks.borrow().len(), 4, "a stored state reports nothing");
             options.set_radio("size", "0");
             assert_eq!(options.radio("size").as_deref(), Some("0"));
             options.set_toggle("downloaded", false);
             options.set_extra_filter(true);
-            assert!(options.dot_visible(), "a filter outside the menu lights the dot too");
+            assert!(options.marked(), "a filter outside the menu marks it too");
             let labels = menu_labels(&options.button().menu_model().expect("a menu"));
             for want in ["Show only", "Unread", "Sort by", "Upload date", "Items per row", "Auto", "Use as default"] {
                 assert!(labels.iter().any(|l| l == want), "{want} in {labels:?}");

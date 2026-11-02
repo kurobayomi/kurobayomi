@@ -61,12 +61,13 @@ fn genre_chip(chip: &GenreChip, h: &Handlers) -> gtk::MenuButton {
 
 /// The genre chips: one wrapping block, so a long list takes more lines instead of scrolling or widening the page.
 fn genre_flow(chips: &[GenreChip], h: &Handlers) -> gtk::FlowBox {
+    // libadwaita pads every flow box child by 3 px, so 2 px of spacing makes the 8 px step (`SPACE_S`) between two chips
+    let gap = (SPACE_S - 6).unsigned_abs();
     let flow = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)
         .homogeneous(false)
-        .row_spacing(SPACE_S.unsigned_abs())
-        .column_spacing(SPACE_S.unsigned_abs())
-        .css_classes(["kb-chips"])
+        .row_spacing(gap)
+        .column_spacing(gap)
         .max_children_per_line(30)
         .margin_bottom(SPACE_S)
         .build();

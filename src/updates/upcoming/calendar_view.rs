@@ -11,7 +11,7 @@ use chrono::{Datelike, NaiveDate, Weekday};
 use gtk::gdk;
 use gtk::glib;
 use gtk::prelude::*;
-use gtk::{Align, Box as GBox, GestureClick, Label, Orientation as O};
+use gtk::{Align, Box as GBox, Label, Orientation as O};
 use kuro_i18n::{MsgKey, tr};
 
 use crate::updates::upcoming::calendar::{self, CalKey};
@@ -183,17 +183,13 @@ impl CalendarView {
         self.grid_slot.append(&grid);
     }
 
-    /// One day: the number (dimmed when past), the ring when it is today, up to three dots, and a circular click area.
+    /// One day: a round flat button with the number (dimmed when past, in the accent colour when it is today) and up to
+    /// three dots. Hover, press, focus and Enter or Space are the button's own.
     fn day_cell(self: &Rc<Self>, date: NaiveDate, count: u32, today: NaiveDate) -> gtk::Widget {
-        let cell = gtk::Overlay::builder().halign(Align::Center).valign(Align::Center).focusable(true).build();
-        cell.set_size_request(CELL_SIZE, CELL_SIZE);
-        cell.add_css_class("kuro-cal-day");
-        if date == today {
-            cell.add_css_class("kuro-cal-today");
-        }
+        let content = gtk::Overlay::new();
         let number = Label::builder().label(date.day().to_string()).css_classes(["heading"]).halign(Align::Center).valign(Align::Center).build();
         number.set_opacity(calendar::day_alpha(date, today));
-        cell.set_child(Some(&number));
+        content.set_child(Some(&number));
         let dots = GBox::new(O::Horizontal, 2);
         dots.set_halign(Align::Center);
         dots.set_valign(Align::End);
@@ -207,23 +203,24 @@ impl CalendarView {
             dot.set_opacity(alpha);
             dots.append(&dot);
         }
-        cell.add_overlay(&dots);
+        content.add_overlay(&dots);
 
-        let click = GestureClick::new();
-        let (weak, cell_weak) = (Rc::downgrade(self), cell.downgrade());
-        click.connect_released(move |_, _, x, y| {
-            let (Some(view), Some(cell)) = (weak.upgrade(), cell_weak.upgrade()) else { return };
-            if calendar::in_circle(x, y, f64::from(cell.width()), f64::from(cell.height())) {
+        let cell = gtk::Button::builder().child(&content).css_classes(["flat", "circular"]).halign(Align::Center).valign(Align::Center).build();
+        cell.set_size_request(CELL_SIZE, CELL_SIZE);
+        if date == today {
+            cell.add_css_class("accent");
+        }
+        let weak = Rc::downgrade(self);
+        cell.connect_clicked(move |_| {
+            if let Some(view) = weak.upgrade() {
                 view.focus.set(date);
-                cell.grab_focus();
                 (view.on_day)(date);
             }
         });
-        cell.add_controller(click);
         cell.upcast()
     }
 
-    /// Arrow keys move the focus by day and week, Page Up and Page Down by month; Enter or Space picks the focused day.
+    /// Arrow keys move the focus by day and week, Page Up and Page Down by month; the focused day's button takes Enter or Space.
     fn attach_keys(self: &Rc<Self>) {
         let keys = gtk::EventControllerKey::new();
         let weak = Rc::downgrade(self);
@@ -233,9 +230,6 @@ impl CalendarView {
                 view.move_focus(calendar::key_move(view.focus_date(), step));
                 glib::Propagation::Stop
             } else if key == gdk::Key::Home && view.home() {
-                glib::Propagation::Stop
-            } else if matches!(key, gdk::Key::Return | gdk::Key::KP_Enter | gdk::Key::space) && view.focused_cell().is_some() {
-                (view.on_day)(view.focus_date());
                 glib::Propagation::Stop
             } else {
                 glib::Propagation::Proceed
@@ -253,11 +247,6 @@ impl CalendarView {
         }
         let today = self.today.get();
         if (today.year(), today.month()) == (year, month) { today } else { NaiveDate::from_ymd_opt(year, month, 1).unwrap_or(today) }
-    }
-
-    fn focused_cell(&self) -> Option<NaiveDate> {
-        let cells = self.cells.borrow();
-        cells.iter().find(|(_, widget)| widget.has_focus()).map(|(date, _)| *date)
     }
 
     /// Focuses `to`, changing the month first when it is in another one.
@@ -289,7 +278,7 @@ mod tests {
 
     /// The dots drawn on a day cell: the overlay's `Box` of dot boxes.
     fn dots_of(cell: &gtk::Widget) -> Vec<f64> {
-        let mut child = cell.first_child();
+        let mut child = cell.first_child().and_then(|content| content.first_child());
         while let Some(widget) = child {
             if widget.is::<GBox>() {
                 let mut alphas = Vec::new();
@@ -306,18 +295,18 @@ mod tests {
     }
 
     fn number_of(cell: &gtk::Widget) -> Label {
-        cell.first_child().and_downcast::<Label>().expect("the day number is the first child")
+        cell.first_child().and_then(|content| content.first_child()).and_downcast::<Label>().expect("the day number is the first child")
     }
 
     #[test]
-    fn calendar_view_draws_the_ring_the_dimming_and_at_most_three_dots() {
+    fn calendar_view_marks_today_dims_the_past_and_draws_at_most_three_dots() {
         crate::testing::with_display(|| {
             let view = CalendarView::new(Weekday::Mon, d(2026, 10, 8), |_| {});
             view.set_events(BTreeMap::from([(d(2026, 10, 8), 5), (d(2026, 10, 9), 1)]));
             let cells = view.cells.borrow();
             assert_eq!(cells.len(), 31, "one cell per day of October");
-            assert!(cells[&d(2026, 10, 8)].has_css_class("kuro-cal-today"), "today has the ring");
-            assert!(!cells[&d(2026, 10, 9)].has_css_class("kuro-cal-today"));
+            assert!(cells[&d(2026, 10, 8)].has_css_class("accent"), "today is in the accent colour");
+            assert!(!cells[&d(2026, 10, 9)].has_css_class("accent"));
             assert_eq!(dots_of(&cells[&d(2026, 10, 8)]).len(), 3, "five entries draw three dots");
             let alphas = dots_of(&cells[&d(2026, 10, 8)]);
             // GTK keeps an opacity in 8 bits, so 0.3 reads back as 77/255
