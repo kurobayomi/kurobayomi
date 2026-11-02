@@ -60,17 +60,9 @@ pub fn menu_button(icon_name: &str, label: &str, items: impl Fn() -> Vec<Item> +
             button.insert_action_group("ctx", Some(&actions));
         })
     };
-    // GTK reports `active` more than once while a menu opens: build once per opening
-    let (on_open, open) = (Rc::clone(&fill), std::cell::Cell::new(false));
-    button.connect_active_notify(move |button| {
-        let active = button.is_active();
-        if active && !open.replace(true) {
-            on_open(button);
-        }
-        if !active {
-            open.set(false);
-        }
-    });
+    // GTK's own hook, run each time just before the menu shows: the model is complete before GTK builds the menu from it
+    let on_open = Rc::clone(&fill);
+    button.set_create_popup_func(move |button| on_open(button));
     // weak on both: the caller's items may hold this refresh (a list that loads), and the button owns the builder
     let (weak, fill) = (button.downgrade(), Rc::downgrade(&fill));
     let refresh: Rc<dyn Fn()> = Rc::new(move || {
@@ -151,7 +143,9 @@ fn show(widget: &gtk::Widget, items: Vec<Item>, x: f64, y: f64) {
     let menu = gio::Menu::new();
     fill(&menu, items, &actions, &mut 0);
 
-    let popover = gtk::PopoverMenu::from_model(Some(&menu));
+    // a right-click menu opens its submenus beside it, each at its own size (a sliding menu is as tall as its tallest
+    // submenu, so a short first page scrolled)
+    let popover = gtk::PopoverMenu::from_model_full(&menu, gtk::PopoverMenuFlags::NESTED);
     popover.insert_action_group("ctx", Some(&actions));
     popover.set_parent(widget);
     popover.set_has_arrow(false);
