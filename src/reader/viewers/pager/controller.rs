@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use super::items::{build_pager_items, place_insert};
-use super::nav::{MoveDecision, PageCmd, Phys, decide};
+use super::nav::{MoveDecision, PageCmd, decide};
 use crate::reader::viewers::effect::Effect;
 use crate::reader::viewers::ViewerKind;
 use crate::reader::viewers::model::{ChapterKey, ChapterSet, Dir, ItemKey, PageRef, Transition};

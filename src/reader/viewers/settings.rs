@@ -11,7 +11,6 @@ use kuro_prefs::store::Changed;
 
 use super::nav::NavMode;
 use crate::misc::diet_defaults as diet;
-use crate::reader::page_profile::set_display_profile;
 use crate::reader::tiles::set_tile_threshold;
 use crate::reader::pref_rules::{self, NAVIGATION_MODE, READER_THEME, ZOOM_START, clamp_to};
 
@@ -45,8 +44,6 @@ pub struct ViewerSettings {
     pub double_tap_zoom: bool,
     /// `pref_hardware_bitmap_threshold`: the largest tile edge of a page decoded from now on (T-44a-060).
     pub tile_threshold: i32,
-    /// `pref_display_profile_key`: the ICC file pages are taken to when decoded from now on (T-43a-067).
-    pub display_profile: String,
     pub dual_split_pager: bool,
     pub dual_invert_pager: bool,
     pub dual_rotate_pager: bool,
@@ -85,12 +82,6 @@ fn read_tile_threshold() -> i32 {
     diet::READER_TILE_THRESHOLD
 }
 
-/// The display profile is cut from the settings: no profile file is applied to pages.
-fn read_display_profile() -> String {
-    set_display_profile(diet::READER_DISPLAY_PROFILE);
-    diet::READER_DISPLAY_PROFILE.to_owned()
-}
-
 impl ViewerSettings {
     /// The settings of the defaults alone: a manga with no values of its own.
     #[cfg(test)]
@@ -125,7 +116,6 @@ impl ViewerSettings {
             zoom_out_disabled: diet::READER_WEBTOON_DISABLE_ZOOM_OUT,
             double_tap_zoom: diet::READER_WEBTOON_DOUBLE_TAP_ZOOM,
             tile_threshold: read_tile_threshold(),
-            display_profile: read_display_profile(),
             dual_split_pager: p.dual_page_split_paged().get(),
             dual_invert_pager: diet::READER_DUAL_PAGE_INVERT,
             dual_rotate_pager: diet::READER_DUAL_PAGE_ROTATE,

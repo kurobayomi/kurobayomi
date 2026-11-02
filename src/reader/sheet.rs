@@ -2,14 +2,13 @@
 //! and a click outside the sheet dismiss it. The reader settings are a native window (`settings_window`). The confirm
 //! prompt uses the shared dialog. No libadwaita.
 
+use kuro_i18n::{MsgKey, tr};
 use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gtk::glib;
 use gtk::prelude::*;
-
-use super::strings;
 use crate::ui::{DialogButton, Role};
 
 /// A bottom sheet over `base`. Only one content is shown at a time; `show` replaces it.
@@ -145,10 +144,10 @@ fn first_focusable(root: &gtk::Widget) -> Option<gtk::Widget> {
 /// nothing.
 pub fn confirm(parent: &impl IsA<gtk::Window>, message: &str, on_ok: impl FnOnce() + 'static) {
     let on_ok = std::cell::Cell::new(Some(on_ok));
-    let ok = DialogButton::new(strings::action_ok(), Role::Suggested, move || {
+    let ok = DialogButton::new(tr(MsgKey::action_ok), Role::Suggested, move || {
         if let Some(on_ok) = on_ok.take() {
             on_ok();
         }
     });
-    crate::ui::alert(message, "", vec![DialogButton::cancel(strings::action_cancel()), ok], || {}).open_over(parent.as_ref());
+    crate::ui::alert(message, "", vec![DialogButton::cancel(tr(MsgKey::action_cancel)), ok], || {}).open_over(parent.as_ref());
 }

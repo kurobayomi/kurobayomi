@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use gtk::prelude::*;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
-use gtk::{gdk, gio, glib, graphene};
+use gtk::{gdk, glib, graphene};
 
 use crate::reader::crop_borders;
 use crate::reader::decode_guard::{self, Ticket};
@@ -29,7 +29,6 @@ use crate::reader::page_decode::{self, DecodeError, LoadState, MIN_DELAY_MS};
 use crate::reader::page_transform::{self, DecodeIntent};
 use crate::reader::page_zoom::{self as zoom, PageConfig, Size, ZoomKey, ZoomState};
 use crate::reader::progress::LoadingIndicator;
-use crate::reader::page_profile;
 use crate::reader::tiles::{Pyramid, Tile, current_tile_edge};
 use crate::reader::viewers::page_bytes::ByteSource;
 use crate::reader::viewers::pager::nav::Phys;
@@ -51,7 +50,7 @@ fn decode_animation(bytes: &[u8], width: Option<u32>, intent: DecodeIntent, crop
     // read once per page: a change of the threshold applies to pages decoded after it (T-44a-060)
     let tile_edge = current_tile_edge();
     for (index, frame) in page_decode::decode_frames(bytes)?.into_iter().enumerate() {
-        let (page, split) = page_transform::apply(page_profile::apply(frame.page), intent);
+        let (page, split) = page_transform::apply(frame.page, intent);
         if index == 0 {
             changed = split;
         }

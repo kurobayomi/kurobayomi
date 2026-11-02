@@ -35,11 +35,6 @@ impl EngineViewer {
         Self { engine, container, destroyed: Cell::new(false) }
     }
 
-    #[cfg(test)]
-    pub fn kind(&self) -> ViewerKind {
-        self.engine.kind()
-    }
-
     fn attach_widget(&self) {
         let widget = self.engine.widget();
         if widget.parent().is_none() {
@@ -84,6 +79,7 @@ impl Viewer for EngineViewer {
             })
     }
 
+    #[cfg(test)]
     fn handle_motion(&self, _dx: f64, dy: f64) -> bool {
         !self.destroyed.get() && self.engine.handle_scroll(dy)
     }

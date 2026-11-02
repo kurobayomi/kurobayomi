@@ -268,6 +268,7 @@ impl HttpLoader {
         self.shared.wake.notify_one();
     }
 
+    #[cfg(test)]
     /// The status of a page, as the worker last set it.
     pub fn status(&self, index: usize) -> Option<PageStatus> {
         self.shared.lock().slots.get(index).map(|s| s.status)

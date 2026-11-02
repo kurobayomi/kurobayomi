@@ -82,6 +82,7 @@ impl ViewerKind {
 
 /// The calls the core makes on a viewer. `widget` is the viewer's root, which the container shows.
 pub trait ViewerEngine {
+    #[cfg(test)]
     fn kind(&self) -> ViewerKind;
     fn widget(&self) -> &gtk::Widget;
     /// Hands over the current, previous and next chapters. The viewer keeps what it needs.
@@ -90,6 +91,7 @@ pub trait ViewerEngine {
     fn move_to_page(&self, page: &Rc<ReaderPage>);
     /// A key the viewer owns, on either edge. `true` when it claimed the key.
     fn handle_key(&self, ev: KeyEvent) -> bool;
+    #[cfg(test)]
     /// A pointer scroll, `dy > 0` for scrolling down. `true` when the viewer used it.
     fn handle_scroll(&self, dy: f64) -> bool;
     /// Releases everything. No event is sent after this (E-78). A viewer with nothing to release keeps the default.

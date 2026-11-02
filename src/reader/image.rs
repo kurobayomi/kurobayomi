@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-use kuro_core::image::{ImageKind, is_image_name, sniff};
+use kuro_core::image::is_image_name;
 use kuro_core::text::natural_cmp;
 
 /// Bytes read from a file to sniff its type (`HEAD_LEN` in the archive reader).
@@ -53,11 +53,6 @@ mod tests {
 
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR";
     const JPEG: &[u8] = b"\xff\xd8\xff\xe0\x00\x10JFIF";
-    const GIF: &[u8] = b"GIF89a\x01\x00\x01\x00";
-    const WEBP: &[u8] = b"RIFF\x24\x00\x00\x00WEBPVP8 ";
-    const AVIF: &[u8] = b"\x00\x00\x00\x1cftypavif\x00\x00\x00\x00";
-    const HEIF: &[u8] = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00";
-    const JXL: &[u8] = b"\0\0\0\x0cJXL \r\n\x87\n\0\0\0\x1f";
 
     #[test]
     fn extension_list_is_accepted_without_reading_the_head() {

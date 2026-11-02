@@ -16,7 +16,6 @@ use gtk::prelude::*;
 use kuro_prefs::reader::{MangaReaderPrefs, ReadingMode};
 
 use super::chrome::mode_label;
-use super::strings;
 use crate::pref_model::bind;
 use crate::pref_model::model::{ItemCommon, Preference, PreferenceItem};
 use crate::pref_model::page;
@@ -35,12 +34,12 @@ fn mode_row(mode: ReadingMode, on_mode: Rc<dyn Fn(ReadingMode)>) -> PreferenceIt
         }
         async move { result.map(|_| true) }
     });
-    PreferenceItem::BasicList { common: ItemCommon::bound(strings::viewer()), value: mode.flag_value().to_string(), entries, on_change }
+    PreferenceItem::BasicList { common: ItemCommon::bound(tr(MsgKey::viewer)), value: mode.flag_value().to_string(), entries, on_change }
 }
 
 /// The rows of the page: the reading mode, then the shared Display and Paged groups.
 pub fn page_rows(prefs: &MangaReaderPrefs, mode: ReadingMode, on_mode: Rc<dyn Fn(ReadingMode)>) -> Vec<Preference> {
-    let mut rows = vec![group(&strings::pref_category_reading_mode(), vec![mode_row(mode, on_mode)])];
+    let mut rows = vec![group(&tr(MsgKey::pref_category_reading_mode), vec![mode_row(mode, on_mode)])];
     rows.extend(layout_rows(&LayoutPrefs::manga(prefs)));
     rows
 }
@@ -53,7 +52,7 @@ pub fn open(parent: &impl IsA<gtk::Window>, prefs: &MangaReaderPrefs, mode: Read
     body.scrolled.set_vexpand(false);
     body.scrolled.set_propagate_natural_height(true);
     body.scrolled.set_max_content_height(max_height);
-    let window = crate::ui::dialog(&strings::action_settings(), &body.widget, 420, vec![DialogButton::new(&tr(MsgKey::action_close), Role::Suggested, || {})]);
+    let window = crate::ui::dialog(&tr(MsgKey::action_settings), &body.widget, 420, vec![DialogButton::new(&tr(MsgKey::action_close), Role::Suggested, || {})]);
     window.open_over(parent.as_ref());
 }
 
@@ -90,7 +89,7 @@ mod tests {
     fn the_page_is_the_reading_mode_then_the_display_and_paged_groups() {
         let prefs = MangaReaderPrefs::new(ReaderPrefs::new(PrefStore::in_memory()), 1);
         let rows = page_rows(&prefs, ReadingMode::LeftToRight, Rc::new(|_| {}));
-        assert_eq!(group_titles(&rows), [strings::pref_category_reading_mode().as_str(), "Display", "Paged"]);
+        assert_eq!(group_titles(&rows), [tr(MsgKey::pref_category_reading_mode).as_str(), "Display", "Paged"]);
     }
 
     #[test]

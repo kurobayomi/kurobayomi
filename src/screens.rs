@@ -1,5 +1,6 @@
 // Hand-built screens. Labels, menus, sheets and dialogs come from spec/*.json; layout follows the
 // "notes" Aniyomi layouts. Anything without a builder here falls back to ui::generic.
+use kuro_i18n::{Arg, trf};
 use kuro_i18n::{MsgKey, tr};
 use crate::ui::*;
 use gtk::prelude::*;
@@ -125,7 +126,7 @@ pub fn open_unit(kind: Kind, entry_id: i64, unit_id: i64) {
         return;
     }
     let source = source.map_or_else(|| unit_id.to_string(), |source| source.to_string());
-    crate::toast::notify(crate::reader::strings::source_not_installed(&source));
+    crate::toast::notify(trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&source))]));
 }
 
 /// Opens a unit by its entry's title and its own name, which finds only a local entry's file. Kept for
@@ -134,7 +135,7 @@ pub fn open_unit(kind: Kind, entry_id: i64, unit_id: i64) {
 pub fn open_media(kind: Kind, title: &str, unit: &str) {
     if kind.is_anime() {
         if !crate::local_flow::open::open_episode(title, unit) {
-            crate::toast::notify(crate::reader::strings::source_not_installed(title));
+            crate::toast::notify(trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(title))]));
         }
     } else {
         push(&crate::local_flow::reader::page_for(title, unit));
@@ -449,7 +450,7 @@ mod tests {
             let episode = items.add_all(&[Item { entry_id: anime, url: "/e1".into(), name: "Episode 1".into(), number: 1.0, ..Item::create(Kind::Anime) }]).expect("episode")[0].id;
             let before = top();
             open_unit(Kind::Anime, anime, episode);
-            assert!(alone::pump(ctx, || toast.text() == crate::reader::strings::source_not_installed("7")), "the toast names the missing source, got {:?}", toast.text());
+            assert!(alone::pump(ctx, || toast.text() == trf(MsgKey::source_not_installed, &[("arg1", Arg::Str("7"))])), "the toast names the missing source, got {:?}", toast.text());
             assert_eq!(top(), before, "no page was opened");
             open_entry(Kind::Anime, anime);
             assert!(alone::pump(ctx, || top().as_deref() == Some("screen:anime_entry_details")), "an anime opens its entry page by id");

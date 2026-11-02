@@ -8,6 +8,7 @@
 //! [`super::backlight`] when a writable backlight exists (T-43a-065); without one the page is left unchanged and the
 //! notice is shown once per session (E-BRIGHT-2).
 
+use kuro_i18n::{MsgKey, tr};
 use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
@@ -163,7 +164,7 @@ impl Tint {
         if let super::backlight::Outcome::Unavailable { notify: true } =
             super::backlight::apply(std::path::Path::new(super::backlight::SYSFS_ROOT), enabled, value)
         {
-            crate::toast::notify(super::strings::custom_brightness_unavailable());
+            crate::toast::notify(tr(MsgKey::reader_custom_brightness_unavailable));
         }
         let alpha = brightness_alpha(enabled, value);
         self.brightness_colour.set((0.0, 0.0, 0.0, alpha));
@@ -183,13 +184,6 @@ impl Tint {
         if due {
             self.start_flash(FlashColor::BLACK, pref_rules::flash_duration_ms(FLASH_DURATION_STORED));
         }
-    }
-
-    /// Clears the interval counter and any flash on screen, for when the feature is turned off.
-    pub fn reset_flash(&self) {
-        self.flash_trigger.set(0);
-        self.flash_generation.set(self.flash_generation.get() + 1);
-        self.flash.set_visible(false);
     }
 
     fn start_flash(&self, colour: FlashColor, duration_ms: i32) {

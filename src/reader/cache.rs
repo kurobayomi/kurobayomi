@@ -17,6 +17,7 @@ use kuro_core::hash::md5_hex;
 
 use super::loader::PageEntry;
 
+#[cfg(test)]
 /// The cache size limit (`100L * 1024 * 1024`).
 pub const CACHE_LIMIT_BYTES: u64 = 100 * 1024 * 1024;
 
@@ -94,6 +95,7 @@ impl DiskCache {
         self.evict().map(|_| ())
     }
 
+    #[cfg(test)]
     /// Total size of the cached files in bytes.
     pub fn size(&self) -> io::Result<u64> {
         Ok(self.entries()?.iter().map(|e| e.len).sum())

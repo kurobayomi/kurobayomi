@@ -3,6 +3,7 @@
 //! The pure helpers hold the text and the source-dependent overflow rule, so they are tested without GTK.
 //! The widget builders only assemble them.
 
+use kuro_i18n::{Arg, MsgKey, tr, trf};
 use std::rc::Rc;
 
 use gtk::gio;
@@ -11,17 +12,16 @@ use gtk::prelude::*;
 use kuro_prefs::reader::ReadingMode;
 
 use super::model::LoadError;
-use super::strings;
 use crate::widgets::page_header;
 
 /// The card text for an initial load failure. A blank message shows the generic text, so no card is empty. The
 /// downloaded-only text is shown as is, since it is not a page-load failure (T-43a-074).
 pub fn error_card_message(error: &LoadError) -> String {
-    if error.message == strings::chapter_not_downloaded() {
+    if error.message == tr(MsgKey::reader_chapter_not_downloaded) {
         return error.message.clone();
     }
-    let message = if error.message.trim().is_empty() { strings::unknown_error() } else { error.message.as_str().to_string() };
-    strings::failed_to_load_pages(&message)
+    let message = if error.message.trim().is_empty() { tr(MsgKey::unknown_error) } else { error.message.as_str().to_string() };
+    trf(MsgKey::transition_pages_error, &[("arg1", Arg::Str(&message))])
 }
 
 /// The action group the reader page installs, so the menu's items name their actions as `reader.<name>`.
@@ -46,12 +46,12 @@ pub const MODES: [(&str, ReadingMode); 5] = [
 /// The label of a mode, in the menu, the settings chips and the toast.
 pub fn mode_label(mode: ReadingMode) -> String {
     match mode {
-        ReadingMode::Default => strings::label_default(),
-        ReadingMode::LeftToRight => strings::left_to_right_viewer(),
-        ReadingMode::RightToLeft => strings::right_to_left_viewer(),
-        ReadingMode::Vertical => strings::vertical_viewer(),
-        ReadingMode::Webtoon => strings::webtoon_viewer(),
-        ReadingMode::ContinuousVertical => strings::vertical_plus_viewer(),
+        ReadingMode::Default => tr(MsgKey::label_default),
+        ReadingMode::LeftToRight => tr(MsgKey::left_to_right_viewer),
+        ReadingMode::RightToLeft => tr(MsgKey::right_to_left_viewer),
+        ReadingMode::Vertical => tr(MsgKey::vertical_viewer),
+        ReadingMode::Webtoon => tr(MsgKey::webtoon_viewer),
+        ReadingMode::ContinuousVertical => tr(MsgKey::vertical_plus_viewer),
     }
 }
 
@@ -78,17 +78,17 @@ pub fn overflow_menu(is_http_source: bool) -> gio::Menu {
         item.set_action_and_target_value(Some(&detailed(ACTION_MODE)), Some(&target.to_variant()));
         modes.append_item(&item);
     }
-    menu.append_section(Some(&strings::pref_category_reading_mode()), &modes);
+    menu.append_section(Some(&tr(MsgKey::pref_category_reading_mode)), &modes);
     let reader = gio::Menu::new();
-    reader.append(Some(&strings::pref_crop_borders()), Some(&detailed(ACTION_CROP)));
-    reader.append(Some(&strings::menu_reader_settings()), Some(&detailed(ACTION_SETTINGS)));
+    reader.append(Some(&tr(MsgKey::pref_crop_borders)), Some(&detailed(ACTION_CROP)));
+    reader.append(Some(&tr(MsgKey::reader_menu_reader_settings)), Some(&detailed(ACTION_SETTINGS)));
     menu.append_section(None, &reader);
     let page = gio::Menu::new();
     if is_http_source {
-        page.append(Some(&strings::action_open_in_browser()), Some(&detailed(ACTION_OPEN_BROWSER)));
-        page.append(Some(&strings::action_share()), Some(&detailed(ACTION_SHARE)));
+        page.append(Some(&tr(MsgKey::action_open_in_browser)), Some(&detailed(ACTION_OPEN_BROWSER)));
+        page.append(Some(&tr(MsgKey::action_share)), Some(&detailed(ACTION_SHARE)));
     } else {
-        page.append(Some(&strings::set_as_cover()), Some(&detailed(ACTION_SET_COVER)));
+        page.append(Some(&tr(MsgKey::set_as_cover)), Some(&detailed(ACTION_SET_COVER)));
     }
     menu.append_section(None, &page);
     menu
@@ -162,20 +162,20 @@ pub fn web_url(chapter_url: &str) -> Option<String> {
 
 /// The bookmark action's label for the chapter's state.
 pub fn bookmark_label(bookmarked: bool) -> String {
-    if bookmarked { strings::action_remove_bookmark() } else { strings::action_bookmark() }
+    if bookmarked { tr(MsgKey::action_remove_bookmark) } else { tr(MsgKey::action_bookmark) }
 }
 
 /// The chapter list button's tooltip, with its key.
 pub fn chapters_tooltip() -> String {
-    format!("{} (L)", strings::chapters())
+    format!("{} (L)", tr(MsgKey::chapters))
 }
 
 /// The error page: the message, a Retry button and a Close button (the shared `widgets::status` page). The reader does
 /// not close by itself.
 pub fn build_error_card(error: &LoadError, on_retry: impl Fn() + 'static, on_close: impl Fn() + 'static) -> adw::StatusPage {
-    let retry = gtk::Button::with_label(&strings::retry());
+    let retry = gtk::Button::with_label(&tr(MsgKey::action_retry));
     retry.connect_clicked(move |_| on_retry());
-    let close = gtk::Button::with_label(&strings::close());
+    let close = gtk::Button::with_label(&tr(MsgKey::action_close));
     close.connect_clicked(move |_| on_close());
     crate::widgets::status::error_with(&error_card_message(error), None, &[retry, close])
 }
@@ -221,7 +221,7 @@ pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (adw::HeaderBar, p
     let popover = gtk::PopoverMenu::from_model(Some(&overflow_menu(bar.is_http_source)));
     // no tooltip: it would sit on top of the open menu; the accessible label below still names the button
     let menu = gtk::MenuButton::builder().icon_name("view-more-symbolic").popover(&popover).build();
-    menu.update_property(&[gtk::accessible::Property::Label(&strings::overflow_menu())]);
+    menu.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::player_sheets_more_title))]);
 
     let chapters = gtk::Button::builder().icon_name("view-list-symbolic").tooltip_text(chapters_tooltip()).build();
     chapters.connect_clicked(move |_| on_chapters());

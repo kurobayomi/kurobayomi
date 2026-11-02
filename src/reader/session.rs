@@ -3,7 +3,7 @@
 //! through [`ReaderStore`]. T-43a-023 (initial index), T-43a-025, T-43a-026, T-43a-027, T-43a-028, T-43a-029,
 //! T-43a-036, T-43a-086 (event channel).
 
-use std::path::PathBuf;
+use kuro_i18n::{Arg, MsgKey, tr, trf};
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc::Sender;
@@ -13,18 +13,16 @@ use kuro_data::item::{Item, ItemRepo};
 use kuro_db::Db;
 use kuro_domain::history::recorder::SessionTimer;
 use kuro_platform::kind::Kind;
-use kuro_prefs::reader::{READING_MODE_MASK, ReadingMode};
+use kuro_prefs::reader::ReadingMode;
 
 use super::chapters::{ListError, ListOptions, build_reader_list};
 use super::delete_queue::{self, DeleteQueue, Pending};
 use super::download_ahead;
-use super::flags;
 use super::history_rules::{self, now_ms};
 use super::loader::{LoadFailure, Loader, load_chapter};
 use super::model::{ChapterState, LoadError, PageStatus, ReaderChapter, ReaderPage, ViewerChapters};
 use super::nav::{self, Step};
 use super::restore::SavedSession;
-use super::strings;
 
 /// The writes a session makes. The production implementation is the writer thread (`writer::WriterHandle`).
 pub trait ReaderStore {
@@ -46,11 +44,6 @@ pub trait ReaderStore {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReaderEvent {
     ReloadViewerChapters,
-    PageChanged,
-    SetCoverResult(bool),
-    SavedImage(PathBuf),
-    ShareImage(PathBuf),
-    CopyImage(PathBuf),
 }
 
 /// What an adjacent chapter load ended with.
@@ -68,15 +61,15 @@ pub enum AdjacentOutcome {
 
 /// Initial chapter index for the requested chapter id. A missing id gives the generic message (E-INIT-4).
 pub fn initial_index(ids: &[i64], requested: i64) -> Result<usize, String> {
-    ids.iter().position(|&id| id == requested).ok_or_else(|| strings::requested_chapter_not_found(requested))
+    ids.iter().position(|&id| id == requested).ok_or_else(|| trf(MsgKey::reader_requested_chapter_not_found, &[("arg1", Arg::Int(requested))]))
 }
 
 /// The message for a list that could not be built. The downloaded-only text is the proposal in
 /// `p1-edge-cases-and-tests.md` for E-LIST-2, flagged there for strings review.
 pub fn list_error_message(error: &ListError) -> String {
     match error {
-        ListError::ChapterNotFound(id) => strings::requested_chapter_not_found(*id),
-        ListError::CurrentChapterMissing => strings::chapter_not_downloaded().to_owned(),
+        ListError::ChapterNotFound(id) => trf(MsgKey::reader_requested_chapter_not_found, &[("arg1", Arg::Int(*id))]),
+        ListError::CurrentChapterMissing => tr(MsgKey::reader_chapter_not_downloaded).to_owned(),
     }
 }
 
@@ -95,7 +88,7 @@ pub fn open_list(
     opts: impl FnOnce(&Entry) -> ListOptions,
     is_downloaded: impl Fn(&Item) -> bool,
 ) -> Result<OpenedList, String> {
-    let manga = EntryRepo::new(Arc::clone(&db)).by_id(manga_id).map_err(|_| strings::unknown_err().to_owned())?;
+    let manga = EntryRepo::new(Arc::clone(&db)).by_id(manga_id).map_err(|_| tr(MsgKey::reader_unknown_err).to_owned())?;
     let all = ItemRepo::new(db).by_entry_id(manga_id, true).map_err(|e| e.to_string())?;
     let list = build_reader_list(&all, requested, &opts(&manga), is_downloaded).map_err(|e| list_error_message(&e))?;
     let ids: Vec<i64> = list.iter().map(|c| c.id).collect();
@@ -257,6 +250,7 @@ impl ReaderSession {
         self.current.and_then(|i| self.chapters.get(i))
     }
 
+    #[cfg(test)]
     /// Replaces the chapter list (E-LIST-1). The chapter being read keeps its own object, with its loaded pages, and
     /// stays the current one; the list the caller built must contain it.
     pub fn replace_list(&mut self, mut list: Vec<Rc<ReaderChapter>>) {
@@ -963,7 +957,7 @@ mod tests {
         let a = chapter(1, false);
         let (s, rx) = session(rec, vec![a], 0, false);
         for _ in 0..1000 {
-            s.notify(ReaderEvent::PageChanged);
+            s.notify(ReaderEvent::ReloadViewerChapters);
         }
         assert_eq!(rx.try_iter().count(), 1000);
     }

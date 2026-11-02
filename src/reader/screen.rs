@@ -10,6 +10,7 @@
 //! spinner is shown and one frame is let through before the load starts, so the screen is never modal, but it does
 //! not animate while an HTTP page list is fetched. Move the page-list fetch to the runtime when the viewers land.
 
+use kuro_i18n::{Arg, MsgKey, tr, trf};
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
@@ -43,7 +44,7 @@ use crate::misc::diet_defaults as diet;
 use crate::widgets::page_header::{self, TwoLineTitle};
 use super::keep_awake::{self, KeepAwake};
 use super::loader::{LoadFailure, Loader, load_chapter};
-use super::model::{LoadError, PageStatus, ReaderChapter, ReaderPage, ViewerChapters};
+use super::model::{LoadError, ReaderChapter, ReaderPage, ViewerChapters};
 use super::nav::{self, Step};
 use super::nav_overlay::{self, NavOverlay};
 use super::navigator::{Navigator, NavigatorState};
@@ -54,7 +55,6 @@ use super::sheet::{self, Sheet};
 use super::source_pages;
 use super::sync::{self, Effect};
 use super::state::{self, Dialog, EscapeAction, UiState};
-use super::strings;
 use super::theme;
 use super::viewer::{self, Viewer, ViewerEvent, ViewerSlot};
 use super::viewers::adapter::{self, EngineViewer};
@@ -135,7 +135,7 @@ pub fn crop_icon(on: bool) -> &'static str {
 
 /// The toast for a failed adjacent load. A blank message never gives an empty toast (E-TOAST-1).
 pub fn failure_toast(message: &str) -> String {
-    if message.trim().is_empty() { strings::unknown_error().to_owned() } else { message.to_owned() }
+    if message.trim().is_empty() { tr(MsgKey::unknown_error).to_owned() } else { message.to_owned() }
 }
 
 /// Resolves once the source manager has finished initialising. `false` when it went away without doing so.
@@ -160,6 +160,7 @@ pub struct ReaderCore {
 }
 
 impl ReaderCore {
+    #[cfg(test)]
     pub fn new(deps: ReaderDeps) -> Self {
         Self::with_extras(deps, ReaderExtras::default())
     }
@@ -220,21 +221,6 @@ impl ReaderCore {
         }
     }
 
-    /// Builds the chapter list again after a skip rule changed (E-LIST-1). The chapter being read stays open with its
-    /// loaded pages.
-    pub fn rebuild_list(&self) -> Result<(), String> {
-        let Some(current) = self.session.borrow().as_ref().and_then(|s| s.current_chapter().map(|c| c.key().id)) else {
-            return Ok(());
-        };
-        let opened = open_list(Arc::clone(&self.deps.db), self.deps.manga_id, current, |manga| self.list_options(manga), |chapter| {
-            (self.deps.is_downloaded)(chapter)
-        })?;
-        if let Some(session) = self.session.borrow_mut().as_mut() {
-            session.replace_list(opened.chapters);
-        }
-        Ok(())
-    }
-
     /// The preference store handle a viewer follows for live changes (T-44a-005).
     /// The reader settings of the open manga: its own values, else the defaults of the Settings page.
     pub fn reader_prefs(&self) -> MangaReaderPrefs {
@@ -254,7 +240,7 @@ impl ReaderCore {
         let chapter = Rc::clone(&opened.chapters[opened.index]);
         load_chapter(&chapter, || (self.deps.build)(&chapter), preserve).map_err(|failure| match failure {
             LoadFailure::Failed(error) => error,
-            LoadFailure::Cancelled => LoadError::new(strings::unknown_error()),
+            LoadFailure::Cancelled => LoadError::new(tr(MsgKey::unknown_error)),
         })?;
         if let (Some(page), Some(pages)) = (start.page_index, chapter.pages()) {
             // a restored page is where the viewer opens, kept inside the chapter
@@ -404,34 +390,34 @@ impl ReaderCore {
     /// The toast after a local manga's cover write. The new thumbnail and its time go on the manga row, which the library
     /// reads its cover from.
     pub fn local_cover_result(&self, written: Result<kuro_local::images::CoverWrite, String>) -> String {
-        let Ok(cover) = written else { return strings::notification_cover_update_failed() };
+        let Ok(cover) = written else { return tr(MsgKey::notification_cover_update_failed) };
         let update = EntryUpdate {
             thumbnail_url: Some(cover.thumbnail_url),
             cover_last_modified: Some(cover.cover_last_modified),
             ..EntryUpdate::new(self.deps.manga_id)
         };
         match EntryRepo::new(Arc::clone(&self.deps.db)).update(&update) {
-            Ok(()) => strings::cover_updated(),
-            Err(_) => strings::notification_cover_update_failed(),
+            Ok(()) => tr(MsgKey::cover_updated),
+            Err(_) => tr(MsgKey::notification_cover_update_failed),
         }
     }
 
     /// The toast after a cover write (T-43a-058). The cover is written first, then the library check (E-COVER-1).
     pub fn cover_result(&self, written: Result<(), String>) -> String {
         if written.is_err() {
-            return strings::notification_cover_update_failed();
+            return tr(MsgKey::notification_cover_update_failed);
         }
         let manga = match EntryRepo::new(Arc::clone(&self.deps.db)).by_id(self.deps.manga_id) {
             Ok(manga) => manga,
-            Err(_) => return strings::notification_cover_update_failed(),
+            Err(_) => return tr(MsgKey::notification_cover_update_failed),
         };
         if !manga.favorite {
-            return strings::notification_first_add_to_library();
+            return tr(MsgKey::notification_first_add_to_library);
         }
         let update = EntryUpdate { id: self.deps.manga_id, cover_last_modified: Some(history_rules::now_ms()), ..Default::default() };
         match EntryRepo::new(Arc::clone(&self.deps.db)).update(&update) {
-            Ok(()) => strings::cover_updated(),
-            Err(_) => strings::notification_cover_update_failed(),
+            Ok(()) => tr(MsgKey::cover_updated),
+            Err(_) => tr(MsgKey::notification_cover_update_failed),
         }
     }
 
@@ -496,7 +482,7 @@ impl ReaderCore {
         if let Err(e) = crop.set(toggle.value) {
             tracing::warn!(error = %e, "the crop preference could not be saved");
         }
-        CropView { value: toggle.value, icon: crop_icon(toggle.value), toast: strings::on_off(toggle.value) }
+        CropView { value: toggle.value, icon: crop_icon(toggle.value), toast: (if toggle.value { tr(MsgKey::on) } else { tr(MsgKey::off) }) }
     }
 
     /// The resolved reading mode of the current manga (the default preference applies to a Default manga).
@@ -580,8 +566,12 @@ impl ReaderCore {
 /// The reader widget and the slot the viewers fill. `chrome` is what the viewers call: taps toggle the menu.
 pub struct ReaderScreen {
     pub root: gtk::Box,
+    // held for the reader's life, and read by the tests
+    #[cfg_attr(not(test), allow(dead_code))]
     pub viewer: gtk::Box,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub core: Rc<ReaderCore>,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub chrome: ReaderChrome,
 }
 
@@ -809,7 +799,7 @@ pub fn open_with(
     bottom.set_valign(gtk::Align::End);
     page_layer.add_overlay(&bottom);
     // the chapter list floats over the pages' right side, below a floating top bar so the window buttons stay reachable
-    let chapter_panel = ChapterPanel::new(strings::chapters(), strings::chapter_list_search());
+    let chapter_panel = ChapterPanel::new(tr(MsgKey::chapters), tr(MsgKey::reader_chapter_list_search));
     page_layer.add_overlay(chapter_panel.root());
     // with auto-hide (`auto_hide_bars`) the top bar floats over the pages too, so hiding it never moves them; without it
     // the bar sits above the pages and never covers one
@@ -1137,7 +1127,7 @@ fn run_page_action(screen: &Rc<Screen>, page: &Rc<ReaderPage>, action: page_acti
 }
 
 fn warn_unknown(screen: &Screen) {
-    screen.toaster.show(strings::unknown_error(), ToastLength::Short);
+    screen.toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
 }
 
 /// Where a page's bytes are, for an action that runs now. A page that is not `Ready` gives `None` and nothing is
@@ -1162,7 +1152,7 @@ fn copy_page(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
         match (texture, gtk::gdk::Display::default()) {
             (Some(texture), Some(display)) => display.clipboard().set_texture(&texture),
             _ => {
-                toaster.show(strings::unknown_error(), ToastLength::Short);
+                toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
             }
         }
     });
@@ -1189,7 +1179,7 @@ fn share_page(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
     let Some(source) = ready_source(screen, page) else { return };
     let (title, chapter) = screen.core.page_names(page);
     let base = page_save::page_file_base(&title, &chapter, page.number() as usize);
-    let message = strings::share_page_info(&title, &chapter, page.number() as i32);
+    let message = trf(MsgKey::share_page_info, &[("arg1", Arg::Str(&title)), ("arg2", Arg::Str(&chapter)), ("arg3", Arg::Int(i64::from(page.number() as i32)))]);
     let Ok(paths) = kuro_platform::system_paths::SystemPaths::system() else { return warn_unknown(screen) };
     let staging = kuro_images::share::staging_dir(&paths);
     let toaster = screen.toaster.clone();
@@ -1203,7 +1193,7 @@ fn share_page(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
             (Ok(path), Some(app)) => saved_notice::show_shared(&app, &message, &path),
             (Ok(_), None) => {}
             (Err(_), _) => {
-                toaster.show(strings::unknown_error(), ToastLength::Short);
+                toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
             }
         }
     });
@@ -1216,7 +1206,7 @@ fn set_cover(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
     }
     let Some(window) = window_of(screen) else { return };
     let (weak, page) = (Rc::downgrade(screen), Rc::clone(page));
-    sheet::confirm(&window, &strings::confirm_set_image_as_cover(), move || {
+    sheet::confirm(&window, &tr(MsgKey::confirm_set_image_as_cover), move || {
         let Some(s) = weak.upgrade() else { return };
         // checked again now that the confirm has been answered
         let Some(source) = ready_source(&s, &page) else { return };
@@ -1316,7 +1306,7 @@ fn start(screen: &Rc<Screen>) {
             glib::timeout_future(std::time::Duration::ZERO).await;
             screen.core.initial_load()
         } else {
-            Err(LoadError::new(strings::unknown_error()))
+            Err(LoadError::new(tr(MsgKey::unknown_error)))
         };
         match result {
             Ok(()) => {
@@ -1407,12 +1397,6 @@ fn drain_events(screen: &Rc<Screen>) {
     for event in events {
         match event {
             ReaderEvent::ReloadViewerChapters => reload_viewer(screen),
-            // the image actions belong to the page sheet (T-043a-045)
-            ReaderEvent::PageChanged
-            | ReaderEvent::SetCoverResult(_)
-            | ReaderEvent::SavedImage(_)
-            | ReaderEvent::ShareImage(_)
-            | ReaderEvent::CopyImage(_) => {}
         }
     }
 }
@@ -1512,7 +1496,7 @@ const BACK_BUTTON_FOR: std::time::Duration = std::time::Duration::from_secs(8);
 
 fn show_back_button(screen: &Rc<Screen>, chapter_id: i64, page: usize, name: &str) {
     screen.back_to.set(Some((chapter_id, page)));
-    screen.back_button.set_label(&strings::chapter_list_back(name));
+    screen.back_button.set_label(&trf(MsgKey::reader_chapter_list_back, &[("name", Arg::Str(name))]));
     screen.back_button.set_visible(true);
     let shown = screen.back_shown.get() + 1;
     screen.back_shown.set(shown);
@@ -1548,7 +1532,7 @@ fn rebuild_top_bar(screen: &Rc<Screen>) {
         on_bookmark: Box::new(move || {
             let Some(screen) = bookmark.upgrade() else { return };
             if let Some(Err(_)) = screen.core.toggle_bookmark() {
-                screen.toaster.show(strings::unknown_error(), ToastLength::Short);
+                screen.toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
             }
             // the bar is rebuilt after the click has finished, so its icon and label follow the new state
             glib::idle_add_local_once(move || rebuild_top_bar(&screen));
@@ -1605,7 +1589,7 @@ fn menu_handlers(me: &Weak<Screen>) -> MenuHandlers {
         on_set_cover: run(me, |screen| match screen.core.visible_page() {
             Some(page) => set_cover(screen, &page),
             None => {
-                screen.toaster.show(strings::unknown_error(), ToastLength::Short);
+                screen.toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
             }
         }),
     }
@@ -1615,7 +1599,7 @@ fn menu_handlers(me: &Weak<Screen>) -> MenuHandlers {
 fn chapter_web_url(screen: &Screen) -> Option<String> {
     let url = screen.core.chapter_url().and_then(|u| chrome::web_url(&u));
     if url.is_none() {
-        screen.toaster.show(strings::unknown_error(), ToastLength::Short);
+        screen.toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
     }
     url
 }

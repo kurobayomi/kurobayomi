@@ -1,6 +1,7 @@
 //! The chapter navigator (T-043a-041): previous and next buttons around a page pill with a slider. The decisions
 //! (slider range, labels, RTL mirror, padding) are pure functions; [`Navigator`] only applies them.
 
+use kuro_i18n::{MsgKey, tr};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -64,10 +65,10 @@ pub fn button_plan(rtl: bool, previous_enabled: bool, next_enabled: bool) -> [Bu
     let previous = ButtonPlan {
         step: Step::Previous,
         enabled: previous_enabled,
-        description: super::strings::action_previous_chapter(),
+        description: tr(MsgKey::action_previous_chapter),
         icon: ICON_PREVIOUS,
     };
-    let next = ButtonPlan { step: Step::Next, enabled: next_enabled, description: super::strings::action_next_chapter(), icon: ICON_NEXT };
+    let next = ButtonPlan { step: Step::Next, enabled: next_enabled, description: tr(MsgKey::action_next_chapter), icon: ICON_NEXT };
     if rtl { [next, previous] } else { [previous, next] }
 }
 

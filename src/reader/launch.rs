@@ -25,7 +25,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use gtk::glib;
-use gtk::prelude::*;
 use kuro_core::sources::SourceGate;
 use crate::downloads::directory::AppDirectory;
 use kuro_data::entry::{Entry, EntryRepo};

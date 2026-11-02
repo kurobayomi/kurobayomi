@@ -5,8 +5,6 @@
 use kuro_i18n::{MsgKey, tr};
 use gtk::prelude::*;
 
-use super::strings;
-
 /// The message of a failed page (`reader_error`).
 pub fn page_error_text() -> String {
     tr(MsgKey::decode_image_error)
@@ -31,11 +29,11 @@ pub fn webtoon_card_height(viewport: i32) -> i32 {
 
 /// The error card for a page: the message, Retry, and Open in browser when [`can_open_in_browser`] allows it.
 pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> adw::StatusPage {
-    let retry = gtk::Button::with_label(&strings::retry());
+    let retry = gtk::Button::with_label(&tr(MsgKey::action_retry));
     retry.connect_clicked(move |_| on_retry());
     let mut buttons = vec![retry];
     if can_open_in_browser(image_url.as_deref()) {
-        let open = gtk::Button::with_label(&strings::action_open_in_browser());
+        let open = gtk::Button::with_label(&tr(MsgKey::action_open_in_browser));
         let url = image_url.unwrap_or_default();
         open.connect_clicked(move |button| {
             let window = button.root().and_downcast::<gtk::Window>();

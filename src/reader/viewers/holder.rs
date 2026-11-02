@@ -6,6 +6,7 @@
 //! a `PageView` once its image is ready, fitted by the viewer's settings, and the error card when it fails. Any other
 //! page keeps the text label. The state the label shows comes from the pure functions here.
 
+use kuro_i18n::{MsgKey, tr};
 use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -31,7 +32,6 @@ use crate::reader::page_transform;
 use crate::reader::page_view::PageView as PageWidget;
 use crate::reader::page_zoom::ZoomKey;
 use crate::reader::progress::LoadingIndicator;
-use crate::reader::strings;
 
 /// How often a fetched page's status is copied from its loader while it is not settled.
 const POLL_MS: u64 = 100;
@@ -204,9 +204,9 @@ pub fn plain_row(text: &str) -> Row {
 pub fn page_text(base: &str, view: PageView) -> String {
     match view {
         PageView::Ready => base.to_owned(),
-        PageView::Spinner => format!("{base}\n{}", strings::loading()),
+        PageView::Spinner => format!("{base}\n{}", tr(MsgKey::loading)),
         PageView::Progress(percent) => format!("{base}\n{percent}%"),
-        PageView::Error => format!("{base}\n{}", strings::download_notifier_title_error()),
+        PageView::Error => format!("{base}\n{}", tr(MsgKey::download_notifier_title_error)),
     }
 }
 

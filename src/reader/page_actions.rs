@@ -2,12 +2,12 @@
 //! page, and on Shift+F10. Four actions in a fixed order. Copy, Share and Save close the sheet; Set as cover stays
 //! open until its result toast (E-UI-5).
 
+use kuro_i18n::{MsgKey, tr};
 use std::rc::Rc;
 
 use gtk::prelude::*;
 
 use super::model::PageStatus;
-use super::strings;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -22,10 +22,10 @@ pub const ACTIONS: [Action; 4] = [Action::SetCover, Action::Copy, Action::Share,
 
 pub fn label(action: Action) -> String {
     match action {
-        Action::SetCover => strings::set_as_cover(),
-        Action::Copy => strings::action_copy_to_clipboard(),
-        Action::Share => strings::action_share(),
-        Action::Save => strings::action_save(),
+        Action::SetCover => tr(MsgKey::set_as_cover),
+        Action::Copy => tr(MsgKey::action_copy_to_clipboard),
+        Action::Share => tr(MsgKey::action_share),
+        Action::Save => tr(MsgKey::action_save),
     }
 }
 

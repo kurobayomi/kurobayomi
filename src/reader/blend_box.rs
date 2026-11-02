@@ -11,7 +11,7 @@ mod imp {
 
     use gtk::prelude::*;
     use gtk::subclass::prelude::*;
-    use gtk::{gdk, glib, graphene, gsk};
+    use gtk::{gdk, glib, graphene};
 
     #[derive(Default)]
     pub struct BlendBox {

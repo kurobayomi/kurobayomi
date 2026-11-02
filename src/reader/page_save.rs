@@ -9,8 +9,6 @@ use kuro_images::cover_file::write_atomic;
 use kuro_images::names::{build_valid_filename, reader_file_name};
 use kuro_images::save::PICTURES_FOLDER;
 use kuro_images::sniff::sniff;
-
-use super::strings;
 use super::viewers::page_bytes::{ByteSource, read};
 
 /// `base` when `base.ext` is free, else `base (2).ext`, `base (3).ext`, and so on. `taken` says whether a file name
@@ -20,7 +18,7 @@ pub fn free_name(base: &str, ext: &str, taken: impl Fn(&str) -> bool) -> String 
         return base.to_owned();
     }
     (2..)
-        .map(|n| format!("{base}{}", strings::name_collision_suffix(n)))
+        .map(|n| format!("{base}{}", format!(" ({n})")))
         .find(|candidate| !taken(&format!("{candidate}.{ext}")))
         .unwrap_or_else(|| base.to_owned())
 }

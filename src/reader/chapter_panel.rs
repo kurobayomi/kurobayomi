@@ -3,13 +3,12 @@
 //! bar's list button opens it (and L in the reader, E in the player); a click on a row, or Enter in its search box, opens
 //! that one. The matching rules are pure functions, tested without GTK.
 
+use kuro_i18n::{MsgKey, tr};
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk::glib;
 use gtk::prelude::*;
-
-use super::strings;
 
 /// One chapter of the reader's list, as the panel shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -87,7 +86,7 @@ impl ChapterPanel {
     /// A panel titled `heading` ("Chapters", "Episodes") with `placeholder` in its search box.
     pub fn new(heading: String, placeholder: String) -> Rc<Self> {
         let title = gtk::Label::builder().xalign(0.0).hexpand(true).css_classes(["heading"]).build();
-        let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["flat"]).tooltip_text(strings::close()).build();
+        let close = gtk::Button::builder().icon_name("window-close-symbolic").css_classes(["flat"]).tooltip_text(tr(MsgKey::action_close)).build();
         let head = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         head.append(&title);
         head.append(&close);
@@ -224,10 +223,6 @@ impl ChapterPanel {
         }
     }
 
-    pub fn toggle(&self, rows: impl FnOnce() -> Vec<Row>) {
-        if self.is_open() { self.close() } else { self.open(rows()) }
-    }
-
     fn pick(&self, index: usize) {
         self.close();
         let pick = self.on_pick.borrow().clone();
@@ -294,13 +289,13 @@ fn build_row(row: &Row) -> gtk::ListBoxRow {
     line.append(&text);
     if row.bookmarked {
         let icon = gtk::Image::from_icon_name("bookmark-filled-symbolic");
-        icon.update_property(&[gtk::accessible::Property::Label(&strings::action_filter_bookmarked())]);
+        icon.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::action_filter_bookmarked))]);
         line.append(&icon);
     }
     if row.downloaded {
         let icon = gtk::Image::from_icon_name("folder-download-symbolic");
         icon.add_css_class("dim-label");
-        icon.update_property(&[gtk::accessible::Property::Label(&strings::label_downloaded())]);
+        icon.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::label_downloaded))]);
         line.append(&icon);
     }
     if row.read && !row.current {
@@ -376,7 +371,7 @@ mod tests {
     #[test]
     fn opening_lists_every_chapter_and_a_pick_hands_back_its_index() {
         crate::testing::with_display(|| {
-            let panel = ChapterPanel::new(strings::chapters(), strings::chapter_list_search());
+            let panel = ChapterPanel::new(tr(MsgKey::chapters), tr(MsgKey::reader_chapter_list_search));
             let picked = Rc::new(std::cell::Cell::new(None));
             let seen = Rc::clone(&picked);
             panel.connect_pick(move |index| seen.set(Some(index)));

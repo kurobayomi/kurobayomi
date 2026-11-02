@@ -5,14 +5,13 @@
 //! The notices go out through the app's one notifier (`misc::notify`). Their actions are application actions that take the
 //! saved file's path as their parameter. The thumbnail is built on the worker thread that saved the file.
 
+use kuro_i18n::{MsgKey, tr};
 use std::path::Path;
 
 use gtk::gio;
 use gtk::glib;
 use gtk::prelude::*;
 use crate::misc::ids::PICTURE_NOTICE_ID;
-
-use super::strings;
 use crate::misc::notify::{self, Post, Target};
 
 /// The notice after a share: one fixed id, so a share again replaces it.
@@ -100,9 +99,9 @@ fn on_file(name: &str, path: &Path) -> Target {
 pub fn saved_post(path: &Path, thumbnail: Option<Vec<u8>>) -> Post {
     Post {
         id: PICTURE_NOTICE_ID.to_owned(),
-        title: strings::picture_saved().to_owned(),
+        title: tr(MsgKey::picture_saved).to_owned(),
         tap: Some(on_file(OPEN_ACTION, path)),
-        buttons: vec![(strings::action_share().to_owned(), on_file(SHARE_ACTION, path))],
+        buttons: vec![(tr(MsgKey::action_share).to_owned(), on_file(SHARE_ACTION, path))],
         icon: thumbnail,
         ..Post::default()
     }
@@ -119,7 +118,7 @@ pub fn shared_post(text: &str, path: &Path) -> Post {
     Post {
         id: SHARE_NOTICE_ID.to_owned(),
         title: text.to_owned(),
-        buttons: vec![(strings::action_show_in_file_manager().to_owned(), on_file(REVEAL_ACTION, path))],
+        buttons: vec![(tr(MsgKey::reader_action_show_in_file_manager).to_owned(), on_file(REVEAL_ACTION, path))],
         ..Post::default()
     }
 }
@@ -139,8 +138,8 @@ pub fn open_with_default(path: &Path) -> std::io::Result<()> {
 pub fn show_failed(_app: &gtk::Application, message: Option<&str>) {
     notify::post(Post {
         id: PICTURE_NOTICE_ID.to_owned(),
-        title: strings::download_notifier_title_error().to_owned(),
-        body: Some(message.filter(|m| !m.trim().is_empty()).unwrap_or(&strings::unknown_error()).to_owned()),
+        title: tr(MsgKey::download_notifier_title_error).to_owned(),
+        body: Some(message.filter(|m| !m.trim().is_empty()).unwrap_or(&tr(MsgKey::unknown_error)).to_owned()),
         ..Post::default()
     });
 }

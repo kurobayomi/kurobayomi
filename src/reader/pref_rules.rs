@@ -3,7 +3,7 @@
 
 use std::ops::RangeInclusive;
 
-use kuro_prefs::reader::{ReadingMode, TappingInvertMode, clamp_webtoon_side_padding};
+use kuro_prefs::reader::clamp_webtoon_side_padding;
 
 /// `pref_reader_flash_duration`, milliseconds.
 pub const FLASH_DURATION_MS: RangeInclusive<i32> = 100..=1500;

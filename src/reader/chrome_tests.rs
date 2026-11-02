@@ -2,6 +2,7 @@
 //! crop toggle, and the top bar with the bookmark label and its menu. They build real widgets under [`crate::testing::with_display`], find the buttons by walking the widget tree, and skip when
 //! there is no display. CI runs them under a virtual display (`xvfb-run`) so they do not skip there.
 
+use kuro_i18n::{MsgKey, tr};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -10,7 +11,6 @@ use kuro_prefs::reader::ReadingMode;
 
 use super::chrome::{MODES, MenuHandlers, TopBar, TopBarActions, build_top_bar, menu_actions, mode_label, overflow_menu, sync_menu_state};
 use super::navigator::{Navigator, NavigatorState};
-use super::strings;
 
 /// Every button under `root`, in tree order.
 fn buttons_under(root: &gtk::Widget) -> Vec<gtk::Button> {
@@ -45,8 +45,8 @@ fn the_navigator_puts_next_on_the_left_in_rtl_and_disables_the_missing_chapter()
         let navigator = Navigator::new();
         navigator.update(&navigator_state(true, true, false), (800, 600));
         let buttons = buttons_under(navigator.root.upcast_ref());
-        let next = position_of(&buttons, &strings::action_next_chapter()).expect("a next button");
-        let previous = position_of(&buttons, &strings::action_previous_chapter()).expect("a previous button");
+        let next = position_of(&buttons, &tr(MsgKey::action_next_chapter)).expect("a next button");
+        let previous = position_of(&buttons, &tr(MsgKey::action_previous_chapter)).expect("a previous button");
         assert!(next < previous, "in RTL the next chapter button is on the left");
         assert!(!buttons[next].is_sensitive(), "no next chapter, so the button is disabled");
         assert!(buttons[previous].is_sensitive());
@@ -59,8 +59,8 @@ fn the_navigator_keeps_previous_on_the_left_in_ltr() {
         let navigator = Navigator::new();
         navigator.update(&navigator_state(false, true, true), (800, 600));
         let buttons = buttons_under(navigator.root.upcast_ref());
-        let next = position_of(&buttons, &strings::action_next_chapter()).expect("a next button");
-        let previous = position_of(&buttons, &strings::action_previous_chapter()).expect("a previous button");
+        let next = position_of(&buttons, &tr(MsgKey::action_next_chapter)).expect("a next button");
+        let previous = position_of(&buttons, &tr(MsgKey::action_previous_chapter)).expect("a previous button");
         assert!(previous < next);
         assert!(buttons[next].is_sensitive() && buttons[previous].is_sensitive());
     });
@@ -73,7 +73,7 @@ fn the_navigator_is_the_whole_bottom_bar_and_has_no_settings_buttons() {
         navigator.update(&navigator_state(false, true, true), (800, 600));
         let buttons = buttons_under(navigator.root.upcast_ref());
         assert_eq!(buttons.len(), 2, "only the previous and next chapter buttons");
-        for gone in [strings::viewer(), strings::pref_crop_borders(), strings::action_settings()] {
+        for gone in [tr(MsgKey::viewer), tr(MsgKey::pref_crop_borders), tr(MsgKey::action_settings)] {
             assert!(position_of(&buttons, &gone).is_none());
         }
     });
@@ -89,7 +89,7 @@ fn the_top_bar_labels_the_bookmark_by_its_state_and_has_a_named_back_button() {
         assert_eq!((title.title.label().as_str(), title.subtitle().as_str()), ("Manga", "Chapter 1"), "the manga over the chapter");
         assert_eq!(title.root.observe_controllers().n_items(), 0, "the title is not clickable");
         let buttons = buttons_under(header.upcast_ref());
-        assert!(position_of(&buttons, &strings::action_remove_bookmark()).is_some(), "a bookmarked chapter offers to unbookmark");
+        assert!(position_of(&buttons, &tr(MsgKey::action_remove_bookmark)).is_some(), "a bookmarked chapter offers to unbookmark");
         assert!(position_of(&buttons, "Back").is_some(), "the back button is named");
         assert!(position_of(&buttons, &super::chrome::chapters_tooltip()).is_some(), "the chapter list has its button");
         let menu = all_of::<gtk::MenuButton>(header.upcast_ref()).pop().expect("the menu button");
@@ -146,7 +146,7 @@ fn item(label: &str, action: &str) -> (String, Option<String>, Option<String>) {
 fn the_menu_model_has_five_radio_modes_then_crop_and_settings_then_the_source_entries() {
     let web = sections_of(true);
     assert_eq!(web.len(), 3);
-    assert_eq!(web[0].0.as_deref(), Some(strings::pref_category_reading_mode()).as_deref());
+    assert_eq!(web[0].0.as_deref(), Some(tr(MsgKey::pref_category_reading_mode)).as_deref());
     let modes: Vec<_> = MODES
         .iter()
         .map(|(target, mode)| (mode_label(*mode).to_owned(), Some("reader.mode".to_owned()), Some((*target).to_owned())))
@@ -154,9 +154,9 @@ fn the_menu_model_has_five_radio_modes_then_crop_and_settings_then_the_source_en
     assert_eq!(web[0].1, modes, "five radio items on one action, each with its mode as the target");
     assert_eq!(modes.len(), 5);
     assert_eq!(modes[0].0, "Left to right");
-    assert_eq!(web[1].1, [item(&strings::pref_crop_borders(), "reader.crop"), item(&strings::menu_reader_settings(), "reader.settings")]);
-    assert_eq!(web[2].1, [item(&strings::action_open_in_browser(), "reader.open-browser"), item(&strings::action_share(), "reader.share")]);
-    assert_eq!(sections_of(false)[2].1, [item(&strings::set_as_cover(), "reader.set-cover")], "a local manga sets the cover instead");
+    assert_eq!(web[1].1, [item(&tr(MsgKey::pref_crop_borders), "reader.crop"), item(&tr(MsgKey::reader_menu_reader_settings), "reader.settings")]);
+    assert_eq!(web[2].1, [item(&tr(MsgKey::action_open_in_browser), "reader.open-browser"), item(&tr(MsgKey::action_share), "reader.share")]);
+    assert_eq!(sections_of(false)[2].1, [item(&tr(MsgKey::set_as_cover), "reader.set-cover")], "a local manga sets the cover instead");
 }
 
 #[test]

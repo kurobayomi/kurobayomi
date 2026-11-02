@@ -16,9 +16,6 @@ pub const FILE_NAME: &str = "reader_session.json";
 /// How long a record stays usable: 24 hours (a PROPOSAL of E-RESTORE-1; the Kotlin app has no window).
 pub const WINDOW_MS: i64 = 24 * 60 * 60 * 1000;
 
-/// The preference key of the switch; it is on by default.
-pub const PREF_KEY: &str = "restore_after_crash";
-
 /// What was on screen when the record was written.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SavedSession {

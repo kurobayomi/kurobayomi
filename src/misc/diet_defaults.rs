@@ -37,8 +37,6 @@ pub const READER_CREATE_FOLDER_PER_MANGA: bool = false;
 pub const READER_RESTORE_AFTER_CRASH: bool = true;
 /// `pref_hardware_bitmap_threshold`: the largest image tile edge in pixels.
 pub const READER_TILE_THRESHOLD: i32 = 4096;
-/// `pref_display_profile_key`: no colour profile file.
-pub const READER_DISPLAY_PROFILE: &str = "";
 pub const READER_COLOUR_FILTER: bool = false;
 pub const READER_GRAYSCALE: bool = false;
 pub const READER_INVERTED_COLOURS: bool = false;

@@ -384,6 +384,7 @@ impl PagerEngine {
 }
 
 impl ViewerEngine for PagerEngine {
+    #[cfg(test)]
     fn kind(&self) -> ViewerKind {
         self.0.kind
     }
@@ -406,6 +407,7 @@ impl ViewerEngine for PagerEngine {
         self.0.key(ev)
     }
 
+    #[cfg(test)]
     fn handle_scroll(&self, dy: f64) -> bool {
         self.0.wheel(Scroll { dx: 0.0, dy, notches: true, ctrl: false })
     }
@@ -1005,6 +1007,7 @@ impl WebtoonEngine {
 }
 
 impl ViewerEngine for WebtoonEngine {
+    #[cfg(test)]
     fn kind(&self) -> ViewerKind {
         self.0.kind
     }
@@ -1027,6 +1030,7 @@ impl ViewerEngine for WebtoonEngine {
         self.0.key(ev)
     }
 
+    #[cfg(test)]
     /// The scrolled window handles the wheel itself (B§4.4).
     fn handle_scroll(&self, _dy: f64) -> bool {
         false

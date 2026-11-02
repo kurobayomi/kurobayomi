@@ -18,6 +18,7 @@ pub trait Viewer {
     fn destroy(&self);
     /// A key press the viewer owns (arrow and page keys). `true` when it consumed the key.
     fn handle_key(&self, key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType) -> bool;
+    #[cfg(test)]
     /// A scroll or pointer motion the viewer owns, as deltas. `true` when it consumed the event.
     fn handle_motion(&self, dx: f64, dy: f64) -> bool;
 }

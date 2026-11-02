@@ -4,6 +4,7 @@
 //! side, and the gap warning. [`build`] turns it into GTK widgets. Names are cut to 5 lines and scanlators to 2
 //! by the labels; the card is at most 460 px wide and keeps its natural width below that.
 
+use kuro_i18n::{Arg, MsgKey, tr, tr_plural, trf};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -16,7 +17,6 @@ use kuro_domain::items::missing::item_gap;
 
 
 use super::model::{ChapterState, ChapterTransition};
-use super::strings;
 
 /// One chapter in a block: its header, name, scanlator and download state.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -46,7 +46,7 @@ impl Content {
     /// The warning between the two blocks: only when the bottom block shows a chapter and the gap is positive.
     pub fn gap_warning(&self) -> Option<String> {
         match self.bottom {
-            Slot::Chapter(_) if self.gap > 0 => Some(strings::missing_chapters_warning(self.gap)),
+            Slot::Chapter(_) if self.gap > 0 => Some(tr_plural(MsgKey::missing_chapters_warning, i64::from(self.gap), &[])),
             _ => None,
         }
     }
@@ -68,18 +68,18 @@ pub fn content(transition: &ChapterTransition, from_downloaded: bool, to_downloa
     match transition {
         ChapterTransition::Prev { .. } => Content {
             top: match to {
-                Some(to) => Slot::Chapter(line(strings::transition_previous(), to, to_downloaded)),
-                None => Slot::NoChapter(strings::transition_no_previous()),
+                Some(to) => Slot::Chapter(line(tr(MsgKey::transition_previous), to, to_downloaded)),
+                None => Slot::NoChapter(tr(MsgKey::transition_no_previous)),
             },
-            bottom: Slot::Chapter(line(strings::transition_current(), from, from_downloaded)),
+            bottom: Slot::Chapter(line(tr(MsgKey::transition_current), from, from_downloaded)),
             // calculateChapterGap(currChapter, goingToChapter)
             gap: item_gap(Some(from), to),
         },
         ChapterTransition::Next { .. } => Content {
-            top: Slot::Chapter(line(strings::transition_finished(), from, from_downloaded)),
+            top: Slot::Chapter(line(tr(MsgKey::transition_finished), from, from_downloaded)),
             bottom: match to {
-                Some(to) => Slot::Chapter(line(strings::transition_next(), to, to_downloaded)),
-                None => Slot::NoChapter(strings::transition_no_next()),
+                Some(to) => Slot::Chapter(line(tr(MsgKey::transition_next), to, to_downloaded)),
+                None => Slot::NoChapter(tr(MsgKey::transition_no_next)),
             },
             // calculateChapterGap(goingToChapter, currChapter)
             gap: item_gap(to, Some(from)),
@@ -178,8 +178,8 @@ fn chapter_text(line: &ChapterLine) -> gtk::Box {
     name_row.set_halign(gtk::Align::Center);
     if line.downloaded {
         let check = gtk::Image::from_icon_name("emblem-ok-symbolic");
-        check.set_tooltip_text(Some(&strings::label_downloaded()));
-        check.update_property(&[gtk::accessible::Property::Label(&strings::label_downloaded())]);
+        check.set_tooltip_text(Some(&tr(MsgKey::label_downloaded)));
+        check.update_property(&[gtk::accessible::Property::Label(&tr(MsgKey::label_downloaded))]);
         name_row.append(&check);
     }
     let name = gtk::Label::new(Some(&line.name));
@@ -247,8 +247,8 @@ pub fn going_to_downloaded(manga_is_local: bool, to: Option<&Item>, lookup: impl
 pub fn status_text(state: &ChapterState) -> Option<String> {
     match state {
         ChapterState::Wait | ChapterState::Loaded(_) => None,
-        ChapterState::Loading => Some(strings::transition_pages_loading().to_owned()),
-        ChapterState::Error(e) => Some(strings::failed_to_load_pages(&e.message)),
+        ChapterState::Loading => Some(tr(MsgKey::transition_pages_loading).to_owned()),
+        ChapterState::Error(e) => Some(trf(MsgKey::transition_pages_error, &[("arg1", Arg::Str(&e.message))])),
     }
 }
 
@@ -281,7 +281,7 @@ pub fn status_box(state: &ChapterState, on_retry: Rc<dyn Fn()>) -> Option<gtk::B
     label.set_justify(gtk::Justification::Center);
     column.append(&label);
     if matches!(state, ChapterState::Error(_)) {
-        let retry = gtk::Button::with_label(&strings::retry());
+        let retry = gtk::Button::with_label(&tr(MsgKey::action_retry));
         retry.set_halign(gtk::Align::Center);
         retry.connect_clicked(move |_| on_retry());
         column.append(&retry);

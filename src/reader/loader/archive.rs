@@ -12,7 +12,10 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use kuro_archive::EpubReader;
-use kuro_archive::reader::{ArchiveReader, EntryReader};
+use kuro_archive::reader::ArchiveReader;
+#[cfg(test)]
+use kuro_archive::reader::EntryReader;
+#[cfg(test)]
 use kuro_i18n::{Arg, MsgKey, trf};
 
 use super::LoadFailure;

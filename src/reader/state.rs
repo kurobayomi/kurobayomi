@@ -1,13 +1,10 @@
 //! Reader UI state (T-043a-075, T-043a-076, and the menu, fullscreen and escape rules of T-043a-050). Pure: the
 //! GTK side reads these values and applies them. Every change computes the new value first, then assigns it.
 
-use super::model::ChapterState;
-
 /// The one sheet or dialog the reader can show. `Loading` is the marker for an adjacent chapter load; it is
 /// non-modal on Linux (the spinner is in the navigator), so it never hides another sheet (E-UI-5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
-    Loading,
     PageActions,
 }
 
@@ -41,6 +38,7 @@ impl UiState {
         self.dialog = Some(dialog);
     }
 
+    #[cfg(test)]
     /// Closes `dialog` only when it is the one open. Closing a different sheet changes nothing.
     pub fn close(&mut self, dialog: Dialog) {
         if self.dialog == Some(dialog) {
@@ -48,21 +46,6 @@ impl UiState {
         }
     }
 
-    #[cfg(test)]
-    /// An adjacent chapter load started: the loading marker shows only when no sheet is open.
-    pub fn begin_adjacent_load(&mut self) {
-        if self.dialog.is_none() {
-            self.dialog = Some(Dialog::Loading);
-        }
-    }
-
-    #[cfg(test)]
-    /// The adjacent load ended: only the loading marker is removed, never a sheet that is still open.
-    pub fn end_adjacent_load(&mut self) {
-        if self.dialog == Some(Dialog::Loading) {
-            self.dialog = None;
-        }
-    }
 
     #[cfg(test)]
     /// A tap or a key toggles the chrome. Returns the new visibility.
@@ -103,37 +86,15 @@ pub fn escape_action(sheet_open: bool, window_fullscreen: bool) -> EscapeAction 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::reader::model::LoadError;
-    use std::rc::Rc;
 
     #[test]
-    fn a_sheet_is_closed_only_by_its_own_close() {
+    fn closing_the_open_sheet_clears_it() {
         let mut s = UiState::default();
         s.open(Dialog::PageActions);
-        s.close(Dialog::Loading);
-        assert_eq!(s.dialog, Some(Dialog::PageActions));
         s.close(Dialog::PageActions);
         assert_eq!(s.dialog, None);
     }
 
-    #[test]
-    fn closing_an_adjacent_load_keeps_the_sheet_whose_page_is_still_loaded() {
-        let mut s = UiState::default();
-        s.open(Dialog::PageActions);
-        s.begin_adjacent_load();
-        assert_eq!(s.dialog, Some(Dialog::PageActions), "the load marker never hides a sheet");
-        s.end_adjacent_load();
-        assert_eq!(s.dialog, Some(Dialog::PageActions));
-    }
-
-    #[test]
-    fn the_load_marker_comes_and_goes_with_the_load() {
-        let mut s = UiState::default();
-        s.begin_adjacent_load();
-        assert_eq!(s.dialog, Some(Dialog::Loading));
-        s.end_adjacent_load();
-        assert_eq!(s.dialog, None);
-    }
 
     #[test]
     fn menu_toggles_and_reports_the_new_visibility() {

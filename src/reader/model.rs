@@ -238,6 +238,7 @@ impl ReaderChapter {
         true
     }
 
+    #[cfg(test)]
     pub fn references(&self) -> i32 {
         self.refs.get()
     }
@@ -349,6 +350,7 @@ impl ReaderPage {
         self.chapter.borrow().upgrade()
     }
 
+    #[cfg(test)]
     /// `Page.update(bytesRead, contentLength)`: integer percent, or -1 for an unknown length.
     pub fn update_progress(&self, bytes_read: i64, content_length: i64) {
         let percent = if content_length > 0 { (100 * bytes_read / content_length) as i32 } else { -1 };

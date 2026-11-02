@@ -30,7 +30,6 @@ so all three share the fetch and decode slots and one decoded-image cache. The r
 - `src/reader/mod.rs` turns dead-code warnings off for the whole module (`#![allow(dead_code, unused_imports)]`) with a
   note that parts "attach later". They are attached; the allow hides about 100 unused items.
 - The module overview says trackers, downloads and the source registry are not connected. They are; the notes mislead.
-- `misc::diet_defaults::READER_TILE_THRESHOLD` (4096) is read by nothing; the real tile edge is 2048.
 - Display colour management (`page_profile`, ICC) exists but the build never enables it and its setting was cut.
 - Three files are far past the "no god files" rule: `screen.rs` (2,318 lines), `viewers/engine.rs` (2,239),
   `page_view.rs` (1,519).
@@ -60,7 +59,7 @@ are built once, on the shared pieces.
 ### Phase 1: clean up (no behaviour change)
 
 - Remove the blanket allow in `src/reader/mod.rs`, then delete what it was hiding (the unused wrappers, functions and
-  constants), and `READER_TILE_THRESHOLD`.
+  constants).
 - Replace `strings.rs` with direct `tr(MsgKey::...)` calls, like the rest of the app, and delete the file.
 - Rewrite the stale notes in the module overview to say what is connected now.
 - Decide the ICC code: enable the `icc` feature with its setting, or delete it. Recommended: delete (the setting was cut).
@@ -102,7 +101,7 @@ moves.
 - Manual list before the nightly: a Kagane chapter (JPEG XL pages), a Japanese manga (right to left, two pages on a wide
   window), a webtoon (vertical, mouse drag), a local archive, a page that fails (offline), and the next-chapter keys.
 
-## Questions to settle before phase 3
+## Decisions (2026-11-02)
 
-- Two pages side by side: Automatic by window shape as the default, or off by default?
-- Reading mode from the content: on for everyone, or behind a setting?
+- Two pages side by side: Automatic by window shape is the default, with Always and Never as the other choices.
+- Reading mode from the content: on for everyone, no setting; a mode the user picked for a title always wins.

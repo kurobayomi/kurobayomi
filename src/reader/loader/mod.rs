@@ -9,6 +9,7 @@ pub mod dir;
 pub mod download;
 pub mod http;
 
+use kuro_i18n::{Arg, MsgKey, tr, trf};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -17,7 +18,6 @@ use serde::{Deserialize, Serialize};
 
 use super::cache::DiskCache;
 use super::model::{ChapterState, LoadError, PageLoader, ReaderChapter, ReaderPage};
-use super::strings;
 
 /// One page of a page list before it becomes a [`ReaderPage`]: the page url and its image url when the source
 /// already knows it. Stored in the page-list cache.
@@ -142,7 +142,9 @@ pub enum SourceKind {
     Local,
     /// An HTTP source with its page-list and image access.
     Http { source: Arc<dyn http::HttpPageSource>, manga_id: i64, cache: Arc<DiskCache> },
-    /// A source that is known but not installed (`StubMangaSource`).
+    /// A source that is known but not installed (`StubMangaSource`). Its "not installed" message is better than
+    /// `Unknown`'s; `launch` passes it once it knows the source's name (reader overhaul, phase 3).
+    #[cfg_attr(not(test), allow(dead_code))]
     Stub(String),
     /// Anything else.
     Unknown,
@@ -170,8 +172,8 @@ pub fn choose_loader(inputs: LoaderInputs) -> Result<Loader, LoadError> {
         (None, SourceKind::Http { source, manga_id, cache }) => {
             Ok(Loader::Http(http::HttpLoader::new(source, manga_id, chapter_url, cache)))
         }
-        (None, SourceKind::Stub(name)) => Err(LoadError::new(strings::source_not_installed(&name))),
-        _ => Err(LoadError::new(strings::loader_not_implemented_error())),
+        (None, SourceKind::Stub(name)) => Err(LoadError::new(trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&name))]))),
+        _ => Err(LoadError::new(tr(MsgKey::loader_not_implemented_error))),
     }
 }
 
@@ -217,7 +219,7 @@ pub fn load_chapter(
     };
     if pages.is_empty() {
         drop(loader);
-        return fail(chapter, LoadFailure::Failed(LoadError::new(strings::page_list_empty_error())));
+        return fail(chapter, LoadFailure::Failed(LoadError::new(tr(MsgKey::page_list_empty_error))));
     }
     let read = chapter.read.get();
     let last_page_read = chapter.last_page_read.get();
