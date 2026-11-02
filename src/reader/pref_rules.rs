@@ -15,6 +15,8 @@ pub const NAVIGATION_MODE: RangeInclusive<i32> = 0..=5;
 pub const ZOOM_START: RangeInclusive<i32> = 1..=4;
 /// `pref_reader_theme_key`.
 pub const READER_THEME: RangeInclusive<i32> = 0..=3;
+/// `pref_two_pages`: 0 when the window is wide, 1 always, 2 never.
+pub const TWO_PAGES: RangeInclusive<i32> = 0..=2;
 
 /// Clamps a stored value into its range. Never panics: the bounds are constants with `lo <= hi`.
 pub fn clamp_to(value: i32, range: RangeInclusive<i32>) -> i32 {

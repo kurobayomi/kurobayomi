@@ -153,6 +153,10 @@ fn item_row(item: &ItemKey, lookup: &Lookup, host: &PageHost) -> Row {
             };
             holder::page_row(text, lookup.page(p), Some(host))
         }
+        ItemKey::Spread(first, second) => {
+            let (first, second) = (item_row(&ItemKey::Page(first.clone()), lookup, host), item_row(&ItemKey::Page(second.clone()), lookup, host));
+            holder::spread_row(first, second, host.right_to_left)
+        }
         ItemKey::Transition(t) => {
             let to = match &t.to {
                 Some(key) => match lookup.chapter(key) {
@@ -193,8 +197,10 @@ fn page_host(
         // Any zoom of a page hides the menu (T-44a-071, B§6.5).
         on_zoom: Rc::new(move || zoom_emit.send(ViewerEvent::HideMenu)),
         on_split,
+        on_wide: Rc::new(|_| {}),
         on_layout,
         is_webtoon: !kind.is_pager(),
+        right_to_left: kind == ViewerKind::RightToLeft,
         on_retry: Rc::new(move |chapter| retry_emit.send(ViewerEvent::RequestPreload(chapter))),
         downloads: downloads.clone(),
         menu_open: Rc::clone(menu_open),
@@ -458,6 +464,8 @@ struct PagerInner {
     settled: Cell<usize>,
     /// The size the slots were laid out for, so a resize relays them out.
     laid_size: Cell<(i32, i32)>,
+    /// Two pages side by side are shown (`settings::two_pages_on`).
+    two_pages: Cell<bool>,
 }
 
 fn pager_options(s: &ViewerSettings) -> PagerOptions {
@@ -494,6 +502,7 @@ impl PagerInner {
             anim: Rc::default(),
             settled: Cell::new(0),
             laid_size: Cell::new((-1, -1)),
+            two_pages: Cell::new(false),
         });
         wire_surface(&inner);
         // The first emission of the store gives page transitions their stored value (E-22).
@@ -512,19 +521,55 @@ impl PagerInner {
         self.kind != ViewerKind::Vertical
     }
 
-    /// What a new row is handed. A split page asks for its insert page on the next idle, because the report can come
-    /// while the rows are being built.
+    /// What a new row is handed. A split page asks for its insert page, and a wide page tells the pairing, on the next
+    /// idle, because the report can come while the rows are being built.
     fn host(&self) -> PageHost {
-        let weak = self.me.clone();
-        let on_split: Rc<dyn Fn(Rc<ReaderPage>)> = Rc::new(move |page| {
-            let weak = weak.clone();
-            glib::idle_add_local_once(move || {
-                if let Some(this) = weak.upgrade() {
-                    this.on_page_split(&page);
-                }
-            });
-        });
-        page_host(&self.settings.borrow(), self.kind, &self.emit, on_split, Rc::new(|| {}), &self.downloads, &self.menu_open)
+        let later = |run: fn(&PagerInner, &Rc<ReaderPage>)| -> Rc<dyn Fn(Rc<ReaderPage>)> {
+            let weak = self.me.clone();
+            Rc::new(move |page| {
+                let weak = weak.clone();
+                glib::idle_add_local_once(move || {
+                    if let Some(this) = weak.upgrade() {
+                        run(&this, &page);
+                    }
+                });
+            })
+        };
+        let mut host = page_host(&self.page_settings(), self.kind, &self.emit, later(Self::on_page_split), Rc::new(|| {}), &self.downloads, &self.menu_open);
+        host.on_wide = later(Self::on_wide_page);
+        host
+    }
+
+    /// The settings the pages are shown with: wide pages are not split while two pages show side by side, so a wide
+    /// page shows whole.
+    fn page_settings(&self) -> ViewerSettings {
+        let mut settings = self.settings.borrow().clone();
+        settings.dual_split_pager &= !self.two_pages.get();
+        settings
+    }
+
+    /// Turns two pages side by side on or off for the setting and the strip's size (a resize can cross from tall to
+    /// wide). The shown pages take the split setting that goes with it.
+    fn sync_two_pages(&self) {
+        let size = (self.root.width(), self.root.height());
+        let on = settings::two_pages_on(self.settings.borrow().two_pages, self.kind, size);
+        if self.two_pages.replace(on) == on {
+            return;
+        }
+        let opts = page_opts(&self.page_settings(), self.kind, crate::reader::theme::system_prefers_dark());
+        self.slots.borrow().values().for_each(|(_, row)| row.apply(&opts));
+        let fx = self.ctl.borrow_mut().set_two_pages(on);
+        self.run(fx);
+    }
+
+    /// `page` decoded wider than tall: in two-page mode it stands alone.
+    fn on_wide_page(&self, page: &Rc<ReaderPage>) {
+        if !self.emit.is_open() {
+            return;
+        }
+        let Some(page) = PageRef::from_reader(page) else { return };
+        let fx = self.ctl.borrow_mut().set_wide(page);
+        self.run(fx);
     }
 
     /// A transform split `page` in two: its insert page goes next to it (B§5.6, T-44a-050).
@@ -805,6 +850,9 @@ impl PagerInner {
         let weak = self.me.clone();
         self.root.add_tick_callback(move |root, _| {
             let Some(this) = weak.upgrade() else { return ControlFlow::Break };
+            if root.is_visible() && root.width() > 0 && root.height() > 0 {
+                this.sync_two_pages();
+            }
             if this.laid_size.get() != (root.width(), root.height()) && root.is_visible() {
                 this.rebuild();
                 let view = this.ctl.borrow().view_index() as f64;
@@ -840,8 +888,9 @@ impl PagerInner {
     fn apply_settings(&self, new: ViewerSettings) {
         let old = std::mem::replace(&mut *self.settings.borrow_mut(), new.clone());
         self.ctl.borrow_mut().set_options(pager_options(&new));
-        let opts = page_opts(&new, self.kind, crate::reader::theme::system_prefers_dark());
+        let opts = page_opts(&self.page_settings(), self.kind, crate::reader::theme::system_prefers_dark());
         self.slots.borrow().values().for_each(|(_, row)| row.apply(&opts));
+        self.sync_two_pages();
         for reaction in settings::diff(&old, &new, Family::Pager) {
             match reaction {
                 Reaction::RefreshImages => {

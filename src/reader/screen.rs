@@ -2152,6 +2152,93 @@ mod tests {
         }
     }
 
+    /// Six portrait pages, each its own colour, so a picture of the reader shows which page sits where.
+    struct ColouredPages;
+
+    impl HttpPageSource for ColouredPages {
+        fn page_list(&self, _chapter_url: &str) -> Result<Vec<PageEntry>, String> {
+            SixPngPages.page_list(_chapter_url)
+        }
+        fn image_url(&self, page_url: &str) -> Result<String, String> {
+            PngPages.image_url(page_url)
+        }
+        fn image(&self, image_url: &str) -> Result<Vec<u8>, String> {
+            let index: u8 = image_url.trim_start_matches("https://img/p").trim_end_matches(".png").parse().map_err(|_| image_url.to_string())?;
+            let colour = image::Rgba([60 + index * 30, 140, 220 - index * 30, 255]);
+            let mut out = std::io::Cursor::new(Vec::new());
+            image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(600, 900, colour)).write_to(&mut out, image::ImageFormat::Png).map_err(|e| e.to_string())?;
+            Ok(out.into_inner())
+        }
+    }
+
+    /// A wide window shows two pages side by side (the default, Automatic), the cover alone first; the pair's halves
+    /// meet in the middle, and both pages count as read. Right to left too. `KB_SPREAD_SHOT=<prefix>` saves a picture of
+    /// the window per direction.
+    #[test]
+    fn a_wide_window_shows_two_pages_side_by_side() {
+        for (mode, name) in [(1, "ltr"), (2, "rtl")] {
+            wide_window_spread(mode, name);
+        }
+    }
+
+    fn wide_window_spread(mode: i32, name: &'static str) {
+        crate::testing::with_display(move || {
+            let f = fixture(2);
+            let build: BuildLoader = Rc::new(|chapter| {
+                let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/reader-screen-tests/spread");
+                let cache = Arc::new(DiskCache::open(root, CACHE_LIMIT_BYTES).unwrap());
+                Ok(Loader::Http(HttpLoader::new(Arc::new(ColouredPages), 1, chapter.chapter.url.clone(), cache)))
+            });
+            let deps = ReaderDeps {
+                db: Arc::clone(&f.db),
+                manga_id: f.manga_id,
+                chapter_id: f.chapter_ids[0],
+                prefs: {
+                    let prefs = ReaderPrefs::new(PrefStore::in_memory());
+                    prefs.default_reading_mode.set(mode).unwrap();
+                    prefs
+                },
+                store: Rc::new(NoStore),
+                build,
+                is_downloaded: Rc::new(|_| false),
+                downloaded_only: false,
+                incognito: Rc::new(|| false),
+                prefs_store: PrefStore::in_memory(),
+            };
+            let (toaster, _feed) = kuro_platform::toast::toast_channel();
+            let screen = open(deps, &crate::reader::launch::open_gate(), toaster, || {});
+            let window = gtk::Window::new();
+            window.set_default_size(1200, 700);
+            window.set_child(Some(&screen.root));
+            window.present();
+            assert!(pump_until(|| screen.core.page_counts() == (1, 6)), "{:?}", screen.core.page_counts());
+            let inner = screen.chrome.screen.upgrade().unwrap();
+            move_viewer(&inner, 1);
+            assert!(pump_until(|| screen.core.page_counts().0 == 3), "pages 2 and 3 shown, 3 the last read: {:?}", screen.core.page_counts());
+            let shown = || {
+                let mut views = Vec::new();
+                page_views(screen.root.upcast_ref(), &mut views);
+                let mut shown: Vec<_> = views.into_iter().filter(|v| v.is_mapped() && v.state() == crate::reader::page_decode::LoadState::Ready).collect();
+                shown.retain(|v| v.compute_bounds(&window).is_some_and(|b| b.x() >= 0.0 && b.x() < window.width() as f32));
+                shown
+            };
+            assert!(pump_until(|| shown().len() == 2), "two pages on screen: {}", shown().len());
+            let halves: Vec<f32> = shown().iter().filter_map(|v| v.compute_bounds(&window)).map(|b| b.width()).collect();
+            assert!((halves[0] - halves[1]).abs() < 1.0, "each page has half the room: {halves:?}");
+            if let Ok(prefix) = std::env::var("KB_SPREAD_SHOT") {
+                let path = format!("{prefix}-{name}.png");
+                pump_until(|| false);
+                let paintable = gtk::WidgetPaintable::new(Some(&window));
+                let snap = gtk::Snapshot::new();
+                paintable.snapshot(&snap, f64::from(window.width()), f64::from(window.height()));
+                if let (Some(node), Some(renderer)) = (snap.to_node(), window.renderer()) {
+                    renderer.render_texture(node, None).save_to_png(path).unwrap();
+                }
+            }
+            window.destroy();
+        });
+    }
+
     /// A mode switch keeps the page on screen: the new viewer opens where the old one was, not at the chapter's start.
     #[test]
     fn a_mode_switch_keeps_the_page_on_screen() {

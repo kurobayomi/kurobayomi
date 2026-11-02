@@ -168,6 +168,8 @@ mod imp {
         pub fitted: Cell<Option<(i32, i32)>>,
         /// The zoom of the page: scale, centre, fitted minimum, maximum and double-tap level (T-44a-044).
         pub zoom: Cell<ZoomState>,
+        /// Where the page sits across a view wider than it: a page of a two-page spread hugs the gutter.
+        pub hug: Cell<zoom::Hug>,
         /// Whether a decode is cut to the view width first (webtoon pages, B§8.4).
         pub decode_to_view: Cell<bool>,
         /// Whether a decode cuts the uniform border off the page (`crop_borders`, `crop_borders_webtoon`).
@@ -321,7 +323,7 @@ mod imp {
                 }
                 None => ZoomState::fitted(min, zoom::anchor_center(config.zoom_start, src)),
             };
-            z.center = zoom::clamp_center(z.center, view, src, z.scale);
+            z.center = zoom::clamp_center_hugging(z.center, view, src, z.scale, self.hug.get());
             self.zoom.set(z);
             self.fitted.set(Some(key));
             if (z.scale - before.scale).abs() > 1e-9 {
@@ -516,7 +518,7 @@ mod imp {
                 return None;
             }
             let (cx, cy) = z.center;
-            let to = zoom::clamp_center((cx + dx / z.scale, cy + dy / z.scale), self.view(), self.src.get(), z.scale);
+            let to = zoom::clamp_center_hugging((cx + dx / z.scale, cy + dy / z.scale), self.view(), self.src.get(), z.scale, self.hug.get());
             let moved = ((to.0 - cx) * z.scale).abs().max(((to.1 - cy) * z.scale).abs());
             (moved > 0.5).then_some(to)
         }
@@ -554,7 +556,7 @@ mod imp {
                 let now = start.scale + (to - start.scale) * eased;
                 let at = (start.center.0 + (centre.0 - start.center.0) * eased, start.center.1 + (centre.1 - start.center.1) * eased);
                 let before = p.zoom.get().scale;
-                p.zoom.set(ZoomState { scale: now, center: zoom::clamp_center(at, view, src, now), ..p.zoom.get() });
+                p.zoom.set(ZoomState { scale: now, center: zoom::clamp_center_hugging(at, view, src, now, p.hug.get()), ..p.zoom.get() });
                 page.queue_draw();
                 if (now - before).abs() > 1e-9 {
                     page.emit_by_name::<()>("scale-changed", &[&now]);
@@ -753,7 +755,7 @@ mod imp {
             }
             let (sx, sy) = self.drag_start.get();
             let view = self.view();
-            z.center = zoom::clamp_center((sx - dx / z.scale, sy - dy / z.scale), view, self.src.get(), z.scale);
+            z.center = zoom::clamp_center_hugging((sx - dx / z.scale, sy - dy / z.scale), view, self.src.get(), z.scale, self.hug.get());
             self.zoom.set(z);
             self.obj().queue_draw();
         }
@@ -786,7 +788,7 @@ mod imp {
                 let elapsed = began.elapsed().as_secs_f64() * 1000.0;
                 let done = elapsed >= f64::from(duration_ms);
                 let scale = zoom::zoom_step(from, to, elapsed, duration_ms);
-                let center = zoom::clamp_center(zoom::zoom_about(begin, view, from, scale, focus), view, src, scale);
+                let center = zoom::clamp_center_hugging(zoom::zoom_about(begin, view, from, scale, focus), view, src, scale, p.hug.get());
                 p.zoom.set(ZoomState { scale, center, ..p.zoom.get() });
                 page.queue_draw();
                 page.emit_by_name::<()>("scale-changed", &[&scale]);
@@ -802,7 +804,7 @@ mod imp {
             let z = self.zoom.get();
             let new = z.clamp(target);
             let center = zoom::zoom_about(z.center, view, z.scale, new, focus);
-            self.zoom.set(ZoomState { scale: new, center: zoom::clamp_center(center, view, src, new), ..z });
+            self.zoom.set(ZoomState { scale: new, center: zoom::clamp_center_hugging(center, view, src, new, self.hug.get()), ..z });
             let obj = self.obj();
             obj.queue_draw();
             obj.emit_by_name::<()>("scale-changed", &[&new]);
@@ -933,6 +935,15 @@ impl PageView {
     /// decoded again by the caller.
     pub fn set_crop_borders(&self, on: bool) {
         self.imp().crop_borders.set(on);
+    }
+
+    /// Where the page sits across a view wider than it (a page of a two-page spread hugs the gutter). Refits it.
+    pub fn set_hug(&self, hug: zoom::Hug) {
+        let imp = self.imp();
+        if imp.hug.replace(hug) != hug {
+            imp.fitted.set(None);
+            self.queue_draw();
+        }
     }
 
     /// Whether a wide fitted page zooms to the view height after it loads (`landscape_zoom`).

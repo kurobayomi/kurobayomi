@@ -4,10 +4,14 @@
 //! Selection side effects (B§6.4): a settled page hides the menu unless the slider is moving, reports the page,
 //! runs the zoom-start hook, and may ask for the next chapter. A transition asks for its destination, and the
 //! terminal `Next` shows the menu.
+//!
+//! Two pages side by side: the list is built page by page (`flat`) and, while spreads are on, paired into spreads
+//! (`pair_spreads`). A page found to be wide later re-pairs it. Splitting wide pages is off meanwhile: a wide page shows
+//! whole on its own.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
-use super::items::{build_pager_items, place_insert};
+use super::items::{build_pager_items, pair_spreads, place_insert};
 use super::nav::{MoveDecision, PageCmd, decide};
 use crate::reader::viewers::effect::Effect;
 use crate::reader::viewers::ViewerKind;
@@ -32,7 +36,16 @@ struct CurrentChapter {
 pub struct PagerController {
     kind: ViewerKind,
     opts: PagerOptions,
+    /// The list page by page, as built.
+    flat: Vec<ItemKey>,
+    /// The list the strip shows: `flat`, paired into spreads while `two_pages` is on.
     items: Vec<ItemKey>,
+    two_pages: bool,
+    /// Pages known to be wider than tall (they stand alone in two-page mode).
+    wide: HashSet<PageRef>,
+    /// A re-pairing waits for the strip to settle: a page turn gliding toward an index of the old list would land on
+    /// another item.
+    relayout_pending: bool,
     preprocessed: BTreeMap<u32, PageRef>,
     next: Option<Transition>,
     chapter: Option<CurrentChapter>,
@@ -50,7 +63,11 @@ impl PagerController {
         Self {
             kind,
             opts,
+            flat: Vec::new(),
             items: Vec::new(),
+            two_pages: false,
+            wide: HashSet::new(),
+            relayout_pending: false,
             preprocessed: BTreeMap::new(),
             next: None,
             chapter: None,
@@ -69,6 +86,58 @@ impl PagerController {
 
     pub fn items(&self) -> &[ItemKey] {
         &self.items
+    }
+
+    /// Shows two pages side by side, or one. The strip stays on the page it shows.
+    pub fn set_two_pages(&mut self, on: bool) -> Vec<Effect> {
+        if self.two_pages == on {
+            return Vec::new();
+        }
+        self.two_pages = on;
+        // a wide page shows whole beside the others: its split halves go
+        if on {
+            self.flat.retain(|i| !i.page().is_some_and(PageRef::is_insert));
+            self.preprocessed.clear();
+        }
+        self.relayout_when_idle()
+    }
+
+    /// `page` turned out wider than tall: in two-page mode it stands alone, and the pages after it pair again.
+    pub fn set_wide(&mut self, page: PageRef) -> Vec<Effect> {
+        if !self.wide.insert(page) || !self.two_pages {
+            return Vec::new();
+        }
+        self.relayout_when_idle()
+    }
+
+    /// [`Self::relayout`] now when the strip is idle, else once it settles (`set_idle`).
+    fn relayout_when_idle(&mut self) -> Vec<Effect> {
+        if self.idle {
+            return self.relayout();
+        }
+        self.relayout_pending = true;
+        Vec::new()
+    }
+
+    /// Pairs `flat` into the shown list again; `Rebuilt` when that changed it. When the item on screen changed with it
+    /// (a page now beside another, or alone again), that item is selected, so a page that joined the screen counts as
+    /// read.
+    fn relayout(&mut self) -> Vec<Effect> {
+        let items = self.paired();
+        if items == self.items {
+            return Vec::new();
+        }
+        self.items = items;
+        self.reanchor();
+        let mut fx = vec![Effect::Rebuilt];
+        if self.current.is_some() {
+            fx.extend(self.on_page_change(self.view_index));
+        }
+        fx
+    }
+
+    fn paired(&self) -> Vec<ItemKey> {
+        if self.two_pages { pair_spreads(self.flat.clone(), self.kind, &|page| self.wide.contains(page)) } else { self.flat.clone() }
     }
 
     /// The item the reader has settled on, if any (the engine's settle check reads it).
@@ -102,8 +171,9 @@ impl PagerController {
         if !idle {
             return Vec::new();
         }
-        let Some(set) = self.awaiting.take() else { return Vec::new() };
-        let mut fx = self.apply(set);
+        let mut fx = if std::mem::take(&mut self.relayout_pending) { self.relayout() } else { Vec::new() };
+        let Some(set) = self.awaiting.take() else { return fx };
+        fx.extend(self.apply(set));
         if let (Some(chapter), Some(to)) = (&self.chapter, self.next_to()) {
             if chapter.loaded && chapter.page_count == 1 {
                 fx.push(Effect::Preload(to.clone()));
@@ -115,7 +185,8 @@ impl PagerController {
     fn apply(&mut self, set: ChapterSet) -> Vec<Effect> {
         let force = self.opts.always_show_transition || self.current.as_ref().is_some_and(|c| c.transition().is_some());
         let list = build_pager_items(&set, force, &mut self.preprocessed, self.kind);
-        self.items = list.items;
+        self.flat = list.items;
+        self.items = self.paired();
         self.next = Some(list.next);
         self.chapter = Some(CurrentChapter {
             key: set.curr.key.clone(),
@@ -144,7 +215,8 @@ impl PagerController {
     /// pages in front of it, so the index alone would point at another item (`ViewPager.getItemPosition`).
     fn reanchor(&mut self) {
         let last = self.items.len().saturating_sub(1);
-        let kept = self.current.as_ref().and_then(|c| self.items.iter().position(|i| i == c));
+        // a page and a spread holding it are the same place: the spread re-paired or split around it
+        let kept = self.current.as_ref().and_then(|c| self.items.iter().position(|i| i == c || c.page().is_some_and(|p| i.shows(p))));
         self.view_index = kept.unwrap_or_else(|| self.view_index.min(last));
     }
 
@@ -182,6 +254,12 @@ impl PagerController {
         self.current = Some(item.clone());
         match &item {
             ItemKey::Page(page) => self.on_page_selected(page, allow, forward),
+            // both pages are read: the first is reported, then the second runs the selection (progress, preload)
+            ItemKey::Spread(first, second) => {
+                let mut fx = vec![Effect::PageSelected(first.clone())];
+                fx.extend(self.on_page_selected(second, allow, forward));
+                fx
+            }
             ItemKey::Transition(t) => self.on_transition_selected(t),
         }
     }
@@ -217,7 +295,7 @@ impl PagerController {
     /// `moveToPage` (B§6.6). A move to the index already shown runs the page change directly, since no
     /// settle will follow.
     pub fn move_to_page(&mut self, key: &ItemKey) -> Vec<Effect> {
-        let Some(index) = self.items.iter().position(|i| i == key) else { return Vec::new() };
+        let Some(index) = self.items.iter().position(|i| i.holds(key)) else { return Vec::new() };
         if self.view_index == index {
             return self.on_page_change(index);
         }
@@ -245,27 +323,33 @@ impl PagerController {
 
     /// Removes every dual-page insert (`cleanupPageSplit`, B§5.6), used when splitting is switched off.
     pub fn remove_splits(&mut self) -> Vec<Effect> {
-        let before = self.items.len();
-        self.items.retain(|i| !i.page().is_some_and(PageRef::is_insert));
+        let before = self.flat.len();
+        self.flat.retain(|i| !i.page().is_some_and(PageRef::is_insert));
         self.preprocessed.clear();
-        if self.items.len() == before {
+        if self.flat.len() == before {
             return Vec::new();
         }
+        self.items = self.paired();
         self.reanchor();
         vec![Effect::Rebuilt]
     }
 
     /// A dual-page split of `parent` (B§5.6). A split of a neighbour's page waits in `preprocessed`.
     pub fn on_page_split(&mut self, parent: &PageRef, insert: PageRef) -> Vec<Effect> {
+        // two pages side by side show a wide page whole
+        if self.two_pages {
+            return Vec::new();
+        }
         let is_current = self.chapter.as_ref().is_some_and(|c| c.key == parent.chapter);
         if !is_current {
             self.preprocessed.insert(insert.index, insert);
             return Vec::new();
         }
-        let Some(index) = self.items.iter().position(|i| i.page() == Some(parent)) else { return Vec::new() };
-        if !place_insert(&mut self.items, index, self.kind, insert) {
+        let Some(index) = self.flat.iter().position(|i| i.page() == Some(parent)) else { return Vec::new() };
+        if !place_insert(&mut self.flat, index, self.kind, insert) {
             return Vec::new();
         }
+        self.items = self.paired();
         self.reanchor();
         vec![Effect::Rebuilt]
     }
@@ -273,7 +357,7 @@ impl PagerController {
 
 /// `checkAllowPreload` (B§6.4). Transitions and a missing current page always allow it.
 fn allow_preload(item: &ItemKey, current: Option<&ItemKey>, next_to: Option<&ChapterKey>) -> bool {
-    let (Some(current), ItemKey::Page(page)) = (current, item) else { return true };
+    let (Some(current), Some(page)) = (current, item.page()) else { return true };
     let from_next = current.transition().filter(|t| t.dir == Dir::Next).and_then(|t| t.to.as_ref());
     Some(&page.chapter) == from_next
         || current.page().is_some_and(|c| c.chapter == page.chapter)
@@ -282,15 +366,13 @@ fn allow_preload(item: &ItemKey, current: Option<&ItemKey>, next_to: Option<&Cha
 
 /// The `forward` flag of a selection (B§6.4 step 3, E-11, E-12).
 fn forward_flag(current: Option<&ItemKey>, item: &ItemKey) -> bool {
-    match (current, item) {
-        (Some(ItemKey::Page(c)), ItemKey::Page(p)) => {
-            if p.number() == c.number() {
-                p.is_insert()
-            } else {
-                p.number() > c.number()
-            }
-        }
-        (Some(ItemKey::Transition(t)), ItemKey::Page(_)) => t.dir != Dir::Prev,
+    match (current, item.page()) {
+        (Some(ItemKey::Transition(t)), Some(_)) => t.dir != Dir::Prev,
+        (Some(c), Some(p)) => match c.page() {
+            Some(c) if p.number() == c.number() => p.is_insert(),
+            Some(c) => p.number() > c.number(),
+            None => true,
+        },
         _ => true,
     }
 }
@@ -479,6 +561,49 @@ mod tests {
         assert!(fx.contains(&Effect::ScrollTo { index: at(&c, 2, 0), smooth: true }));
         c.on_settled(at(&c, 2, 0));
         c
+    }
+
+    #[test]
+    fn two_pages_pair_the_strip_and_keep_the_page_on_show() {
+        let mut c = opened(ViewerKind::LeftToRight);
+        let page = |i| loaded(2, 2.0, 24).page(i);
+        let on_three = c.items().iter().position(|i| i.shows(&page(2))).unwrap();
+        c.on_settled(on_three);
+        assert_eq!(selected(&c.set_two_pages(true)), ["sel:2:1", "sel:2:2"], "the page joining the screen counts as read");
+        assert_eq!(c.items()[c.view_index()], ItemKey::Spread(page(1), page(2)), "still on page 3, now beside page 2");
+        let fx = c.move_to_page(&ItemKey::Page(page(4)));
+        assert!(matches!(fx.as_slice(), [Effect::ScrollTo { index, .. }] if c.items()[*index] == ItemKey::Spread(page(3), page(4))), "a page asked for finds its spread");
+        assert_eq!(c.set_wide(page(1))[0], Effect::Rebuilt);
+        assert!(c.items().contains(&ItemKey::Page(page(1))) && c.items().contains(&ItemKey::Spread(page(2), page(3))), "a wide page stands alone and the pairs after it move");
+        assert!(c.set_wide(page(1)).is_empty(), "known already");
+        assert_eq!(c.set_two_pages(false)[0], Effect::Rebuilt);
+        assert!(!c.items().iter().any(|i| matches!(i, ItemKey::Spread(..))));
+    }
+
+    #[test]
+    fn pairing_waits_while_a_page_turn_glides_and_runs_once_the_strip_settles() {
+        let mut c = opened(ViewerKind::RightToLeft);
+        let before = c.items().to_vec();
+        c.set_idle(false);
+        assert!(c.set_two_pages(true).is_empty(), "nothing moves under the glide");
+        assert_eq!(c.items(), before.as_slice());
+        assert_eq!(c.set_idle(true)[0], Effect::Rebuilt);
+        assert!(c.items().iter().any(|i| matches!(i, ItemKey::Spread(..))));
+        let page = |i| loaded(2, 2.0, 24).page(i);
+        c.set_idle(false);
+        assert!(c.set_wide(page(3)).is_empty());
+        assert_eq!(c.set_idle(true)[0], Effect::Rebuilt);
+        assert!(c.items().contains(&ItemKey::Page(page(3))));
+    }
+
+    #[test]
+    fn a_spread_reports_both_its_pages_and_splitting_is_off() {
+        let mut c = opened(ViewerKind::RightToLeft);
+        c.set_two_pages(true);
+        let page = |i| loaded(2, 2.0, 24).page(i);
+        let index = c.items().iter().position(|i| i == &ItemKey::Spread(page(1), page(2))).unwrap();
+        assert_eq!(selected(&c.on_settled(index)), ["hide", "sel:2:1", "sel:2:2"]);
+        assert!(c.on_page_split(&page(3), PageRef::insert_of(&page(3))).is_empty());
     }
 
     #[test]

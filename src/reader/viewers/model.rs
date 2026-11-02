@@ -171,25 +171,42 @@ impl Hash for Transition {
     }
 }
 
-/// One row of a viewer's list: a page or a transition. Also the key for diffs and `move_to_page` (`ItemKey`).
+/// One row of a viewer's list: a page, two pages side by side (a spread of the page-by-page modes, in reading order) or a
+/// transition. Also the key for diffs and `move_to_page` (`ItemKey`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ItemKey {
     Page(PageRef),
+    Spread(PageRef, PageRef),
     Transition(Transition),
 }
 
 impl ItemKey {
+    /// The page of a page row, or the first page (in reading order) of a spread.
     pub fn page(&self) -> Option<&PageRef> {
         match self {
-            Self::Page(p) => Some(p),
+            Self::Page(p) | Self::Spread(p, _) => Some(p),
             Self::Transition(_) => None,
         }
+    }
+
+    /// Whether the row shows `page`.
+    pub fn shows(&self, page: &PageRef) -> bool {
+        match self {
+            Self::Page(p) => p == page,
+            Self::Spread(a, b) => a == page || b == page,
+            Self::Transition(_) => false,
+        }
+    }
+
+    /// Whether the row is `key`, or shows the page `key` names (a page asked for that sits in a spread now).
+    pub fn holds(&self, key: &ItemKey) -> bool {
+        self == key || matches!(key, Self::Page(page) if self.shows(page))
     }
 
     pub fn transition(&self) -> Option<&Transition> {
         match self {
             Self::Transition(t) => Some(t),
-            Self::Page(_) => None,
+            Self::Page(_) | Self::Spread(..) => None,
         }
     }
 }

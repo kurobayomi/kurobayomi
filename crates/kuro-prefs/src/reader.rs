@@ -153,6 +153,8 @@ define_prefs! {
         reader_theme: i32 = "pref_reader_theme_key" => 1;
         crop_borders: bool = "crop_borders" => false;
         dual_page_split_paged: bool = "pref_dual_page_split" => false;
+        /// Two pages side by side in the page-by-page modes: 0 when the window is wider than tall, 1 always, 2 never.
+        two_pages: i32 = "pref_two_pages" => 0;
     }
 }
 
@@ -188,6 +190,10 @@ impl MangaReaderPrefs {
 
     pub fn dual_page_split_paged(&self) -> Pref<bool> {
         self.own("manga_dual_page_split", &self.defaults.dual_page_split_paged)
+    }
+
+    pub fn two_pages(&self) -> Pref<i32> {
+        self.own("manga_two_pages", &self.defaults.two_pages)
     }
 
     /// The manga's key `<prefix>_<id>`, read fresh each time so an unset key follows the default as it is now.
@@ -230,6 +236,7 @@ mod tests {
             one.zoom_start().key().to_owned(),
             one.crop_borders().key().to_owned(),
             one.dual_page_split_paged().key().to_owned(),
+            one.two_pages().key().to_owned(),
         ] {
             assert_eq!(lookup(&key).and_then(|(_, id)| id), Some("7"), "{key}");
         }
@@ -237,7 +244,7 @@ mod tests {
 
     #[test]
     fn the_section_holds_every_reader_row() {
-        assert_eq!(ReaderPrefs::FIELDS.len(), 6);
+        assert_eq!(ReaderPrefs::FIELDS.len(), 7);
         let reader = ReaderPrefs::new(PrefStore::in_memory());
         assert_section_registered(ReaderPrefs::TABLE, ReaderPrefs::FIELDS, &reader.defaults());
     }

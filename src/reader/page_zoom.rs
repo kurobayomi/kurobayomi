@@ -270,18 +270,42 @@ pub fn key_zoom_target(scale: f64, min: f64, key: ZoomKey) -> f64 {
     }
 }
 
+/// Where a page narrower than its view sits across it. The two pages of a spread hug the gutter between them (the left
+/// one its right edge, the right one its left edge), so the pair reads as one picture.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Hug {
+    #[default]
+    Center,
+    Start,
+    End,
+}
+
 /// Keeps the view inside the image (`PAN_LIMIT_INSIDE`, E-12). An axis where the image is smaller than the view is
 /// centred on the image.
 pub fn clamp_center(center: (f64, f64), view: Size, src: Size, scale: f64) -> (f64, f64) {
+    clamp_center_hugging(center, view, src, scale, Hug::Center)
+}
+
+/// [`clamp_center`], with a page narrower than the view placed across it by `hug`. Up and down it is always centred.
+pub fn clamp_center_hugging(center: (f64, f64), view: Size, src: Size, scale: f64, hug: Hug) -> (f64, f64) {
     if scale <= 0.0 {
         return center;
     }
-    (clamp_axis(center.0, view.w, src.w, scale), clamp_axis(center.1, view.h, src.h, scale))
+    (clamp_axis(center.0, view.w, src.w, scale, hug), clamp_axis(center.1, view.h, src.h, scale, Hug::Center))
 }
 
-fn clamp_axis(c: f64, view_px: f64, src_px: f64, scale: f64) -> f64 {
+fn clamp_axis(c: f64, view_px: f64, src_px: f64, scale: f64, hug: Hug) -> f64 {
     let visible = view_px / scale;
-    if visible >= src_px { src_px / 2.0 } else { c.max(visible / 2.0).min(src_px - visible / 2.0) }
+    if visible < src_px {
+        return c.max(visible / 2.0).min(src_px - visible / 2.0);
+    }
+    match hug {
+        Hug::Center => src_px / 2.0,
+        // the view's left edge on the image's left edge
+        Hug::Start => visible / 2.0,
+        // the view's right edge on the image's right edge
+        Hug::End => src_px - visible / 2.0,
+    }
 }
 
 /// The centre after zooming from `old` to `new` while the source point under `focus` (view pixels) stays under it.
@@ -457,6 +481,18 @@ mod tests {
         // At 2.0 the visible window is 400x300 source px and the centre stays inside the edges.
         assert_eq!(clamp_center((0.0, 0.0), VIEW, TALL, 2.0), (200.0, 150.0));
         assert_eq!(clamp_center((5000.0, 5000.0), VIEW, TALL, 2.0), (800.0, 1850.0));
+    }
+
+    #[test]
+    fn a_spread_page_narrower_than_its_half_hugs_the_gutter_and_a_zoomed_one_pans_as_usual() {
+        // At 0.3 the 1000 px wide page shows 300 px wide in an 800 px view: 2667 source px are visible across.
+        let visible = 800.0 / 0.3;
+        let (start, end) = (clamp_center_hugging((10.0, 10.0), VIEW, TALL, 0.3, Hug::Start), clamp_center_hugging((10.0, 10.0), VIEW, TALL, 0.3, Hug::End));
+        assert!((start.0 - visible / 2.0).abs() < 1e-9, "the view starts at the page's left edge");
+        assert!((end.0 - (1000.0 - visible / 2.0)).abs() < 1e-9, "the view ends at the page's right edge");
+        assert_eq!((start.1, end.1), (1000.0, 1000.0), "always centred up and down");
+        // zoomed in past the view, the hug changes nothing
+        assert_eq!(clamp_center_hugging((0.0, 0.0), VIEW, TALL, 2.0, Hug::End), (200.0, 150.0));
     }
 
     #[test]

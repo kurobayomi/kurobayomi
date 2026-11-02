@@ -1,11 +1,12 @@
 //! Pager item list (T-44a-021, T-44a-022, T-44a-030): the shared flow of `items.rs`, the preprocessed dual-page
-//! inserts of the current chapter (B§5.3 step 5, B§5.6) and the right-to-left reversal (B§5.3 step 10).
+//! inserts of the current chapter (B§5.3 step 5, B§5.6), the right-to-left reversal (B§5.3 step 10), and the two-page
+//! spreads of a wide window (`pair_spreads`).
 
 use std::collections::BTreeMap;
 
 use crate::reader::viewers::ViewerKind;
 use crate::reader::viewers::items::build_flow;
-use crate::reader::viewers::model::{ChapterSet, ItemKey, PageRef, Transition};
+use crate::reader::viewers::model::{ChapterSet, ItemKey, PageKind, PageRef, Transition};
 
 /// The result of one build: the rows, the item to jump to when the last page had a split, and the `Next`
 /// transition.
@@ -38,6 +39,49 @@ pub fn build_pager_items(set: &ChapterSet, force: bool, preprocessed: &mut BTree
         items.reverse();
     }
     PagerList { items, jump, next }
+}
+
+/// Pairs the pages of `items` (in the order the strip shows them) into two-page spreads, in reading order. Each
+/// chapter pairs from its own start: its first page (the cover) stands alone, then pages go in twos, and a wide page
+/// (`wide`: a spread already, wider than tall) stands alone and starts the count again after it. So a pair is the same
+/// whichever part of the chapter the list holds. Transitions, split inserts and pages of different chapters never pair.
+pub fn pair_spreads(items: Vec<ItemKey>, kind: ViewerKind, wide: &dyn Fn(&PageRef) -> bool) -> Vec<ItemKey> {
+    let rtl = kind == ViewerKind::RightToLeft;
+    let mut reading = items;
+    if rtl {
+        reading.reverse();
+    }
+    let mut out = Vec::with_capacity(reading.len());
+    let mut rows = reading.into_iter().peekable();
+    while let Some(item) = rows.next() {
+        if let (ItemKey::Page(first), Some(ItemKey::Page(second))) = (&item, rows.peek())
+            && pairs_with(first, second, wide)
+        {
+            let second = second.clone();
+            rows.next();
+            out.push(ItemKey::Spread(first.clone(), second));
+            continue;
+        }
+        out.push(item);
+    }
+    if rtl {
+        out.reverse();
+    }
+    out
+}
+
+/// Whether `second` goes beside `first` (see [`pair_spreads`]).
+fn pairs_with(first: &PageRef, second: &PageRef, wide: &dyn Fn(&PageRef) -> bool) -> bool {
+    if first.is_insert() || second.is_insert() || first.chapter != second.chapter || second.index != first.index + 1 {
+        return false;
+    }
+    if first.index == 0 || wide(first) || wide(second) {
+        return false;
+    }
+    // the count restarts after the cover and after every wide page before `first`
+    let page = |index| PageRef { chapter: first.chapter.clone(), index, kind: PageKind::Normal };
+    let restart = (1..first.index).rev().find(|&index| wide(&page(index))).unwrap_or(0) + 1;
+    (first.index - restart).is_multiple_of(2)
 }
 
 /// Places a dual-page split next to the page at `current` (B§5.6). Returns `false` when the insert would repeat
@@ -160,6 +204,49 @@ mod tests {
         let mut at_end = vec![ItemKey::Page(curr.page(0))];
         assert!(!place_insert(&mut at_end, 0, ViewerKind::LeftToRight, insert));
         assert_eq!(at_end.len(), 1);
+    }
+
+    fn pages(chapter: i64, count: u32) -> Vec<ItemKey> {
+        (0..count).map(|i| ItemKey::Page(loaded(chapter, chapter as f64, count).page(i))).collect()
+    }
+
+    #[test]
+    fn the_cover_stands_alone_and_the_pages_after_it_go_in_twos() {
+        let paired = pair_spreads(pages(2, 6), ViewerKind::LeftToRight, &|_| false);
+        assert_eq!(label(&paired), ["p2:0", "s2:1-2", "s2:3-4", "p2:5"]);
+    }
+
+    #[test]
+    fn a_wide_page_stands_alone_and_the_count_starts_again_after_it() {
+        let wide = |p: &PageRef| p.index == 2;
+        let paired = pair_spreads(pages(2, 7), ViewerKind::LeftToRight, &wide);
+        assert_eq!(label(&paired), ["p2:0", "p2:1", "p2:2", "s2:3-4", "s2:5-6"]);
+    }
+
+    #[test]
+    fn a_list_holding_part_of_a_chapter_keeps_the_pairs_of_the_whole_chapter() {
+        // the tail of a 5-page chapter from page index 2: 2 belongs with 1, which the list does not hold
+        let tail: Vec<ItemKey> = pages(1, 5).into_iter().skip(2).collect();
+        assert_eq!(label(&pair_spreads(tail, ViewerKind::LeftToRight, &|_| false)), ["p1:2", "s1:3-4"]);
+    }
+
+    #[test]
+    fn transitions_inserts_and_chapter_edges_never_pair() {
+        let s = set(loaded(2, 2.0, 3), Some(loaded(1, 1.0, 5)), Some(loaded(3, 3.0, 4)));
+        let list = build_pager_items(&s, true, &mut BTreeMap::new(), ViewerKind::LeftToRight);
+        let paired = pair_spreads(list.items, ViewerKind::LeftToRight, &|_| false);
+        assert_eq!(label(&paired), ["s1:3-4", "P(2,1)", "p2:0", "s2:1-2", "N(2,3)", "p3:0", "p3:1"]);
+        let insert = ItemKey::Page(PageRef::insert_of(&loaded(2, 2.0, 3).page(1)));
+        let with_insert = vec![pages(2, 3)[1].clone(), insert, pages(2, 3)[2].clone()];
+        assert_eq!(label(&pair_spreads(with_insert, ViewerKind::LeftToRight, &|_| false)), ["p2:1", "i2:1", "p2:2"]);
+    }
+
+    #[test]
+    fn right_to_left_pairs_in_reading_order_and_keeps_the_strip_reversed() {
+        let mut rtl = pages(2, 5);
+        rtl.reverse();
+        let paired = pair_spreads(rtl, ViewerKind::RightToLeft, &|_| false);
+        assert_eq!(label(&paired), ["s2:3-4", "s2:1-2", "p2:0"]);
     }
 
     /// One golden scenario: the labels of the list a set builds, and the item to jump to when the last page was split.

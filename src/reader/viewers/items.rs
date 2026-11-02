@@ -59,6 +59,7 @@ pub(crate) mod tests {
             .map(|i| match i {
                 ItemKey::Page(p) if p.is_insert() => format!("i{}:{}", p.chapter.id, p.index),
                 ItemKey::Page(p) => format!("p{}:{}", p.chapter.id, p.index),
+                ItemKey::Spread(a, b) => format!("s{}:{}-{}", a.chapter.id, a.index, b.index),
                 ItemKey::Transition(t) => {
                     let to = t.to.as_ref().map_or("-".to_string(), |k| k.id.to_string());
                     let dir = if t.dir == Dir::Prev { "P" } else { "N" };

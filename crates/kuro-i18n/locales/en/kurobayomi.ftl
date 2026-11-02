@@ -2579,6 +2579,10 @@ pref_show_navigation_mode_summary = Briefly show when reader is opened
 
 # source: i18n
 pref_dual_page_split = Split wide pages
+pref_two_pages = Two pages side by side
+two_pages_automatic = When the window is wide
+two_pages_always = Always
+two_pages_never = Never
 
 # source: i18n
 pref_dual_page_invert = Invert split page placement

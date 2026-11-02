@@ -1,6 +1,7 @@
-//! Reader settings rows: the six kept reader settings (settings diet, 2026-10-11). The top row is the default reading
-//! mode; the Display group holds the background colour; the Paged group holds the scale type, the zoom start position,
-//! crop borders and split wide pages. Every other reader setting is cut.
+//! Reader settings rows: the kept reader settings (settings diet, 2026-10-11, and two pages side by side, 2026-11-02).
+//! The top row is the default reading mode; the Display group holds the background colour; the Paged group holds the
+//! scale type, the zoom start position, crop borders, split wide pages and two pages side by side. Every other reader
+//! setting is cut.
 use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::prefs::Prefs;
 use kuro_prefs::pref::Pref;
@@ -34,12 +35,16 @@ pub fn scale_types() -> [(i32, String); 6] {
         (6, tr(MsgKey::scale_type_smart_fit)),
     ]
 }
+/// Two-page codes (`pref_two_pages`).
+pub fn two_pages_choices() -> [(i32, String); 3] {
+    [(0, tr(MsgKey::two_pages_automatic)), (1, tr(MsgKey::two_pages_always)), (2, tr(MsgKey::two_pages_never))]
+}
 /// Zoom start codes (`pref_zoom_start_key`).
 pub fn zoom_starts() -> [(i32, String); 4] {
     [(1, tr(MsgKey::zoom_start_automatic)), (2, tr(MsgKey::zoom_start_left)), (3, tr(MsgKey::zoom_start_right)), (4, tr(MsgKey::zoom_start_center))]
 }
 
-/// The five layout settings the Display and Paged groups show: the defaults on the Settings page, the open manga's own
+/// The six layout settings the Display and Paged groups show: the defaults on the Settings page, the open manga's own
 /// values in the reader's settings window (user, 2026-10-24).
 pub struct LayoutPrefs {
     pub reader_theme: Pref<i32>,
@@ -47,6 +52,7 @@ pub struct LayoutPrefs {
     pub zoom_start: Pref<i32>,
     pub crop_borders: Pref<bool>,
     pub dual_page_split_paged: Pref<bool>,
+    pub two_pages: Pref<i32>,
 }
 
 impl LayoutPrefs {
@@ -57,6 +63,7 @@ impl LayoutPrefs {
             zoom_start: r.zoom_start.clone(),
             crop_borders: r.crop_borders.clone(),
             dual_page_split_paged: r.dual_page_split_paged.clone(),
+            two_pages: r.two_pages.clone(),
         }
     }
 
@@ -67,6 +74,7 @@ impl LayoutPrefs {
             zoom_start: m.zoom_start(),
             crop_borders: m.crop_borders(),
             dual_page_split_paged: m.dual_page_split_paged(),
+            two_pages: m.two_pages(),
         }
     }
 }
@@ -83,6 +91,7 @@ pub fn layout_rows(r: &LayoutPrefs) -> Vec<Preference> {
                 int_choice(&tr(MsgKey::pref_zoom_start), &r.zoom_start, &zoom_starts(), true),
                 switch(&tr(MsgKey::pref_crop_borders), &r.crop_borders, true),
                 switch(&tr(MsgKey::pref_dual_page_split), &r.dual_page_split_paged, true),
+                int_choice(&tr(MsgKey::pref_two_pages), &r.two_pages, &two_pages_choices(), true),
             ],
         ),
     ]
@@ -121,12 +130,12 @@ mod tests {
     }
 
     #[test]
-    fn the_paged_group_holds_the_four_kept_layout_rows() {
+    fn the_paged_group_holds_the_kept_layout_rows() {
         let prefs = Prefs::in_memory();
         let tree = rows_all(&prefs);
         let Preference::Group(paged) = &tree[3] else { panic!("the Paged group") };
         let titles: Vec<&str> = paged.items.iter().map(|i| i.title()).collect();
-        assert_eq!(titles, ["Scale type", "Zoom start position", "Crop borders", "Split wide pages"]);
+        assert_eq!(titles, ["Scale type", "Zoom start position", "Crop borders", "Split wide pages", "Two pages side by side"]);
     }
 
     #[test]

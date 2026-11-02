@@ -30,7 +30,7 @@ use crate::reader::model::{ChapterState, PageStatus, ReaderChapter, ReaderPage, 
 use crate::reader::page_decode::LoadState;
 use crate::reader::page_transform;
 use crate::reader::page_view::PageView as PageWidget;
-use crate::reader::page_zoom::ZoomKey;
+use crate::reader::page_zoom::{Hug, ZoomKey};
 use crate::reader::progress::LoadingIndicator;
 
 /// How often a fetched page's status is copied from its loader while it is not settled.
@@ -47,11 +47,15 @@ pub struct PageHost {
     pub on_zoom: Rc<dyn Fn()>,
     /// A transform split a normal page in two: the pager places the insert page for it (T-44a-050).
     pub on_split: Rc<dyn Fn(Rc<ReaderPage>)>,
+    /// A page decoded wider than tall (a spread already): two pages side by side show it alone.
+    pub on_wide: Rc<dyn Fn(Rc<ReaderPage>)>,
     /// A row started or stopped showing its error card, so the strip lays out again (the card is 0.8 of the
     /// viewport, T-44a-064). May be called while a row is being built.
     pub on_layout: Rc<dyn Fn()>,
     /// The viewer is the webtoon strip, whose transition cards take the webtoon metrics (B§11.4).
     pub is_webtoon: bool,
+    /// The pager reads right to left: a spread shows its second page on the left.
+    pub right_to_left: bool,
     /// A transition's Retry asks for the destination chapter again (T-44a-067).
     pub on_retry: Rc<dyn Fn(Rc<ReaderChapter>)>,
     /// The download index, for a transition's destination (B§11.2). The lookup runs off the GTK thread.
@@ -83,7 +87,8 @@ impl Tasks {
 /// A realised row: the widget in the strip and the subscriptions that keep it current.
 pub struct Row {
     pub widget: gtk::Widget,
-    image: Option<Rc<Image>>,
+    /// The row's page, or the two pages of a spread (left first); none for a transition or a label.
+    images: Vec<Rc<Image>>,
     _tasks: Tasks,
     /// The loader's claim on a fetched page: dropping the row cancels what it queued and the page has not started.
     _guard: Option<Box<dyn Any>>,
@@ -94,38 +99,20 @@ impl Row {
     /// page holds is applied, so an unrelated change does not reset the user's zoom. A changed dual-page setting
     /// decodes the page again, since the transform is part of the decode.
     pub fn apply(&self, new: &PageOpts) {
-        let Some(image) = &self.image else { return };
-        let old = image.opts.replace(*new);
-        if old.config != new.config {
-            image.view.set_config(new.config);
-        }
-        if old.background != new.background {
-            image.view.set_page_background(Some(rgba(*new)));
-        }
-        if old.automatic_background != new.automatic_background {
-            image.view.set_auto_background(new.automatic_background);
-        }
-        image.view.set_double_tap_anim_ms(new.double_tap_ms);
-        image.view.set_long_tap_enabled(new.long_tap);
-        image.view.set_landscape_zoom(new.landscape_zoom);
-        // the crop and the decode width are part of the decode, so a change decodes the page again
-        image.view.set_crop_borders(new.crop);
-        image.view.set_decode_to_view(new.decode_to_view());
-        let redecode = old.transform != new.transform || old.crop != new.crop || old.decode_to_view() != new.decode_to_view();
-        if redecode && image.view.state() != LoadState::Empty {
-            image.load();
+        for image in &self.images {
+            apply_to(image, new);
         }
     }
 
     /// Whether the row's page has been decoded and is shown.
     #[cfg(test)]
     pub fn page_ready(&self) -> bool {
-        self.image.as_ref().is_some_and(|i| i.view.state() == LoadState::Ready)
+        !self.images.is_empty() && self.images.iter().all(|i| i.view.state() == LoadState::Ready)
     }
 
     /// Whether the shown page can pan toward `dir` (`canPanLeft`, `canPanRight`). A row with no page cannot.
     pub fn can_pan(&self, dir: Phys) -> bool {
-        self.image.as_ref().is_some_and(|i| match dir {
+        self.images.iter().any(|i| match dir {
             Phys::Left => i.view.can_pan_left(),
             Phys::Right => i.view.can_pan_right(),
         })
@@ -133,24 +120,22 @@ impl Row {
 
     /// Whether the shown page has room to pan by `(dx, dy)` screen px.
     pub fn can_pan_by(&self, dx: f64, dy: f64) -> bool {
-        self.image.as_ref().is_some_and(|i| i.view.can_pan_by(dx, dy))
+        self.images.iter().any(|i| i.view.can_pan_by(dx, dy))
     }
 
     /// Pans the shown page by `(dx, dy)` screen px at once. `false` when it is at its edge that way.
     pub fn scroll_pan(&self, dx: f64, dy: f64) -> bool {
-        self.image.as_ref().is_some_and(|i| i.view.scroll_pan(dx, dy))
+        self.images.iter().any(|i| i.view.scroll_pan(dx, dy))
     }
 
     /// One notch of Ctrl+wheel zoom on the shown page.
     pub fn zoom_wheel(&self, up: bool) {
-        if let Some(image) = &self.image {
-            image.view.zoom_wheel(up);
-        }
+        self.images.iter().for_each(|i| i.view.zoom_wheel(up));
     }
 
     /// Pans the shown page one view width toward `dir`.
     pub fn pan(&self, dir: Phys) {
-        if let Some(image) = &self.image {
+        for image in &self.images {
             match dir {
                 Phys::Left => image.view.pan_left(),
                 Phys::Right => image.view.pan_right(),
@@ -160,26 +145,46 @@ impl Row {
 
     /// The row's page became the selected one; `forward` is the direction of the selection (`onPageSelected`).
     pub fn page_selected(&self, forward: bool) {
-        if let Some(image) = &self.image {
-            image.view.on_page_selected(forward);
-        }
+        self.images.iter().for_each(|i| i.view.on_page_selected(forward));
     }
 
     /// Applies a zoom key to the shown page.
     pub fn zoom_key(&self, key: ZoomKey) {
-        if let Some(image) = &self.image {
-            image.view.zoom_by_key(key);
-        }
+        self.images.iter().for_each(|i| i.view.zoom_by_key(key));
     }
 
     /// The decoded size of the row's page, `None` until the page is shown. The webtoon strip sizes the row from it.
     pub fn source_size(&self) -> Option<(u32, u32)> {
-        self.image.as_ref().and_then(|i| i.view.source_size())
+        self.images.first().and_then(|i| i.view.source_size())
     }
 
     /// Whether the row shows its error card (a webtoon row is then 0.8 of the viewport tall).
     pub fn errored(&self) -> bool {
-        self.image.as_ref().is_some_and(|i| i.errored.get())
+        self.images.iter().any(|i| i.errored.get())
+    }
+}
+
+/// Applies changed settings to one shown page (`Row::apply`).
+fn apply_to(image: &Image, new: &PageOpts) {
+    let old = image.opts.replace(*new);
+    if old.config != new.config {
+        image.view.set_config(new.config);
+    }
+    if old.background != new.background {
+        image.view.set_page_background(Some(rgba(*new)));
+    }
+    if old.automatic_background != new.automatic_background {
+        image.view.set_auto_background(new.automatic_background);
+    }
+    image.view.set_double_tap_anim_ms(new.double_tap_ms);
+    image.view.set_long_tap_enabled(new.long_tap);
+    image.view.set_landscape_zoom(new.landscape_zoom);
+    // the crop and the decode width are part of the decode, so a change decodes the page again
+    image.view.set_crop_borders(new.crop);
+    image.view.set_decode_to_view(new.decode_to_view());
+    let redecode = old.transform != new.transform || old.crop != new.crop || old.decode_to_view() != new.decode_to_view();
+    if redecode && image.view.state() != LoadState::Empty {
+        image.load();
     }
 }
 
@@ -195,9 +200,25 @@ fn label(text: &str) -> gtk::Label {
     label
 }
 
+/// Two page rows side by side, a spread of the page-by-page modes: `first` and `second` in reading order, so right to
+/// left puts `second` on the left. Each half is half the row, its page fitted in it and hugging the gutter between
+/// them; a zoom (keys, wheel, double tap) zooms each half in its own half.
+pub fn spread_row(first: Row, second: Row, right_to_left: bool) -> Row {
+    let (left, right) = if right_to_left { (second, first) } else { (first, second) };
+    let pair = gtk::Box::builder().homogeneous(true).hexpand(true).vexpand(true).build();
+    for (row, hug) in [(&left, Hug::End), (&right, Hug::Start)] {
+        pair.append(&row.widget);
+        for image in &row.images {
+            image.view.set_hug(hug);
+        }
+    }
+    let images = left.images.iter().chain(&right.images).cloned().collect();
+    Row { widget: pair.upcast(), images, _tasks: Tasks::default(), _guard: Some(Box::new((left, right))) }
+}
+
 /// A row with no state to follow.
 pub fn plain_row(text: &str) -> Row {
-    Row { widget: label(text).upcast(), image: None, _tasks: Tasks::default(), _guard: None }
+    Row { widget: label(text).upcast(), images: Vec::new(), _tasks: Tasks::default(), _guard: None }
 }
 
 /// The line a page row shows for its holder view.
@@ -280,9 +301,12 @@ impl Image {
             let (on_split, parent) = (Rc::clone(&host.on_split), Rc::clone(page));
             image.view.connect_page_split(move || on_split(Rc::clone(&parent)));
         }
-        let weak = image.me.clone();
+        let (weak, on_wide) = (image.me.clone(), Rc::clone(&host.on_wide));
         image.view.connect_image_loaded(move || {
             if let Some(image) = weak.upgrade() {
+                if !image.page.is_insert_page() && image.view.source_size().is_some_and(|(w, h)| w > h) {
+                    on_wide(Rc::clone(&image.page));
+                }
                 image.set_child("page");
                 // the row now has the page's own height
                 (image.on_layout)();
@@ -521,7 +545,7 @@ pub fn page_row(base: String, page: Option<Rc<ReaderPage>>, host: Option<&PageHo
             image.poll();
         }
     }
-    Row { widget, image, _tasks: tasks, _guard: guard }
+    Row { widget, images: image.into_iter().collect(), _tasks: tasks, _guard: guard }
 }
 
 fn set_child(slot: &gtk::Box, child: &impl IsA<gtk::Widget>) {
@@ -664,7 +688,7 @@ impl TransitionCard {
 pub fn transition_row(transition: ChapterTransition, host: &PageHost) -> Row {
     let card = TransitionCard::new(host);
     card.bind(Some(transition));
-    Row { widget: card.widget(), image: None, _tasks: Tasks::default(), _guard: Some(Box::new(card)) }
+    Row { widget: card.widget(), images: Vec::new(), _tasks: Tasks::default(), _guard: Some(Box::new(card)) }
 }
 
 /// Calls `on_change` on the main loop whenever the load state of the current chapter or a neighbour changes
@@ -768,8 +792,10 @@ mod tests {
             menu_open: Rc::default(),
             on_zoom: Rc::new(|| {}),
             on_split: Rc::new(|_| {}),
+            on_wide: Rc::new(|_| {}),
             on_layout: Rc::new(move || layouts.set(layouts.get() + 1)),
             is_webtoon: false,
+            right_to_left: false,
             on_retry: Rc::new(|_| {}),
             downloads: DownloadCheck::default(),
         }
@@ -835,7 +861,7 @@ mod tests {
             assert!(pump_until(|| visible(&row) == "error"), "the loader's failure reaches the row");
             assert!(row.errored());
             assert_eq!(layouts.get(), 1, "the strip is told the row changed");
-            row.image.as_ref().unwrap().retry();
+            row.images[0].retry();
             assert_eq!(fetch.retried.get(), 1);
             assert_eq!(visible(&row), "status", "retry shows the spinner again");
             assert!(!row.errored());
@@ -886,7 +912,7 @@ mod tests {
             host.opts = page_opts(&settings, ViewerKind::LeftToRight, false);
             let row = page_row("Page 1 (split)".into(), Some(insert), Some(&host));
             assert!(pump_until(|| visible(&row) == "page"));
-            let (_, intent) = row.image.as_ref().unwrap().decode_request();
+            let (_, intent) = row.images[0].decode_request();
             assert_eq!(intent.transform, page_transform::PageTransform::SplitRight, "left to right: the insert is the right half");
             assert!(!intent.only_if_wide);
         });

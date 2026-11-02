@@ -9,10 +9,11 @@ use kuro_prefs::reader::{MangaReaderPrefs, ReaderHideThreshold, TappingInvertMod
 use kuro_prefs::reader::ReaderPrefs;
 use kuro_prefs::store::Changed;
 
+use super::ViewerKind;
 use super::nav::NavMode;
 use crate::misc::diet_defaults as diet;
 use crate::reader::tiles::set_tile_threshold;
-use crate::reader::pref_rules::{self, NAVIGATION_MODE, READER_THEME, ZOOM_START, clamp_to};
+use crate::reader::pref_rules::{self, NAVIGATION_MODE, READER_THEME, TWO_PAGES, ZOOM_START, clamp_to};
 
 // `pref_always_decode_long_strip_with_ssiv` is dropped (T-44a-061): the viewer does not read it, and a stored value is ignored.
 
@@ -45,6 +46,8 @@ pub struct ViewerSettings {
     /// `pref_hardware_bitmap_threshold`: the largest tile edge of a page decoded from now on (T-44a-060).
     pub tile_threshold: i32,
     pub dual_split_pager: bool,
+    /// Two pages side by side (`pref_two_pages`): 0 on a wide view, 1 always, 2 never (`two_pages_on`).
+    pub two_pages: i32,
     pub dual_invert_pager: bool,
     pub dual_rotate_pager: bool,
     pub dual_rotate_invert_pager: bool,
@@ -117,6 +120,7 @@ impl ViewerSettings {
             double_tap_zoom: diet::READER_WEBTOON_DOUBLE_TAP_ZOOM,
             tile_threshold: read_tile_threshold(),
             dual_split_pager: p.dual_page_split_paged().get(),
+            two_pages: clamp_to(p.two_pages().get(), TWO_PAGES),
             dual_invert_pager: diet::READER_DUAL_PAGE_INVERT,
             dual_rotate_pager: diet::READER_DUAL_PAGE_ROTATE,
             dual_rotate_invert_pager: diet::READER_DUAL_PAGE_ROTATE_INVERT,
@@ -134,6 +138,19 @@ impl ViewerSettings {
     pub fn before_first_emission(mut self) -> Self {
         self.page_transitions = false;
         self
+    }
+}
+
+/// Whether the pager shows two pages side by side: in the left-to-right and right-to-left modes, always (1), never (2),
+/// or when the view is wider than tall (0, the default).
+pub fn two_pages_on(setting: i32, kind: ViewerKind, (width, height): (i32, i32)) -> bool {
+    if !matches!(kind, ViewerKind::LeftToRight | ViewerKind::RightToLeft) {
+        return false;
+    }
+    match setting {
+        1 => true,
+        2 => false,
+        _ => width > height && height > 0,
     }
 }
 
@@ -219,6 +236,18 @@ impl SettingsWatch {
 mod tests {
     use super::*;
     use kuro_prefs::store::PrefStore;
+
+    #[test]
+    fn two_pages_follow_the_setting_and_the_view_shape_in_the_page_by_page_modes_only() {
+        for kind in [ViewerKind::LeftToRight, ViewerKind::RightToLeft] {
+            assert!(two_pages_on(0, kind, (1600, 900)) && !two_pages_on(0, kind, (900, 1600)), "{kind:?}: wide, then tall");
+            assert!(two_pages_on(1, kind, (900, 1600)) && !two_pages_on(2, kind, (1600, 900)), "{kind:?}: always, never");
+        }
+        assert!(!two_pages_on(0, ViewerKind::LeftToRight, (0, 0)), "no size yet");
+        for kind in [ViewerKind::Vertical, ViewerKind::Webtoon] {
+            assert!(!two_pages_on(1, kind, (1600, 900)), "{kind:?}");
+        }
+    }
 
     #[test]
     fn the_watch_reports_a_changed_value_once_and_never_the_initial_one() {

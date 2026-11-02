@@ -291,6 +291,8 @@ define_prefs! {
     "manga_zoom_start_{id}", Normal, Int, 1, "reader.manga_zoom_start", "";
     "manga_crop_borders_{id}", Normal, Bool, false, "reader.manga_crop_borders", "";
     "manga_dual_page_split_{id}", Normal, Bool, false, "reader.manga_dual_page_split", "";
+    "pref_two_pages", Normal, Int, 0, "reader", "two_pages";
+    "manga_two_pages_{id}", Normal, Int, 0, "reader.manga_two_pages", "";
 }
 
 /// Keys of features this desktop app does not have, and of settings the settings diet cut (docs/design/settings-diet.md).
@@ -693,8 +695,8 @@ mod tests {
         // `pref_player_default_quality` (the height an episode starts at), `enabled_sources` (the sources that are on) and
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
         // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
-        // (`MangaReaderPrefs`)
-        assert_eq!(REGISTRY.len(), rows.len() + 16);
+        // (`MangaReaderPrefs`), then two pages side by side (`pref_two_pages`) and its value for one manga
+        assert_eq!(REGISTRY.len(), rows.len() + 18);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
         assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
         assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");
@@ -708,6 +710,8 @@ mod tests {
         assert_eq!(REGISTRY[rows.len() + 10].key, "library_cover_size");
         assert_eq!(REGISTRY[rows.len() + 11].key, "manga_reader_theme_{id}");
         assert_eq!(REGISTRY[rows.len() + 15].key, "manga_dual_page_split_{id}");
+        assert_eq!(REGISTRY[rows.len() + 16].key, "pref_two_pages");
+        assert_eq!(REGISTRY[rows.len() + 17].key, "manga_two_pages_{id}");
         let mut pinned = 0;
         for (meta, (key, store, kind, default)) in REGISTRY.iter().zip(&rows) {
             assert_eq!(meta.key, key);

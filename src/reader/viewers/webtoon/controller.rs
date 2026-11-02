@@ -113,7 +113,7 @@ impl WebtoonController {
         let allow = self.allow_preload(&item);
         self.current = Some(item.clone());
         match &item {
-            ItemKey::Page(page) => self.on_page_selected(page, allow),
+            ItemKey::Page(page) | ItemKey::Spread(page, _) => self.on_page_selected(page, allow),
             ItemKey::Transition(t) => self.on_transition_selected(t),
         }
     }
@@ -131,7 +131,7 @@ impl WebtoonController {
         match self.items.last()? {
             ItemKey::Transition(Transition { dir: Dir::Next, to, .. }) => to.clone(),
             ItemKey::Transition(_) => None,
-            ItemKey::Page(p) => Some(p.chapter.clone()),
+            ItemKey::Page(p) | ItemKey::Spread(p, _) => Some(p.chapter.clone()),
         }
     }
 
