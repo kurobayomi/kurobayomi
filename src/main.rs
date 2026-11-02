@@ -85,7 +85,7 @@ fn main() -> glib::ExitCode {
             return glib::ExitCode::from(cli::run(&args));
         }
     }
-    // `--run-backup`: one automatic backup from the systemd timer, no window and no GTK
+    // `--run-backup`: one automatic backup, no window and no GTK
     if std::env::args().skip(1).any(|a| a == "--run-backup") {
         return glib::ExitCode::from(backup_run::run_backup_cli());
     }

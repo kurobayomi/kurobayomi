@@ -230,19 +230,6 @@ mod tests {
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicU32, Ordering};
 
-    /// T-21a-041: the unit files of topic section 5 ship in `data/systemd/` for the package to install.
-    const SERVICE: &str = include_str!("../../../data/systemd/kurobayomi-backup.service");
-    const TIMER: &str = include_str!("../../../data/systemd/kurobayomi-backup.timer");
-
-    #[test]
-    fn the_packaged_units_run_the_one_shot_entry_point_on_a_thirty_minute_timer() {
-        assert!(SERVICE.contains("Type=oneshot"));
-        assert!(SERVICE.lines().any(|l| l.starts_with("ExecStart=") && l.ends_with("kurobayomi --run-backup")));
-        assert!(TIMER.contains("OnUnitActiveSec=30min"));
-        assert!(TIMER.contains("Persistent=true"));
-        assert!(TIMER.contains("WantedBy=timers.target"));
-    }
-
     use super::*;
 
     const NOW: i64 = 1_000_000_000_000;

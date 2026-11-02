@@ -569,3 +569,10 @@ the unchanged importer input.
 `pref_display_mode_catalogue` is registered again (`sources.display_mode`, default COMPACT_GRID) and left `DROPPED_KEYS`:
 a source's page has the same View, Grid style and Cover size options as the Library (`src/widgets/view_look.rs`), and
 its look is remembered for every source, apart from the Library's, as in Aniyomi. An Aniyomi backup's value now restores.
+
+## Backup timer units removed (2026-11-02)
+
+The systemd user units of T-21a-041 (`data/systemd/kurobayomi-backup.service` and `.timer`, plan section 5 of
+`plans/21-backup-format-and-create/p1-topic-autobackup-scheduling.md`) are removed. No package installed them and the
+app never wrote or enabled them, and they worked on Linux only. Automatic backups run in the app's own loop while it is
+open (`src/backup_schedule.rs`). The `--run-backup` entry point stays: it is the same on every system.

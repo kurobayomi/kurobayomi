@@ -1,8 +1,0 @@
-[Unit]
-Description=Kurobayomi automatic backup
-
-[Service]
-Type=oneshot
-ExecStart=%h/.local/bin/kurobayomi --run-backup
-Nice=10
-IOSchedulingClass=idle
