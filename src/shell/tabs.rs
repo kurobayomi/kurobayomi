@@ -34,7 +34,7 @@ pub fn tab_for_id(id: &str, current: Tab) -> Option<Tab> {
 /// Hosts `home` on the tab pages in `stack`: the stack shows the selected tab now, and every later change of page is
 /// recorded in `home`. One `HomeTabs` serves every layout, so a switch between the sidebar and the bottom bar keeps
 /// the selection (T-36a-004).
-pub fn bind(stack: &gtk::Stack, home: &Rc<RefCell<HomeTabs>>) {
+pub fn bind(stack: &adw::ViewStack, home: &Rc<RefCell<HomeTabs>>) {
     let wanted = nav_id(home.borrow().current());
     if stack.child_by_name(wanted).is_some() {
         stack.set_visible_child_name(wanted);
@@ -50,7 +50,7 @@ pub fn bind(stack: &gtk::Stack, home: &Rc<RefCell<HomeTabs>>) {
 }
 
 /// Back or Escape on the root page: returns to the start tab when `home` handles back. Returns whether it did.
-pub fn go_back(stack: &gtk::Stack, home: &Rc<RefCell<HomeTabs>>) -> bool {
+pub fn go_back(stack: &adw::ViewStack, home: &Rc<RefCell<HomeTabs>>) -> bool {
     let handled = home.borrow_mut().back();
     if handled {
         stack.set_visible_child_name(nav_id(home.borrow().current()));

@@ -58,7 +58,7 @@ pub fn nav_target(screen: StartScreen) -> (&'static str, Option<&'static str>) {
 }
 
 /// Selects the tab `prefs.ui.start_screen` names (task T-48a-005). A tab the window does not have is left alone.
-pub fn open_start_tab(tabs: &gtk::Stack, prefs: &Prefs) {
+pub fn open_start_tab(tabs: &adw::ViewStack, prefs: &Prefs) {
     let (tab, kind) = nav_target(prefs.ui.start_screen.get());
     let Some(page) = tabs.child_by_name(tab) else { return };
     tabs.set_visible_child(&page);

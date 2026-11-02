@@ -1,8 +1,8 @@
 //! The tracker services behind the Tracking screen (tasks T-47a-055 to T-47a-059): the eleven trackers in one
 //! `TrackerManager` over the app's secret store, the pending browser logins, and the arrival of a login redirect.
 //!
-//! The secret store is opened off the GTK thread (its first open probes the keyring and can take seconds), then the
-//! trackers are built on the GTK thread inside the app's runtime, which the manager's watcher tasks need.
+//! The secret store is opened and the trackers are built off the GTK thread (the keyring probe can take seconds, and every
+//! tracker builds its own network client), inside the app's runtime, which the manager's watcher tasks need.
 //!
 //! Decisions:
 //! - Shikimori and Bangumi read their OAuth client from `config.toml`; without one their rows say they are not
@@ -156,12 +156,21 @@ pub fn ensure() {
     if !start {
         return;
     }
+    // what the build needs from the GTK thread; the build itself (eleven trackers, each with its own network client)
+    // runs off it, so the first page that asks for the trackers does not freeze the window
+    let inputs = crate::shell::host::Shell::get().map(|shell| {
+        let app = crate::data::app();
+        Inputs { runtime: shell.runtime().clone(), prefs: app.base.store().clone(), db: Arc::clone(&app.db) }
+    });
     gtk::glib::spawn_future_local(async move {
-        let opened = gtk::gio::spawn_blocking(open_store).await;
-        let built = match opened {
-            Ok(Ok((secrets, config_dir))) => build(secrets, &config_dir),
-            Ok(Err(err)) => Err(err),
-            Err(_) => Err("the secret store task panicked".to_owned()),
+        let built = match inputs {
+            Some(inputs) => gtk::gio::spawn_blocking(move || {
+                let (secrets, config_dir) = open_store()?;
+                build(inputs, secrets, &config_dir)
+            })
+            .await
+            .unwrap_or_else(|_| Err("the tracker services task panicked".to_owned())),
+            None => Err("no runtime".to_owned()),
         };
         STATE.with(|state| {
             *state.borrow_mut() = match built {
@@ -194,14 +203,20 @@ impl SourceDirectory for NoSources {
     }
 }
 
-fn build(secrets: Arc<kuro_platform::secrets::FallbackSecrets>, config_dir: &std::path::Path) -> Result<Host, String> {
-    let handle = crate::shell::host::Shell::get().map(|shell| shell.runtime().clone()).ok_or("no runtime")?;
-    let _entered = handle.enter();
+/// The parts of the app the tracker services are built over, taken on the GTK thread.
+struct Inputs {
+    runtime: tokio::runtime::Handle,
+    prefs: kuro_prefs::store::PrefStore,
+    db: Arc<kuro_db::handle::Db>,
+}
+
+/// Builds the services. Runs on a blocking-pool thread, inside the app's runtime, which the manager's watcher tasks need.
+fn build(inputs: Inputs, secrets: Arc<kuro_platform::secrets::FallbackSecrets>, config_dir: &std::path::Path) -> Result<Host, String> {
+    let Inputs { runtime, prefs, db } = inputs;
+    let _entered = runtime.enter();
     let fallback = secrets.mode() == SecretsMode::EncryptedFile;
     let store: Arc<dyn SecretStore> = secrets;
     let events = EventBus::default();
-    let app = crate::data::app();
-    let prefs = app.base.store().clone();
     let flags: Arc<dyn FlagStore> = Arc::new(prefs.clone());
     let dir: Arc<dyn SourceDirectory> = Arc::new(NoSources);
     let clients = TrackClientConfig::load(config_dir);
@@ -236,17 +251,17 @@ fn build(secrets: Arc<kuro_platform::secrets::FallbackSecrets>, config_dir: &std
     let manager = Arc::new(TrackerManager::new(all).map_err(|e| text(&e))?);
 
     // The queue lives in the anime database (its rows carry the kind, so both kinds share it).
-    let queue = Arc::new(RetryQueue::new(Arc::clone(&app.db)).map_err(|e| text(&e))?);
+    let queue = Arc::new(RetryQueue::new(Arc::clone(&db)).map_err(|e| text(&e))?);
     let net: Arc<dyn Connectivity> = Arc::new(GioNetwork);
     let scheduler = Arc::new(RetryScheduler::new(Arc::clone(&queue), Arc::clone(&net)));
     let ctx = Arc::new(TrackCtx {
         trackers: Arc::clone(&manager),
-        anime_tracks: Arc::new(SharedTracks::new(Arc::clone(&app.db))),
-        manga_tracks: Arc::new(SharedTracks::new(Arc::clone(&app.db))),
-        anime_episodes: Arc::new(SharedItems::new(Arc::clone(&app.db))),
-        manga_chapters: Arc::new(SharedItems::new(Arc::clone(&app.db))),
-        anime_history: Arc::new(SharedHistory::new(Arc::clone(&app.db))),
-        manga_history: Arc::new(SharedHistory::new(Arc::clone(&app.db))),
+        anime_tracks: Arc::new(SharedTracks::new(Arc::clone(&db))),
+        manga_tracks: Arc::new(SharedTracks::new(Arc::clone(&db))),
+        anime_episodes: Arc::new(SharedItems::new(Arc::clone(&db))),
+        manga_chapters: Arc::new(SharedItems::new(Arc::clone(&db))),
+        anime_history: Arc::new(SharedHistory::new(Arc::clone(&db))),
+        manga_history: Arc::new(SharedHistory::new(Arc::clone(&db))),
         queue,
         scheduler,
         net,

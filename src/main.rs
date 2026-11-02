@@ -477,9 +477,8 @@ fn schedule_crash_test() {
 }
 
 /// One page per Aniyomi nav destination, each with its own header (title + that tab's actions).
-fn tabs() -> gtk::Stack {
-    let tabs = gtk::Stack::new();
-    tabs.set_transition_type(gtk::StackTransitionType::Crossfade);
+fn tabs() -> adw::ViewStack {
+    let tabs = adw::ViewStack::new();
     tabs.set_hhomogeneous(false);
     for n in ui::with_spec(|s| s.nav.clone()) {
         let Some(b) = screens::body(&n.id) else { continue };
@@ -487,7 +486,7 @@ fn tabs() -> gtk::Stack {
         // sidebar already names the tab, so it carries no title
         let own_header = b.content.first_child().is_some_and(|w| w.is::<adw::HeaderBar>());
         let page: gtk::Widget = if own_header { b.content } else { ui::page(&spec::shown(&ui::screen(&n.id).title), &b.content, b.end, false).upcast() };
-        tabs.add_titled(&page, Some(&n.id), &spec::shown(&n.title)).set_icon_name(&n.icon);
+        tabs.add_titled_with_icon(&page, Some(&n.id), &spec::shown(&n.title), &n.icon);
     }
     tabs
 }

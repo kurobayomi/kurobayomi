@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn the_sidebar_rows_always_show_their_labels_at_the_top() {
         crate::testing::with_display(|| {
-            let sidebar = crate::shell::sidebar::build(&gtk::Stack::new());
+            let sidebar = crate::shell::sidebar::build(&adw::ViewStack::new());
             let mut all = vec![];
             descendants(sidebar.upcast_ref(), &mut all);
             let titles: Vec<String> = crate::ui::with_spec(|s| s.nav.iter().map(|n| n.title.clone()).collect());

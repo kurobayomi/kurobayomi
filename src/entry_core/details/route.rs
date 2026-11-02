@@ -1461,6 +1461,8 @@ impl View {
 
     /// Draws the info block: the header in the layout and column of the page, then the description with its genre chips.
     fn render_info(self: &Rc<Self>, m: &EntryModel) {
+        // the header shows no title of its own: the navigation page takes the entry's
+        crate::ui::set_page_title(&self.refresh_button, &m.entry.title);
         let two = self.two_pane.get().unwrap_or(false);
         let model = header_model(&m.entry, &m.source);
         let column = if two { self.panes.width() } else { self.width.get() };

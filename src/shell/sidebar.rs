@@ -123,7 +123,7 @@ fn scroll_to_top(root: &gtk::Widget) {
 
 /// A click on the panel item `id`: when its page is already on show (nothing pushed over it), the page scrolls to the
 /// top; otherwise the pushed pages go and the item's page shows.
-fn select(tabs: &gtk::Stack, id: &str) {
+fn select(tabs: &adw::ViewStack, id: &str) {
     if ui::page_stack().1 == 0 && tabs.visible_child_name().as_deref() == Some(id) {
         if let Some(page) = tabs.visible_child() {
             scroll_to_top(&page);
@@ -255,7 +255,7 @@ fn bottom_rows() -> gtk::ListBox {
 /// Keeps one row of the panel selected, the place on screen: Settings while it (or a page inside it) shows, else the open
 /// tab, also over a page opened from the tab (an entry is still "in" Browse). Follows the tabs and the pushed pages, so the
 /// bottom bar, a link or Back moves it too.
-fn follow_pages(tabs: &gtk::Stack, places: &gtk::ListBox, bottom: &gtk::ListBox, ids: Vec<String>) {
+fn follow_pages(tabs: &adw::ViewStack, places: &gtk::ListBox, bottom: &gtk::ListBox, ids: Vec<String>) {
     let sync = {
         let (tabs, places, bottom) = (tabs.clone(), places.clone(), bottom.clone());
         Rc::new(move || {
@@ -279,7 +279,7 @@ fn follow_pages(tabs: &gtk::Stack, places: &gtk::ListBox, bottom: &gtk::ListBox,
 
 /// The left panel: the app menu in a split header, one row per place from the top, and Settings at the bottom. Always
 /// full width; there is no collapsed mode (docs/design/main-window.md).
-pub fn build(tabs: &gtk::Stack) -> GBox {
+pub fn build(tabs: &adw::ViewStack) -> GBox {
     let header = ui::header_bar();
     header.set_decoration_layout(Some(&ui::decoration(true)));
     header.set_title_widget(Some(&title()));
@@ -319,15 +319,14 @@ pub fn build(tabs: &gtk::Stack) -> GBox {
     b
 }
 
-/// The narrow window's bar: the same items as the panel. The places switch the tab pages, then the app menu (Incognito,
-/// Help, About and Settings).
-pub fn bottom_bar(tabs: &gtk::Stack) -> GBox {
+/// The narrow window's bar: the same items as the panel. The places are libadwaita's view switcher over the tab pages,
+/// then the app menu (Incognito, Help, About and Settings) as a flat button beside them.
+pub fn bottom_bar(tabs: &adw::ViewStack) -> GBox {
     let bar = GBox::new(O::Horizontal, SPACE_S);
-    bar.add_css_class("kb-bottom-bar");
     bar.set_halign(gtk::Align::Center);
     bar.set_margin_top(SPACE_S);
     bar.set_margin_bottom(SPACE_S);
-    let switcher = gtk::StackSwitcher::builder().stack(tabs).build();
+    let switcher = adw::ViewSwitcher::builder().stack(tabs).policy(adw::ViewSwitcherPolicy::Narrow).build();
     // the bar also shows over a pushed page: a tap leaves it for the tab pages, like the panel's rows
     let leave = gtk::GestureClick::new();
     leave.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -335,7 +334,10 @@ pub fn bottom_bar(tabs: &gtk::Stack) -> GBox {
     switcher.add_controller(leave);
     bar.append(&switcher);
     // Settings is in the menu with the app's other pages
-    bar.append(&app_menu_button());
+    let menu = app_menu_button();
+    menu.add_css_class("flat");
+    menu.set_valign(gtk::Align::Center);
+    bar.append(&menu);
     ui::no_sticky_focus(&bar);
     bar
 }
@@ -372,7 +374,7 @@ mod tests {
     fn the_panel_has_the_places_and_the_app_rows_at_the_bottom() {
         crate::testing::with_display(|| {
             let _nav = crate::testing::nav();
-            let panel = build(&gtk::Stack::new());
+            let panel = build(&adw::ViewStack::new());
             let texts = labels(panel.upcast_ref());
             assert!(!texts.iter().any(|l| *l == tr(MsgKey::pref_category_about)), "About is in Settings only");
             let wanted = [incognito_label().to_owned(), tr(MsgKey::label_help)];
@@ -395,9 +397,9 @@ mod tests {
     #[test]
     fn the_bottom_bar_has_the_places_and_the_app_menu_with_settings_in_it() {
         crate::testing::with_display(|| {
-            let bar = bottom_bar(&gtk::Stack::new());
+            let bar = bottom_bar(&adw::ViewStack::new());
             let all = crate::screens::alone::descendants(bar.upcast_ref());
-            assert_eq!(all.iter().filter(|w| w.is::<gtk::StackSwitcher>()).count(), 1);
+            assert_eq!(all.iter().filter(|w| w.is::<adw::ViewSwitcher>()).count(), 1);
             let menus: Vec<_> = all.iter().filter_map(|w| w.downcast_ref::<gtk::MenuButton>()).collect();
             assert_eq!(menus.len(), 1, "the app menu, and no separate Settings button");
             let model = menus[0].menu_model().expect("a menu model");
@@ -417,7 +419,7 @@ mod tests {
         crate::testing::with_display(|| {
             let _ = crate::testing::nav();
             ui::push(&gtk::Label::new(Some("root")));
-            let tabs = gtk::Stack::new();
+            let tabs = adw::ViewStack::new();
             let ids: Vec<String> = ui::with_spec(|s| s.nav.iter().map(|n| n.id.clone()).collect());
             for id in &ids {
                 tabs.add_named(&gtk::Label::new(Some(id)), Some(id));

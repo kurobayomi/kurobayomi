@@ -16,6 +16,7 @@ use kuro_images::art::ArtRef;
 #[cfg(test)]
 use kuro_platform::kind::Kind;
 use kuro_images::cover_image::{CoverBinding, CoverState};
+use kuro_images::error::ImageError;
 use kuro_images::fetch::{ImageService, LoadRequest};
 use kuro_images::options::{LoadOptions, Priority};
 use kuro_images::texture::TextureSpec;
@@ -136,7 +137,15 @@ impl Inner {
         // the service's future is not `Send`, so it runs to the end on a blocking-pool thread
         let driver = runtime.clone();
         runtime.spawn_blocking(move || {
+            let url = art.url.clone();
             let result = driver.block_on(service.load(&LoadRequest { art, options, cancel }));
+            // a cover that cannot be shown says why once, in the log; a cancelled load (the cover left the screen) is not
+            // a failure
+            if let Err(error) = &result
+                && !matches!(error, ImageError::Cancelled)
+            {
+                tracing::warn!(url = url.as_deref().unwrap_or("none"), %error, "a cover could not be loaded");
+            }
             let _ = done.send_blocking(result);
         });
         let this = Rc::clone(this);

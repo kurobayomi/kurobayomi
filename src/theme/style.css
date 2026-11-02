@@ -18,21 +18,6 @@
   font-weight: 600;
   color: alpha(@theme_fg_color, 0.7);
 }
-/* The narrow window's bottom bar: bare icon buttons, no frame and no fill until hovered, pressed or switched on, so the tab
-   buttons show the open tab with the "on" fill. The header's buttons are libadwaita's own (flat, with its hover). */
-.kb-bottom-bar button {
-  background: none;
-  border-color: transparent;
-  box-shadow: none;
-  transition: background 120ms ease;
-}
-.kb-bottom-bar button:hover {
-  background: alpha(currentColor, 0.14);
-}
-.kb-bottom-bar button:active,
-.kb-bottom-bar button:checked {
-  background: alpha(currentColor, 0.22);
-}
 /* a narrow window (the bottom bar shows) packs its header buttons tighter, so a pushed page's Back, search and ⋮ fit
    beside its own actions at 360 px */
 window.kb-narrow headerbar button.image-button,
@@ -52,14 +37,6 @@ button.kb-refreshing image {
 }
 button.kb-spin-once image {
   animation: kb-spin 700ms ease-in-out 1;
-}
-/* a switch button has a wide minimum and padding; the Anime | Manga switch then made each header too wide for a small
-   window (360 px). The words fit in their own width with 10 px on each side. */
-stackswitcher > button,
-stackswitcher > button.text-button {
-  min-width: 0;
-  padding-left: 10px;
-  padding-right: 10px;
 }
 /* A group heading (ui::heading) gets the gap between two groups above it, except the first of a column, which sits at the
  * column's own top margin like any other first child (the 12 px of SPACE_M; the column's own spacing adds the other 12). */

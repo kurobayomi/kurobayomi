@@ -69,9 +69,45 @@ fn pages(nav: &adw::NavigationView) -> Vec<adw::NavigationPage> {
     (0..stack.n_items()).filter_map(|i| stack.item(i).and_downcast::<adw::NavigationPage>()).collect()
 }
 
-/// A pushed widget as a navigation page. The widget keeps its own header bar, so the page has no title of its own.
+/// A pushed widget as a navigation page. The widget keeps its own header bar; the page is named after the title that bar
+/// shows (screen readers and the back button read it), or the app's name until the page names itself
+/// ([`set_page_title`]).
 fn wrap(page: &impl IsA<gtk::Widget>) -> adw::NavigationPage {
-    adw::NavigationPage::builder().child(page).title("").build()
+    let title = header_title(page.upcast_ref()).unwrap_or_else(|| tr(MsgKey::home_title).to_string());
+    adw::NavigationPage::builder().child(page).title(title).build()
+}
+
+/// The title the first header bar inside `widget` shows, if it shows one.
+fn header_title(widget: &gtk::Widget) -> Option<String> {
+    let title = first_header(widget)?.title_widget()?;
+    let text = match title.downcast_ref::<Label>() {
+        Some(label) => label.text().to_string(),
+        None => title.downcast_ref::<adw::WindowTitle>()?.title().to_string(),
+    };
+    (!text.is_empty()).then_some(text)
+}
+
+/// The first header bar in `widget`, depth first.
+fn first_header(widget: &gtk::Widget) -> Option<adw::HeaderBar> {
+    if let Some(header) = widget.downcast_ref::<adw::HeaderBar>() {
+        return Some(header.clone());
+    }
+    let mut child = widget.first_child();
+    while let Some(next) = child {
+        if let Some(found) = first_header(&next) {
+            return Some(found);
+        }
+        child = next.next_sibling();
+    }
+    None
+}
+
+/// Names the navigation page that holds `widget`: a page whose header shows no title (an entry page) calls it once it
+/// knows its name.
+pub fn set_page_title(widget: &impl IsA<gtk::Widget>, title: &str) {
+    if let Some(page) = widget.ancestor(adw::NavigationPage::static_type()).and_downcast::<adw::NavigationPage>() {
+        page.set_title(title);
+    }
 }
 
 /// The widget on show: the child of the visible navigation page.
@@ -415,7 +451,7 @@ pub fn open(id: &str) {
         // sidebar destinations switch tabs instead of stacking a second copy; a hidden page (Downloads with an empty
         // queue) shows while it is open
         pop_to_root();
-        if let Some(tabs) = pages(&nav().0).first().and_then(|p| p.child()).and_downcast::<gtk::Stack>() {
+        if let Some(tabs) = pages(&nav().0).first().and_then(|p| p.child()).and_downcast::<adw::ViewStack>() {
             if let Some(page) = tabs.child_by_name(id) {
                 page.set_visible(true);
             }
