@@ -600,6 +600,7 @@ fn watch_fullscreen(page: &gtk::Box, header: &adw::HeaderBar, button: &gtk::Butt
             header.set_visible(!on);
         }
         if let Some(button) = button.upgrade() {
+            // both glyphs are bundled (Material's fullscreen and fullscreen exit), so they match on every desktop
             button.set_icon_name(if on { "view-restore-symbolic" } else { "view-fullscreen-symbolic" });
             let label = fullscreen_tooltip(on);
             button.set_tooltip_text(Some(&label));
