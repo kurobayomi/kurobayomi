@@ -127,26 +127,27 @@ pub fn is_completed(last_second_seen: i64, total_seconds: i64, threshold: f64) -
     last_second_seen as f64 >= total_seconds as f64 * threshold
 }
 
-/// Whether progress is written in a save: `!incognito_source || has_trackers` (T56, T57). A source
-/// in incognito keeps progress only for a tracked entry, so the tracker can still read it.
-pub fn progress_allowed(incognito_source: bool, has_trackers: bool) -> bool {
-    !incognito_source || has_trackers
+/// Whether progress is written in a save: `!incognito || has_trackers` (T56, T57). In incognito progress is kept only
+/// for a tracked entry, so the tracker can still read it.
+pub fn progress_allowed(incognito: bool, has_trackers: bool) -> bool {
+    !incognito || has_trackers
 }
 
-/// Whether history is written: never for a source in incognito (T56, T57).
-pub fn history_allowed(incognito_source: bool) -> bool {
-    !incognito_source
+/// Whether history is written: never in incognito (T56, T57).
+pub fn history_allowed(incognito: bool) -> bool {
+    !incognito
 }
 
-/// Whether tracker sync runs. It reads the app-wide incognito flag, not the per-source one (E-17).
-pub fn tracker_sync_allowed(incognito_global: bool, has_trackers: bool, auto_update: bool) -> bool {
-    !incognito_global && has_trackers && auto_update
+/// Whether tracker sync runs (E-17).
+pub fn tracker_sync_allowed(incognito: bool, has_trackers: bool, auto_update: bool) -> bool {
+    !incognito && has_trackers && auto_update
 }
 
-/// The inputs of one save that are not episode data. `forced` is set on pause and close.
+/// The inputs of one save that are not episode data. `incognito` is the app's one Incognito switch (Kurobayomi has no
+/// per-source incognito); `forced` is set on pause and close.
 #[derive(Clone, Copy, Debug)]
 pub struct SaveContext {
-    pub incognito_source: bool,
+    pub incognito: bool,
     pub has_trackers: bool,
     pub now_ms: i64,
     pub forced: bool,
@@ -154,8 +155,7 @@ pub struct SaveContext {
 }
 
 /// Plans one save of the current episode (T-45a-063, T-45a-064, T-45b-056, T-45b-026, T-45b-028).
-/// `incognito_source` is the per-source state read for the current anime. History gets `now_ms`
-/// unless incognito, and only when `history_throttle` says a write is due (every 5 s, or `forced`
+/// History gets `now_ms` unless incognito, and only when `history_throttle` says a write is due (every 5 s, or `forced`
 /// on pause and close; E-47). Progress is written when `progress_allowed` and `total_seconds > 0`,
 /// and only the fields that differ from `stored` (E-46). An unseen episode becomes seen when it is
 /// completed, and a seen episode stays seen.
@@ -166,13 +166,13 @@ pub fn plan_save(
     episode: &EpisodeProgress,
 ) -> SavePlan {
     let SaveContext {
-        incognito_source,
+        incognito,
         has_trackers,
         now_ms,
         forced,
         threshold,
     } = ctx;
-    let progress = (progress_allowed(incognito_source, has_trackers) && episode.total_seconds > 0)
+    let progress = (progress_allowed(incognito, has_trackers) && episode.total_seconds > 0)
         .then(|| {
             EpisodeChanges::diff(
                 stored,
@@ -185,7 +185,7 @@ pub fn plan_save(
         })
         .filter(|changes| !changes.is_empty());
     SavePlan {
-        history_seen_at: (history_allowed(incognito_source)
+        history_seen_at: (history_allowed(incognito)
             && history_throttle.due(now_ms, forced))
         .then_some(now_ms),
         episode: progress,
@@ -328,9 +328,9 @@ mod tests {
         )
     }
 
-    fn ctx(incognito_source: bool, has_trackers: bool, now_ms: i64, forced: bool) -> SaveContext {
+    fn ctx(incognito: bool, has_trackers: bool, now_ms: i64, forced: bool) -> SaveContext {
         SaveContext {
-            incognito_source,
+            incognito,
             has_trackers,
             now_ms,
             forced,

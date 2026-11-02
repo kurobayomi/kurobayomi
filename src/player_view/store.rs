@@ -133,7 +133,7 @@ impl Tracker {
         };
         let plan = progress::plan_save(
             SaveContext {
-                incognito_source: (self.incognito)(),
+                incognito: (self.incognito)(),
                 has_trackers: false,
                 now_ms,
                 forced,

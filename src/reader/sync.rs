@@ -16,8 +16,10 @@ pub enum Effect {
     Incognito,
 }
 
-/// The preference key of the global incognito flag (`BasePrefs::incognito_mode`).
-pub const INCOGNITO_KEY: &str = "__APP_STATE_incognito_mode";
+/// Whether `key` is the global incognito flag's, read from its one definition (`BasePrefs::incognito_mode`).
+fn is_incognito_key(key: &str) -> bool {
+    key == kuro_prefs::base::BasePrefs::new(PrefStore::in_memory()).incognito_mode.key()
+}
 
 /// Whether the reader closes for a new value of the global incognito flag (E-INC-2).
 pub fn closes_on_incognito(now_on: bool) -> bool {
@@ -30,7 +32,7 @@ pub fn effects_for(key: &str) -> Vec<Effect> {
         // the default and any manga's own background: the reader reads the one that applies to its manga
         "pref_reader_theme_key" => vec![Effect::Theme],
         key if key.starts_with("manga_reader_theme_") => vec![Effect::Theme],
-        INCOGNITO_KEY => vec![Effect::Incognito],
+        key if is_incognito_key(key) => vec![Effect::Incognito],
         _ => Vec::new(),
     }
 }
@@ -64,7 +66,7 @@ mod tests {
 
     #[test]
     fn the_incognito_flag_maps_to_its_effect_and_only_turning_it_off_closes_the_reader() {
-        assert_eq!(effects_for(INCOGNITO_KEY), [Effect::Incognito]);
+        assert_eq!(effects_for("__APP_STATE_incognito_mode"), [Effect::Incognito]);
         assert!(closes_on_incognito(false));
         assert!(!closes_on_incognito(true));
     }

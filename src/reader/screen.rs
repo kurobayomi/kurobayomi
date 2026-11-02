@@ -1002,9 +1002,8 @@ fn apply_effect(screen: &Screen, effect: Effect) {
             theme::apply_background(&screen.stack, screen.core.theme_pref());
         }
         Effect::Incognito => {
-            // turning the global flag off closes the reader (E-INC-2)
-            let on = kuro_prefs::base::BasePrefs::new(screen.core.deps.prefs_store.clone()).incognito_mode.get();
-            if sync::closes_on_incognito(on) {
+            // turning the global flag off closes the reader (E-INC-2); the same live check the session's writes ask
+            if sync::closes_on_incognito((screen.core.deps.incognito)()) {
                 (screen.on_close)();
             }
         }
