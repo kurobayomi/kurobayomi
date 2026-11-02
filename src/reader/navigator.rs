@@ -189,7 +189,11 @@ impl Navigator {
             button.update_property(&[gtk::accessible::Property::Label(&action.description)]);
             button.set_sensitive(action.enabled && !state.loading);
         }
-        self.pill.set_direction(if state.rtl { gtk::TextDirection::Rtl } else { gtk::TextDirection::Ltr });
+        // the page part mirrors for right to left: the numbers swap ends and the slider runs from the right (a child
+        // keeps its own direction, so the slider is set too, or it would still fill from the left)
+        let direction = if state.rtl { gtk::TextDirection::Rtl } else { gtk::TextDirection::Ltr };
+        self.pill.set_direction(direction);
+        self.slider.set_direction(direction);
         self.pill.set_visible(slider_visible(state.total) || state.loading);
         self.spinner.set_spinning(state.loading);
         self.current.set(state.current_page);

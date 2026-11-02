@@ -50,6 +50,19 @@ fn the_navigator_puts_next_on_the_left_in_rtl_and_disables_the_missing_chapter()
         assert!(next < previous, "in RTL the next chapter button is on the left");
         assert!(!buttons[next].is_sensitive(), "no next chapter, so the button is disabled");
         assert!(buttons[previous].is_sensitive());
+        let slider = |root: &gtk::Widget| {
+            let mut stack = vec![root.clone()];
+            while let Some(w) = stack.pop() {
+                if let Ok(scale) = w.clone().downcast::<gtk::Scale>() {
+                    return scale;
+                }
+                stack.extend(std::iter::successors(w.first_child(), |c| c.next_sibling()));
+            }
+            panic!("a slider")
+        };
+        assert_eq!(slider(navigator.root.upcast_ref()).direction(), gtk::TextDirection::Rtl, "the slider runs from the right, as the pages do");
+        navigator.update(&navigator_state(false, true, true));
+        assert_eq!(slider(navigator.root.upcast_ref()).direction(), gtk::TextDirection::Ltr);
     });
 }
 
