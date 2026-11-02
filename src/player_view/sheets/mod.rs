@@ -1,68 +1,37 @@
-//! The player's popover menus: quality and server, speed, chapters, and the audio and subtitle menu (`menu.rs`).
-//! Every menu is a `gtk::MenuButton` whose popover is rebuilt each time it opens, so its rows show what the player
-//! has now. [`menu`] and [`section`] are the one way to build such a list: an optional heading, then rows with a check
-//! on the current choice, each row going through `widgets::row_activate`. Main thread only.
+//! The lists the player's menu offers: quality and server (`quality`), speed (`speed`), chapters (`chapters`); the
+//! audio and subtitle tracks are in `menu.rs`. Each list is a column of [`Choice`]s with the current one marked; the
+//! player's one menu (the header's ⋮ and the video's right-click, `widgets::context_menu`) shows each as a submenu
+//! through [`items`]. Main thread only.
 
 pub(super) mod chapters;
 pub(super) mod quality;
 pub(super) mod speed;
 
-use gtk::prelude::*;
+use crate::widgets::context_menu::Item;
 
-/// One row of a menu.
+/// One entry of a list.
 pub struct Choice {
     pub title: String,
     pub subtitle: Option<String>,
-    /// The row that carries the check mark.
+    /// The entry that carries the check mark.
     pub current: bool,
-    /// A row that is not enabled is shown but does nothing when clicked.
+    /// An entry that is not enabled is shown greyed out and does nothing (a server that failed to load).
     pub enabled: bool,
-    /// Runs when the row is chosen; the popover closes first.
+    /// Runs when the entry is chosen.
     pub pick: Box<dyn Fn()>,
 }
 
-/// A menu button, labelled by `tooltip`, whose popover `fill` rebuilds on each open. `fill` gets the popover's column
-/// (already empty) and the popover itself.
-pub fn menu(tooltip: &str, fill: impl Fn(&gtk::Box, &gtk::Popover) + 'static) -> gtk::MenuButton {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
-    crate::ui::margins(&column, 6);
-    let popover = gtk::Popover::builder().child(&column).build();
-    {
-        let column = column.clone();
-        popover.connect_show(move |popover| {
-            clear(&column);
-            fill(&column, popover);
-        });
-    }
-    let button = gtk::MenuButton::builder().popover(&popover).tooltip_text(tooltip).build();
-    button.update_property(&[gtk::accessible::Property::Label(tooltip)]);
-    button
-}
-
-/// Removes every child of a menu column.
-pub fn clear(column: &gtk::Box) {
-    while let Some(child) = column.first_child() {
-        column.remove(&child);
-    }
-}
-
-/// Appends an optional heading and one boxed list of `choices`. A chosen row closes `popover` and then runs its pick.
-pub fn section(column: &gtk::Box, heading: Option<&str>, choices: Vec<Choice>, popover: &gtk::Popover) {
-    if let Some(heading) = heading {
-        column.append(&gtk::Label::builder().label(heading).xalign(0.0).css_classes(["heading"]).build());
-    }
-    let list = crate::ui::boxed_list();
-    for choice in choices {
-        let check = gtk::Image::from_icon_name("object-select-symbolic");
-        check.set_opacity(if choice.current { 1.0 } else { 0.0 });
-        let row = crate::ui::row(&choice.title, choice.subtitle.as_deref(), Some(check.upcast()));
-        row.set_activatable(choice.enabled);
-        let (popover, pick) = (popover.clone(), choice.pick);
-        crate::widgets::row_activate::on_activate(&row, move |_| {
-            popover.popdown();
-            pick();
-        });
-        list.append(&row);
-    }
-    column.append(&list);
+/// The entries of a submenu for `choices`: the current one checked, a subtitle after the title ("Opening · 1:30").
+pub fn items(choices: Vec<Choice>) -> Vec<Item> {
+    choices
+        .into_iter()
+        .map(|choice| {
+            let label = match &choice.subtitle {
+                Some(subtitle) => format!("{} · {subtitle}", choice.title),
+                None => choice.title,
+            };
+            let item = Item::new(label, 0, choice.pick).checked(choice.current);
+            if choice.enabled { item } else { item.disabled() }
+        })
+        .collect()
 }

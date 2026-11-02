@@ -3,6 +3,7 @@
 //! the items the caller returns, so the labels always match the current state (Mark as read / Mark as unread). The Menu
 //! key and Shift+F10 open the same menu from the keyboard. An item can carry a check mark or open a submenu. A widget
 //! whose long press means something else (chapter and episode rows select on it) uses `attach_without_long_press`.
+//! [`menu_button`] opens the same kind of menu from a header button (the player's ⋮, which right-click also opens).
 
 use std::rc::Rc;
 
@@ -18,11 +19,13 @@ pub struct Item {
     pub checked: Option<bool>,
     /// Not empty: the entry opens this submenu instead of running `run`.
     pub children: Vec<Item>,
+    /// A disabled entry is shown greyed out and does nothing (a list that is still loading, a server that failed).
+    pub enabled: bool,
 }
 
 impl Item {
     pub fn new(label: impl Into<String>, section: u8, run: impl Fn() + 'static) -> Self {
-        Self { label: label.into(), section, run: Rc::new(run), checked: None, children: Vec::new() }
+        Self { label: label.into(), section, run: Rc::new(run), checked: None, children: Vec::new(), enabled: true }
     }
 
     /// An entry that opens `children` as a submenu.
@@ -34,6 +37,48 @@ impl Item {
     pub fn checked(self, on: bool) -> Self {
         Self { checked: Some(on), ..self }
     }
+
+    /// The same entry, greyed out.
+    pub fn disabled(self) -> Self {
+        Self { enabled: false, ..self }
+    }
+}
+
+/// A header button that opens a menu of `items()`, rebuilt each time it opens so it shows the state of now. The returned
+/// function rebuilds the open menu in place (a list that finished loading); it does nothing while the menu is closed.
+pub fn menu_button(icon_name: &str, label: &str, items: impl Fn() -> Vec<Item> + 'static) -> (gtk::MenuButton, Rc<dyn Fn()>) {
+    let model = gio::Menu::new();
+    let button = gtk::MenuButton::builder().icon_name(icon_name).menu_model(&model).build();
+    // no tooltip: it would sit over the open menu; screen readers get the label
+    button.update_property(&[gtk::accessible::Property::Label(label)]);
+    let fill: Rc<dyn Fn(&gtk::MenuButton)> = {
+        let model = model.clone();
+        Rc::new(move |button| {
+            let actions = gio::SimpleActionGroup::new();
+            model.remove_all();
+            fill(&model, items(), &actions, &mut 0);
+            button.insert_action_group("ctx", Some(&actions));
+        })
+    };
+    // GTK reports `active` more than once while a menu opens: build once per opening
+    let (on_open, open) = (Rc::clone(&fill), std::cell::Cell::new(false));
+    button.connect_active_notify(move |button| {
+        let active = button.is_active();
+        if active && !open.replace(true) {
+            on_open(button);
+        }
+        if !active {
+            open.set(false);
+        }
+    });
+    // weak on both: the caller's items may hold this refresh (a list that loads), and the button owns the builder
+    let (weak, fill) = (button.downgrade(), Rc::downgrade(&fill));
+    let refresh: Rc<dyn Fn()> = Rc::new(move || {
+        if let (Some(button), Some(fill)) = (weak.upgrade().filter(gtk::MenuButton::is_active), fill.upgrade()) {
+            fill(&button);
+        }
+    });
+    (button, refresh)
 }
 
 /// Opens a menu of `items(x, y)` on `widget` at the click position: on a right click, a touch long press, or the
@@ -103,8 +148,8 @@ fn show(widget: &gtk::Widget, items: Vec<Item>, x: f64, y: f64) {
         return;
     }
     let actions = gio::SimpleActionGroup::new();
-    let mut next = 0;
-    let menu = build(items, &actions, &mut next);
+    let menu = gio::Menu::new();
+    fill(&menu, items, &actions, &mut 0);
 
     let popover = gtk::PopoverMenu::from_model(Some(&menu));
     popover.insert_action_group("ctx", Some(&actions));
@@ -119,11 +164,10 @@ fn show(widget: &gtk::Widget, items: Vec<Item>, x: f64, y: f64) {
     popover.popup();
 }
 
-/// The menu model of `items`, sections in ascending order, with one action per runnable entry in `actions`. `next`
+/// Fills `menu` with `items`, sections in ascending order, with one action per runnable entry in `actions`. `next`
 /// numbers the actions across submenus.
-fn build(mut items: Vec<Item>, actions: &gio::SimpleActionGroup, next: &mut usize) -> gio::Menu {
+fn fill(menu: &gio::Menu, mut items: Vec<Item>, actions: &gio::SimpleActionGroup, next: &mut usize) {
     items.sort_by_key(|item| item.section);
-    let menu = gio::Menu::new();
     let mut section = gio::Menu::new();
     let mut current = items.first().map_or(0, |item| item.section);
     for item in items {
@@ -133,7 +177,9 @@ fn build(mut items: Vec<Item>, actions: &gio::SimpleActionGroup, next: &mut usiz
             current = item.section;
         }
         if !item.children.is_empty() {
-            section.append_submenu(Some(&item.label), &build(item.children, actions, next));
+            let submenu = gio::Menu::new();
+            fill(&submenu, item.children, actions, next);
+            section.append_submenu(Some(&item.label), &submenu);
             continue;
         }
         let name = format!("item{next}");
@@ -144,6 +190,7 @@ fn build(mut items: Vec<Item>, actions: &gio::SimpleActionGroup, next: &mut usiz
             Some(on) => gio::SimpleAction::new_stateful(&name, None, &on.to_variant()),
             None => gio::SimpleAction::new(&name, None),
         };
+        action.set_enabled(item.enabled);
         let run = Rc::clone(&item.run);
         // run after the menu closed and every handler up the stack returned, so no caller borrow is still held
         action.connect_activate(move |_, _| {
@@ -153,7 +200,6 @@ fn build(mut items: Vec<Item>, actions: &gio::SimpleActionGroup, next: &mut usiz
         actions.add_action(&action);
     }
     menu.append_section(None, &section);
-    menu
 }
 
 #[cfg(test)]
@@ -185,6 +231,35 @@ mod tests {
         assert_eq!(speed.children.len(), 2);
         assert_eq!(speed.children[0].checked, Some(true));
         assert_eq!(Item::new("x", 0, || {}).checked, None);
+    }
+
+    #[test]
+    fn the_button_rebuilds_its_menu_on_open_with_greyed_out_entries() {
+        crate::testing::with_display(|| {
+            let opened = Rc::new(Cell::new(0));
+            let count = Rc::clone(&opened);
+            let (button, refresh) = menu_button("view-more-symbolic", "More", move || {
+                count.set(count.get() + 1);
+                vec![Item::new("Loading", 0, || {}).disabled(), Item::new("Fullscreen", 1, || {}).checked(true)]
+            });
+            refresh();
+            assert_eq!(opened.get(), 0, "a closed menu is not rebuilt");
+            // a menu opens from a button on screen
+            let window = gtk::Window::builder().child(&button).build();
+            window.present();
+            button.set_active(true);
+            assert_eq!(opened.get(), 1, "opening builds the menu of now");
+            let model = button.menu_model().expect("a model");
+            assert_eq!(model.n_items(), 2, "two sections");
+            refresh();
+            assert_eq!(opened.get(), 2, "an open menu is rebuilt in place");
+            assert_eq!(button.menu_model().as_ref(), Some(&model), "the same model, so the open menu updates");
+            let (menu, actions) = (gio::Menu::new(), gio::SimpleActionGroup::new());
+            fill(&menu, vec![Item::new("Loading", 0, || {}).disabled(), Item::new("Fullscreen", 1, || {})], &actions, &mut 0);
+            assert!(!actions.is_action_enabled("item0") && actions.is_action_enabled("item1"), "a disabled entry is greyed out");
+            button.set_active(false);
+            window.destroy();
+        });
     }
 
     #[test]

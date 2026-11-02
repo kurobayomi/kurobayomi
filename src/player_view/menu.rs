@@ -1,14 +1,15 @@
-//! The player header's audio and subtitle menu: the tracks of the loaded file, read from mpv each time the menu opens.
-//! Both lists start with Off (audio Off comes from `load_track_lists`, subtitle Off is added here). The current track
-//! carries the check mark. A row click selects the track. The lists use the shared popover helper in `sheets`.
+//! The Audio and Subtitles lists of the player's menu: the tracks of the loaded file, read from mpv each time the menu
+//! opens. Both lists start with Off (audio Off comes from `load_track_lists`, subtitle Off is added here). The current
+//! track carries the check mark; choosing one selects it.
 
 use std::rc::Rc;
 
+use kuro_i18n::{MsgKey, tr};
 use kuro_player::mpv::MpvHandle;
 use kuro_player::tracks::{TRACK_NONE, TrackProps, VideoTrack, load_track_lists, track_id_from_value, track_label};
 
 use super::Shared;
-use super::sheets::{self, Choice};
+use super::sheets::Choice;
 
 /// mpv's `track-list/*` properties as the track lists read them.
 pub struct MpvTracks<'a>(pub &'a MpvHandle);
@@ -31,38 +32,17 @@ impl TrackProps for MpvTracks<'_> {
     }
 }
 
-/// The menu button. Its list is rebuilt whenever it opens, so tracks added after the load show up.
-pub fn tracks_menu(shared: &Shared, servers: &sheets::quality::Servers) -> gtk::MenuButton {
-    let (shared, servers) = (Rc::clone(shared), servers.clone());
-    let menu = sheets::menu("Tracks", move |column, popover| {
-        // an online episode lists its servers first, then the tracks
-        if sheets::quality::is_online(shared.borrow().episode_id) {
-            sheets::quality::fill_servers(column, popover, &shared, &servers);
-        }
-        fill(column, popover, &shared);
-    });
-    menu.set_icon_name("view-more-symbolic");
-    menu
-}
-
-fn fill(column: &gtk::Box, popover: &gtk::Popover, shared: &Shared) {
-    for (heading, choices) in track_sections(shared) {
-        sheets::section(column, Some(heading), choices, popover);
-    }
-}
-
-/// The two lists of the menu, read from mpv now: Audio, then Subtitles, each with the playing track marked. The video's
-/// right-click menu lists the same.
-pub fn track_sections(shared: &Shared) -> Vec<(&'static str, Vec<Choice>)> {
+/// The two lists of the menu, read from mpv now: Audio, then Subtitles, each with the playing track marked.
+pub fn track_sections(shared: &Shared) -> Vec<(String, Vec<Choice>)> {
     let (lists, aid, sid) = {
         let player = shared.borrow();
         let mpv = player.playback.mpv();
         let current = |name: &str| track_id_from_value(mpv.get_string(name).as_deref());
         (load_track_lists(&MpvTracks(mpv)), current("aid"), current("sid"))
     };
-    let mut subtitles = vec![VideoTrack { id: TRACK_NONE, name: "Off".to_owned(), language: None }];
+    let mut subtitles = vec![VideoTrack { id: TRACK_NONE, name: tr(MsgKey::off), language: None }];
     subtitles.extend(lists.subtitles);
-    [("Audio", "aid", lists.audio, aid), ("Subtitles", "sid", subtitles, sid)]
+    [(tr(MsgKey::pref_player_audio), "aid", lists.audio, aid), (tr(MsgKey::pref_player_subtitle), "sid", subtitles, sid)]
         .into_iter()
         .map(|(heading, property, tracks, selected)| (heading, tracks.into_iter().map(|track| choice(shared, property, track, selected)).collect()))
         .collect()

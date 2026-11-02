@@ -1,40 +1,17 @@
-//! The playback speed button and its menu. The menu offers six presets, and the button shows the speed that plays now.
-//! The speed is written to mpv, which keeps it while the page plays on. Label text comes from `kuro_player::speed`.
+//! The playback speed list of the player's menu: six presets, the playing one marked. The speed is written to mpv, which
+//! keeps it while the page plays on. Label text comes from `kuro_player::speed`.
 
-use kuro_i18n::{MsgKey, tr};
 use std::rc::Rc;
 
 use kuro_player::speed::speed_label;
 
 use super::super::Shared;
-use super::{Choice, menu, section};
+use super::Choice;
 
 /// The speeds the menu offers, slowest first.
 pub const PRESETS: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
-/// The speed button. Its label follows the playing speed through [`refresh`].
-pub fn button(shared: &Shared) -> gtk::MenuButton {
-    let button = menu(&tr(MsgKey::ui_playback_speed), {
-        let shared = Rc::clone(shared);
-        move |column, popover| fill(column, popover, &shared)
-    });
-    refresh(&button, shared);
-    button
-}
-
-/// Shows the playing speed on `button`. Called on every tick, so the text changes only when it differs.
-pub fn refresh(button: &gtk::MenuButton, shared: &Shared) {
-    let text = speed_label(playing(shared) as f32);
-    if button.label().as_deref() != Some(text.as_str()) {
-        button.set_label(&text);
-    }
-}
-
-fn fill(column: &gtk::Box, popover: &gtk::Popover, shared: &Shared) {
-    section(column, None, choices(shared), popover);
-}
-
-/// The menu's rows: the presets with the playing one marked. The video's right-click menu lists the same.
+/// The list's entries: the presets with the playing one marked.
 pub fn choices(shared: &Shared) -> Vec<Choice> {
     let playing = playing(shared);
     PRESETS

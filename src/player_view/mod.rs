@@ -310,14 +310,11 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     volume.set_width_request(120);
     volume.set_draw_value(false);
     let fullscreen = gtk::Button::from_icon_name("view-fullscreen-symbolic");
-    let speed = sheets::speed::button(shared);
-    let chapters = sheets::chapters::button(shared);
     let servers = sheets::quality::Servers::default();
-    let quality = sheets::quality::button(shared, &servers);
     let skip = skip_button::Ui::new(shared);
 
     let bar = crate::widgets::osd::bar();
-    for widget in [previous.upcast_ref::<gtk::Widget>(), play.upcast_ref(), next.upcast_ref(), seek.upcast_ref(), time.upcast_ref(), quality.upcast_ref(), speed.upcast_ref(), chapters.upcast_ref(), volume.upcast_ref(), fullscreen.upcast_ref()] {
+    for widget in [previous.upcast_ref::<gtk::Widget>(), play.upcast_ref(), next.upcast_ref(), seek.upcast_ref(), time.upcast_ref(), volume.upcast_ref(), fullscreen.upcast_ref()] {
         bar.append(widget);
     }
 
@@ -351,7 +348,14 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
             crate::ui::pop();
         }
     });
-    let menu = menu::tracks_menu(shared, &servers);
+    // the one menu of the player: the header's ⋮ and the video's right-click open the same entries (`player_menu`);
+    // the ⋮ one refreshes in place when the servers finish loading
+    let refresh_menu: Rc<RefCell<Rc<dyn Fn()>>> = Rc::new(RefCell::new(Rc::new(|| {})));
+    let (menu, refresh) = context_menu::menu_button("view-more-symbolic", &tr(MsgKey::player_sheets_more_title), {
+        let (shared, page, servers, refresh_menu) = (Rc::clone(shared), page.downgrade(), servers.clone(), Rc::clone(&refresh_menu));
+        move || page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page, &servers, &refresh_menu))
+    });
+    *refresh_menu.borrow_mut() = refresh;
     let list = crate::ui::icon_button("view-list-symbolic", &format!("{} (E)", tr(MsgKey::episodes)));
     {
         let (shared, episodes, episode_ids) = (Rc::clone(shared), Rc::clone(&episodes), Rc::clone(&episode_ids));
@@ -371,7 +375,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     watch_left(&page, shared, &area);
     {
         let (shared, page) = (Rc::clone(shared), page.downgrade());
-        context_menu::attach(&area, move |_, _| page.upgrade().map_or_else(Vec::new, |page| video_menu(&shared, &page, &servers)));
+        context_menu::attach(&area, move |_, _| page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page, &servers, &refresh_menu)));
     }
 
     {
@@ -445,14 +449,12 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     {
         let (shared, page, menu) = (Rc::clone(shared), page.downgrade(), menu.downgrade());
         let (episodes, episode_ids) = (Rc::clone(&episodes), Rc::clone(&episode_ids));
-        let popovers = [quality.downgrade(), speed.downgrade(), chapters.downgrade()];
         keys.connect_key_pressed(move |_, keyval, _, state| {
             let Some(page) = page.upgrade() else {
                 return glib::Propagation::Proceed;
             };
-            // an open menu (tracks, quality, speed, chapters) keeps its own keys
-            let popover_open = popovers.iter().filter_map(|b| b.upgrade()).any(|b| b.popover().is_some_and(|p| p.is_visible()));
-            if popover_open || menu.upgrade().is_some_and(|m| m.is_active()) {
+            // the open menu keeps its own keys
+            if menu.upgrade().is_some_and(|m| m.is_active()) {
                 return glib::Propagation::Proceed;
             }
             if episodes.is_open() && keyval == gdk::Key::Escape {
@@ -480,48 +482,54 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     });
 
     controls::wire(
-        controls::Parts { page: &page, area: &area, bar: &bar, previous: &previous, next: &next, quality: &quality, speed: &speed, chapters: &chapters },
+        controls::Parts { page: &page, area: &area, previous: &previous, next: &next },
         shared,
     );
     start_ticks(&page, &two_lines, &hiding, &play, &seek, &time, &volume, &loading, &skip, shared);
     page
 }
 
-/// The video's right-click menu: Audio, Subtitles and Quality (the lists of the header's menus), Speed (the speed menu's
-/// presets) and Fullscreen. Each list marks what plays now; the rows run the menus' own picks.
-fn video_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Servers) -> Vec<Item> {
-    let mut items: Vec<Item> = menu::track_sections(shared)
-        .into_iter()
-        .map(|(heading, choices)| Item::submenu(heading, 0, menu_items(choices)))
-        .filter(|item| !item.children.is_empty())
-        .collect();
-    if let Some(sections) = sheets::quality::menu_sections(shared, servers) {
-        // the servers load on the first ask; the next right-click lists them: Quality, then Server
+/// The player's one menu, for the header's ⋮ and the video's right-click: Quality and Server (an online episode; while
+/// its servers load, a greyed-out "Quality: loading…" and the open menu refreshes when they are in), Audio, Subtitles,
+/// Speed and Chapters (a file that has them) as submenus, each marking what plays now; then Autoplay next episode and
+/// Fullscreen.
+fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Servers, refresh: &Rc<RefCell<Rc<dyn Fn()>>>) -> Vec<Item> {
+    let mut items = Vec::new();
+    let refresh = Rc::clone(refresh);
+    if let Some(sections) = sheets::quality::menu_sections(shared, servers, move || (refresh.borrow())()) {
         if sections.is_empty() {
-            items.push(Item::new(tr(MsgKey::ui_quality_loading), 0, || {}));
+            items.push(Item::new(tr(MsgKey::ui_quality_loading), 0, || {}).disabled());
         }
         for (heading, choices) in sections {
-            let choices: Vec<sheets::Choice> = choices.into_iter().filter(|choice| choice.enabled).collect();
             if !choices.is_empty() {
-                items.push(Item::submenu(heading.unwrap_or_default(), 0, menu_items(choices)));
+                items.push(Item::submenu(heading.unwrap_or_default(), 0, sheets::items(choices)));
             }
         }
     }
-    items.push(Item::submenu(tr(MsgKey::player_speed_menu), 0, menu_items(sheets::speed::choices(shared))));
+    let lists = menu::track_sections(shared)
+        .into_iter()
+        .chain([(tr(MsgKey::player_speed_menu), sheets::speed::choices(shared)), (tr(MsgKey::chapters), sheets::chapters::choices(shared))]);
+    for (heading, choices) in lists {
+        if !choices.is_empty() {
+            items.push(Item::submenu(heading, 0, sheets::items(choices)));
+        }
+    }
+    if let Some(autoplay) = player_prefs().map(|p| p.autoplay_enabled.clone()) {
+        let on = autoplay.get();
+        items.push(Item::new(tr(MsgKey::ui_autoplay_next_episode), 1, move || {
+            if let Err(e) = autoplay.set(!on) {
+                tracing::warn!(error = %e, "player: autoplay could not be saved");
+            }
+        }).checked(on));
+    }
     let fullscreen = window_of(page).is_some_and(|w| w.is_fullscreen());
     let page = page.downgrade();
-    let toggle = move || {
+    items.push(Item::new(tr(MsgKey::pref_fullscreen), 1, move || {
         if let Some(page) = page.upgrade() {
             toggle_fullscreen(&page);
         }
-    };
-    items.push(Item::new(tr(MsgKey::pref_fullscreen), 1, toggle).checked(fullscreen));
+    }).checked(fullscreen));
     items
-}
-
-/// The rows of a player menu as right-click entries, the current one checked. A row that cannot be chosen is left out.
-fn menu_items(choices: Vec<sheets::Choice>) -> Vec<Item> {
-    choices.into_iter().filter(|choice| choice.enabled).map(|choice| Item::new(choice.title, 0, choice.pick).checked(choice.current)).collect()
 }
 
 /// Stops playback at once when the page leaves the screen by a route the page does not see (Escape, Alt+Left, the
