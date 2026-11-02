@@ -151,6 +151,7 @@ fn open_in(data_dir: std::path::PathBuf, media: Media, episode_id: i64, start_ms
         media,
         episode_id,
         resolving: false,
+        muted_from: None,
         skip: skip_button::State::default(),
         awake: crate::reader::keep_awake::KeepAwake::default(),
     }));
@@ -179,6 +180,8 @@ struct Player {
     skip: skip_button::State,
     /// The screen stays on while the video plays (released on pause and when the player closes).
     awake: crate::reader::keep_awake::KeepAwake,
+    /// The level before M muted the sound, which M brings back; `None` while not muted.
+    muted_from: Option<f64>,
 }
 
 type Shared = Rc<RefCell<Player>>;
@@ -275,6 +278,8 @@ fn apply_action(shared: &Shared, page: &gtk::Box, action: Action) -> bool {
             }
         }
         Action::VolumeStep(steps) => {
+            // a level chosen after a mute replaces the one M would bring back
+            shared.borrow_mut().muted_from = None;
             let player = shared.borrow();
             let volume = volume_after_steps(player.playback.volume(), steps);
             if let Err(e) = player.playback.set_volume(volume) {
@@ -282,9 +287,12 @@ fn apply_action(shared: &Shared, page: &gtk::Box, action: Action) -> bool {
             }
             remember_volume(&player.playback);
         }
+        Action::ToggleMute => toggle_mute(shared),
+        Action::SpeedStep(steps) => sheets::speed::step(shared, steps),
+        Action::SpeedReset => sheets::speed::reset(shared),
         Action::ToggleFullscreen => toggle_fullscreen(page),
         Action::Escape if fullscreen => toggle_fullscreen(page),
-        _ => return false,
+        Action::Escape | Action::OpenEpisodeList => return false,
     }
     true
 }
@@ -449,6 +457,9 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
             if (player.playback.volume() - value).abs() < 0.5 {
                 return;
             }
+            drop(player);
+            shared.borrow_mut().muted_from = None;
+            let player = shared.borrow();
             if let Err(e) = player.playback.set_volume(value) {
                 tracing::warn!(error = %e, "player: volume change failed");
             }
@@ -842,6 +853,22 @@ fn play_source_episode(shared: &Shared, episode_id: i64) {
     if !started {
         shared.borrow_mut().resolving = false;
         crate::toast::notify(tr(MsgKey::player_hoster_failed));
+    }
+}
+
+/// M: sound off, then back to the level it had. Muting is not kept as the remembered volume.
+fn toggle_mute(shared: &Shared) {
+    let mut player = shared.borrow_mut();
+    let level = player.playback.volume();
+    let target = match player.muted_from.take() {
+        Some(previous) if level < 0.5 => previous,
+        _ => {
+            player.muted_from = Some(level);
+            0.0
+        }
+    };
+    if let Err(e) = player.playback.set_volume(target) {
+        tracing::warn!(error = %e, "player: mute failed");
     }
 }
 
