@@ -161,7 +161,8 @@ impl Tracker {
                 Err(e) => tracing::error!(episode_id = self.episode_id, error = %e, "progress write failed"),
             }
         }
-        if let Some(seen_at) = plan.history_seen_at {
+        // the one writer of watch history: Incognito keeps it empty whichever path planned the write
+        if let Some(seen_at) = plan.history_seen_at.filter(|_| !(self.incognito)()) {
             // the time watched since the last write goes onto the history row (at most two intervals at once)
             let watched = self.played_since.map_or(0, |since| (seen_at - since).clamp(0, 2 * HISTORY_INTERVAL_MS));
             if let Err(e) = self.history.upsert(self.episode_id, seen_at, watched) {

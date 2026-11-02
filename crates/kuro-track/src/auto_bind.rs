@@ -71,6 +71,10 @@ fn targets(ctx: &TrackCtx) -> Vec<std::sync::Arc<dyn Tracker>> {
 /// the trackers it bound on, and the failures; one tracker failing does not stop the others.
 pub async fn auto_bind_anime(ctx: &TrackCtx, entry_id: i64, title: &str) -> (Vec<TrackerId>, Vec<(TrackerId, TrackError)>) {
     let (mut bound, mut failed) = (Vec::new(), Vec::new());
+    // binding puts the title on the tracker's list: never while Incognito is on
+    if ctx.incognito() {
+        return (bound, failed);
+    }
     for tracker in targets(ctx) {
         let Some(api) = tracker.as_anime() else { continue };
         let id = tracker.id();
@@ -97,6 +101,9 @@ pub async fn auto_bind_anime(ctx: &TrackCtx, entry_id: i64, title: &str) -> (Vec
 /// Manga form of [`auto_bind_anime`].
 pub async fn auto_bind_manga(ctx: &TrackCtx, entry_id: i64, title: &str) -> (Vec<TrackerId>, Vec<(TrackerId, TrackError)>) {
     let (mut bound, mut failed) = (Vec::new(), Vec::new());
+    if ctx.incognito() {
+        return (bound, failed);
+    }
     for tracker in targets(ctx) {
         let Some(api) = tracker.as_manga() else { continue };
         let id = tracker.id();

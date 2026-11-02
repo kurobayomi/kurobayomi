@@ -95,6 +95,13 @@ pub struct TrackCtx {
 }
 
 impl TrackCtx {
+    /// Whether Incognito is on now. Every write the app makes by itself (progress, auto-track, enhanced binds) asks it
+    /// first and sends nothing while it is on, whichever screen asked for the write. A bind the user makes in the
+    /// tracking sheet is their own choice and goes through.
+    pub fn incognito(&self) -> bool {
+        self.prefs.incognito.get()
+    }
+
     /// Starts the retry loop for this context. `None` when it already runs.
     pub fn start_retry(self: &Arc<Self>) -> Option<JoinHandle<()>> {
         Arc::clone(&self.scheduler).spawn(Arc::new(TrackRunner(Arc::clone(self))))

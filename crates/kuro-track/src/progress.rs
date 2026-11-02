@@ -71,8 +71,12 @@ async fn track_episode_with(
     episode: f64,
     already_locked: bool,
 ) -> Vec<(TrackerId, TrackOutcome)> {
-    // The "update progress after reading" switch and incognito are the caller's gate (`auto_update_allowed`): the reader and
-    // the player check it, a mark as read does not (Aniyomi checks `autoUpdateTrackOnMarkRead` there instead).
+    // Incognito sends nothing, whoever asked (`TrackCtx::incognito`). The "update progress after reading" switch is the
+    // caller's gate (`auto_update_allowed`): the reader and the player check it, a mark as read does not (Aniyomi checks
+    // `autoUpdateTrackOnMarkRead` there instead).
+    if ctx.incognito() {
+        return Vec::new();
+    }
     let runs = ctx
         .trackers
         .logged_in()
@@ -160,6 +164,9 @@ async fn track_chapter_with(
     chapter: f64,
     already_locked: bool,
 ) -> Vec<(TrackerId, TrackOutcome)> {
+    if ctx.incognito() {
+        return Vec::new();
+    }
     let runs = ctx
         .trackers
         .logged_in()
@@ -393,6 +400,18 @@ mod tests {
         let row = h.ctx.anime_tracks.list_for_entry(1).await.unwrap();
         assert_eq!(row[0].last_episode_seen, 6.0);
         assert!(h.ctx.queue.is_empty().unwrap());
+    }
+
+    #[tokio::test]
+    async fn incognito_sends_no_progress_whoever_asks() {
+        let h = Harness::new();
+        h.login(TrackerId::KITSU);
+        h.ctx.anime_tracks.upsert(&anime_binding(1, TrackerId::KITSU, 5.0)).await.unwrap();
+        h.ctx.prefs.incognito.set(true).unwrap();
+        assert!(track_episode(&h.ctx, 1, 6.0).await.is_empty(), "no tracker is asked");
+        assert!(!logs(&h).iter().any(|l| l.starts_with("update")), "no request left the app");
+        assert_eq!(h.ctx.anime_tracks.list_for_entry(1).await.unwrap()[0].last_episode_seen, 5.0);
+        assert!(crate::auto_bind::auto_bind_anime(&h.ctx, 2, "A title").await.0.is_empty(), "and nothing is auto-bound");
     }
 
     #[tokio::test]

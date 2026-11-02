@@ -117,6 +117,10 @@ impl ReaderStore for WriterHandle {
     }
 
     fn upsert_history(&self, chapter_id: i64, read_at: i64, duration: i64) {
+        // the one writer of reading history: Incognito keeps it empty whichever screen asked
+        if crate::incognito::is_on() {
+            return;
+        }
         self.send(Command::History { chapter_id, read_at, duration });
     }
 

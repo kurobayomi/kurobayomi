@@ -74,11 +74,15 @@ pub struct TrackPrefs {
     /// (`auto_bind`). Default on (user, 2026-10-25); with no tracker logged in it does nothing. Not an Aniyomi key, so it
     /// is stored under `[extra]` and exported with the `kuro_` prefix.
     pub auto_track: Pref<bool>,
+    /// The app's Incognito switch (`BasePrefs::incognito_mode`, the same stored key). While it is on, nothing the app
+    /// does by itself reaches a tracker: no progress, no auto-track and no enhanced bind ([`crate::ctx::TrackCtx::incognito`]).
+    pub incognito: Pref<bool>,
 }
 
 impl TrackPrefs {
     pub fn new(store: PrefStore) -> Self {
         Self {
+            incognito: kuro_prefs::base::BasePrefs::new(store.clone()).incognito_mode,
             auto_update_track: Pref::new(store.clone(), "pref_auto_update_manga_sync_key", true),
             track_on_adding_to_library: Pref::new(
                 store.clone(),

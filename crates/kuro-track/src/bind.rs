@@ -254,6 +254,10 @@ pub async fn bind_enhanced_anime_entry(
     source_identity: &str,
 ) -> Vec<(TrackerId, TrackError)> {
     let mut failures = Vec::new();
+    // an automatic bind never runs while Incognito is on (`TrackCtx::incognito`)
+    if ctx.incognito() {
+        return failures;
+    }
     for tracker in ctx.trackers.logged_in() {
         let (Some(api), Some(enhanced)) = (tracker.as_anime(), tracker.as_enhanced_anime()) else {
             continue;
@@ -314,6 +318,9 @@ pub async fn bind_enhanced_manga_entry(
     source_identity: &str,
 ) -> Vec<(TrackerId, TrackError)> {
     let mut failures = Vec::new();
+    if ctx.incognito() {
+        return failures;
+    }
     for tracker in ctx.trackers.logged_in() {
         let (Some(api), Some(enhanced)) = (tracker.as_manga(), tracker.as_enhanced_manga()) else {
             continue;
