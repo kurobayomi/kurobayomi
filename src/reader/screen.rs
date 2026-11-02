@@ -1008,10 +1008,6 @@ fn window_of(screen: &Screen) -> Option<gtk::Window> {
     screen.root.upgrade().and_then(|root| root.root()).and_then(|root| root.downcast::<gtk::Window>().ok())
 }
 
-fn size_of(screen: &Screen) -> (i32, i32) {
-    screen.root.upgrade().map_or((0, 0), |root| (root.width(), root.height()))
-}
-
 /// Takes or releases the keep-awake inhibit for the open reader (T-043a-051).
 fn sync_keep_awake(screen: &Screen, reader_open: bool) {
     let Some(window) = window_of(screen) else { return };
@@ -1048,7 +1044,7 @@ fn refresh(screen: &Screen) {
         rtl: screen.core.reading_mode() == ReadingMode::RightToLeft,
         loading: screen.stepping.get(),
     };
-    screen.navigator.update(&state, size_of(screen));
+    screen.navigator.update(&state);
     let ui = *screen.ui.borrow();
     update_position(screen);
     chrome::sync_menu_state(&screen.menu_actions, screen.core.menu_state());

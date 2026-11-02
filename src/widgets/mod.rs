@@ -7,6 +7,7 @@ pub mod context_menu;
 pub mod drag_select;
 pub mod cover_grid;
 pub mod int_slider;
+pub mod osd;
 pub mod rail;
 pub mod status;
 pub mod row;

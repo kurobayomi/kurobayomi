@@ -316,13 +316,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     let quality = sheets::quality::button(shared, &servers);
     let skip = skip_button::Ui::new(shared);
 
-    let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    bar.add_css_class("osd");
-    bar.add_css_class("toolbar");
-    bar.set_margin_start(12);
-    bar.set_margin_end(12);
-    bar.set_margin_bottom(12);
-    bar.set_valign(gtk::Align::End);
+    let bar = crate::widgets::osd::bar();
     for widget in [previous.upcast_ref::<gtk::Widget>(), play.upcast_ref(), next.upcast_ref(), seek.upcast_ref(), time.upcast_ref(), quality.upcast_ref(), speed.upcast_ref(), chapters.upcast_ref(), volume.upcast_ref(), fullscreen.upcast_ref()] {
         bar.append(widget);
     }

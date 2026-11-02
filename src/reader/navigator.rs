@@ -1,7 +1,7 @@
-//! The chapter navigator (T-043a-041): previous and next buttons around a page pill with a slider, centred at the bottom
-//! and at most [`MAX_WIDTH`] wide (libadwaita's clamp), so on a wide window the buttons sit beside the pill instead of
-//! at the window's edges. The decisions (slider range, labels, RTL mirror, padding) are pure functions; [`Navigator`]
-//! only applies them.
+//! The chapter navigator (T-043a-041): one floating capsule, the same as the player's control bar
+//! (`widgets::osd::bar`): the previous and next chapter buttons around the page numbers and the slider, centred at the
+//! bottom and at most [`MAX_WIDTH`] wide (libadwaita's clamp). The decisions (slider range, labels, RTL mirror) are pure
+//! functions; [`Navigator`] only applies them.
 
 use kuro_i18n::{MsgKey, tr};
 use std::cell::{Cell, RefCell};
@@ -49,11 +49,6 @@ pub fn page_marks(total: i32) -> Vec<f64> {
         return Vec::new();
     }
     (1..=total).map(f64::from).collect()
-}
-
-/// The horizontal padding of the navigator for a window size: 24 px in a wide window, 8 px otherwise.
-pub fn horizontal_padding(window_width: i32, window_height: i32) -> i32 {
-    if crate::window_size::is_tablet_ui(window_width, window_height) { 24 } else { 8 }
 }
 
 /// One of the two chapter buttons: the action it runs, whether it is enabled, its label and its icon.
@@ -118,34 +113,29 @@ impl Navigator {
     pub fn new() -> Rc<Self> {
         let left = gtk::Button::from_icon_name(ICON_PREVIOUS);
         let right = gtk::Button::from_icon_name(ICON_NEXT);
-        for button in [&left, &right] {
-            button.add_css_class("flat");
-        }
         let slider = gtk::Scale::with_range(gtk::Orientation::Horizontal, 1.0, 2.0, 1.0);
         slider.set_draw_value(false);
         slider.set_digits(0);
         slider.set_hexpand(true);
         let current_label = gtk::Label::new(Some("-"));
         let total_label = gtk::Label::new(Some(""));
-        current_label.set_width_chars(3);
-        total_label.set_width_chars(3);
-        // the numbers keep off the pill's rounded ends
-        current_label.set_margin_start(8);
-        total_label.set_margin_end(8);
+        // tabular digits, so the slider does not shift as the numbers change
+        for label in [&current_label, &total_label] {
+            label.set_width_chars(3);
+            label.add_css_class("numeric");
+        }
         let spinner = gtk::Spinner::new();
+        // the page part: what mirrors for right to left (the buttons follow `button_plan` instead)
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        pill.add_css_class("osd");
-        pill.set_margin_start(8);
-        pill.set_margin_end(8);
         pill.set_hexpand(true);
         for child in [current_label.upcast_ref::<gtk::Widget>(), slider.upcast_ref(), total_label.upcast_ref(), spinner.upcast_ref()] {
             pill.append(child);
         }
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        row.append(&left);
-        row.append(&pill);
-        row.append(&right);
-        let root = adw::Clamp::builder().maximum_size(MAX_WIDTH).tightening_threshold(MAX_WIDTH).child(&row).build();
+        let bar = crate::widgets::osd::bar();
+        bar.append(&left);
+        bar.append(&pill);
+        bar.append(&right);
+        let root = adw::Clamp::builder().maximum_size(MAX_WIDTH).tightening_threshold(MAX_WIDTH).child(&bar).build();
         root.set_widget_name("navigator");
 
         let navigator = Rc::new(Self {
@@ -195,10 +185,7 @@ impl Navigator {
     }
 
     /// Applies a state. Every value is computed from `state`; nothing here calls back into the reader.
-    pub fn update(&self, state: &NavigatorState, window_size: (i32, i32)) {
-        let padding = horizontal_padding(window_size.0, window_size.1);
-        self.root.set_margin_start(padding);
-        self.root.set_margin_end(padding);
+    pub fn update(&self, state: &NavigatorState) {
         let plan = button_plan(state.rtl, state.previous_enabled, state.next_enabled);
         for (button, step, action) in [(&self.left, &self.left_step, &plan[0]), (&self.right, &self.right_step, &plan[1])] {
             step.set(action.step);
@@ -274,12 +261,5 @@ mod tests {
         assert!(!rtl[0].enabled, "the left button follows enabledNext in RTL");
         assert_eq!(rtl[0].icon, ICON_NEXT);
         assert_eq!(rtl[1].description, "Previous chapter");
-    }
-
-    #[test]
-    fn wide_window_uses_24_px_padding_otherwise_8() {
-        assert_eq!(horizontal_padding(1000, 800), 24);
-        assert_eq!(horizontal_padding(719, 800), 8);
-        assert_eq!(horizontal_padding(1000, 719), 8, "the smaller side decides");
     }
 }

@@ -43,7 +43,7 @@ fn navigator_state(rtl: bool, previous_enabled: bool, next_enabled: bool) -> Nav
 fn the_navigator_puts_next_on_the_left_in_rtl_and_disables_the_missing_chapter() {
     crate::testing::with_display(|| {
         let navigator = Navigator::new();
-        navigator.update(&navigator_state(true, true, false), (800, 600));
+        navigator.update(&navigator_state(true, true, false));
         let buttons = buttons_under(navigator.root.upcast_ref());
         let next = position_of(&buttons, &tr(MsgKey::action_next_chapter)).expect("a next button");
         let previous = position_of(&buttons, &tr(MsgKey::action_previous_chapter)).expect("a previous button");
@@ -57,7 +57,7 @@ fn the_navigator_puts_next_on_the_left_in_rtl_and_disables_the_missing_chapter()
 fn the_navigator_keeps_previous_on_the_left_in_ltr() {
     crate::testing::with_display(|| {
         let navigator = Navigator::new();
-        navigator.update(&navigator_state(false, true, true), (800, 600));
+        navigator.update(&navigator_state(false, true, true));
         let buttons = buttons_under(navigator.root.upcast_ref());
         let next = position_of(&buttons, &tr(MsgKey::action_next_chapter)).expect("a next button");
         let previous = position_of(&buttons, &tr(MsgKey::action_previous_chapter)).expect("a previous button");
@@ -70,7 +70,7 @@ fn the_navigator_keeps_previous_on_the_left_in_ltr() {
 fn the_navigator_is_the_whole_bottom_bar_and_has_no_settings_buttons() {
     crate::testing::with_display(|| {
         let navigator = Navigator::new();
-        navigator.update(&navigator_state(false, true, true), (800, 600));
+        navigator.update(&navigator_state(false, true, true));
         let buttons = buttons_under(navigator.root.upcast_ref());
         assert_eq!(buttons.len(), 2, "only the previous and next chapter buttons");
         for gone in [tr(MsgKey::viewer), tr(MsgKey::pref_crop_borders), tr(MsgKey::action_settings)] {
