@@ -94,23 +94,36 @@ pub const MAX_FRAMES: usize = 300;
 /// The shortest frame delay a player shows, in milliseconds (E-46).
 pub const MIN_DELAY_MS: u32 = 10;
 
-/// The frames of a page (T-44a-051). An animated GIF or WebP gives every frame with its delay, clamped to
-/// [`MIN_DELAY_MS`]. Anything else, and a still GIF or WebP, is one frame with no delay. An animation that fails part
-/// way keeps the frames before the failure. Animated AVIF, HEIF and JXL are a still first frame (T-44a-052).
+/// The frames of a page (T-44a-051), through the app's one decoder (`kuro_images::decode`: every raster format, JPEG XL,
+/// HEIF and AVIF, turned by its EXIF orientation). An animated GIF or WebP gives every frame with its delay, clamped to
+/// [`MIN_DELAY_MS`], at most [`MAX_FRAMES`]. Anything else, and a single-frame animation, is one frame with no delay.
 pub fn decode_frames(bytes: &[u8]) -> Result<Vec<Frame>, DecodeError> {
-    use image::AnimationDecoder;
-    let animated = match image::guess_format(bytes) {
-        Ok(image::ImageFormat::Gif) => image::codecs::gif::GifDecoder::new(std::io::Cursor::new(bytes))
-            .ok()
-            .map(|d| animation_frames(d.into_frames())),
-        Ok(image::ImageFormat::WebP) => image::codecs::webp::WebPDecoder::new(std::io::Cursor::new(bytes))
-            .ok()
-            .map(|d| animation_frames(d.into_frames())),
-        _ => None,
-    };
-    match animated {
-        Some(frames) if frames.len() > 1 => Ok(frames),
-        _ => decode_rgba(bytes).map(|page| vec![Frame { page, delay_ms: 0 }]),
+    if bytes.is_empty() {
+        return Err(DecodeError::Corrupt);
+    }
+    let frames = kuro_images::decode::decode_frames(bytes, &page_options()).map_err(decode_error)?;
+    let animated = frames.len() > 1;
+    Ok(frames
+        .into_iter()
+        .take(MAX_FRAMES)
+        .map(|frame| Frame { page: page_of(frame.picture), delay_ms: if animated { frame.delay_ms.max(MIN_DELAY_MS) } else { 0 } })
+        .collect())
+}
+
+/// The decode options of a reader page: the original size, up to the page pixel limit.
+fn page_options() -> kuro_images::DecodeOptions {
+    kuro_images::DecodeOptions { max_pixels: kuro_images::decode::PAGE_MAX_PIXELS, ..kuro_images::DecodeOptions::default() }
+}
+
+fn page_of(picture: kuro_images::Decoded) -> DecodedPage {
+    DecodedPage { width: picture.width, height: picture.height, rgba: Vec::from(picture.rgba) }
+}
+
+/// The reader's two kinds of failure: bytes in no format the decoder knows, and anything else that did not decode.
+fn decode_error(error: kuro_images::ImageError) -> DecodeError {
+    match error {
+        kuro_images::ImageError::UnsupportedFormat | kuro_images::ImageError::InvalidImage => DecodeError::UnsupportedFormat,
+        _ => DecodeError::Corrupt,
     }
 }
 
@@ -146,32 +159,14 @@ pub fn loop_passes(bytes: &[u8]) -> Option<u32> {
     }
 }
 
-/// The frames of an animation decoder, up to [`MAX_FRAMES`], stopping at the first frame that fails to decode.
-fn animation_frames(frames: image::Frames<'_>) -> Vec<Frame> {
-    frames
-        .take(MAX_FRAMES)
-        .map_while(Result::ok)
-        .map(|frame| {
-            let (numer, denom) = frame.delay().numer_denom_ms();
-            let delay_ms = if denom == 0 { 0 } else { (numer / denom).max(MIN_DELAY_MS) };
-            let buffer = frame.into_buffer();
-            let (width, height) = buffer.dimensions();
-            Frame { page: DecodedPage { width, height, rgba: buffer.into_raw() }, delay_ms }
-        })
-        .collect()
-}
-
-/// Decodes page bytes to RGBA8. An empty input is `Corrupt`. Bytes with no known image signature are
-/// `UnsupportedFormat`. Bytes with a known signature that fail to decode, including a truncated file, are `Corrupt`.
+#[cfg(test)]
+/// Decodes page bytes to RGBA8 (the first frame of an animation). An empty input is `Corrupt`. Bytes in no known image
+/// format are `UnsupportedFormat`. Bytes of a known format that fail to decode, including a truncated file, are `Corrupt`.
 pub fn decode_rgba(bytes: &[u8]) -> Result<DecodedPage, DecodeError> {
     if bytes.is_empty() {
         return Err(DecodeError::Corrupt);
     }
-    if image::guess_format(bytes).is_err() {
-        return Err(DecodeError::UnsupportedFormat);
-    }
-    let rgba = image::load_from_memory(bytes).map_err(|_| DecodeError::Corrupt)?.to_rgba8();
-    Ok(DecodedPage { width: rgba.width(), height: rgba.height(), rgba: rgba.into_raw() })
+    kuro_images::decode::decode(bytes, &page_options()).map(page_of).map_err(decode_error)
 }
 
 #[cfg(test)]
@@ -316,5 +311,14 @@ mod tests {
     #[test]
     fn the_default_load_state_is_empty() {
         assert_eq!(LoadState::default(), LoadState::Empty);
+    }
+
+    #[test]
+    fn a_jpeg_xl_page_decodes_as_kagane_sends_it() {
+        // the reader decodes through the shared decoder, which reads JPEG XL (the format Kagane's page host prefers)
+        let bytes = include_bytes!("../../crates/kuro-images/tests/fixtures/jxl_still_96.jxl");
+        let frames = decode_frames(bytes).expect("a JPEG XL page decodes");
+        assert_eq!(frames.len(), 1, "one still frame");
+        assert!(frames[0].page.width > 0 && frames[0].page.height > 0 && frames[0].delay_ms == 0);
     }
 }
