@@ -9,6 +9,10 @@ use crate::entry_core::constants::two_pane;
 /// The smaller side, in logical pixels, from which the tablet layouts apply (`TABLET_UI_REQUIRED_SCREEN_WIDTH_DP`).
 pub const TABLET_UI_MIN: i32 = 720;
 
+/// The size a new window opens at: 16:9, the shape of an episode, so the player fills it with no bars (user,
+/// 2026-11-02), and exactly [`TABLET_UI_MIN`] tall so the wide layouts apply.
+pub const DEFAULT_SIZE: (i32, i32) = (1280, 720);
+
 /// True when `min(width, height)` is at least 720 logical pixels. Android uses the smallest screen width, so a
 /// window that is wide but short stays on the phone layouts.
 pub fn is_tablet_ui(width: i32, height: i32) -> bool {
@@ -74,6 +78,13 @@ pub fn watch(window: &impl IsA<gtk::Window>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_window_has_the_shape_of_an_episode_and_the_wide_layouts() {
+        let (w, h) = DEFAULT_SIZE;
+        assert_eq!(w * 9, h * 16, "16:9");
+        assert!(is_tablet_ui(w, h));
+    }
 
     #[test]
     fn the_smaller_side_decides_with_719_off_and_720_on() {

@@ -221,13 +221,13 @@ fn build_window(app: &gtk::Application) {
     let adw_win = adw::ApplicationWindow::builder()
         .application(app)
         .title(channel::APP_NAME)
-        .default_width(1180)
-        .default_height(780)
+        .default_width(window_size::DEFAULT_SIZE.0)
+        .default_height(window_size::DEFAULT_SIZE.1)
         .build();
     // the rest of the shell takes the GTK window it is
     let win: gtk::ApplicationWindow = adw_win.clone().upcast();
     // dev hook: KUROBAYOMI_SIZE=WxH opens at that size, set before any page is built so they lay out for it
-    if let Some((w, h)) = std::env::var("KUROBAYOMI_SIZE").ok().and_then(|v| v.split_once('x').map(|(w, h)| (w.parse().unwrap_or(1180), h.parse().unwrap_or(780)))) {
+    if let Some((w, h)) = std::env::var("KUROBAYOMI_SIZE").ok().and_then(|v| v.split_once('x').map(|(w, h)| (w.parse().unwrap_or(window_size::DEFAULT_SIZE.0), h.parse().unwrap_or(window_size::DEFAULT_SIZE.1)))) {
         win.set_default_size(w, h);
     }
     // each page brings its own header bar; an AdwApplicationWindow has no titlebar of its own
