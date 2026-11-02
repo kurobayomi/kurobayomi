@@ -1,0 +1,108 @@
+# Manga reader overhaul
+
+Audit of `src/reader` (about 24,000 lines) on 2026-11-02, and the plan that follows from it. Nothing here is built yet.
+
+## Why
+
+The reader works, but it was built as its own island. It re-implements pieces the shared image crate (`kuro-images`)
+already has, and one of those copies cannot read a format a source sends. On the desktop it also misses the reading
+features people expect from a manga reader: the right reading mode for the content, two pages side by side on a wide
+window, and dragging a webtoon with the mouse.
+
+## What the audit found
+
+### Duplicated instead of shared
+
+`kuro-images` says in its own notes that one image service serves the covers, the full-cover viewer and the reader,
+so all three share the fetch and decode slots and one decoded-image cache. The reader never joined it.
+
+| Reader copy | Shared version | Problem |
+|---|---|---|
+| `page_decode.rs` (`image::load_from_memory`) | `kuro_images::decode` (raster, JPEG XL, HEIF, AVIF, animation) | The reader cannot decode JPEG XL. Kagane asks for JPEG XL first, so its pages can fail with "The image couldn't be loaded". |
+| `crop_borders.rs` | `kuro_images::decode::borders` | Two border crops to keep in step. |
+| `cache.rs` (chapter disk cache, 100 MiB) | `kuro_images::chapter_cache` (same folder, same rules) | Two implementations of one cache; the shared one has no user at all. |
+| `decoded_lru.rs` (a fixed 512 MiB in the reader) | `kuro_images::memory_cache` (64 MiB) | Two memory budgets that do not know about each other; 512 MiB is heavy on an 8 GB machine. |
+| `loader/http.rs` (one worker thread, one page at a time) | the image service's fetch (8 slots, priority lane) | Pages download one after another, and the reader's queue is separate from the rest of the app's. |
+| `strings.rs` (642 lines of one-line wrappers around `tr`) | `tr(MsgKey::...)` as everywhere else | A second way to get a text; 79 of the wrappers are unused. |
+
+### Not best practice in the code
+
+- `src/reader/mod.rs` turns dead-code warnings off for the whole module (`#![allow(dead_code, unused_imports)]`) with a
+  note that parts "attach later". They are attached; the allow hides about 100 unused items.
+- The module overview says trackers, downloads and the source registry are not connected. They are; the notes mislead.
+- `misc::diet_defaults::READER_TILE_THRESHOLD` (4096) is read by nothing; the real tile edge is 2048.
+- Display colour management (`page_profile`, ICC) exists but the build never enables it and its setting was cut.
+- Three files are far past the "no god files" rule: `screen.rs` (2,318 lines), `viewers/engine.rs` (2,239),
+  `page_view.rs` (1,519).
+
+### Missing or odd for readers
+
+1. **Every title opens left to right in single pages.** Japanese manga reads right to left; webtoons and manhwa read as
+   a vertical strip. Nothing picks a mode from the content; only a per-title choice the reader remembers.
+2. **No two pages side by side.** On a wide desktop window "fit screen" shows one narrow page between black bars. Only
+   the opposite exists (splitting one wide spread into two pages).
+3. **Mouse drag does not scroll a webtoon at normal size.** The drag code only pans when zoomed in, and GTK's own drag
+   scrolling reacts to touch only. The page-by-page modes do take mouse drags.
+4. **Page errors never say why.** Offline, blocked by the site, or a damaged file all show "The image couldn't be loaded".
+5. **No keys for the next or previous chapter.** Arrows, Space, Page Up/Down, Home/End, zoom, F11 and Escape work.
+
+### Already right (keep)
+
+Background decoding with a page pyramid for very tall images, the error card with Retry and Open in browser, position
+saved on every page, the live Incognito check, the next chapter fetched ahead, F11 and Escape handling, the shared top
+bar, and the native settings window.
+
+## The plan
+
+Each phase is one commit, built and tested at its end (touched modules only), in this order so the features in phase 3
+are built once, on the shared pieces.
+
+### Phase 1: clean up (no behaviour change)
+
+- Remove the blanket allow in `src/reader/mod.rs`, then delete what it was hiding (the unused wrappers, functions and
+  constants), and `READER_TILE_THRESHOLD`.
+- Replace `strings.rs` with direct `tr(MsgKey::...)` calls, like the rest of the app, and delete the file.
+- Rewrite the stale notes in the module overview to say what is connected now.
+- Decide the ICC code: enable the `icc` feature with its setting, or delete it. Recommended: delete (the setting was cut).
+
+### Phase 2: one image pipeline
+
+- Decode pages with `kuro_images::decode` (gains JPEG XL, HEIF, AVIF; animation stays), and crop borders with
+  `kuro_images::decode::borders`. Delete `page_decode`'s decoder and `crop_borders.rs`; keep the tiling, which is the
+  reader's own job.
+- Use `kuro_images::chapter_cache` for page lists and page images; delete `src/reader/cache.rs`.
+- One decoded-image cache: the reader's pages go into the image service's memory cache under their own budget share,
+  and the budget is sized from the machine's memory (`kuro_platform::device` already reads it), not a fixed 512 MiB.
+- Page fetches go through the image service: the page on screen in the priority lane, preloads in the normal one, two
+  to three at a time instead of one. The reader's queue keeps its ordering and cancels pages that left the screen.
+
+### Phase 3: reading features
+
+- **Reading mode from the content**, for a title with no choice of its own: Webtoon, Manhwa, Manhua or Long Strip in its
+  tags, or a first page much taller than wide, opens the vertical strip; other manga opens right to left; a choice the
+  user made for the title always wins. The global default setting stays as the fallback.
+- **Two pages side by side** in the page-by-page modes when the window is wider than tall: pages pair in reading order,
+  a wide page (an existing spread) and the first page stand alone, and the pair follows the reading direction. A
+  setting turns it on or off (Automatic, the default; Always; Never).
+- **Drag to scroll a webtoon with the mouse** at any zoom, with the same momentum the page modes have.
+- **Page errors say why**: no connection, the site refused the image (with the HTTP status), or the image could not be
+  read; Retry and Open in browser stay.
+- **Chapter keys**: `[` and `]` (and Ctrl+Page Up / Ctrl+Page Down) go to the previous and next chapter.
+
+### Phase 4: split the big files
+
+Split by concern so each file is one part of the reader: `screen.rs` into loading, chapter navigation, chrome and
+sheets; `viewers/engine.rs` into the pager and the webtoon engine with their shared drag and wheel input;
+`page_view.rs` into the page widget and its gestures. Mechanical, after the behaviour changes, so the moves are pure
+moves.
+
+## Checks
+
+- Each phase: the touched modules' tests, both CI scripts, and a manual read in the dev build with real libadwaita.
+- Manual list before the nightly: a Kagane chapter (JPEG XL pages), a Japanese manga (right to left, two pages on a wide
+  window), a webtoon (vertical, mouse drag), a local archive, a page that fails (offline), and the next-chapter keys.
+
+## Questions to settle before phase 3
+
+- Two pages side by side: Automatic by window shape as the default, or off by default?
+- Reading mode from the content: on for everyone, or behind a setting?
