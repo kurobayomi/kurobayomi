@@ -258,9 +258,9 @@ pub fn menu_actions(state: MenuState, handlers: MenuHandlers) -> gio::SimpleActi
         group.add_action(&action);
     }
 
-    let cover = gio::SimpleAction::new(ACTION_SET_COVER, None);
-    cover.connect_activate(move |_, _| on_set_cover());
-    group.add_action(&cover);
+    let action = gio::SimpleAction::new(ACTION_SET_COVER, None);
+    action.connect_activate(move |_, _| on_set_cover());
+    group.add_action(&action);
     sync_enabled(&group, state.mode);
     group
 }
