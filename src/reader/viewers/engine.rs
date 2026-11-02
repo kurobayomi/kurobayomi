@@ -637,6 +637,12 @@ impl PagerInner {
                         self.emit.send(ViewerEvent::PageSelected(page));
                     }
                 }
+                Effect::ShownBeside(r) => {
+                    let page = self.lookup.borrow().page(&r);
+                    if let Some(page) = page {
+                        self.emit.send(ViewerEvent::ShownBeside(page));
+                    }
+                }
                 Effect::TransitionSelected => self.emit.send(ViewerEvent::TransitionShown),
                 Effect::HideMenu => self.emit.send(ViewerEvent::HideMenu),
                 Effect::ShowMenu => self.emit.send(ViewerEvent::ShowMenu),
@@ -1396,6 +1402,8 @@ impl WebtoonInner {
                         self.emit.send(ViewerEvent::PageSelected(page));
                     }
                 }
+                // the strip shows no spreads
+                Effect::ShownBeside(_) => {}
                 Effect::TransitionSelected => self.emit.send(ViewerEvent::TransitionShown),
                 Effect::HideMenu => self.emit.send(ViewerEvent::HideMenu),
                 Effect::ShowMenu => self.emit.send(ViewerEvent::ShowMenu),

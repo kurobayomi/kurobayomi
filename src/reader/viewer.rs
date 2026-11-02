@@ -28,6 +28,8 @@ pub trait Viewer {
 pub enum ViewerEvent {
     /// A page became the visible one.
     PageSelected(Rc<ReaderPage>),
+    /// The page selected last shows beside this one (two pages side by side); the next selection ends it.
+    ShownBeside(Rc<ReaderPage>),
     /// A chapter transition card became the visible item (no page is on screen).
     TransitionShown,
     /// A tap toggled the chrome.

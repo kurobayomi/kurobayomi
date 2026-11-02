@@ -80,9 +80,19 @@ pub fn two_line_title(title: &MediaTitle) -> TwoLineTitle {
     two_lines
 }
 
-/// `Page 3 of 12`, or `None` when there is no page on screen (a page or total not above zero, or a transition card).
-pub fn page_position(page: i32, total: i32) -> Option<String> {
-    (page > 0 && total > 0).then(|| trf(MsgKey::page_header_page_of, &[("page", Arg::Str(&page.to_string())), ("total", Arg::Str(&total.to_string()))]))
+/// `Page 3 of 12`, `Page 2-3 of 12` with page 2 shown `beside` it, or `None` when there is no page on screen (a page or
+/// total not above zero, or a transition card).
+pub fn page_position(page: i32, beside: Option<i32>, total: i32) -> Option<String> {
+    (page > 0 && total > 0).then(|| trf(MsgKey::page_header_page_of, &[("page", Arg::Str(&page_span(page, beside))), ("total", Arg::Str(&total.to_string()))]))
+}
+
+/// The page number, or the two numbers of a spread in order (`2-3`). A dash before the first page.
+pub fn page_span(page: i32, beside: Option<i32>) -> String {
+    match beside.filter(|other| *other > 0 && *other != page) {
+        _ if page < 1 => "-".to_owned(),
+        Some(other) => format!("{}-{}", page.min(other), page.max(other)),
+        None => page.to_string(),
+    }
 }
 
 /// The header with Back on the left (`on_back`) and `title` in the centre. The right side is left to the caller: the
@@ -113,10 +123,12 @@ mod tests {
 
     #[test]
     fn the_position_needs_a_page_and_a_total_above_zero() {
-        assert_eq!(page_position(1, 23).as_deref(), Some("Page 1 of 23"));
-        assert_eq!(page_position(-1, 23), None, "a transition card has no page");
-        assert_eq!(page_position(0, 23), None);
-        assert_eq!(page_position(1, 0), None);
+        assert_eq!(page_position(1, None, 23).as_deref(), Some("Page 1 of 23"));
+        assert_eq!(page_position(3, Some(2), 23).as_deref(), Some("Page 2-3 of 23"), "a spread names both pages");
+        assert_eq!(page_position(-1, None, 23), None, "a transition card has no page");
+        assert_eq!(page_position(0, None, 23), None);
+        assert_eq!(page_position(1, None, 0), None);
+        assert_eq!((page_span(2, Some(3)), page_span(3, Some(3)), page_span(0, Some(1))), ("2-3".into(), "3".into(), "-".into()));
     }
 
     #[test]

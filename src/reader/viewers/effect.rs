@@ -16,6 +16,8 @@ pub enum Effect {
     Pan(Phys),
     /// A page became the visible one (`ViewerEvent::PageSelected`).
     PageSelected(PageRef),
+    /// The page selected last shows beside this one, a two-page spread (`ViewerEvent::ShownBeside`).
+    ShownBeside(PageRef),
     /// The page's zoom-start hook (B§10.3). `forward` is the selection direction.
     ZoomStart { page: PageRef, forward: bool },
     /// A chapter transition card became the visible item; the page counter shows no number on it.

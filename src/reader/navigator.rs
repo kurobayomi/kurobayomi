@@ -1,5 +1,7 @@
-//! The chapter navigator (T-043a-041): previous and next buttons around a page pill with a slider. The decisions
-//! (slider range, labels, RTL mirror, padding) are pure functions; [`Navigator`] only applies them.
+//! The chapter navigator (T-043a-041): previous and next buttons around a page pill with a slider, centred at the bottom
+//! and at most [`MAX_WIDTH`] wide (libadwaita's clamp), so on a wide window the buttons sit beside the pill instead of
+//! at the window's edges. The decisions (slider range, labels, RTL mirror, padding) are pure functions; [`Navigator`]
+//! only applies them.
 
 use kuro_i18n::{MsgKey, tr};
 use std::cell::{Cell, RefCell};
@@ -17,9 +19,13 @@ pub fn slider_value(current_page: i32, total: i32) -> f64 {
     f64::from(current_page.clamp(1, total.max(1)))
 }
 
-/// The current page number label. A dash before the first page event (`ReaderViewModel.kt:962`).
-pub fn page_text(current_page: i32) -> String {
-    if current_page < 1 { "-".to_owned() } else { current_page.to_string() }
+/// The widest the navigator gets, in px: a floating bar under the page, not a strip across a wide window.
+pub const MAX_WIDTH: i32 = 600;
+
+/// The current page number label: `3`, or `2-3` with page 2 shown `beside` it. A dash before the first page event
+/// (`ReaderViewModel.kt:962`).
+pub fn page_text(current_page: i32, beside: Option<i32>) -> String {
+    crate::widgets::page_header::page_span(current_page, beside)
 }
 
 /// The pill is shown only with more than one page (`ChapterNavigator.kt:131-133`).
@@ -33,8 +39,8 @@ pub fn slider_target(value: f64, current_page: i32) -> Option<usize> {
     if page == current_page { None } else { Some((page - 1).max(0) as usize) }
 }
 
-/// Above this many pages the slider shows no page marks: they would sit too close to tell apart.
-pub const MAX_PAGE_MARKS: i32 = 100;
+/// Above this many pages the slider shows no page marks: in the capped bar they would sit too close to tell apart.
+pub const MAX_PAGE_MARKS: i32 = 30;
 
 /// The slider values that get a mark, one per page, so the slider reads as a row of page parts. None for a single
 /// page or past [`MAX_PAGE_MARKS`].
@@ -77,6 +83,8 @@ pub fn button_plan(rtl: bool, previous_enabled: bool, next_enabled: bool) -> [Bu
 pub struct NavigatorState {
     pub total: i32,
     pub current_page: i32,
+    /// The page shown beside the current one (two pages side by side).
+    pub beside: Option<i32>,
     pub previous_enabled: bool,
     pub next_enabled: bool,
     pub rtl: bool,
@@ -86,7 +94,7 @@ pub struct NavigatorState {
 
 /// The navigator widgets. `on_step` runs a chapter button, `on_page` moves the viewer to a 0-based index.
 pub struct Navigator {
-    pub root: gtk::Box,
+    pub root: adw::Clamp,
     /// The left and right buttons by position; what each runs follows the RTL plan in `update`.
     left: gtk::Button,
     right: gtk::Button,
@@ -121,6 +129,9 @@ impl Navigator {
         let total_label = gtk::Label::new(Some(""));
         current_label.set_width_chars(3);
         total_label.set_width_chars(3);
+        // the numbers keep off the pill's rounded ends
+        current_label.set_margin_start(8);
+        total_label.set_margin_end(8);
         let spinner = gtk::Spinner::new();
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         pill.add_css_class("osd");
@@ -130,11 +141,12 @@ impl Navigator {
         for child in [current_label.upcast_ref::<gtk::Widget>(), slider.upcast_ref(), total_label.upcast_ref(), spinner.upcast_ref()] {
             pill.append(child);
         }
-        let root = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        row.append(&left);
+        row.append(&pill);
+        row.append(&right);
+        let root = adw::Clamp::builder().maximum_size(MAX_WIDTH).tightening_threshold(MAX_WIDTH).child(&row).build();
         root.set_widget_name("navigator");
-        root.append(&left);
-        root.append(&pill);
-        root.append(&right);
 
         let navigator = Rc::new(Self {
             root,
@@ -199,7 +211,7 @@ impl Navigator {
         self.pill.set_visible(slider_visible(state.total) || state.loading);
         self.spinner.set_spinning(state.loading);
         self.current.set(state.current_page);
-        self.current_label.set_label(&page_text(state.current_page));
+        self.current_label.set_label(&page_text(state.current_page, state.beside));
         self.total_label.set_label(&state.total.max(0).to_string());
         self.slider.set_visible(slider_visible(state.total));
         self.syncing.set(true);
@@ -230,8 +242,9 @@ mod tests {
     fn before_the_first_page_the_slider_stays_in_range_and_the_label_is_a_dash() {
         assert_eq!(slider_value(-1, 20), 1.0);
         assert_eq!(slider_value(25, 20), 20.0);
-        assert_eq!(page_text(-1), "-");
-        assert_eq!(page_text(4), "4");
+        assert_eq!(page_text(-1, None), "-");
+        assert_eq!(page_text(4, None), "4");
+        assert_eq!(page_text(5, Some(4)), "4-5", "two pages side by side");
     }
 
     #[test]
@@ -245,6 +258,7 @@ mod tests {
     fn every_page_gets_a_mark_up_to_the_limit() {
         assert_eq!(page_marks(3), vec![1.0, 2.0, 3.0]);
         assert_eq!(page_marks(19).len(), 19);
+        assert!(page_marks(86).is_empty(), "a long chapter gets no comb of marks");
         assert!(page_marks(1).is_empty(), "a single page has no slider");
         assert_eq!(page_marks(MAX_PAGE_MARKS).len(), MAX_PAGE_MARKS as usize);
         assert!(page_marks(MAX_PAGE_MARKS + 1).is_empty(), "too many to tell apart");

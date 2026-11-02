@@ -615,6 +615,7 @@ impl ReaderChrome {
             ViewerEvent::ShowMenu => self.show_menu(),
             ViewerEvent::HideMenu => self.hide_menu(),
             ViewerEvent::PageSelected(page) => {
+                screen.beside.set(None);
                 let tint = &screen.tint;
                 // the flash counts only while the feature is on, so enabling it later does not flash at once
                 let mut flash = || {
@@ -631,7 +632,14 @@ impl ReaderChrome {
                 refresh(&screen);
             }
             ViewerEvent::TransitionShown => {
+                screen.beside.set(None);
                 screen.core.transition_shown();
+                refresh(&screen);
+            }
+            ViewerEvent::ShownBeside(page) => {
+                // a page of the chapter on screen; the pair's number is the reader's 1-based one
+                let current = screen.core.current_chapter_id();
+                screen.beside.set(page.chapter().filter(|c| Some(c.chapter.id) == current).map(|_| page.index as i32 + 1));
                 refresh(&screen);
             }
             ViewerEvent::RequestPreload(chapter) => screen.core.request_preload(&chapter),
@@ -718,6 +726,8 @@ struct Screen {
     top_slot: gtk::Box,
     /// The id of the chapter the top bar shows, `-1` before the first build.
     shown_chapter: Cell<i64>,
+    /// The number of the page shown beside the current one (two pages side by side), until the next selection.
+    beside: Cell<Option<i32>>,
     top: gtk::Revealer,
     /// The bars hide by themselves (`auto_hide_bars`, read when the reader opens).
     auto_hide: bool,
@@ -864,6 +874,7 @@ pub fn open_with(
         nav_overlay,
         top_slot,
         shown_chapter: Cell::new(-1),
+        beside: Cell::new(None),
         top,
         bottom,
         auto_hide,
@@ -1031,6 +1042,7 @@ fn refresh(screen: &Screen) {
     let state = NavigatorState {
         total,
         current_page: page,
+        beside: screen.beside.get(),
         previous_enabled: previous,
         next_enabled: next,
         rtl: screen.core.reading_mode() == ReadingMode::RightToLeft,
@@ -1567,7 +1579,7 @@ fn rebuild_top_bar(screen: &Rc<Screen>) {
 fn update_position(screen: &Screen) {
     if let Some(title) = screen.position.borrow().as_ref() {
         let (page, total) = screen.core.page_counts();
-        title.set_subtitle(page_header::page_position(page, total).as_deref());
+        title.set_subtitle(page_header::page_position(page, screen.beside.get(), total).as_deref());
     }
 }
 
@@ -2232,6 +2244,10 @@ mod tests {
             assert!(pump_until(|| shown().len() == 2), "two pages on screen: {}", shown().len());
             let halves: Vec<f32> = shown().iter().filter_map(|v| v.compute_bounds(&window)).map(|b| b.width()).collect();
             assert!((halves[0] - halves[1]).abs() < 1.0, "each page has half the room: {halves:?}");
+            assert!(pump_until(|| inner.beside.get() == Some(2)), "the page shown beside page 3 is page 2");
+            let subtitle = inner.position.borrow().as_ref().map(|t| t.subtitle()).unwrap_or_default();
+            assert!(subtitle.ends_with("Page 2-3 of 6"), "the title names both pages: {subtitle}");
+            screen.chrome.show_menu();
             if let Ok(prefix) = std::env::var("KB_SPREAD_SHOT") {
                 let path = format!("{prefix}-{name}.png");
                 pump_until(|| false);

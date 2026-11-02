@@ -258,6 +258,7 @@ impl PagerController {
             ItemKey::Spread(first, second) => {
                 let mut fx = vec![Effect::PageSelected(first.clone())];
                 fx.extend(self.on_page_selected(second, allow, forward));
+                fx.push(Effect::ShownBeside(first.clone()));
                 fx
             }
             ItemKey::Transition(t) => self.on_transition_selected(t),

@@ -36,7 +36,7 @@ fn position_of(buttons: &[gtk::Button], text: &str) -> Option<usize> {
 }
 
 fn navigator_state(rtl: bool, previous_enabled: bool, next_enabled: bool) -> NavigatorState {
-    NavigatorState { total: 10, current_page: 3, previous_enabled, next_enabled, rtl, loading: false }
+    NavigatorState { total: 10, current_page: 3, beside: None, previous_enabled, next_enabled, rtl, loading: false }
 }
 
 #[test]
