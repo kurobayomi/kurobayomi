@@ -32,8 +32,8 @@ pub fn status(value: i64) -> StatusView {
     StatusView { icon, text: tr(key) }
 }
 
-/// The info box lines of an anime: title, author and artist with their placeholders (`entry_core::text`), the anime
-/// status table, and the source line with its stub flag. The widget is `entry_core::header_view`, shared with manga.
+/// The info box lines of an entry: title, author and artist with their placeholders (`entry_core::text`), the status
+/// table, and the source line with its stub flag. The widget is `entry_core::header_view`, for anime and manga alike.
 pub fn header_model(entry: &Entry, source: &SourceInfo) -> HeaderModel {
     let shown = status(entry.status);
     let mut model = HeaderModel::from_parts(
@@ -45,12 +45,15 @@ pub fn header_model(entry: &Entry, source: &SourceInfo) -> HeaderModel {
         source.stub,
     )
     .with_genres(entry.genre.as_deref());
-    // T-39a-029: an anime genre chip searches every source (global), where the shared chip searches the entry's source
-    for chip in &mut model.genres {
-        chip.search.global = true;
+    // T-39a-029: an anime genre chip searches every source (global), where a manga chip searches the entry's source
+    if entry.kind == Kind::Anime {
+        for chip in &mut model.genres {
+            chip.search.global = true;
+        }
     }
+    // the cover is the entry's own kind: its cache key and cover file are the ones the listing and the library use
     model.with_cover(
-        Kind::Anime,
+        entry.kind,
         entry.id,
         entry.source,
         entry.thumbnail_url.as_deref(),
@@ -101,5 +104,14 @@ mod tests {
         let model = header_model(&entry, &SourceInfo { name: "Src".into(), stub: false });
         assert_eq!(model.genres.len(), 2);
         assert!(model.genres.iter().all(|c| c.search.global));
+    }
+
+    #[test]
+    fn a_manga_keeps_its_own_kind_for_the_cover_and_its_source_for_the_chips() {
+        // the listing caches a manga cover under the manga key: an anime key missed it and fetched the picture again
+        let entry = Entry { genre: Some(vec!["Action".into()]), thumbnail_url: Some("https://x/c.jpg".into()), ..Entry::create(Kind::Manga) };
+        let model = header_model(&entry, &SourceInfo { name: "Src".into(), stub: false });
+        assert_eq!(model.cover.as_ref().map(|art| art.owner), Some(Kind::Manga));
+        assert!(model.genres.iter().all(|c| !c.search.global));
     }
 }
