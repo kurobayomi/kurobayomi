@@ -209,29 +209,31 @@ fn on_disk(kind: Kind, tree: &Tree, root: &Path) -> Vec<on_disk::Title> {
     on_disk::titles(kind, tree, root, |source| entries.by_source(kind, source).unwrap_or_default(), |entry| items.by_entry_id(entry, false).unwrap_or_default())
 }
 
-/// One title on disk: a heading row (title, count and size; a click opens the title's page, a button its folder), then a
-/// row per episode or chapter (a click plays or reads it, a button deletes it), in a list of their own. One row of the
-/// page's list, so a search by the title keeps the whole group.
-fn title_row(kind: Kind, title: on_disk::Title) -> gtk::ListBoxRow {
+/// One title on disk: libadwaita's expander row (title, count and size, a button to its folder and, for a title in the
+/// library, one to its page) with a row per episode or chapter inside (a click plays or reads it, a button deletes it).
+/// One row of the page's list; a click on the title folds its rows away.
+fn title_row(kind: Kind, title: on_disk::Title) -> adw::ExpanderRow {
     let count = kuro_i18n::tr_plural(crate::entry_core::wording::count(kind), title.units.len() as i64, &[]);
     let folder = crate::ui::icon_button("document-open-symbolic", &tr(MsgKey::ui_open_containing_folder));
     folder.add_css_class("flat");
     let path = title.folder.clone();
     folder.connect_clicked(move |_| open_folder(&path));
     let entry_id = title.entry_id;
-    let on_click: Option<Rc<dyn Fn()>> = entry_id.map(|id| Rc::new(move || crate::screens::open_entry(kind, id)) as Rc<dyn Fn()>);
-    let heading = row::build(RowSpec { title: &title.label, subtitle: Some(&count), icon: None, trailing: Some(folder.upcast_ref()), on_click });
+    let open = entry_id.map(|id| {
+        let open = crate::ui::icon_button("go-next-symbolic", &tr(MsgKey::ui_open_title_page));
+        open.add_css_class("flat");
+        open.connect_clicked(move |_| crate::screens::open_entry(kind, id));
+        open
+    });
+    let mut trailing: Vec<&gtk::Widget> = vec![folder.upcast_ref()];
+    trailing.extend(open.as_ref().map(|b| b.upcast_ref::<gtk::Widget>()));
+    let lines: Vec<gtk::ListBoxRow> = title.units.into_iter().map(|unit| unit_line(kind, entry_id, unit).upcast()).collect();
+    let heading = row::expander(&title.label, Some(&count), &trailing, &lines);
     if entry_id.is_none() {
         heading.set_tooltip_text(Some(&tr(MsgKey::ui_download_not_in_library)));
     }
     show_size(&heading, count, title.folder.clone());
-    // a list of its own inside the page's card: no second frame
-    let lines = gtk::ListBox::builder().selection_mode(gtk::SelectionMode::None).build();
-    lines.append(&heading);
-    for unit in title.units {
-        lines.append(&unit_line(kind, entry_id, unit));
-    }
-    gtk::ListBoxRow::builder().child(&lines).activatable(false).build()
+    heading
 }
 
 /// One episode or chapter: a click plays or reads it, the button deletes it. A unit the library no longer knows only
@@ -256,12 +258,12 @@ fn unit_line(kind: Kind, entry_id: Option<i64>, unit: on_disk::Unit) -> adw::Act
 
 /// Adds the size of `folder` on disk to the count in the subtitle of `heading`, once it is known (it is summed off the GTK
 /// thread).
-fn show_size(heading: &adw::ActionRow, count: String, folder: PathBuf) {
+fn show_size(heading: &adw::ExpanderRow, count: String, folder: PathBuf) {
     let heading = heading.downgrade();
     glib::spawn_future_local(async move {
         let Ok(bytes) = crate::background::blocking(move || kuro_core::storage::dir_size(&folder).unwrap_or(0)).await else { return };
         if let Some(heading) = heading.upgrade() {
-            row::set_subtitle(&heading, Some(&format!("{count} · {}", glib::format_size(bytes))));
+            row::set_expander_subtitle(&heading, Some(&format!("{count} · {}", glib::format_size(bytes))));
         }
     });
 }
@@ -333,7 +335,11 @@ mod tests {
                 all.push(w);
             }
             let rows: Vec<&adw::ActionRow> = all.iter().filter_map(|w| w.downcast_ref::<adw::ActionRow>()).collect();
-            let texts: Vec<String> = rows.iter().flat_map(|r| [r.title().to_string(), r.subtitle().map(|s| s.to_string()).unwrap_or_default()]).collect();
+            let mut texts: Vec<String> = rows.iter().flat_map(|r| [r.title().to_string(), r.subtitle().map(|s| s.to_string()).unwrap_or_default()]).collect();
+            texts.extend([row.title().to_string(), row.subtitle().to_string()]);
+            assert!(row.is_expanded(), "the title shows its rows from the start");
+            let opens = all.iter().filter_map(|w| w.downcast_ref::<gtk::Button>()).filter(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::ui_open_title_page).as_str())).count();
+            assert_eq!(opens, 1, "a title in the library has a button to its page");
             for want in ["Bleach", "2 episodes", "Episode 1", "Episode 9 (stray)"] {
                 assert!(texts.iter().any(|l| l == want), "{want} in {texts:?}");
             }

@@ -51,6 +51,29 @@ pub fn build(spec: RowSpec) -> adw::ActionRow {
     row
 }
 
+/// A heading with rows under it, libadwaita's expander row: title, subtitle and trailing widgets on the heading, `rows`
+/// inside, shown from the start. A click on the heading folds them in and out.
+pub fn expander(title: &str, subtitle: Option<&str>, trailing: &[&gtk::Widget], rows: &[ListBoxRow]) -> adw::ExpanderRow {
+    let row = adw::ExpanderRow::new();
+    plain_text(&row);
+    row.set_title(title);
+    set_expander_subtitle(&row, subtitle);
+    for widget in trailing {
+        widget.set_valign(gtk::Align::Center);
+        row.add_suffix(*widget);
+    }
+    for child in rows {
+        row.add_row(child);
+    }
+    row.set_expanded(true);
+    row
+}
+
+/// [`set_subtitle`] for an expander row.
+pub fn set_expander_subtitle(row: &adw::ExpanderRow, text: Option<&str>) {
+    row.set_subtitle(text.filter(|t| !t.trim().is_empty()).unwrap_or_default());
+}
+
 /// A title, a subtitle and a trailing widget, with no handler: what a page of plain facts and controls is made of.
 pub fn plain(title: &str, subtitle: Option<&str>, trailing: Option<&gtk::Widget>) -> adw::ActionRow {
     build(RowSpec { title, subtitle, icon: None, trailing, on_click: None })
