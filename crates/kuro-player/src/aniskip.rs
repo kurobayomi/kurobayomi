@@ -102,16 +102,56 @@ pub fn episode_length(duration: Option<f64>) -> Option<i64> {
     Some(secs as i64)
 }
 
-/// Fetches the skip intervals of one episode. Any error gives `None`.
+/// Fetches the skip intervals of one episode. AniSkip answers only for a video within a few seconds of
+/// `episode_length`, and a stream is often longer or shorter than the version people timed (a preview
+/// cut, other credits), so when nothing matches the times of any length are asked for and fitted to
+/// this video ([`fit_to_length`]). Any error gives `None`.
 pub async fn fetch_skip_times(
     client: &NetworkClient,
     mal_id: i64,
     episode: i32,
     episode_length: i64,
 ) -> Option<Vec<TimeStamp>> {
-    let url = skip_times_url(mal_id, episode, episode_length);
-    let response = client.get(&url).await.ok()?.await_success().ok()?;
-    parse_skip_times(&response.text().await.ok()?)
+    let get = |length: i64| async move {
+        let response = client.get(&skip_times_url(mal_id, episode, length)).await.ok()?.await_success().ok()?;
+        response.text().await.ok()
+    };
+    if let Some(exact) = get(episode_length).await.as_deref().and_then(parse_skip_times) {
+        return Some(exact);
+    }
+    let any = get(0).await?;
+    Some(fit_to_length(&any, episode_length as f64)).filter(|stamps| !stamps.is_empty())
+}
+
+/// The times of a skip-times answer for any length, fitted to a video of `length` seconds: an
+/// opening, a mixed opening or a recap keeps its times (they sit at a fixed time from the start),
+/// an ending moves by the length difference (it sits at a fixed time before the end). One interval
+/// per kind, the first; an interval that falls outside the video is dropped. A body that does not
+/// decode gives nothing.
+pub fn fit_to_length(body: &str, length: f64) -> Vec<TimeStamp> {
+    let Ok(value) = serde_json::from_str::<Value>(body) else {
+        return Vec::new();
+    };
+    let Some(results) = value.get("results").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let mut out: Vec<TimeStamp> = Vec::new();
+    for item in results {
+        let Some(mut stamp) = parse_stamp(item) else { continue };
+        if out.iter().any(|kept| kept.kind == stamp.kind) {
+            continue;
+        }
+        if matches!(stamp.kind, ChapterType::Ending | ChapterType::Other) {
+            let Some(theirs) = item.get("episodeLength").and_then(Value::as_f64) else { continue };
+            let shift = length - theirs;
+            stamp.start += shift;
+            stamp.end += shift;
+        }
+        if stamp.start >= 0.0 && stamp.end <= length + 1.0 && stamp.start < stamp.end {
+            out.push(stamp);
+        }
+    }
+    out
 }
 
 /// Looks up the MAL id of an AniList entry. Any error gives `None`.
@@ -315,6 +355,20 @@ mod tests {
     use super::*;
 
     const LIVE: &str = r#"{"found":true,"results":[{"interval":{"startTime":1387.996,"endTime":1500},"skipType":"ed","skipId":"b60b5bf4-7fc9-40e9-b178-71d2a4f0e6c9","episodeLength":1500.146},{"interval":{"startTime":28.783,"endTime":118.783},"skipType":"op","skipId":"bf98fb07-c8f8-4399-baa4-1579f03b7e90","episodeLength":1500.04}],"message":"Successfully found skip times","statusCode":200}"#;
+
+    #[test]
+    fn times_for_another_length_keep_the_opening_and_move_the_ending_with_the_end() {
+        // timed on a 1566 s release; this stream is 1440 s (no preview at the end)
+        let body = r#"{"found":true,"results":[{"interval":{"startTime":1460,"endTime":1550},"skipType":"ed","episodeLength":1561},{"interval":{"startTime":6.5,"endTime":96.5},"skipType":"op","episodeLength":1566.5}]}"#;
+        let stamps = fit_to_length(body, 1440.0);
+        let op = stamps.iter().find(|s| s.kind == ChapterType::Opening).expect("the opening");
+        assert_eq!((op.start, op.end), (6.5, 96.5), "an opening sits at a fixed time from the start");
+        let ed = stamps.iter().find(|s| s.kind == ChapterType::Ending).expect("the ending");
+        assert_eq!((ed.start, ed.end), (1339.0, 1429.0), "an ending sits at a fixed time before the end");
+        let short = fit_to_length(body, 60.0);
+        assert!(short.is_empty(), "times past the end of a short video are dropped");
+        assert!(fit_to_length("not json", 1440.0).is_empty());
+    }
 
     #[test]
     fn url_matches_the_api_template() {
