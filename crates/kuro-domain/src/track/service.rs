@@ -137,42 +137,8 @@ mod tests {
         }
     }
 
-    /// Captures what the subscriber logs, so a test can count the error lines.
-    #[derive(Clone, Default)]
-    struct Logs(std::sync::Arc<Mutex<Vec<u8>>>);
-
-    impl std::io::Write for Logs {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Logs {
-        type Writer = Logs;
-        fn make_writer(&'a self) -> Logs {
-            self.clone()
-        }
-    }
-
     fn logged<T>(f: impl FnOnce() -> T) -> (T, String) {
-        let logs = Logs::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(logs.clone())
-            .with_ansi(false)
-            .without_time()
-            .with_max_level(tracing::Level::ERROR)
-            .finish();
-        let value = tracing::subscriber::with_default(subscriber, || {
-            // parallel tests can cache a log statement as unwatched before this thread's subscriber arrives: rebuild the cache
-            tracing::callsite::rebuild_interest_cache();
-            f()
-        });
-        let text = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
-        (value, text)
+        kuro_testkit::logs::capture(f)
     }
 
     #[test]

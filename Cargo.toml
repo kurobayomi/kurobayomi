@@ -57,6 +57,7 @@ url = { workspace = true }
 [dev-dependencies]
 async-trait = { workspace = true }
 kuro-testkit = { path = "crates/kuro-testkit" }
+tokio = { workspace = true, features = ["test-util"] }
 proptest = "1.11.0"
 
 [workspace]

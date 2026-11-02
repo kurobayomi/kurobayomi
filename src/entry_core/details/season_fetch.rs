@@ -107,7 +107,8 @@ mod tests {
         assert_eq!(peak.load(Ordering::SeqCst), MAX_PARALLEL);
     }
 
-    #[tokio::test]
+    // the clock is paused, so the 70 ms deadline falls between the second and the third 50 ms season on any machine
+    #[tokio::test(start_paused = true)]
     async fn dropping_a_metered_run_stops_it_before_the_next_season() {
         let started = Arc::new(AtomicUsize::new(0));
         let seasons: Vec<Entry> = (1..=5).map(|id| season(id, FetchType::Episodes, 0, 0)).collect();

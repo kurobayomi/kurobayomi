@@ -11,6 +11,7 @@ mod db;
 mod settings;
 mod tracker;
 
+pub mod logs;
 pub mod track_samples;
 pub use db::{TestDb, insert_category};
 pub use settings::InMemorySettings;

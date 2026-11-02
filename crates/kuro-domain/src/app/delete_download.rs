@@ -120,27 +120,6 @@ mod tests {
         ids.iter().map(|&id| Item { id, ..Item::create(kind) }).collect()
     }
 
-    /// Captures what the subscriber logs on this thread.
-    #[derive(Clone, Default)]
-    struct Logs(Arc<Mutex<Vec<u8>>>);
-
-    impl std::io::Write for Logs {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Logs {
-        type Writer = Logs;
-        fn make_writer(&'a self) -> Logs {
-            self.clone()
-        }
-    }
-
     fn runtime() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime")
     }
@@ -157,19 +136,10 @@ mod tests {
     fn an_absent_source_logs_a_warning_and_deletes_nothing() {
         let downloads = Arc::new(Recorder::default());
         let interactor = DeleteItemDownload::new(registry(Kind::Manga, &[7]), downloads.clone());
-        let logs = Logs::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(logs.clone())
-            .with_ansi(false)
-            .without_time()
-            .with_max_level(tracing::Level::WARN)
-            .finish();
-        tracing::subscriber::with_default(subscriber, || {
-            tracing::callsite::rebuild_interest_cache();
+        let ((), text) = kuro_testkit::logs::capture(|| {
             runtime().block_on(interactor.await_all(&entry(Kind::Manga, 3, 99), &items(Kind::Manga, &[1])));
         });
         assert!(downloads.calls.lock().unwrap().is_empty(), "EC-27");
-        let text = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
         assert!(text.contains("WARN") && text.contains("no source for the entry"), "{text}");
     }
 
