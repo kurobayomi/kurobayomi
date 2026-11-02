@@ -25,12 +25,12 @@ use tokio::sync::watch;
 
 use super::content::ContentPlan;
 use super::glue::{consume_events, follow_changes, follow_ready, keep_alive, own_tasks};
-use super::grid::{CONTAINER_MARGIN_PX, CoverBinds, last_visible_index};
+use super::grid::{CONTAINER_MARGIN_PX, last_visible_index};
 use super::listing::{ListItem, ListedPage, Listing, PageLoader};
 use super::prefs::BrowsePrefs;
 use super::primitives::{EmptyAction, ToastAction, ToastDuration, ToastSpec, stub_source_label};
 use super::tasks::{PageTasks, Tagged};
-use super::view::{CoverGuard, CoverLoader, error_state, grid_cell, list_cell};
+use super::view::{CoverLoader, error_state, grid_cell, list_cell};
 use crate::library::keys;
 use crate::widgets::selection_mirror::SelectionMirror;
 use crate::library::select::{Selectable, SelectionOf, Shown};
@@ -577,8 +577,6 @@ impl Inner {
         let load = Rc::clone(&self.deps.load_cover);
         let menu = Rc::clone(&self.deps.menu);
         let cover_px = crate::widgets::cover_grid::cover_width(self.deps.prefs.cover_size.get());
-        // one ticket per recycled cell: a cover that arrives after its cell was rebound is dropped (edge R10)
-        let binds: Rc<RefCell<CoverBinds>> = Rc::default();
         let factory = gtk::SignalListItemFactory::new();
         factory.connect_setup(move |_, object| {
             let Some(item) = object.downcast_ref::<gtk::ListItem>() else { return };
@@ -596,23 +594,17 @@ impl Inner {
             item.set_child(Some(&holder));
         });
         let page = Rc::downgrade(self);
+        // a rebound cell gets a new cover widget; the old one's load stops when it is removed (edge R10)
         factory.connect_bind({
-            let binds = Rc::clone(&binds);
             move |_, object| {
                 let Some(row) = object.downcast_ref::<gtk::ListItem>() else { return };
                 let Some(boxed) = row.item().and_downcast::<glib::BoxedAnyObject>() else { return };
                 let Some(holder) = row.child().and_downcast::<gtk::Box>() else { return };
-                let key = glib::object::ObjectType::as_ptr(row) as usize;
-                let ticket = binds.borrow_mut().bind(key);
-                let guard: CoverGuard = {
-                    let binds = Rc::clone(&binds);
-                    Rc::new(move || binds.borrow().accepts(key, ticket))
-                };
                 let slot = boxed.borrow::<Option<ListItem>>();
                 let cell = if mode == LibraryDisplayMode::List {
-                    list_cell(slot.as_ref(), &load, &guard)
+                    list_cell(slot.as_ref(), &load)
                 } else {
-                    grid_cell(slot.as_ref(), mode, &load, &guard, cover_px)
+                    grid_cell(slot.as_ref(), mode, &load, cover_px)
                 };
                 let shown = (*slot).clone();
                 drop(slot);
@@ -622,9 +614,6 @@ impl Inner {
                 holder.append(&cell);
                 bind_cell(&page, &cell, shown);
             }
-        });
-        factory.connect_teardown(move |_, object| {
-            binds.borrow_mut().release(glib::object::ObjectType::as_ptr(object) as usize);
         });
         if mode == LibraryDisplayMode::List {
             self.list.set_factory(Some(&factory));
@@ -849,7 +838,7 @@ pub(crate) mod tests {
             source_id: 9,
             source_name: "Gone Source".into(),
             source_lang: "en".into(),
-            load_cover: Rc::new(|_, _| {}),
+            load_cover: Rc::new(|_, _, _| gtk::Box::new(gtk::Orientation::Vertical, 0).upcast()),
             open_entry: Rc::new(move |item| open_log.borrow_mut().push(item.title.clone())),
             menu: Rc::new(|_: &ListItem| Vec::new()),
             favorite_urls: None,
@@ -1094,7 +1083,7 @@ pub(crate) mod tests {
                 source_id: 1,
                 source_name: String::new(),
                 source_lang: String::new(),
-                load_cover: Rc::new(|_, _| {}),
+                load_cover: Rc::new(|_, _, _| gtk::Box::new(gtk::Orientation::Vertical, 0).upcast()),
                 open_entry: Rc::new(|_| {}),
                 menu: Rc::new(|_: &ListItem| Vec::new()),
                 favorite_urls: None,

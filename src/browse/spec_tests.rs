@@ -183,7 +183,7 @@ fn i4_global_search_progress_is_a_half() {
         open_source: Rc::new(|_, _| {}),
         open_entry: Rc::new(|_, _| {}),
         menu: Rc::new(|_, _: &ListItem| Vec::new()),
-        load_cover: Rc::new(|_, _| {}),
+        load_cover: Rc::new(|_, _, _| gtk::Widget::from(gtk::Box::new(gtk::Orientation::Vertical, 0))),
         chips: SearchChips { filter: SourceFilter::All, only_has_results: false },
         on_chips: Rc::new(|_| {}),
     };

@@ -44,49 +44,6 @@ pub fn last_visible_index(value: f64, page: f64, upper: f64, cells: usize) -> us
     (((cells as f64) * seen).ceil() as usize).saturating_sub(1).min(cells - 1)
 }
 
-/// The recycle guard of a grid cell (edge R10): every bind of the cell takes a new ticket, and a cover that arrives for an
-/// older bind is dropped, so a recycled cell never shows another item's picture.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct CoverBind {
-    current: u64,
-}
-
-impl CoverBind {
-    /// The cell is bound to an item: returns the ticket of that item's cover load.
-    pub fn bind(&mut self) -> u64 {
-        self.current += 1;
-        self.current
-    }
-
-    /// Whether a cover that finished under `ticket` may still be applied to the cell.
-    pub fn accepts(&self, ticket: u64) -> bool {
-        ticket == self.current
-    }
-}
-
-/// The `CoverBind` of every recycled cell of one factory, keyed by the cell object (edge R10).
-#[derive(Debug, Default)]
-pub struct CoverBinds {
-    cells: std::collections::HashMap<usize, CoverBind>,
-}
-
-impl CoverBinds {
-    /// The cell `key` is bound to an item: the ticket of that item's cover load.
-    pub fn bind(&mut self, key: usize) -> u64 {
-        self.cells.entry(key).or_default().bind()
-    }
-
-    /// Whether a cover that finished under `ticket` may still be applied to the cell.
-    pub fn accepts(&self, key: usize, ticket: u64) -> bool {
-        self.cells.get(&key).is_some_and(|bind| bind.accepts(ticket))
-    }
-
-    /// The cell was torn down.
-    pub fn release(&mut self, key: usize) {
-        self.cells.remove(&key);
-    }
-}
-
 /// A request for the next page, tagged with the generation it belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageAsk {
@@ -165,19 +122,6 @@ mod tests {
     }
 
     #[test]
-    fn a_stale_cover_never_reaches_a_recycled_cell() {
-        let mut binds = CoverBinds::default();
-        let first = binds.bind(1);
-        let second = binds.bind(1);
-        let other = binds.bind(2);
-        assert!(!binds.accepts(1, first), "the cell was rebound to another item");
-        assert!(binds.accepts(1, second));
-        assert!(binds.accepts(2, other), "cells do not share tickets");
-        binds.release(1);
-        assert!(!binds.accepts(1, second), "a torn-down cell takes nothing");
-    }
-
-    #[test]
     fn list_height_is_the_container_minus_the_top_bar_and_never_negative() {
         assert_eq!(list_height(800, 56), 744);
         assert_eq!(list_height(40, 56), 0);
@@ -199,15 +143,6 @@ mod tests {
         assert_eq!(last_visible_index(0.0, 100.0, 1000.0, 0), 0);
     }
 
-    #[test]
-    fn a_cover_for_a_recycled_cell_is_dropped() {
-        let mut cell = CoverBind::default();
-        let first = cell.bind();
-        assert!(cell.accepts(first));
-        let second = cell.bind();
-        assert!(!cell.accepts(first), "the earlier item's cover never lands on the recycled cell");
-        assert!(cell.accepts(second));
-    }
 
     #[test]
     fn only_one_page_request_is_in_flight_at_a_time() {

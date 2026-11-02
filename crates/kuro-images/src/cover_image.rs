@@ -102,11 +102,19 @@ impl CoverBinding {
         self.state = CoverState::Placeholder;
     }
 
+    /// Whether a load was started and has not finished yet.
+    pub fn in_flight(&self) -> bool {
+        self.cancel.is_some()
+    }
+
     /// Applies the result of the load started with `generation`. A result of an older load is dropped, and so is
     /// a cancelled one, which is not an error to show. Returns whether the state changed.
     pub fn finish(&mut self, generation: u64, result: Result<LoadedImage, ImageError>) -> bool {
         if generation != self.generation {
             return false;
+        }
+        if !matches!(result, Err(ImageError::Cancelled)) {
+            self.cancel = None;
         }
         self.state = match result {
             Ok(loaded) => CoverState::Loaded(loaded.image),

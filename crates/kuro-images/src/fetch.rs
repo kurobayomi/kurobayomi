@@ -7,7 +7,8 @@ use std::future::Future;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
 use ::http::HeaderMap;
 use bytes::Bytes;
@@ -26,7 +27,7 @@ use crate::http;
 use crate::icc::{self, DisplayProfile};
 use crate::keys;
 use crate::memory_cache::{DEFAULT_BUDGET_BYTES, MemoryCache};
-use crate::options::LoadOptions;
+use crate::options::{LoadOptions, Priority};
 use crate::platform::image_cache_dir;
 use crate::recheck;
 use crate::resource::{self, Resource};
@@ -35,6 +36,9 @@ use crate::resource::{self, Resource};
 pub const FETCH_CONCURRENCY: usize = 8;
 /// At most this many decodes run at once (behavior section 2.3).
 pub const DECODE_CONCURRENCY: usize = 3;
+/// The extra fetch and decode slots only `Priority::High` requests take, so the open page's picture starts at once even
+/// while every normal slot is busy.
+pub const HIGH_PRIORITY_SLOTS: usize = 1;
 
 /// Where the image came from (behavior sections 4.3 and 6.2). `fetch` returns `Disk` or `Network`; `Memory` is
 /// the reader's own buffer (`buffered`) or a decoded image served by the memory cache (`ImageService::load`).
@@ -96,6 +100,11 @@ pub struct ImageService {
     disk: DiskImageCache,
     fetch_permits: Semaphore,
     decode_permits: Semaphore,
+    high_fetch_permits: Semaphore,
+    high_decode_permits: Semaphore,
+    /// One gate per cache key being loaded: a second request for the same picture waits for the first and then finds it
+    /// in the memory cache, instead of fetching and decoding it again.
+    in_flight: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     memory: Arc<MemoryCache>,
     /// The display ICC profile every decode applies, `None` for no colour management (T-34a-031).
     display_profile: RwLock<Option<Arc<DisplayProfile>>>,
@@ -132,6 +141,9 @@ impl ImageService {
             disk,
             fetch_permits: Semaphore::new(FETCH_CONCURRENCY),
             decode_permits: Semaphore::new(DECODE_CONCURRENCY),
+            high_fetch_permits: Semaphore::new(HIGH_PRIORITY_SLOTS),
+            high_decode_permits: Semaphore::new(HIGH_PRIORITY_SLOTS),
+            in_flight: Mutex::default(),
             memory: Arc::new(MemoryCache::new(DEFAULT_BUDGET_BYTES)),
             display_profile: RwLock::new(None),
         })
@@ -171,6 +183,18 @@ impl ImageService {
             .expect("decode semaphore is never closed")
     }
 
+    /// A slot from `normal`, or for a `High` request the first free one of `normal` and `high`.
+    async fn slot<'a>(normal: &'a Semaphore, high: &'a Semaphore, priority: Priority) -> SemaphorePermit<'a> {
+        let permit = match priority {
+            Priority::Normal => normal.acquire().await,
+            Priority::High => tokio::select! {
+                permit = normal.acquire() => permit,
+                permit = high.acquire() => permit,
+            },
+        };
+        permit.expect("image semaphores are never closed")
+    }
+
     /// Loads one image: the decoded-image cache, then `fetch`, then decode on a blocking thread under one of the
     /// three decode slots (design sections 5.1 and 13.1). Cancelling ends the call with `ImageError::Cancelled`
     /// and nothing is cached; a result that finishes after the cancel is dropped (edge E-IMG-30).
@@ -188,6 +212,51 @@ impl ImageService {
                 key,
             });
         }
+        // one load per picture: a request for a key already loading waits for it, then takes it from the memory cache.
+        // The gate is per priority, so the open page never waits behind a thumbnail still queued for a slot.
+        let lane = format!("{:?};{key}", req.options.priority);
+        let gate = self.gate(&lane);
+        let held = tokio::select! {
+            biased;
+            _ = req.cancel.cancelled() => {
+                self.release(&lane, gate);
+                return Err(ImageError::Cancelled);
+            }
+            held = gate.clone().lock_owned() => held,
+        };
+        if let Some(image) = self.memory.get(&key, policy) {
+            drop(held);
+            self.release(&lane, gate);
+            return Ok(LoadedImage {
+                image,
+                source: DataSource::Memory,
+                key,
+            });
+        }
+        let result = self.load_once(req, &key).await;
+        drop(held);
+        self.release(&lane, gate);
+        result
+    }
+
+    /// The gate of `lane` (a priority and a cache key), shared by every request for it while one is loading.
+    fn gate(&self, lane: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut map = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
+        Arc::clone(map.entry(lane.to_owned()).or_default())
+    }
+
+    /// Lets go of `gate`; the last request of a lane removes its entry.
+    fn release(&self, lane: &str, gate: Arc<tokio::sync::Mutex<()>>) {
+        let mut map = self.in_flight.lock().unwrap_or_else(|e| e.into_inner());
+        // the map holds one reference and `gate` the other: nobody else is waiting
+        if Arc::strong_count(&gate) <= 2 {
+            map.remove(lane);
+        }
+    }
+
+    /// Fetches and decodes one picture, and keeps the result in the memory cache.
+    async fn load_once(&self, req: &LoadRequest, key: &str) -> Result<LoadedImage, ImageError> {
+        let (key, policy) = (key.to_owned(), req.options.memory_cache);
         let fetched = self.fetch(&req.art, &req.options, &req.cancel).await?;
         let bytes = match fetched.payload {
             Payload::Bytes(bytes) => bytes,
@@ -217,7 +286,7 @@ impl ImageService {
         let permit = tokio::select! {
             biased;
             _ = cancel.cancelled() => return Err(ImageError::Cancelled),
-            permit = self.decode_permit() => permit,
+            permit = Self::slot(&self.decode_permits, &self.high_decode_permits, opts.priority) => permit,
         };
         let joined = tokio::task::spawn_blocking(move || decode(&bytes, &decode_opts)).await;
         drop(permit);
@@ -251,11 +320,7 @@ impl ImageService {
         opts: &LoadOptions,
         cancel: &CancellationToken,
     ) -> Result<Fetched, ImageError> {
-        let _permit = self
-            .fetch_permits
-            .acquire()
-            .await
-            .map_err(|_| ImageError::Cancelled)?;
+        let _permit = Self::slot(&self.fetch_permits, &self.high_fetch_permits, opts.priority).await;
         self.resolve(art, opts, cancel).await
     }
 
@@ -1024,6 +1089,34 @@ mod tests {
         let second = svc.load(&req).await.unwrap();
         assert_eq!(second.source, DataSource::Memory);
         assert!(Arc::ptr_eq(&first.image, &second.image));
+    }
+
+    #[tokio::test]
+    async fn two_loads_of_one_picture_at_once_decode_it_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let svc = service(tmp.path(), Arc::new(NoSources)).await;
+        let req = request(&local_png(tmp.path(), 40, 30), LoadOptions::default());
+        let (a, b) = tokio::join!(svc.load(&req), svc.load(&req));
+        let (a, b) = (a.unwrap(), b.unwrap());
+        assert!(Arc::ptr_eq(&a.image, &b.image), "the second waited for the first and shares its picture");
+        assert!(svc.in_flight.lock().unwrap().is_empty(), "nothing is left waiting");
+    }
+
+    #[tokio::test]
+    async fn a_high_priority_load_does_not_wait_for_busy_normal_slots() {
+        let tmp = tempfile::tempdir().unwrap();
+        let svc = service(tmp.path(), Arc::new(NoSources)).await;
+        let file = local_png(tmp.path(), 40, 30);
+        let mut held = Vec::new();
+        for _ in 0..DECODE_CONCURRENCY {
+            held.push(svc.decode_permit().await);
+        }
+        let normal = request(&file, LoadOptions::default());
+        assert!(tokio::time::timeout(Duration::from_millis(100), svc.load(&normal)).await.is_err(), "a normal load waits");
+        let high = request(&file, LoadOptions { priority: Priority::High, ..LoadOptions::default() });
+        let loaded = tokio::time::timeout(Duration::from_secs(5), svc.load(&high)).await;
+        assert!(loaded.is_ok_and(|r| r.is_ok()), "the open page's picture takes its own slot");
+        drop(held);
     }
 
     #[tokio::test]

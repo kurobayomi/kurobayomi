@@ -156,54 +156,20 @@ pub fn source_row_with(
     super::look::list_row(Some(cover), name, language, has_trailing.then(|| trailing.upcast()))
 }
 
-/// What a cover load calls when it has the picture.
-pub type CoverDone = Box<dyn FnOnce(gtk::gdk::Paintable)>;
+/// Builds the cover of a listed entry at a size, with the app's one cover widget (`look::cover`).
+pub type CoverLoader = Rc<dyn Fn(&ListItem, i32, i32) -> gtk::Widget>;
 
-/// One cover to load: its url or path, the source of the listed entry (whose image headers a remote cover is sent
-/// with), and the picture that shows it (a load still running when the picture is destroyed is cancelled).
-pub struct CoverAsk<'a> {
-    pub url: &'a str,
-    pub source_id: i64,
-    pub picture: &'a gtk::Picture,
-}
-
-/// Loads the cover asked for and hands the picture to `CoverDone`. The app decides how (network, cache); a failed
-/// load never calls it and leaves the placeholder.
-pub type CoverLoader = Rc<dyn Fn(&CoverAsk, CoverDone)>;
-
-/// True while the cell that asked for a cover is still bound to the item it asked for (edge R10).
-pub type CoverGuard = Rc<dyn Fn() -> bool>;
-
-/// A guard that always accepts, for cells that are never recycled.
-pub fn always() -> CoverGuard {
-    Rc::new(|| true)
-}
-
-/// The loader of the listing covers. A file on disk, such as the local source's, is read off the GTK thread; an http(s)
-/// url goes through the app's image service (network, disk cache and decode off the GTK thread). Without the service a
-/// remote cover keeps its placeholder.
+/// The cover builder of a listing of `kind`: a web, `file://` or bare-path cover goes through the shared cover widget
+/// (image service, load only while on screen); no cover shows the title's initials.
 ///
 /// `kind` is the kind of the listed entries: the picture is cached under the same key the entry page and the library
 /// use for it, so a cover seen in Browse is not downloaded again when the entry opens.
 pub fn file_cover_loader(kind: kuro_platform::kind::Kind) -> CoverLoader {
-    Rc::new(move |ask, done| {
-        // a source's poster-on-demand marker resolves to a remote picture inside the image service
-        // a local title's `file://` cover goes through the service too, for its decoded-image cache
-        if ask.url.starts_with("https://") || ask.url.starts_with("http://") || ask.url.starts_with("file://") || ask.url.starts_with(kuro_images::fetch::COVER_MARKER) {
-            if let (Some(service), Ok(runtime)) = (crate::entry_core::cover_view::service(), tokio::runtime::Handle::try_current()) {
-                remote_cover(service, &runtime, remote_art(ask.url, ask.source_id, kind), ask.picture, done);
-            }
-            return;
-        }
-        let path = ask.url.to_owned();
-        gtk::glib::spawn_future_local(async move {
-            let read = gtk::gio::spawn_blocking(move || std::fs::read(path)).await;
-            if let Ok(Ok(bytes)) = read {
-                if let Ok(texture) = gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_owned(bytes)) {
-                    done(texture.upcast());
-                }
-            }
-        });
+    Rc::new(move |item, width, height| {
+        // a bare path (a local title's file) is the same picture as its `file://` address
+        let url = item.cover.as_deref().map(|url| if url.starts_with('/') { gtk::gio::File::for_path(url).uri().to_string() } else { url.to_owned() });
+        let art = url.map(|url| remote_art(&url, item.source_id, kind));
+        super::look::cover(&item.title, art.as_ref(), width, height)
     })
 }
 
@@ -215,57 +181,13 @@ pub(super) fn remote_art(url: &str, source_id: i64, kind: kuro_platform::kind::K
     ArtRef { owner: kind, entry_id: 0, source_id, kind: ArtKind::Cover, url: Some(url.to_owned()), favorite: false, last_modified: 0 }
 }
 
-/// Loads `art` through the image service. The load is cancelled when `picture` is destroyed (its cell was rebound or its
-/// page closed), which frees its blocking-pool thread, and a cancelled load never calls `done`.
-fn remote_cover(service: std::sync::Arc<kuro_images::fetch::ImageService>, runtime: &tokio::runtime::Handle, art: kuro_images::art::ArtRef, picture: &gtk::Picture, done: CoverDone) {
-    use kuro_images::fetch::LoadRequest;
-
-    let cancel = tokio_util::sync::CancellationToken::new();
-    picture.connect_destroy({
-        let cancel = cancel.clone();
-        move |_| cancel.cancel()
-    });
-    let (sender, receiver) = async_channel::bounded(1);
-    // the service's future is not `Send`, so it runs to the end on a blocking-pool thread
-    let driver = runtime.clone();
-    let request = LoadRequest { art, options: Default::default(), cancel: cancel.clone() };
-    runtime.spawn_blocking(move || {
-        let _ = sender.send_blocking(driver.block_on(service.load(&request)));
-    });
-    gtk::glib::spawn_future_local(async move {
-        if let Ok(Ok(loaded)) = receiver.recv().await
-            && !cancel.is_cancelled()
-        {
-            let spec = kuro_images::texture::TextureSpec::from_decoded(&loaded.image);
-            let bytes = gtk::glib::Bytes::from(&spec.pixels[..]);
-            let texture = gtk::gdk::MemoryTexture::new(spec.width, spec.height, gtk::gdk::MemoryFormat::R8g8b8a8, &bytes, spec.stride);
-            done(texture.upcast());
-        }
-    });
-}
-
-/// A cover: the placeholder frame with the picture over it. Only this widget carries the favourite alpha, so the
+/// A cover: the shared cover widget in the card's rounded frame. Only this widget carries the favourite alpha, so the
 /// title and the badge next to it stay at full strength (B§2.7).
-pub(super) fn cover_widget(item: &ListItem, width: i32, height: i32, load: &CoverLoader, guard: &CoverGuard) -> gtk::Overlay {
-    // the library card's look: rounded corners, and the title's initials until the picture draws
+pub(super) fn cover_widget(item: &ListItem, width: i32, height: i32, load: &CoverLoader) -> gtk::Overlay {
     let overlay = gtk::Overlay::new();
     overlay.add_css_class("kb-card-cover");
     overlay.set_overflow(gtk::Overflow::Hidden);
-    overlay.set_child(Some(&super::look::cover(&item.title, None, width, height)));
-    if let Some(url) = item.cover.as_deref() {
-        let picture = gtk::Picture::new();
-        picture.set_content_fit(gtk::ContentFit::Cover);
-        picture.set_can_shrink(true);
-        let (weak, guard) = (picture.downgrade(), Rc::clone(guard));
-        let ask = CoverAsk { url, source_id: item.source_id, picture: &picture };
-        load(&ask, Box::new(move |paintable| {
-            // a cover that arrives after its cell was rebound belongs to another item
-            if let (true, Some(picture)) = (guard(), weak.upgrade()) {
-                picture.set_paintable(Some(&paintable));
-            }
-        }));
-        overlay.add_overlay(&picture);
-    }
+    overlay.set_child(Some(&load(item, width, height)));
     overlay.set_opacity(cell_alpha(item.favorite));
     overlay
 }
@@ -295,8 +217,8 @@ fn title_label(text: &str, lines: i32) -> Label {
 /// A grid cell for the comfortable, compact or cover-only mode. A `None` slot is a placeholder and draws nothing.
 /// The cell carries half the gap on every side; the container (see `listing_view`) carries the rest of the padding. The
 /// cover is `cover_width` px wide and 2:3.
-pub fn grid_cell(item: Option<&ListItem>, mode: LibraryDisplayMode, load: &CoverLoader, guard: &CoverGuard, cover_width: i32) -> GBox {
-    grid_cell_lines(item, mode, load, guard, cover_width, 2)
+pub fn grid_cell(item: Option<&ListItem>, mode: LibraryDisplayMode, load: &CoverLoader, cover_width: i32) -> GBox {
+    grid_cell_lines(item, mode, load, cover_width, 2)
 }
 
 /// `grid_cell` with `title_lines` lines of title: the listing shows two, a global-search card three (T-40a-011).
@@ -304,7 +226,6 @@ pub fn grid_cell_lines(
     item: Option<&ListItem>,
     mode: LibraryDisplayMode,
     load: &CoverLoader,
-    guard: &CoverGuard,
     cover_width: i32,
     title_lines: i32,
 ) -> GBox {
@@ -318,7 +239,7 @@ pub fn grid_cell_lines(
     cell.set_halign(Align::Center);
     let Some(item) = item else { return cell };
     let stage = gtk::Overlay::new();
-    stage.set_child(Some(&cover_widget(item, cover_width, cover_width * 3 / 2, load, guard)));
+    stage.set_child(Some(&cover_widget(item, cover_width, cover_width * 3 / 2, load)));
     if badge_visible(item.favorite) {
         stage.add_overlay(&in_library_badge());
     }
@@ -344,11 +265,11 @@ pub fn grid_cell_lines(
 
 /// The cell of the list-mode listing, a cell of a `gtk::ListView` (the view's `rich-list` class gives it its insets): a
 /// small cover, the title on one line, and the In library badge at the end for favourites.
-pub fn list_cell(item: Option<&ListItem>, load: &CoverLoader, guard: &CoverGuard) -> GBox {
+pub fn list_cell(item: Option<&ListItem>, load: &CoverLoader) -> GBox {
     let line = GBox::new(O::Horizontal, SPACE_M);
     let Some(item) = item else { return line };
     let size = super::look::SMALL;
-    let cover = cover_widget(item, size.width, size.height, load, guard);
+    let cover = cover_widget(item, size.width, size.height, load);
     cover.set_valign(Align::Center);
     line.append(&cover);
     let title = crate::ui::row_title(&item.title);
@@ -420,7 +341,7 @@ pub(crate) mod tests {
     fn a_long_title_never_makes_a_card_wider_than_its_cover() {
         crate::testing::with_display(|| {
             let item = ListItem { title: "Omniscient Reader's Viewpoint, the long edition".into(), ..ListItem::default() };
-            let cell = grid_cell_lines(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), &always(), 96, 3);
+            let cell = grid_cell_lines(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), 96, 3);
             let (_, natural, _, _) = cell.measure(O::Horizontal, -1);
             assert!(natural <= 96 + 2 * CELL_MARGIN_PX, "the card asks for {natural} px");
         });
@@ -431,18 +352,18 @@ pub(crate) mod tests {
     }
 
     fn loader() -> CoverLoader {
-        Rc::new(|_, _| {})
+        Rc::new(|_, _, _| GBox::new(O::Vertical, 0).upcast())
     }
 
     fn a_placeholder_slot_renders_nothing() {
         for mode in LibraryDisplayMode::ALL {
-            assert!(grid_cell(None, mode, &loader(), &always(), 136).first_child().is_none(), "{mode:?}");
+            assert!(grid_cell(None, mode, &loader(), 136).first_child().is_none(), "{mode:?}");
         }
-        assert!(list_cell(None, &loader(), &always()).first_child().is_none());
+        assert!(list_cell(None, &loader()).first_child().is_none());
     }
 
     fn a_favourite_dims_only_its_cover_and_not_the_cell_or_the_title() {
-        let cell = grid_cell(Some(&favorite("Berserk")), LibraryDisplayMode::ComfortableGrid, &loader(), &always(), 136);
+        let cell = grid_cell(Some(&favorite("Berserk")), LibraryDisplayMode::ComfortableGrid, &loader(), 136);
         assert_eq!(cell.opacity(), 1.0, "the cell itself is not dimmed");
         let stage = cell.first_child().and_downcast::<gtk::Overlay>().expect("stage");
         let cover = stage.child().expect("cover");
@@ -452,76 +373,38 @@ pub(crate) mod tests {
     }
 
     fn a_cell_has_half_a_gap_of_margin_on_every_side() {
-        let cell = grid_cell(None, LibraryDisplayMode::CompactGrid, &loader(), &always(), 136);
+        let cell = grid_cell(None, LibraryDisplayMode::CompactGrid, &loader(), 136);
         assert_eq!((cell.margin_start(), cell.margin_end(), cell.margin_top(), cell.margin_bottom()), (2, 2, 2, 2));
     }
 
     fn cover_only_has_no_title_and_comfortable_has_one_under_the_cover() {
         let item = ListItem { title: "A".into(), ..ListItem::default() };
-        let only = grid_cell(Some(&item), LibraryDisplayMode::CoverOnlyGrid, &loader(), &always(), 136);
+        let only = grid_cell(Some(&item), LibraryDisplayMode::CoverOnlyGrid, &loader(), 136);
         assert!(only.first_child().and_then(|c| c.next_sibling()).is_none());
-        let comfortable = grid_cell(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), &always(), 136);
+        let comfortable = grid_cell(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), 136);
         assert!(comfortable.last_child().is_some_and(|c| c.is::<Label>()));
     }
 
-    fn the_cover_loader_is_called_with_the_item_cover() {
+    fn the_cover_loader_is_called_with_the_item_and_the_cell_size() {
         let seen = Rc::new(std::cell::RefCell::new(Vec::new()));
         let sink = Rc::clone(&seen);
-        let load: CoverLoader = Rc::new(move |ask: &CoverAsk, _| sink.borrow_mut().push((ask.url.to_owned(), ask.source_id)));
+        let load: CoverLoader = Rc::new(move |item: &ListItem, width, height| {
+            sink.borrow_mut().push((item.cover.clone(), item.source_id, width, height));
+            GBox::new(O::Vertical, 0).upcast()
+        });
         let item = ListItem { title: "A".into(), source_id: 41, cover: Some("/covers/a.png".into()), ..ListItem::default() };
-        let _ = grid_cell(Some(&item), LibraryDisplayMode::CompactGrid, &load, &always(), 136);
-        let _ = list_cell(Some(&item), &load, &always());
-        let want = ("/covers/a.png".to_owned(), 41);
-        assert_eq!(*seen.borrow(), [want.clone(), want], "the url and the listed entry's source");
+        let _ = grid_cell(Some(&item), LibraryDisplayMode::CompactGrid, &load, 136);
+        let _ = list_cell(Some(&item), &load);
+        let small = super::super::look::SMALL;
+        let cover = Some("/covers/a.png".to_owned());
+        assert_eq!(*seen.borrow(), [(cover.clone(), 41, 136, 204), (cover, 41, small.width, small.height)]);
     }
 
-    /// The http branch: the cover goes out through the image service. Destroying its picture (the cell was rebound or
-    /// the page closed) cancels the request in flight, and the picture is never drawn. The server is a local socket
-    /// that takes the request and never answers.
-    fn a_remote_cover_is_cancelled_with_its_picture_and_never_drawn() {
-        use std::io::Read;
-        use std::sync::Arc;
-
-        struct NoHeaders;
-        impl kuro_images::fetch::SourceHttp for NoHeaders {
-            fn http_source(&self, _: i64) -> Option<kuro_images::fetch::SourceClient> {
-                None
-            }
-        }
-        let rt = tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_all().build().expect("runtime");
-        let paths = kuro_testkit::TempPaths::new().expect("paths");
-        // a client that may reach this computer: the app's own refuses local addresses, and the test's server is local
-        let prefs = kuro_prefs::network::NetworkPrefs::new(kuro_prefs::store::PrefStore::in_memory());
-        let toaster = kuro_platform::toast::toast_channel().0;
-        let client = kuro_net::NetworkClient::new(&prefs, kuro_platform::paths::Paths::cookie_jar_file(&paths), Arc::new(kuro_platform::webview::NoWebView), toaster).expect("client");
-        let service = rt.block_on(kuro_images::fetch::ImageService::new(client, Arc::new(NoHeaders), Arc::new(paths))).expect("service");
-        let server = std::net::TcpListener::bind("127.0.0.1:0").expect("a local socket");
-        let url = format!("http://{}/cover.jpg", server.local_addr().expect("address"));
-
-        let holder = GBox::new(O::Vertical, 0);
-        let picture = gtk::Picture::new();
-        holder.append(&picture);
-        let drawn = Rc::new(Cell::new(false));
-        let flag = Rc::clone(&drawn);
-        remote_cover(Arc::new(service), rt.handle(), remote_art(&url, 41, kuro_platform::kind::Kind::Anime), &picture, Box::new(move |_| flag.set(true)));
-        let (mut request, _) = server.accept().expect("the cover request reaches the service's client");
-        holder.remove(&picture);
-        drop(picture);
-        request.set_read_timeout(Some(std::time::Duration::from_secs(5))).expect("timeout");
-        let mut buffer = [0_u8; 4096];
-        let closed = loop {
-            match request.read(&mut buffer) {
-                Ok(0) => break true,
-                Ok(_) => continue,
-                Err(_) => break false,
-            }
-        };
-        assert!(closed, "the destroyed picture cancels the request in flight");
-        let until = std::time::Instant::now() + std::time::Duration::from_millis(300);
-        while std::time::Instant::now() < until {
-            gtk::glib::MainContext::default().iteration(false);
-        }
-        assert!(!drawn.get(), "a cancelled cover never reaches its picture");
+    fn a_listed_cover_is_the_shared_cover_widget() {
+        let load = file_cover_loader(kuro_platform::kind::Kind::Manga);
+        let item = ListItem { title: "Solo Leveling".into(), ..ListItem::default() };
+        let cover = load(&item, 40, 56);
+        assert!(cover.has_css_class("kb-cover-initials"), "no cover is the title's initials, as everywhere else");
     }
 
     fn a_row_click_activates_and_a_right_click_or_the_menu_key_asks_for_the_menu() {
@@ -557,8 +440,8 @@ pub(crate) mod tests {
         a_favourite_dims_only_its_cover_and_not_the_cell_or_the_title();
         a_cell_has_half_a_gap_of_margin_on_every_side();
         cover_only_has_no_title_and_comfortable_has_one_under_the_cover();
-        the_cover_loader_is_called_with_the_item_cover();
-        a_remote_cover_is_cancelled_with_its_picture_and_never_drawn();
+        the_cover_loader_is_called_with_the_item_and_the_cell_size();
+        a_listed_cover_is_the_shared_cover_widget();
         a_row_click_activates_and_a_right_click_or_the_menu_key_asks_for_the_menu();
     }
 }

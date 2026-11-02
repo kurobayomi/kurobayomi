@@ -1,4 +1,4 @@
-//! The cover of an entry header (T-38a-059): a placeholder until the image is ready, then the image with a 150 ms
+//! The cover widget (T-38a-059): a placeholder until the image is ready, then the image with a 150 ms
 //! crossfade. The load runs on the blocking pool through the shared `kuro-images` service (fetch, disk cache and decode
 //! all happen off the GTK thread); only the texture is built here. The image is keyed by the entry and its
 //! `cover_last_modified`, so a newer stamp loads the cover again with no restart, and an image of an older load that
@@ -6,7 +6,7 @@
 //!
 //! The service is installed by the app at startup (`install_images`). Without one the placeholder stays.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::{Arc, OnceLock};
 
@@ -17,7 +17,7 @@ use kuro_images::art::ArtRef;
 use kuro_platform::kind::Kind;
 use kuro_images::cover_image::{CoverBinding, CoverState};
 use kuro_images::fetch::{ImageService, LoadRequest};
-use kuro_images::options::LoadOptions;
+use kuro_images::options::{LoadOptions, Priority};
 use kuro_images::texture::TextureSpec;
 
 /// The crossfade between the placeholder and the image, and between an old image and its replacement.
@@ -48,14 +48,27 @@ pub fn needs_load(shown: Option<&ArtRef>, wanted: &ArtRef) -> bool {
     })
 }
 
-/// A cover frame of a fixed size. Cloning shares the same widgets.
+/// A cover frame of a fixed size. Cloning shares the same widgets. It is the one cover widget of the app (entry headers,
+/// list rows, listing cards; anime and manga alike).
+///
+/// A cover loads only while it is on screen: `load` on a hidden frame waits until it is shown, and a load still running
+/// when the frame is hidden (a tab switched away, a page pushed over the list) is stopped and starts again on show. So a
+/// screen the user is not looking at never holds the image queue up for the one they are.
 #[derive(Clone)]
 pub struct CoverView {
     pub frame: gtk::Frame,
+    inner: Rc<Inner>,
+}
+
+struct Inner {
     stack: gtk::Stack,
     picture: gtk::Picture,
-    shown: Rc<RefCell<Option<ArtRef>>>,
-    binding: Rc<RefCell<CoverBinding>>,
+    /// The image on screen or loading.
+    shown: RefCell<Option<ArtRef>>,
+    /// The image asked for while the frame was hidden, loaded once it shows.
+    wanted: RefCell<Option<ArtRef>>,
+    priority: Cell<Priority>,
+    binding: RefCell<CoverBinding>,
 }
 
 impl CoverView {
@@ -74,32 +87,59 @@ impl CoverView {
         frame.set_size_request(width, height);
         frame.set_overflow(gtk::Overflow::Hidden);
         frame.set_child(Some(&sized));
-        let binding = Rc::new(RefCell::new(CoverBinding::default()));
+        let inner = Rc::new(Inner { stack, picture, shown: RefCell::default(), wanted: RefCell::default(), priority: Cell::default(), binding: RefCell::default() });
+        frame.connect_map({
+            let inner = Rc::clone(&inner);
+            move |_| Inner::start(&inner)
+        });
+        frame.connect_unmap({
+            let inner = Rc::clone(&inner);
+            move |_| inner.pause()
+        });
         // a destroyed page cancels the load in flight
         frame.connect_destroy({
-            let binding = Rc::clone(&binding);
-            move |_| binding.borrow_mut().unbind()
+            let inner = Rc::clone(&inner);
+            move |_| inner.binding.borrow_mut().unbind()
         });
-        Self { frame, stack, picture, shown: Rc::default(), binding }
+        Self { frame, inner }
+    }
+
+    /// The image queue this cover waits in: `Priority::High` for the open page's own cover.
+    pub fn with_priority(self, priority: Priority) -> Self {
+        self.inner.priority.set(priority);
+        self
     }
 
     /// Shows `art`. The same image again does nothing; another one (or a newer `cover_last_modified`) keeps what is on
-    /// screen until the new image is ready and then fades to it.
+    /// screen until the new image is ready and then fades to it. A hidden frame loads it once it is shown.
     pub fn load(&self, art: ArtRef) {
-        if !needs_load(self.shown.borrow().as_ref(), &art) {
+        let current = self.inner.wanted.borrow().clone().or_else(|| self.inner.shown.borrow().clone());
+        if !needs_load(current.as_ref(), &art) {
             return;
         }
-        *self.shown.borrow_mut() = Some(art.clone());
-        let (generation, cancel) = self.binding.borrow_mut().bind();
+        *self.inner.wanted.borrow_mut() = Some(art);
+        if self.frame.is_mapped() {
+            Inner::start(&self.inner);
+        }
+    }
+}
+
+impl Inner {
+    /// Starts the load of the image waiting for the frame to show, if any.
+    fn start(this: &Rc<Self>) {
+        let Some(art) = this.wanted.borrow_mut().take() else { return };
+        *this.shown.borrow_mut() = Some(art.clone());
+        let (generation, cancel) = this.binding.borrow_mut().bind();
         let (Some(service), Ok(runtime)) = (SERVICE.get().cloned(), tokio::runtime::Handle::try_current()) else { return };
+        let options = LoadOptions { priority: this.priority.get(), ..LoadOptions::default() };
         let (done, loaded) = async_channel::bounded(1);
         // the service's future is not `Send`, so it runs to the end on a blocking-pool thread
         let driver = runtime.clone();
         runtime.spawn_blocking(move || {
-            let result = driver.block_on(service.load(&LoadRequest { art, options: LoadOptions::default(), cancel }));
+            let result = driver.block_on(service.load(&LoadRequest { art, options, cancel }));
             let _ = done.send_blocking(result);
         });
-        let this = self.clone();
+        let this = Rc::clone(this);
         glib::spawn_future_local(async move {
             if let Ok(result) = loaded.recv().await
                 && this.binding.borrow_mut().finish(generation, result)
@@ -107,6 +147,18 @@ impl CoverView {
                 this.show();
             }
         });
+    }
+
+    /// The frame was hidden: a load still running stops, and the image is asked for again when the frame shows. An
+    /// image already on screen stays.
+    fn pause(&self) {
+        if !self.binding.borrow().in_flight() {
+            return;
+        }
+        self.binding.borrow_mut().unbind();
+        if let Some(art) = self.shown.borrow_mut().take() {
+            self.wanted.borrow_mut().get_or_insert(art);
+        }
     }
 
     /// Puts the loaded image on screen. A failed load leaves the placeholder.
@@ -135,8 +187,8 @@ mod tests {
         crate::testing::with_display(|| {
             let view = CoverView::new(64, 96);
             let big = gdk::MemoryTexture::new(600, 900, gdk::MemoryFormat::R8g8b8a8, &glib::Bytes::from(&vec![0u8; 600 * 900 * 4][..]), 600 * 4);
-            view.picture.set_paintable(Some(&big));
-            view.stack.set_visible_child_name("image");
+            view.inner.picture.set_paintable(Some(&big));
+            view.inner.stack.set_visible_child_name("image");
             let (_, natural_h, _, _) = view.frame.measure(gtk::Orientation::Vertical, 64);
             let (_, natural_w, _, _) = view.frame.measure(gtk::Orientation::Horizontal, -1);
             assert_eq!((natural_w, natural_h), (64, 96), "the image's 600x900 never reaches the layout");

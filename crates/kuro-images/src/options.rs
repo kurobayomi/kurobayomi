@@ -36,6 +36,15 @@ pub enum Scale {
     Fill,
 }
 
+/// Which queue a request waits in. `High` is for what the user is looking at right now (the open entry page's cover and
+/// backdrop): it has slots of its own, so it never waits behind the thumbnails of a long list.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Priority {
+    #[default]
+    Normal,
+    High,
+}
+
 /// Per-request options (behavior section 3). Defaults are Coil's, plus `use_custom_cover`, the only
 /// Kotlin extra that defaults to true.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,6 +58,7 @@ pub struct LoadOptions {
     pub network_cache: CachePolicy,
     pub size: RequestSize,
     pub scale: Scale,
+    pub priority: Priority,
 }
 
 impl Default for LoadOptions {
@@ -63,6 +73,7 @@ impl Default for LoadOptions {
             network_cache: CachePolicy::Enabled,
             size: RequestSize::Original,
             scale: Scale::Fit,
+            priority: Priority::Normal,
         }
     }
 }

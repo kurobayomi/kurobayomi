@@ -463,11 +463,10 @@ pub(crate) mod tests {
     }
 
     fn the_has_results_toggle_filters_the_open_page_and_is_not_stored() {
-        // the search options menu: its button, and the dot that shows while a Show only filter is on
-        fn options(root: &gtk::Widget) -> Option<(gtk::MenuButton, gtk::Widget)> {
+        // the search options menu button, which takes the accent colour while a Show only filter is on
+        fn options(root: &gtk::Widget) -> Option<gtk::MenuButton> {
             if let Some(button) = root.downcast_ref::<gtk::MenuButton>().filter(|b| b.tooltip_text().as_deref() == Some(super::super::pages::search_options_label().as_str())) {
-                let dot = button.parent()?.last_child()?;
-                return Some((button.clone(), dot));
+                return Some(button.clone());
             }
             let mut child = root.first_child();
             while let Some(next) = child {
@@ -484,13 +483,13 @@ pub(crate) mod tests {
         let (_page, actions) = search_page(&rig.env, &start, false);
         let in_header = |actions: &[gtk::Widget]| actions.iter().find_map(options);
         assert!(pump_until(|| in_header(&actions).is_some()), "the search options menu");
-        let (button, dot) = in_header(&actions).expect("menu");
-        assert!(!dot.is_visible(), "Has results starts off on every open");
+        let button = in_header(&actions).expect("menu");
+        assert!(!button.has_css_class("accent"), "Has results starts off on every open");
         button.activate_action("viewopt.has_results", None).expect("the Has results check");
-        assert!(dot.is_visible(), "Has results is on in this page");
+        assert!(button.has_css_class("accent"), "Has results is on in this page");
         let (_again, again) = search_page(&rig.env, &start, true);
         assert!(pump_until(|| in_header(&again).is_some()));
-        assert!(!in_header(&again).expect("menu").1.is_visible(), "the next page does not read it back");
+        assert!(!in_header(&again).expect("menu").has_css_class("accent"), "the next page does not read it back");
     }
     fn a_source_arrow_opens_its_listing_with_the_typed_text() {
         let rig = rig();

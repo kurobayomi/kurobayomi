@@ -169,7 +169,8 @@ pub const TITLE_MAX_LINES: i32 = 3;
 pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) -> gtk::Overlay {
     // the cover sits inside the header's 16 px side margins
     let (w, ht) = cover_size(large, column_width - 32);
-    let cover_view = CoverView::new(w, ht);
+    // the open page's own cover goes first in the image queue
+    let cover_view = CoverView::new(w, ht).with_priority(kuro_images::options::Priority::High);
     if let Some(art) = &model.cover {
         cover_view.load(art.clone());
     }

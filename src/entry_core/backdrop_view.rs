@@ -11,7 +11,7 @@ use gtk::prelude::*;
 use gtk::{gdk, glib};
 use kuro_images::art::ArtRef;
 use kuro_images::fetch::{ImageService, Payload};
-use kuro_images::options::LoadOptions;
+use kuro_images::options::{LoadOptions, Priority};
 use tokio_util::sync::CancellationToken;
 
 use super::backdrop::{BACKDROP_ALPHA, FADE_CLASS, cache_key, prepare};
@@ -47,7 +47,7 @@ async fn cover_bytes(service: &ImageService, art: &ArtRef, custom: &Path) -> Opt
         return tokio::fs::read(custom).await.ok();
     }
     art.url.as_ref()?;
-    let fetched = service.fetch(art, &LoadOptions { use_custom_cover: false, ..LoadOptions::default() }, &CancellationToken::new()).await.ok()?;
+    let fetched = service.fetch(art, &LoadOptions { use_custom_cover: false, priority: Priority::High, ..LoadOptions::default() }, &CancellationToken::new()).await.ok()?;
     match fetched.payload {
         Payload::File(path) => tokio::fs::read(path).await.ok(),
         Payload::Bytes(bytes) => Some(bytes.to_vec()),

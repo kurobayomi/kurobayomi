@@ -783,7 +783,6 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
                     Some(item),
                     kuro_prefs::library::LibraryDisplayMode::ComfortableGrid,
                     &nav.load_cover,
-                    &super::view::always(),
                     SEARCH_CARD_WIDTH_PX,
                     3,
                 );
@@ -833,7 +832,7 @@ pub fn migrate_entries(entries: &[MigrateEntry], error: Option<&str>, nav: Migra
     for entry in sorted {
         let item = ListItem { id: entry.id, title: entry.title.clone(), cover: entry.cover.clone(), ..ListItem::default() };
         let size = super::look::SMALL;
-        let cover = super::view::cover_widget(&item, size.width, size.height, &nav.load_cover, &super::view::always());
+        let cover = super::view::cover_widget(&item, size.width, size.height, &nav.load_cover);
         let (open_search, id) = (Rc::clone(&nav.open_search), entry.id);
         // a click on the row opens the migrate search; a click on the cover opens the entry and claims the click
         let open_entry = Rc::clone(&nav.open_entry);
@@ -907,7 +906,7 @@ pub(crate) mod tests {
         let entries = migrate_entries(
             &[],
             None,
-            MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: Rc::new(|_, _| {}) },
+            MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: Rc::new(|_, _, _| gtk::Box::new(gtk::Orientation::Vertical, 0).upcast()) },
         );
         assert!(!all_labels(&entries).iter().any(|t| t.starts_with("Title")), "no invented entries");
     }
@@ -987,7 +986,7 @@ pub(crate) mod tests {
                 menus.borrow_mut().push(format!("menu {id} {}", item.title));
                 Vec::new()
             }),
-            load_cover: Rc::new(|_, _| {}),
+            load_cover: Rc::new(|_, _, _| gtk::Box::new(gtk::Orientation::Vertical, 0).upcast()),
             chips,
             on_chips: Rc::new(move |c| chipped.borrow_mut().push(format!("chips {c:?}"))),
         };
@@ -1078,7 +1077,7 @@ pub(crate) mod tests {
         let page = migrate_entries(
             &entries,
             Some("could not load"),
-            MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: Rc::new(|_, _| {}) },
+            MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: crate::browse::view::file_cover_loader(kuro_platform::kind::Kind::Manga) },
         );
         // an empty label is a row's blank subtitle
         let text: Vec<_> = all_labels(&page).into_iter().filter(|t| !t.is_empty()).collect();
@@ -1154,7 +1153,7 @@ pub(crate) mod tests {
                 source_id: 42,
                 source_name: "Gone".into(),
                 source_lang: "en".into(),
-                load_cover: Rc::new(|_, _| {}),
+                load_cover: Rc::new(|_, _, _| gtk::Box::new(gtk::Orientation::Vertical, 0).upcast()),
                 open_entry: Rc::new(|_| {}),
                 menu: Rc::new(|_: &ListItem| Vec::new()),
                 favorite_urls: None,
