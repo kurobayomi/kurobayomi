@@ -48,8 +48,13 @@ fn queued_percents() -> (Vec<u8>, usize) {
 
 /// One panel row: the icon, the title, then `extra` (badges).
 fn nav_row(icon: &str, title: &str, extra: &[&gtk::Widget]) -> gtk::ListBoxRow {
+    nav_row_with(&gtk::Image::from_icon_name(icon), title, extra)
+}
+
+/// `nav_row` with an image the caller keeps, for a row whose icon follows a state.
+fn nav_row_with(image: &gtk::Image, title: &str, extra: &[&gtk::Widget]) -> gtk::ListBoxRow {
     let h = GBox::new(O::Horizontal, SPACE_M);
-    h.append(&gtk::Image::from_icon_name(icon));
+    h.append(image);
     h.append(&gtk::Label::builder().label(title).xalign(0.0).hexpand(true).build());
     for w in extra {
         h.append(*w);
@@ -213,7 +218,10 @@ fn bottom_rows() -> gtk::ListBox {
     list.set_margin_bottom(rail::PAD_V);
     // the switch is bound to app.incognito, so it shows the state and flips it like the menu item did
     let switch = gtk::Switch::builder().valign(gtk::Align::Center).action_name(crate::incognito::TOGGLE_ACTION).build();
-    let incognito = nav_row(crate::incognito::ICON, &incognito_label(), &[switch.upcast_ref()]);
+    // the eye is open while Incognito is off and crossed out while it is on
+    let eye = gtk::Image::new();
+    switch.bind_property("active", &eye, "icon-name").transform_to(|_, on: bool| Some(crate::incognito::icon(on))).sync_create().build();
+    let incognito = nav_row_with(&eye, &incognito_label(), &[switch.upcast_ref()]);
     incognito.set_selectable(false);
     list.append(&incognito);
     let rows = app_pages();

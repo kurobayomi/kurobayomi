@@ -23,8 +23,10 @@ struct State {
 pub const TOGGLE_NAME: &str = "incognito";
 /// The check item as the app menu names it.
 pub const TOGGLE_ACTION: &str = "app.incognito";
-/// The incognito icon of the sidebar row: an eye with a line through it.
-pub const ICON: &str = "view-conceal-symbolic";
+/// The icon of the sidebar's Incognito row: an open eye while it is off, the eye with a line through it while it is on.
+pub fn icon(on: bool) -> &'static str {
+    if on { "view-conceal-symbolic" } else { "view-reveal-symbolic" }
+}
 
 thread_local! {
     static STATE: RefCell<Option<State>> = const { RefCell::new(None) };
@@ -77,6 +79,12 @@ mod tests {
     #[test]
     fn the_app_menu_item_names_the_application_action() {
         assert_eq!(TOGGLE_ACTION, format!("app.{TOGGLE_NAME}"));
+    }
+
+    #[test]
+    fn the_eye_is_open_while_off_and_crossed_out_while_on() {
+        assert_eq!(icon(false), "view-reveal-symbolic");
+        assert_eq!(icon(true), "view-conceal-symbolic");
     }
 
     #[test]
