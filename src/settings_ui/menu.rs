@@ -25,7 +25,7 @@ pub fn rows(about: &str) -> Vec<MenuRow> {
         row("Appearance", "Theme and start screen", "preferences-desktop-appearance-symbolic", "settings_appearance"),
         row("Library", "Categories, global update", "view-grid-symbolic", "settings_library"),
         row("Reader", "Reading mode, display, navigation", "x-office-document-symbolic", "settings_reader"),
-        row("Player", "Languages, default volume, autoplay", "video-display-symbolic", "settings_player"),
+        row("Player", "Languages, quality, volume, autoplay, controls", "video-display-symbolic", "settings_player"),
         row("Downloads and storage", "Maximum downloads, auto-download, cleanup", "folder-download-symbolic", "settings_downloads"),
         row("Sources and tracking", "Sources, repositories, AniList, cookies", "compass-symbolic", "settings_browse"),
         row("Backup and restore", "Automatic and manual backups, maintenance", "drive-harddisk-symbolic", "settings_data_storage"),

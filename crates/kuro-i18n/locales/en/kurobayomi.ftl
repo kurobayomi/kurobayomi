@@ -4849,7 +4849,7 @@ spec_downloads_and_storage = Downloads and storage
 spec_kurobayomi_version_licence_and_links = Kurobayomi, version, licence and links
 
 # source: kurobayomi
-spec_languages_default_volume_autoplay = Languages, default volume, autoplay
+spec_languages_default_volume_autoplay = Languages, quality, volume, autoplay, controls
 
 # source: kurobayomi
 spec_library_name = Library name
