@@ -16,7 +16,7 @@ use crate::theme::tokens::{SPACE_L, SPACE_S};
 /// page adds its `ready` child.
 pub fn state_stack() -> gtk::Stack {
     let stack = crate::widgets::status::switcher();
-    stack.add_named(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))), Some("loading"));
+    stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
     let back_missing = Button::with_label(&tr(MsgKey::action_webview_back));
     back_missing.connect_clicked(|_| ui::pop());
     let missing_page = crate::widgets::status::error_with(&tr(MsgKey::no_results_found), None, std::slice::from_ref(&back_missing));

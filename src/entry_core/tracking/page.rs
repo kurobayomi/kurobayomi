@@ -224,7 +224,7 @@ fn connect_section(root: &GBox, tracker: TrackerId, waiting: bool) {
 fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
     let Some(entry) = entry() else { return };
     let slot = GBox::new(O::Vertical, 0);
-    slot.append(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))));
+    slot.append(&crate::widgets::status::loading(None));
     root.append(&slot);
     let again = redraw(root);
     let (weak, tracker, id, kind) = (slot.downgrade(), Arc::clone(tracker), entry.id, entry.kind);
