@@ -133,6 +133,13 @@ impl Inner {
         let (generation, cancel) = this.binding.borrow_mut().bind();
         let Some(service) = SERVICE.get().cloned() else { return };
         let options = LoadOptions { priority: this.priority.get(), ..LoadOptions::default() };
+        // an image already in memory (a list rebuilt when its screen comes back) shows at once: no placeholder, no fade
+        if let Some(hit) = service.cached(&art, &options) {
+            if this.binding.borrow_mut().finish(generation, Ok(hit)) {
+                this.show(gtk::StackTransitionType::None);
+            }
+            return;
+        }
         let this = Rc::clone(this);
         // the service's future is not `Send`
         crate::background::run_local_async(
@@ -150,7 +157,7 @@ impl Inner {
             },
             move |result| {
                 if this.binding.borrow_mut().finish(generation, result) {
-                    this.show();
+                    this.show(gtk::StackTransitionType::Crossfade);
                 }
             },
         );
@@ -168,14 +175,14 @@ impl Inner {
         }
     }
 
-    /// Puts the loaded image on screen. A failed load leaves the placeholder.
-    fn show(&self) {
+    /// Puts the loaded image on screen with `transition`. A failed load leaves the placeholder.
+    fn show(&self, transition: gtk::StackTransitionType) {
         let binding = self.binding.borrow();
         let CoverState::Loaded(image) = binding.state() else { return };
         let spec = TextureSpec::from_decoded(image);
         let texture = gdk::MemoryTexture::new(spec.width, spec.height, gdk::MemoryFormat::R8g8b8a8, &glib::Bytes::from(&spec.pixels[..]), spec.stride);
         self.picture.set_paintable(Some(&texture));
-        self.stack.set_visible_child_name("image");
+        self.stack.set_visible_child_full("image", transition);
     }
 }
 

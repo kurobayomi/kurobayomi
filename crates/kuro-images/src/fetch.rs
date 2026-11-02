@@ -195,6 +195,15 @@ impl ImageService {
         permit.expect("image semaphores are never closed")
     }
 
+    /// The image `load` would return from the decoded-image cache, without waiting: a cover drawn again (a list
+    /// rebuilt when its screen comes back) shows at once instead of passing through its placeholder. Costs one
+    /// `stat` for the custom cover file.
+    pub fn cached(&self, art: &ArtRef, options: &LoadOptions) -> Option<LoadedImage> {
+        let key = keys::cache_key(art, cover_paths::has_custom(&*self.paths, art));
+        let image = self.memory.get(&key, options.memory_cache)?;
+        Some(LoadedImage { image, source: DataSource::Memory, key })
+    }
+
     /// Loads one image: the decoded-image cache, then `fetch`, then decode on a blocking thread under one of the
     /// three decode slots (design sections 5.1 and 13.1). Cancelling ends the call with `ImageError::Cancelled`
     /// and nothing is cached; a result that finishes after the cancel is dropped (edge E-IMG-30).
@@ -1089,6 +1098,20 @@ mod tests {
         let second = svc.load(&req).await.unwrap();
         assert_eq!(second.source, DataSource::Memory);
         assert!(Arc::ptr_eq(&first.image, &second.image));
+    }
+
+    #[tokio::test]
+    async fn cached_answers_only_once_the_picture_is_in_memory() {
+        let tmp = tempfile::tempdir().unwrap();
+        let svc = service(tmp.path(), Arc::new(NoSources)).await;
+        let req = request(&local_png(tmp.path(), 40, 30), LoadOptions::default());
+        assert!(svc.cached(&req.art, &req.options).is_none(), "nothing loaded yet");
+        let loaded = svc.load(&req).await.unwrap();
+        let hit = svc.cached(&req.art, &req.options).expect("in memory after a load");
+        assert_eq!(hit.source, DataSource::Memory);
+        assert!(Arc::ptr_eq(&loaded.image, &hit.image));
+        let no_memory = LoadOptions { memory_cache: CachePolicy::Disabled, ..LoadOptions::default() };
+        assert!(svc.cached(&req.art, &no_memory).is_none(), "a load that skips the memory cache never reads it");
     }
 
     #[tokio::test]
