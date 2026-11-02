@@ -33,7 +33,6 @@ pub mod jobs;
 pub mod library;
 pub mod library_csv;
 pub mod library_export;
-pub mod library_update;
 pub mod licenses;
 pub mod maintenance;
 pub mod menu;

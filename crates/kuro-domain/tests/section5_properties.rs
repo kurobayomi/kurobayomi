@@ -79,8 +79,8 @@ proptest! {
     #[test]
     fn integer_accessors_keep_what_they_are_given(int32: i32, int64: i64) {
         let prefs = LibraryPrefs::new(PrefStore::in_memory());
-        let _ = prefs.auto_update_interval.set(int32);
-        prop_assert_eq!(prefs.auto_update_interval.get(), int32);
+        let _ = prefs.new_manga_updates_count.set(int32);
+        prop_assert_eq!(prefs.new_manga_updates_count.get(), int32);
         let _ = prefs.last_updated_timestamp.set(int64);
         prop_assert_eq!(prefs.last_updated_timestamp.get(), int64);
     }

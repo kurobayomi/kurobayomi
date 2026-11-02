@@ -19,7 +19,6 @@ pub mod politeness;
 pub mod progress;
 pub mod queue;
 pub mod renames;
-pub mod schedule;
 pub mod source;
 pub mod store;
 pub mod sync;

@@ -39,7 +39,7 @@ pub const DECISIONS: &[Decision] = &[
     d("T-26a-122", "Wi-Fi pre-check for Android versions below 28", "the NetworkManager constraint (T-26a-027) in every case", "none", &["SDK_INT", "Build.VERSION", "Build::VERSION"]),
     d("T-26a-123", "FileProvider URIs for shared files", "plain file:// URIs from gio (T-26a-096)", "none", &["FileProvider", "content://"]),
     d("T-26a-124", "Injekt dependency lookup", "explicit PassDeps construction at startup", "none", &["Injekt", "injectLazy", "ServiceLocator"]),
-    d("T-26a-125", "WorkManager migrations", "validation of the stored interval: only 0, 12, 24, 48, 72 and 168 hours, other values snap to the nearest choice", "none", &["cancelAllWorkByTag", "cancelAllWorks", "UseWorkManager", "WorkManager"]),
+    d("T-26a-125", "WorkManager migrations", "none; the automatic update interval is cut (a pass runs at every launch)", "none", &["cancelAllWorkByTag", "cancelAllWorks", "UseWorkManager", "WorkManager"]),
     d("T-26a-126", "decoding the launcher icon bitmap for notifications", "the freedesktop app icon name", "none", &["BitmapFactory", "decodeResource"]),
     d("T-35a-012", "channel creation and the nine deprecated channel ids", "the notification switches of T-35a-004", "per-channel system settings", &["createNotificationChannel", "create_notification_channel", "deleteNotificationChannel"]),
     d("T-35a-025", "the unused ACTION_OPEN_ENTRY constant", "entry opening of T-35a-015", "none", &["ACTION_OPEN_ENTRY"]),
@@ -126,15 +126,6 @@ mod tests {
         for d in DECISIONS.iter().filter(|d| !d.absent.is_empty()) {
             let hits = found(d.absent);
             assert!(hits.is_empty(), "{} came back: {hits:#?}", d.task);
-        }
-    }
-
-    #[test]
-    fn t26a125_the_stored_update_interval_snaps_to_the_six_choices() {
-        let choices = kuro_prefs::ranges::LIBRARY_UPDATE_INTERVAL;
-        assert_eq!(choices.values(), [0, 12, 24, 48, 72, 168]);
-        for (stored, snapped) in [(0, 0), (12, 12), (1, 0), (2, 0), (7, 12), (30, 24), (36, 24), (60, 48), (100, 72), (500, 168), (-5, 0)] {
-            assert_eq!(choices.clamped(stored), snapped, "{stored}");
         }
     }
 }

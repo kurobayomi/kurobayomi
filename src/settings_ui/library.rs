@@ -63,7 +63,7 @@ pub fn default_category_row(title: &str, pref: &Pref<i32>, categories: &[Categor
 }
 
 /// The rows of the library page this module builds: the Categories group (edit rows that open the Categories screen,
-/// default category lists), the Global update group and the notification switch. `open` shows the Categories screen of
+/// default category lists) and the notification switch. `open` shows the Categories screen of
 /// a kind.
 pub fn page_rows(prefs: &Prefs, anime: &[Category], manga: &[Category], open: Rc<dyn Fn(Kind)>) -> Vec<Preference> {
     let edit = |title: &str, kind: Kind, count: usize| {
@@ -80,7 +80,6 @@ pub fn page_rows(prefs: &Prefs, anime: &[Category], manga: &[Category], open: Rc
             default_category_row(&tr(MsgKey::default_manga_category), &l.default_manga_category, manga),
         ],
     )];
-    tree.push(crate::settings_ui::library_update::global_update_group(prefs));
     tree.push(crate::settings_ui::rows::item(crate::settings_ui::notifications::notify_row(&prefs.base)));
     tree
 }
@@ -149,6 +148,6 @@ mod tests {
         assert_eq!(*opened.borrow(), ["manga", "anime"]);
         let PreferenceItem::Text { common, .. } = &g.items[0] else { panic!("text row") };
         assert_eq!(common.subtitle.as_deref(), Some("2 categories"));
-        assert_eq!(tree.len(), 3, "Categories, Global update, the notification switch");
+        assert_eq!(tree.len(), 2, "Categories and the notification switch");
     }
 }

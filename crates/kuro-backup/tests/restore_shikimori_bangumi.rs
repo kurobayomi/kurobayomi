@@ -118,8 +118,8 @@ fn fresh() -> Dbs {
 
 fn restore(dbs: &mut Dbs, path: &Path) {
     let backup = decode_file(path).unwrap();
-    let library = |_: Option<u32>| {};
-    let sched = IntervalScheduler { store: &dbs.app, library_timer: &library, backup_timer: &library };
+    let off = |_: Option<u32>| {};
+    let sched = IntervalScheduler { store: &dbs.app, backup_timer: &off };
     let open = |_: &str| PrefStore::in_memory();
     let now = Local.with_ymd_and_hms(2026, 10, 9, 12, 0, 0).single().unwrap();
     let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open, scheduler: &sched };

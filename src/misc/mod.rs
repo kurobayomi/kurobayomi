@@ -6,7 +6,6 @@ pub mod badge;
 pub mod diet_defaults;
 pub mod headless;
 pub mod ids;
-pub mod interval;
 pub mod notify;
 pub mod notify_icon;
 pub mod reveal;

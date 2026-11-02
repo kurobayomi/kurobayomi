@@ -1,10 +1,9 @@
 # index	key	namespace	rust_field	kind	default
-# the settings diet kept 19 rows; the cut keys are in DROPPED_KEYS in registry.rs (the chapter and episode swipe actions were dropped earlier)
+# the settings diet kept 18 rows; the cut keys are in DROPPED_KEYS in registry.rs (the chapter and episode swipe actions were dropped earlier)
 1	pref_display_mode_library	normal	display_mode	str	COMPACT_GRID
 2	library_sorting_mode	normal	manga_sorting_mode	str	ALPHABETICAL,ASCENDING
 3	animelib_sorting_mode	normal	anime_sorting_mode	str	ALPHABETICAL,ASCENDING
 4	library_update_last_timestamp	app-state	last_updated_timestamp	long	0
-5	pref_library_update_interval_key	normal	auto_update_interval	int	0
 27	pref_filter_animelib_downloaded_v2	normal	filter_downloaded_anime	str	DISABLED
 28	pref_filter_library_downloaded_v2	normal	filter_downloaded_manga	str	DISABLED
 29	pref_filter_animelib_unread_v2	normal	filter_unseen	str	DISABLED

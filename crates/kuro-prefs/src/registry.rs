@@ -238,7 +238,6 @@ define_prefs! {
     "library_sorting_mode", Normal, Str, "ALPHABETICAL,ASCENDING", "library", "manga_sorting_mode";
     "animelib_sorting_mode", Normal, Str, "ALPHABETICAL,ASCENDING", "library", "anime_sorting_mode";
     "__APP_STATE_library_update_last_timestamp", AppState, Long, 0, "library", "last_updated_timestamp";
-    "pref_library_update_interval_key", Normal, Int, 0, "library", "auto_update_interval";
     "pref_filter_animelib_downloaded_v2", Normal, Str, "DISABLED", "library", "filter_downloaded_anime";
     "pref_filter_library_downloaded_v2", Normal, Str, "DISABLED", "library", "filter_downloaded_manga";
     "pref_filter_animelib_unread_v2", Normal, Str, "DISABLED", "library", "filter_unseen";
@@ -298,7 +297,7 @@ define_prefs! {
 /// The registry holds no row for them, a restore skips them ([`is_dropped`]) and nothing reads them, so an old
 /// `config.toml` or an Aniyomi backup that still carries one loads and restores without it. Each key and its reason
 /// is recorded in `docs/drop-decisions.md`.
-pub const DROPPED_KEYS: [&str; 277] = [
+pub const DROPPED_KEYS: [&str; 278] = [
     "extension_installer",
     "pref_hardware_bitmap_threshold",
     "eh_enable_source_blacklist",
@@ -578,6 +577,8 @@ pub const DROPPED_KEYS: [&str; 277] = [
     // source pinning, cut for one on/off switch per source (2026-10-23)
     "pinned_anime_catalogues",
     "pinned_catalogues",
+    // the automatic library update interval, cut: a pass runs at every launch (2026-11-02)
+    "pref_library_update_interval_key",
 ];
 
 /// Whether `key` (as stored, without the backup prefix) belongs to a dropped feature.
@@ -682,9 +683,9 @@ mod tests {
     ];
 
     #[test]
-    fn registry_has_the_60_plan_rows_in_order() {
+    fn registry_has_the_59_plan_rows_in_order() {
         let rows = plan_rows();
-        assert_eq!(rows.len(), 60, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
+        assert_eq!(rows.len(), 59, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
         // four Kurobayomi rows after the plan's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
         // (T-req-platform-004), `check_app_updates` (the update toggle, back from the settings diet, on by default) and
         // `last_kind` (the Anime | Manga choice every page shares), `appimage_menu_removed` (the user took the AppImage

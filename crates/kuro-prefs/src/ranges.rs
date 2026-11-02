@@ -50,7 +50,6 @@ impl Constraint {
 
 pub const DOWNLOAD_SLOTS: Constraint = Constraint::Range { min: 1, max: 5 };
 pub const REMOVE_AFTER_READ_SLOTS: Constraint = Constraint::Choices(&[-1, 0, 1, 2, 3, 4]);
-pub const LIBRARY_UPDATE_INTERVAL: Constraint = Constraint::Choices(&[0, 12, 24, 48, 72, 168]);
 pub const BACKUP_INTERVAL: Constraint = Constraint::Choices(&[0, 6, 12, 24, 48, 168]);
 /// The cache size limit in megabytes.
 pub const CACHE_SIZE_MB: Constraint = Constraint::Choices(&[100, 250, 500, 1000, 2000, 5000]);
@@ -59,7 +58,6 @@ pub const CACHE_SIZE_MB: Constraint = Constraint::Choices(&[100, 250, 500, 1000,
 const CONSTRAINED: &[(&str, Constraint)] = &[
     ("download_slots", DOWNLOAD_SLOTS),
     ("remove_after_read_slots", REMOVE_AFTER_READ_SLOTS),
-    ("pref_library_update_interval_key", LIBRARY_UPDATE_INTERVAL),
     ("backup_interval", BACKUP_INTERVAL),
     ("cache_size_mb", CACHE_SIZE_MB),
 ];

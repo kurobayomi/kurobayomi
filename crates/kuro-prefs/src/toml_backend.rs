@@ -508,7 +508,7 @@ mod tests {
         );
         m.insert("crop_borders".into(), PrefValue::Bool(true));
         m.insert(
-            "pref_library_update_interval_key".into(),
+            "library_unread_updates_count".into(),
             PrefValue::Int(12),
         );
         m.insert("pref_progress_preference".into(), PrefValue::Float(0.85));
@@ -625,7 +625,7 @@ mod tests {
         let config = file(&dir, CONFIG_FILE);
         assert!(config.contains("crop_borders = true"));
         assert!(!config.contains("display_mode"));
-        assert!(!config.contains("auto_update_interval"));
+        assert!(!config.contains("new_manga_updates_count"));
     }
 
     #[test]
@@ -779,10 +779,10 @@ mod tests {
         write_file(
             &dir,
             CONFIG_FILE,
-            "[library]\nauto_update_interval = \"twelve\"\n\n[reader]\ncrop_borders = false\n",
+            "[library]\nnew_manga_updates_count = \"twelve\"\n\n[reader]\ncrop_borders = false\n",
         );
         let loaded = backend(&dir).unwrap().load().unwrap();
-        assert!(!loaded.contains_key("pref_library_update_interval_key"));
+        assert!(!loaded.contains_key("library_unread_updates_count"));
         assert_eq!(
             loaded.get("crop_borders"),
             Some(&PrefValue::Bool(false))
@@ -795,10 +795,10 @@ mod tests {
         write_file(
             &dir,
             CONFIG_FILE,
-            "[library]\nauto_update_interval = 3000000000\n",
+            "[library]\nnew_manga_updates_count = 3000000000\n",
         );
         let loaded = backend(&dir).unwrap().load().unwrap();
-        assert!(!loaded.contains_key("pref_library_update_interval_key"));
+        assert!(!loaded.contains_key("library_unread_updates_count"));
     }
 
     #[test]

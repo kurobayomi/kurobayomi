@@ -61,7 +61,7 @@ T-11a-029 is PARTIAL: the table, `lookup()`, `report()` and their tests exist, b
 | T-26a-122 | Wi-Fi pre-check for Android versions below 28 | the NetworkManager constraint (T-26a-027) in every case | none |
 | T-26a-123 | FileProvider URIs for shared files | plain file:// URIs from gio (T-26a-096) | none |
 | T-26a-124 | Injekt dependency lookup | explicit PassDeps construction at startup | none |
-| T-26a-125 | WorkManager migrations | validation of the stored interval: only 0, 12, 24, 48, 72 and 168 hours, other values snap to the nearest choice | none |
+| T-26a-125 | WorkManager migrations | none; the automatic update interval is cut (a pass runs at every launch) | none |
 | T-26a-126 | decoding the launcher icon bitmap for notifications | the freedesktop app icon name | none |
 | T-35a-012 | channel creation and the nine deprecated channel ids | the notification switches of T-35a-004 | per-channel system settings |
 | T-35a-025 | the unused ACTION_OPEN_ENTRY constant | entry opening of T-35a-015 | none |
@@ -576,3 +576,13 @@ The systemd user units of T-21a-041 (`data/systemd/kurobayomi-backup.service` an
 `plans/21-backup-format-and-create/p1-topic-autobackup-scheduling.md`) are removed. No package installed them and the
 app never wrote or enabled them, and they worked on Linux only. Automatic backups run in the app's own loop while it is
 open (`src/backup_schedule.rs`). The `--run-backup` entry point stays: it is the same on every system.
+
+## Automatic library update interval removed (2026-11-02)
+
+The Library > Global update > Automatic updates choice (`pref_library_update_interval_key`) is cut, with the in-app
+timer behind it (`src/misc/interval.rs`, `src/library_update/schedule.rs`). Every launch already checks the whole
+library, and the timer counted from launch with no saved last run, so it fired only when the app stayed open longer
+than the chosen interval. What stays: the pass at every launch and the library's refresh button. The key is in
+`DROPPED_KEYS`, so an old `config.toml` or an Aniyomi backup that carries it loads and a restore skips it. The
+library update migration steps now only cancel a job an earlier run registered. The translated strings stay in the
+catalog unused, as the i18n names rule says.

@@ -276,7 +276,7 @@ pub fn run_restore(
             })
             .clone()
     };
-    let scheduler = IntervalScheduler { store: &library.prefs, library_timer: &|_| {}, backup_timer: &|_| {} };
+    let scheduler = IntervalScheduler { store: &library.prefs, backup_timer: &|_| {} };
     let end = run_backup(
         backup,
         opts,

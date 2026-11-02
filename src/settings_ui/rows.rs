@@ -259,12 +259,12 @@ mod tests {
     #[test]
     fn ranged_choice_offers_exactly_the_values_the_ranges_allow() {
         let prefs = Prefs::in_memory();
-        let PreferenceItem::BasicList { entries, .. } = ranged_choice("Max", &prefs.library.auto_update_interval, |h| format!("{h}h"), true) else {
+        let PreferenceItem::BasicList { entries, .. } = ranged_choice("Max", &prefs.backup.backup_interval, |h| format!("{h}h"), true) else {
             panic!("expected a list");
         };
         let codes: Vec<&str> = entries.iter().map(|(code, _)| code.as_str()).collect();
-        assert_eq!(codes, ["0", "12", "24", "48", "72", "168"]);
-        assert_eq!(entries[1].1, "12h");
+        assert_eq!(codes, ["0", "6", "12", "24", "48", "168"]);
+        assert_eq!(entries[1].1, "6h");
     }
 
     #[test]

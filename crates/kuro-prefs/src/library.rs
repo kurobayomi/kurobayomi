@@ -24,7 +24,6 @@ define_prefs! {
         manga_sorting_mode: SortSetting<false> = "library_sorting_mode" => SortSetting("ALPHABETICAL,ASCENDING".to_owned());
         anime_sorting_mode: SortSetting<true> = "animelib_sorting_mode" => SortSetting("ALPHABETICAL,ASCENDING".to_owned());
         last_updated_timestamp: i64 = "__APP_STATE_library_update_last_timestamp" => 0;
-        auto_update_interval: i32 = "pref_library_update_interval_key" => 0;
         filter_downloaded_anime: TriState = "pref_filter_animelib_downloaded_v2" => TriState::DISABLED;
         filter_downloaded_manga: TriState = "pref_filter_library_downloaded_v2" => TriState::DISABLED;
         filter_unseen: TriState = "pref_filter_animelib_unread_v2" => TriState::DISABLED;
@@ -297,14 +296,13 @@ mod tests {
     fn every_field_is_registered_under_the_library_table() {
         let lib = LibraryPrefs::new(PrefStore::in_memory());
         assert_eq!(LibraryPrefs::TABLE, "library");
-        assert_eq!(LibraryPrefs::FIELDS.len(), 18, "the settings diet kept 17 keys here, the cover size came back, plus the tracked-filter families");
+        assert_eq!(LibraryPrefs::FIELDS.len(), 17, "the settings diet kept 17 keys here, the cover size came back, plus the tracked-filter families, minus the update interval");
         assert_section_registered(LibraryPrefs::TABLE, LibraryPrefs::FIELDS, &lib.defaults());
     }
 
     #[test]
     fn defaults_match_the_registry() {
         let lib = LibraryPrefs::new(PrefStore::in_memory());
-        assert_eq!(lib.auto_update_interval.get(), 0);
         assert_eq!(lib.new_manga_updates_count.get(), 0);
         assert_eq!(lib.new_anime_updates_count.get(), 0);
         assert_eq!(lib.default_manga_category.get(), -1);
@@ -404,7 +402,7 @@ mod tests {
         assert!(!lib.filter_downloaded_manga.is_set());
     }
 
-    /// Table of `p1-data-and-config.md` section 5 (the 19 rows the settings diet kept). Columns: index, key, namespace, Rust field, kind
+    /// Table of `p1-data-and-config.md` section 5 (the 18 rows the settings diet kept). Columns: index, key, namespace, Rust field, kind
     /// (`bool`, `int`, `long`, `str`, `set`) and the default in stored form (a set is comma-separated, empty for `{}`).
     const SECTION_5: &str = include_str!("../tests/fixtures/library_prefs_table.tsv");
 
@@ -450,7 +448,7 @@ mod tests {
     #[test]
     fn section_5_table_has_19_accessors_registered_with_their_namespace() {
         let rows = section_5_rows();
-        assert_eq!(rows.len(), 19);
+        assert_eq!(rows.len(), 18);
         let fields: Vec<&str> = LibraryPrefs::FIELDS.iter().map(|(_, key)| *key).collect();
         for row in &rows {
             let stored = stored_key(row);

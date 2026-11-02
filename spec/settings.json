@@ -185,24 +185,6 @@
        "default": "Always ask"
       }
      ]
-    },
-    {
-     "title": "Global update",
-     "items": [
-      {
-       "type": "list",
-       "title": "Automatic updates",
-       "options": [
-        "Off",
-        "Every 12 hours",
-        "Daily",
-        "Every 2 days",
-        "Every 3 days",
-        "Weekly"
-       ],
-       "default": "Off"
-      }
-     ]
     }
    ],
    "sheets": [],

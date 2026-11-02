@@ -375,9 +375,8 @@ mod tests {
     }
 
     fn run(e: &mut Env, backup: Backup, opts: RestoreOptions, cancel: &dyn Fn() -> bool) -> (Run, Vec<ProgressEvent>) {
-        let library = |h: Option<u32>| e.timers.borrow_mut().push(("library", h));
         let backup_timer = |h: Option<u32>| e.timers.borrow_mut().push(("backup", h));
-        let sched = IntervalScheduler { store: &e.app, library_timer: &library, backup_timer: &backup_timer };
+        let sched = IntervalScheduler { store: &e.app, backup_timer: &backup_timer };
         let open = |name: &str| e.sources.borrow_mut().entry(name.to_owned()).or_insert_with(PrefStore::in_memory).clone();
         let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
         let mut events = Vec::new();
@@ -413,10 +412,10 @@ mod tests {
         assert_eq!(season.parent_id, Some(root.id));
         assert_eq!(categories::by_entry(&e.db, Kind::Anime, season.id).unwrap().len(), 1);
 
-        // preferences: the default category is remapped, the schedulers saw the restored intervals once each
+        // preferences: the default category is remapped, the backup scheduler saw the restored interval once
         let later = categories::all(&e.db, Kind::Manga).unwrap().into_iter().find(|c| c.name == "Later").unwrap().id;
         assert_eq!(e.app.get_raw("default_category"), Some(Value::Int(later as i32)));
-        assert_eq!(e.timers.borrow().as_slice(), [("library", Some(24)), ("backup", None)]);
+        assert_eq!(e.timers.borrow().as_slice(), [("backup", None)]);
         assert_eq!(e.sources.borrow()["source_1234"].get_raw("show_nsfw_source"), Some(Value::Bool(true)));
     }
 
@@ -473,8 +472,8 @@ mod tests {
             let backup = Backup { manga: vec![manga("a", vec![]), manga("b", vec![]), manga("c", vec![])], ..Default::default() };
             let opts = RestoreOptions::from_bits([true, false, false, false, false, false, false]);
             let mut events = Vec::new();
-            let library = |_: Option<u32>| {};
-            let sched = IntervalScheduler { store: &e.app, library_timer: &library, backup_timer: &library };
+            let off = |_: Option<u32>| {};
+            let sched = IntervalScheduler { store: &e.app, backup_timer: &off };
             let open = |_: &str| PrefStore::in_memory();
             let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
             let cancel = || {
@@ -538,8 +537,8 @@ mod tests {
         };
         let backup = Backup { manga: vec![manga("a", vec![]), manga("b", vec![])], ..Default::default() };
         let opts = RestoreOptions { categories: false, app_settings: false, source_settings: false, ..all_but_extensions() };
-        let library = |_: Option<u32>| {};
-        let sched = IntervalScheduler { store: &e.app, library_timer: &library, backup_timer: &library };
+        let off = |_: Option<u32>| {};
+        let sched = IntervalScheduler { store: &e.app, backup_timer: &off };
         let open = |_: &str| PrefStore::in_memory();
         let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
         let run = restore_backup(backup, opts, now(), targets, &cancel, &mut |_| items_done.set(items_done.get() + 1));

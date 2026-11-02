@@ -158,11 +158,11 @@ mod tests {
     }
 
     #[test]
-    fn the_import_report_lists_the_conversions_and_writes_the_new_values() {
+    fn the_import_report_lists_the_conversions_and_skips_the_cut_interval() {
         let store = PrefStore::in_memory();
         let entries = vec![entry(UPDATE_INTERVAL, PrefValue::Int(1))];
         let report = import_preferences(&store, entries, &CategoryMaps::default(), None, false).unwrap();
         assert_eq!(report.conversions, vec![Conversion::IntervalRaised { from: 1 }]);
-        assert_eq!(store.get_raw(UPDATE_INTERVAL), Some(PrefValue::Int(3)));
+        assert_eq!(store.get_raw(UPDATE_INTERVAL), None, "the interval is cut (DROPPED_KEYS), so the new value is not written");
     }
 }

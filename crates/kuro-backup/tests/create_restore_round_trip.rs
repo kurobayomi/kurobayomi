@@ -135,7 +135,7 @@ fn fresh() -> Dbs {
 fn restore(dbs: &mut Dbs, path: &std::path::Path) {
     let backup = decode_file(path).unwrap();
     let nothing = |_: Option<u32>| {};
-    let sched = IntervalScheduler { store: &dbs.app, library_timer: &nothing, backup_timer: &nothing };
+    let sched = IntervalScheduler { store: &dbs.app, backup_timer: &nothing };
     let source = dbs.source.clone();
     let open = move |_: &str| source.clone();
     let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open, scheduler: &sched };

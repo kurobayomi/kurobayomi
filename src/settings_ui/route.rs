@@ -106,15 +106,16 @@ fn reader_page() -> Option<Built> {
     ))
 }
 
-/// The Library page. The interval, the category sets and the rows they turn on or off are rebuilt when they change.
+/// The Library page. Its rows are the category rows and the notification switch, so no state of its own decides the
+/// layout.
 fn library_page() -> Option<Built> {
     let prefs = Rc::new(prefs());
     let store = prefs.store().clone();
-    let (for_state, for_tree) = (Rc::clone(&prefs), Rc::clone(&prefs));
+    let for_tree = Rc::clone(&prefs);
     let open: Rc<dyn Fn(Kind)> = Rc::new(open_categories);
     Some(view::live_page(
         &store,
-        move || crate::settings_ui::library_update::rule_state(&for_state),
+        || (),
         move || {
             let typed = library::page_rows(&for_tree, &categories_of(Kind::Anime), &categories_of(Kind::Manga), Rc::clone(&open));
             merge(spec_tree("settings_library", for_tree.store()), typed)
@@ -569,7 +570,7 @@ mod tests {
         let library = tree_with("settings_library", &prefs, &[], &[], browse::RepoCounts::default());
         assert!(group_titles(&library, "Season").is_empty(), "the season switches are cut");
         assert!(!group_titles(&library, "Categories").iter().any(|t| t == "Per-category settings for sort"), "per-category sort is cut");
-        assert!(group_titles(&library, "Global update").iter().all(|t| t != "Smart update" && t != "Automatic updates device restrictions"));
+        assert!(group_titles(&library, "Global update").is_empty(), "the automatic update interval is cut");
     }
 
     /// The key a row writes, when it has one a test can read. Every typed row that holds a pref is covered.

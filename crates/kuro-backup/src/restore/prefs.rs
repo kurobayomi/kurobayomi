@@ -1,5 +1,5 @@
 //! Preference restore (area 22, T-22a-009 and T-22a-010). The write rules live in `kuro_prefs::import`; this module
-//! converts the backup values, maps the category ids, and re-arms the schedulers after an app-preference section.
+//! converts the backup values, maps the category ids, and re-arms the backup scheduler after an app-preference section.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -18,18 +18,15 @@ use crate::schema::{BackupCategory, BackupPreference, BackupSourcePreferences, P
 
 /// The scheduler re-arm after app preferences change (p1-rust-design.md section 9). Implemented by the owning areas.
 pub trait Scheduler {
-    /// Reads the auto-update interval and restrictions. An interval of 0 disables the timer.
-    fn rearm_library_updates(&self);
     /// Reads `backup_interval`. 0 disables the automatic backup.
     fn rearm_auto_backup(&self);
 }
 
-/// Reads the two interval preferences after a restore and hands each timer its state: `None` disables it (interval 0),
-/// `Some(hours)` enables it with the restored value (T-22a-010). The callbacks belong to the owning areas; passing
-/// `&|_| {}` makes this a no-op until they land.
+/// Reads the backup interval after a restore and hands the timer its state: `None` disables it (interval 0),
+/// `Some(hours)` enables it with the restored value (T-22a-010). The callback belongs to the owning area; passing
+/// `&|_| {}` makes this a no-op until it lands.
 pub struct IntervalScheduler<'a> {
     pub store: &'a PrefStore,
-    pub library_timer: &'a dyn Fn(Option<u32>),
     pub backup_timer: &'a dyn Fn(Option<u32>),
 }
 
@@ -44,10 +41,6 @@ impl IntervalScheduler<'_> {
 }
 
 impl Scheduler for IntervalScheduler<'_> {
-    fn rearm_library_updates(&self) {
-        (self.library_timer)(self.hours("pref_library_update_interval_key", 0));
-    }
-
     fn rearm_auto_backup(&self) {
         (self.backup_timer)(self.hours("backup_interval", 12));
     }
@@ -152,7 +145,7 @@ pub struct AppPrefsRestore {
 }
 
 /// Restores the app preferences (T-22a-009), writes `categorized_display` when the categories section computed it,
-/// then re-arms both schedulers once each (T-22a-010, X-57). Keys the allowlist refuses are skipped and counted.
+/// then re-arms the backup scheduler once (T-22a-010, X-57). Keys the allowlist refuses are skipped and counted.
 pub fn restore_app_prefs(
     store: &PrefStore,
     prefs: &[BackupPreference],
@@ -168,7 +161,6 @@ pub fn restore_app_prefs(
     if let Some(flag) = categorized_display {
         store.set_raw("categorized_display", Value::Bool(flag));
     }
-    scheduler.rearm_library_updates();
     scheduler.rearm_auto_backup();
     AppPrefsRestore { report, skipped }
 }
@@ -219,14 +211,10 @@ mod tests {
 
     #[derive(Default)]
     struct Count {
-        library: Cell<u32>,
         backup: Cell<u32>,
     }
 
     impl Scheduler for Count {
-        fn rearm_library_updates(&self) {
-            self.library.set(self.library.get() + 1);
-        }
         fn rearm_auto_backup(&self) {
             self.backup.set(self.backup.get() + 1);
         }
@@ -325,13 +313,13 @@ mod tests {
         let store = PrefStore::in_memory();
         let outcome = restore_app_prefs(
             &store,
-            &[pref("pref_library_update_interval_key", PrefValue::Int(1))],
+            &[pref("extension_repos", set(&["https://r/one"]))],
             &CategoryMaps::default(),
             None,
             &Count::default(),
         );
         assert_eq!(outcome.skipped, 0);
-        assert!(!outcome.report.conversions.is_empty(), "an interval of one hour is converted, not dropped");
+        assert!(!outcome.report.conversions.is_empty(), "the repository set is handed on, not dropped");
     }
 
     #[test]
@@ -389,34 +377,22 @@ mod tests {
     }
 
     #[test]
-    fn both_schedulers_are_rearmed_exactly_once_per_app_section() {
+    fn the_backup_scheduler_is_rearmed_exactly_once_per_app_section() {
         let store = PrefStore::in_memory();
         let sched = Count::default();
         restore_app_prefs(&store, &[], &CategoryMaps::default(), None, &sched);
-        assert_eq!((sched.library.get(), sched.backup.get()), (1, 1));
+        assert_eq!(sched.backup.get(), 1);
     }
 
     #[test]
     fn interval_zero_disables_the_timer_and_non_zero_enables_it() {
         let store = PrefStore::in_memory();
         let calls = std::cell::RefCell::new(Vec::new());
-        let library = |h: Option<u32>| calls.borrow_mut().push(("library", h));
-        let backup = |h: Option<u32>| calls.borrow_mut().push(("backup", h));
-        let sched = IntervalScheduler { store: &store, library_timer: &library, backup_timer: &backup };
-        let prefs = [
-            pref("pref_library_update_interval_key", PrefValue::Int(0)),
-            pref("backup_interval", PrefValue::Int(0)),
-        ];
-        restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &sched);
-        let prefs = [
-            pref("pref_library_update_interval_key", PrefValue::Int(24)),
-            pref("backup_interval", PrefValue::Int(6)),
-        ];
-        restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &sched);
-        assert_eq!(
-            calls.into_inner(),
-            vec![("library", None), ("backup", None), ("library", Some(24)), ("backup", Some(6))]
-        );
+        let backup = |h: Option<u32>| calls.borrow_mut().push(h);
+        let sched = IntervalScheduler { store: &store, backup_timer: &backup };
+        restore_app_prefs(&store, &[pref("backup_interval", PrefValue::Int(0))], &CategoryMaps::default(), None, &sched);
+        restore_app_prefs(&store, &[pref("backup_interval", PrefValue::Int(6))], &CategoryMaps::default(), None, &sched);
+        assert_eq!(calls.into_inner(), vec![None, Some(6)]);
     }
 
     #[test]
@@ -424,7 +400,7 @@ mod tests {
         let store = PrefStore::in_memory();
         let got = std::cell::Cell::new(None);
         let backup = |h: Option<u32>| got.set(h);
-        IntervalScheduler { store: &store, library_timer: &|_| {}, backup_timer: &backup }.rearm_auto_backup();
+        IntervalScheduler { store: &store, backup_timer: &backup }.rearm_auto_backup();
         assert_eq!(got.get(), Some(12));
     }
 

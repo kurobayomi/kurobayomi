@@ -1,10 +1,10 @@
 //! The update runner of the app (T-26a-102, T-26a-104, T-26a-131): one `PassRunner` for both kinds over the app's
-//! databases, the settings of a pass read from the preferences, the library's refresh button and the schedule loops.
+//! databases, the settings of a pass read from the preferences, the launch pass and the library's refresh button.
 //!
 //! Decisions:
-//! - The runtime's `Handle` is taken at startup and the schedule loops are spawned on it. The runtime is built by
-//!   `kuro_core::runtime::build` (2 to 8 workers by core count); the 4 workers of T-26a-131 and the "keep running in the
-//!   background" check at shutdown belong to that builder and `main`, which this lane does not own.
+//! - Passes run on the app's runtime, built by `kuro_core::runtime::build` (2 to 8 workers by core count); the 4
+//!   workers of T-26a-131 and the "keep running in the background" check at shutdown belong to that builder and
+//!   `main`, which this lane does not own.
 //! - Entries find their sources through [`LiveRegistry`], the one registry over the recipe and local sources.
 //!   An id it does not know ends the entry as "Source not installed" (the stub slot of `SourceRegistry`).
 //! - The "only on Wi-Fi" restriction reads `kuro_platform::device::read()`. That reader cannot tell "wired" from
@@ -23,12 +23,10 @@ use kuro_data::source::StubSourceRepo;
 use kuro_platform::kind::Kind;
 use kuro_domain::download::prefs::DownloadPrefs;
 use kuro_prefs::Prefs;
-use kuro_prefs::library::LibraryPrefs;
 use kuro_prefs::store::PrefStore;
 use kuro_downloads::queue::Place;
 use kuro_downloads::service::Downloads;
 use tokio::runtime::Handle;
-use tokio::sync::watch;
 
 use crate::downloads::directory::AppDirectory;
 use crate::library_update::constraints::{self, DeviceFacts};
@@ -42,7 +40,6 @@ use crate::library_update::pass::{EntryUpdate, Failure, Host, PassRunner, PassSe
 use crate::library_update::queue::QueueRestrictions;
 use crate::library_update::source::SourceRegistry;
 use crate::library_update::renames::FolderRenames;
-use crate::library_update::schedule::run_schedule;
 use crate::library_update::store::SqliteLibraryStore;
 use crate::library_update::sync::DbItemSync;
 use crate::library_update::text;
@@ -355,13 +352,12 @@ pub fn refresh_library_covers() -> [(Kind, bool); 2] {
     [Kind::Anime, Kind::Manga].map(|kind| (kind, runner.as_ref().is_some_and(|r| r.start_now(kind, now_ms))))
 }
 
-/// Builds the runner, hands it to the library's refresh button and starts one schedule loop per kind on the
-/// runtime's handle. Runs once; call from the GTK main thread inside the app's runtime.
+/// Builds the runner, starts the launch pass and hands the runner to the library's refresh button. Runs once; call from
+/// the GTK main thread inside the app's runtime.
 pub fn start() {
     if STARTED.with(|s| s.set(()).is_err()) || !crate::data::is_installed() {
         return;
     }
-    let handle = Handle::current();
     let runner = runner();
     RUNNING.with(|r| *r.borrow_mut() = Some(runner.clone()));
     let app = crate::data::app();
@@ -373,36 +369,15 @@ pub fn start() {
     let (start_runner, start_inputs) = (runner.clone(), inputs.clone());
     let running_runner = runner.clone();
     let local = LocalTitles { db: app.db.clone(), prefs: app.base.store().clone() };
-    let start_local = local.clone();
     let start: std::rc::Rc<dyn Fn(Kind, Option<i64>) -> bool> = std::rc::Rc::new(move |kind, category| {
-        start_runner.start_after(pass_settings(kind, category, &start_inputs), start_local.clone().before_pass(kind))
+        start_runner.start_after(pass_settings(kind, category, &start_inputs), local.clone().before_pass(kind))
     });
     let running: std::rc::Rc<dyn Fn(Kind) -> bool> =
         std::rc::Rc::new(move |kind| running_runner.locks().holder(kind).is_some());
     register_update_action(start.clone());
-    // every app launch checks the library for new releases, whatever the automatic interval is (the pass waits for the
-    // sources like every other)
+    // every app launch checks the library for new releases (the pass waits for the sources like every other)
     start_all(&*start);
     register_buttons(start, running);
-
-    let mut senders = Vec::new();
-    for kind in [Kind::Manga, Kind::Anime] {
-        let (tx, rx) = watch::channel(0_u32);
-        senders.push(tx);
-        let (runner, inputs, local) = (runner.clone(), inputs.clone(), local.clone());
-        handle.spawn(run_schedule(rx, move || {
-            let (runner, inputs, local) = (runner.clone(), inputs.clone(), local.clone());
-            async move {
-                local.before_pass(kind).await;
-                if !device_allows(&inputs).await {
-                    return PassStatus::Retry;
-                }
-                runner.run(pass_settings(kind, None, &inputs), Trigger::Auto).await.status
-            }
-        }));
-    }
-    let pref = LibraryPrefs::new(app.base.store().clone()).auto_update_interval;
-    crate::misc::interval::pump(&pref, senders);
 }
 
 /// Resolves once the repository sources (anime and manga, one load installs both) have loaded. Every pass of the app
@@ -456,7 +431,7 @@ fn exit_code(statuses: &[PassStatus]) -> u8 {
     u8::from(statuses.iter().any(|status| matches!(status, PassStatus::Failed(_))))
 }
 
-/// One pass per kind over `runner`. A scheduled run checks the device restrictions first, like the in-app schedule.
+/// One pass per kind over `runner`. A scheduled run checks the device restrictions first.
 async fn headless_passes(runner: &Runner, inputs: &Inputs, trigger: Trigger) -> u8 {
     if trigger == Trigger::Auto && !device_allows(inputs).await {
         println!("kurobayomi: the device restrictions are not met, no update ran");
@@ -476,7 +451,7 @@ async fn headless_passes(runner: &Runner, inputs: &Inputs, trigger: Trigger) -> 
 }
 
 /// `kurobayomi --library-update=auto` (and the fallback of `=manual` with no app running): one pass per kind over the
-/// library without GTK, then the exit status. An app that is open owns the library and its own schedule, so this exits
+/// library without GTK, then the exit status. An app that is open owns the library, so this exits
 /// 0 with "already running" (T-26a-020). A headless run has no notifier, so its notices are dropped.
 pub fn run_headless(trigger: Trigger) -> u8 {
     let paths = match kuro_platform::system_paths::SystemPaths::system() {
