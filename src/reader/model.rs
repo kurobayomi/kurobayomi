@@ -294,6 +294,8 @@ pub struct ReaderPage {
     pub status: Observable<PageStatus>,
     /// 0 to 100, or -1 when the length is unknown.
     pub progress: Observable<i32>,
+    /// Why the page last failed, for its error card: the source's message, or what was wrong with the image.
+    pub error: RefCell<Option<String>>,
     pub source: PageSource,
     chapter: RefCell<Weak<ReaderChapter>>,
 }
@@ -310,6 +312,7 @@ impl ReaderPage {
             image_url: RefCell::new(image_url),
             status: Observable::new(status),
             progress: Observable::new(0),
+            error: RefCell::default(),
             source,
             chapter: RefCell::new(Weak::new()),
         })
@@ -323,6 +326,7 @@ impl ReaderPage {
             image_url: RefCell::new(parent.image_url.borrow().clone()),
             status: Observable::new(PageStatus::Ready),
             progress: Observable::new(0),
+            error: RefCell::default(),
             source: PageSource::Shared(Rc::clone(parent)),
             chapter: RefCell::new(parent.chapter.borrow().clone()),
         })

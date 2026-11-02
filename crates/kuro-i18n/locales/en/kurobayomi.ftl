@@ -3656,6 +3656,8 @@ no_next_chapter = Next chapter not found
 
 # source: i18n
 decode_image_error = The image couldn't be loaded
+reader_page_damaged = The image file is damaged or incomplete.
+reader_page_unsupported = This image format can't be shown.
 
 # source: i18n
 confirm_set_image_as_cover = Use this image as cover art?

@@ -12,6 +12,8 @@
 //! [`PageView::set_long_tap_enabled`] is on (`reader_long_tap`).
 
 use std::cell::{Cell, RefCell};
+
+use kuro_i18n::{MsgKey, tr};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
@@ -159,6 +161,8 @@ mod imp {
         pub state: Cell<LoadState>,
         /// Bumped by every load, recycle and cancelled timer, so a late result or timer is dropped.
         pub generation: Cell<u64>,
+        /// Why the last load failed, for the page's error card (`PageView::load_error`).
+        pub load_error: RefCell<Option<String>>,
         pub config: Cell<PageConfig>,
         /// The view size the zoom was last fitted to. `None` means the zoom resets to the fit and the anchor.
         pub fitted: Cell<Option<(i32, i32)>>,
@@ -409,7 +413,12 @@ mod imp {
                     }
                     self.show_pyramid(cached);
                 }
-                _ => {
+                other => {
+                    *self.load_error.borrow_mut() = match other {
+                        Ok(Err(DecodeError::UnsupportedFormat)) => Some(tr(MsgKey::reader_page_unsupported)),
+                        Ok(Err(DecodeError::Corrupt)) | Ok(Ok(_)) => Some(tr(MsgKey::reader_page_damaged)),
+                        Err(_) => None,
+                    };
                     self.drop_pages();
                     self.set_state(LoadState::Error);
                     self.obj().emit_by_name::<()>("image-load-error", &[]);
@@ -1037,6 +1046,11 @@ impl PageView {
             f();
             None
         })
+    }
+
+    /// Why the last load failed: the image was damaged or in a format that cannot be shown. `None` when unknown.
+    pub fn load_error(&self) -> Option<String> {
+        self.imp().load_error.borrow().clone()
     }
 
     pub fn connect_image_load_error<F: Fn() + 'static>(&self, f: F) -> glib::SignalHandlerId {

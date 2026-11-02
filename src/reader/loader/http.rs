@@ -68,6 +68,8 @@ struct Slot {
     url: String,
     image_url: Option<String>,
     status: PageStatus,
+    /// The message of the last failure, for the page's error card.
+    error: Option<String>,
 }
 
 #[derive(Default)]
@@ -188,7 +190,7 @@ impl HttpLoader {
             let mut state = self.shared.lock();
             state.slots = entries
                 .iter()
-                .map(|e| Slot { url: e.url.clone(), image_url: e.image_url.clone(), status: PageStatus::Queued })
+                .map(|e| Slot { url: e.url.clone(), image_url: e.image_url.clone(), status: PageStatus::Queued, error: None })
                 .collect();
         }
         Ok(entries
@@ -307,6 +309,7 @@ impl HttpLoader {
                 *page.image_url.borrow_mut() = slot.image_url.clone();
             }
             if slot.status == PageStatus::Error {
+                page.error.borrow_mut().clone_from(&slot.error);
                 self.drop_stale_list();
             }
         }
@@ -404,7 +407,9 @@ fn process(shared: &Shared, source: &dyn HttpPageSource, cache: &DiskCache, inde
 
 fn fail(shared: &Shared, index: usize, message: &str) {
     tracing::warn!(index, error = message, "page failed to load");
-    set_status(shared, index, PageStatus::Error);
+    let mut state = shared.lock();
+    state.slots[index].error = Some(message.to_owned());
+    state.slots[index].status = PageStatus::Error;
 }
 
 #[cfg(test)]
@@ -493,7 +498,7 @@ mod tests {
 
     #[test]
     fn page_status_filter_on_dequeue() {
-        let slot = |status| Slot { url: "p".into(), image_url: None, status };
+        let slot = |status| Slot { url: "p".into(), image_url: None, status, error: None };
         let mut state = State::default();
         state.slots = vec![slot(PageStatus::Ready), slot(PageStatus::Queued), slot(PageStatus::Error), slot(PageStatus::Queued)];
         // a retry entry (priority 2) for the ready page, a visible entry for page 1, an error page, and page 1 again

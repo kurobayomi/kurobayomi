@@ -27,8 +27,9 @@ pub fn webtoon_card_height(viewport: i32) -> i32 {
     (f64::from(viewport.max(0)) * WEBTOON_CARD_RATIO) as i32
 }
 
-/// The error card for a page: the message, Retry, and Open in browser when [`can_open_in_browser`] allows it.
-pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> adw::StatusPage {
+/// The error card for a page: the message with why it failed (`reason`: the source's message, or what was wrong with
+/// the image), Retry, and Open in browser when [`can_open_in_browser`] allows it.
+pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>, reason: Option<String>) -> adw::StatusPage {
     let retry = gtk::Button::with_label(&tr(MsgKey::action_retry));
     retry.connect_clicked(move |_| on_retry());
     let mut buttons = vec![retry];
@@ -41,7 +42,7 @@ pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> adw::St
         });
         buttons.push(open);
     }
-    crate::widgets::status::error_with(&page_error_text(), None, &buttons)
+    crate::widgets::status::error_with(&page_error_text(), reason.as_deref(), &buttons)
 }
 
 #[cfg(test)]
@@ -71,5 +72,14 @@ mod tests {
     #[test]
     fn the_message_is_the_upstream_text() {
         assert_eq!(page_error_text(), "The image couldn't be loaded");
+    }
+
+    #[test]
+    fn the_card_says_why_the_page_failed() {
+        crate::testing::with_display(|| {
+            let with_reason = card(|| {}, None, Some("HTTP 403 Forbidden".into()));
+            assert_eq!(with_reason.description().as_deref(), Some("HTTP 403 Forbidden"), "the reason is the card's detail");
+            assert!(card(|| {}, None, None).description().is_none_or(|d| d.is_empty()), "no reason, no detail line");
+        });
     }
 }

@@ -291,6 +291,8 @@ impl Image {
         let weak = image.me.clone();
         image.view.connect_image_load_error(move || {
             if let Some(image) = weak.upgrade() {
+                // the bytes arrived but did not decode: the card says what was wrong with them
+                *image.page.error.borrow_mut() = image.view.load_error();
                 image.show_error();
             }
         });
@@ -431,6 +433,7 @@ impl Image {
                 }
             },
             self.page.image_url.borrow().clone(),
+            self.page.error.borrow().clone(),
         );
         self.stack.add_named(&card, Some("error"));
         self.set_child("error");
