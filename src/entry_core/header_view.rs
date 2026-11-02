@@ -22,9 +22,9 @@ use crate::theme::tokens::{SPACE_S};
 pub fn apply_tone(widget: &impl IsA<gtk::Widget>, tone: Tone) {
     widget.set_opacity(tone_alpha(tone));
     if tone == Tone::Primary {
-        widget.add_css_class("chapter-primary");
+        widget.add_css_class("accent");
     } else {
-        widget.remove_css_class("chapter-primary");
+        widget.remove_css_class("accent");
     }
 }
 
@@ -238,7 +238,7 @@ mod tests {
             let button = LibraryButton::new();
             let content = button.button.child().expect("the content box");
             assert!((content.opacity() - 0.38).abs() < 0.01, "not in the library: dimmed (GTK keeps opacity in 8 bits)");
-            assert!(!content.has_css_class("chapter-primary"));
+            assert!(!content.has_css_class("accent"));
             let clicks = Rc::new(Cell::new(0));
             let longs = Rc::new(Cell::new(0));
             button.connect(
@@ -263,7 +263,7 @@ mod tests {
             assert_eq!(longs.get(), 0, "no long press for an entry outside the library (E-13)");
             button.set(true);
             assert_eq!(content.opacity(), 1.0, "a favorite: full opacity");
-            assert!(content.has_css_class("chapter-primary"), "and the primary colour");
+            assert!(content.has_css_class("accent"), "and the primary colour");
             long_press();
             assert_eq!(longs.get(), 1);
             button.button.emit_clicked();

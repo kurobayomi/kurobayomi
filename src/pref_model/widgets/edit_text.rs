@@ -127,7 +127,7 @@ fn open(parent: &gtk::Window, spec: EditSpec, on_ok: impl Fn(String, Dialog) + '
     entry.set_text(&spec.snapshot);
     body.append(&entry);
     let support = Label::new(None);
-    support.add_css_class("pref-error");
+    support.add_css_class("error");
     support.set_wrap(true);
     support.set_xalign(0.0);
     support.set_visible(false);

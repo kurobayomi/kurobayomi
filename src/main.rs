@@ -321,7 +321,6 @@ fn build_window(app: &gtk::Application) {
         }
     });
     window_size::watch(&win);
-    theme::apply::mark_new_window(win.upcast_ref());
     local_flow::ui::attach(&win);
     refresh();
     win.present();

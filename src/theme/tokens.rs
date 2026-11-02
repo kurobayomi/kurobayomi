@@ -1,8 +1,8 @@
-//! The spacing scale, the alpha and duration constants of the theme, and the text styles the guard tests read.
+//! The spacing scale of the theme, and the text styles the guard tests read.
 //!
 //! Dp values are CSS px at scale 1; GTK does the scaling, so no constant is multiplied here.
 
-// --- Spacing, alpha, duration and radius (T-49a-051) ---
+// --- Spacing (T-49a-051) ---
 
 /// The one spacing scale of the app, in px (docs/design/main-window.md). Every margin, padding and box spacing a screen sets
 /// by hand is one of these; the stylesheet repeats the same steps. A built-in style class (`boxed-list`, `toolbar`, `linked`,
@@ -15,9 +15,6 @@ pub const SPACE_S: i32 = 8;
 pub const SPACE_M: i32 = 12;
 pub const SPACE_L: i32 = 16;
 pub const SPACE_XL: i32 = 24;
-
-pub const RIPPLE_ALPHA: f32 = 0.10;
-pub const SCROLLBAR_FADE_MS: u32 = 250;
 
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
 #[cfg(test)]

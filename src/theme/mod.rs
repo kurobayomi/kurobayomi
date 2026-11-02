@@ -1,7 +1,7 @@
 //! Theme: the stored mode, libadwaita's colour scheme, GTK CSS, and the thin widgets built on them.
 //!
-//! The pure parts (`tokens`, `prefs`, `app_theme`, `style`, `icons`) have unit tests and no GTK calls. `apply`,
-//! `components` and the widget functions of the other modules are the GTK layer.
+//! The pure parts (`tokens`, `prefs`, `app_theme`, `style`, `icons`) have unit tests and no GTK calls. `apply`
+//! and the widget functions of the other modules are the GTK layer.
 //!
 //! `startup` is the single call `main.rs` makes before the first window is presented (T-49a-058).
 //! The other helpers are used by the screens as their lanes adopt them.
@@ -12,7 +12,7 @@
 //!   A stored `MONET` reads as the GTK theme (`prefs`).
 //! - `lightStatusBar`, `windowLightStatusBar`, `lightNavigationBar`, `elevationOverlayEnabled`, `windowLightNavigationBar`
 //!   and the API-27 navigation-bar overrides: GTK has no system bars and no forced dark mode; the
-//!   dark decision comes from libadwaita's style manager (`apply::follow_system`).
+//!   dark decision comes from libadwaita's style manager.
 //! - `forceDarkAllowed`, `statusBarColor`, `navigationBarColor`, `navigationBarDividerColor`,
 //!   `enforceNavigationBarContrast`, `enforceStatusBarContrast`, `windowActionModeOverlay`,
 //!   `elevationOverlayColor`: the same reason, no system bars and no elevation tint.
@@ -23,14 +23,10 @@
 //! - Widget corner radii (`appwidget_*`): there is no home-screen widget on Linux.
 //! - `ActionButton.Overflow` and the unused AppCompat full-screen style: no reference in the app.
 
-pub mod anim;
 pub mod app_theme;
 pub mod apply;
-pub mod components;
 pub mod icons;
-pub mod motion;
 pub mod prefs;
-pub mod splash;
 pub mod style;
 pub mod tokens;
 
@@ -51,7 +47,7 @@ impl Default for ThemeSettings {
 }
 
 /// Installs the theme before the first window: the icon bundle, the stored choice (read from the
-/// preference store), the stylesheets and the portal follower (T-49a-058).
+/// preference store), and the stylesheet (T-49a-058).
 pub fn startup() {
     let Some(display) = gtk::gdk::Display::default() else {
         return;
@@ -60,7 +56,6 @@ pub fn startup() {
     let store = crate::data::app().base.store().clone();
     apply::install(&display, prefs::read_settings(&store));
     follow_mode(&kuro_prefs::ui::UiPrefs::new(store).theme_mode);
-    apply::follow_system();
 }
 
 /// Applies the theme mode again on every change of `pref`, from anywhere (a backup import, a second window), not

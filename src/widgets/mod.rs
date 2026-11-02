@@ -12,6 +12,5 @@ pub mod status;
 pub mod row;
 pub mod row_activate;
 pub mod selection_mirror;
-pub mod tabs;
 pub mod view_look;
 pub mod view_options;

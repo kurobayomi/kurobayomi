@@ -1,17 +1,8 @@
-//! Installs the two stylesheets on the default display (T-49a-012, T-49b-008, T-49ba-001).
-//!
-//! The base stylesheet (`style.css`) is added once at APPLICATION priority. The tint rules are one
-//! `CssProvider`, also added once; `reapply` replaces its text and never adds a second provider.
-//! Text is parse-checked first, so a parse error keeps the previous text and is logged once (F-49-01).
-//! `apply` is not re-entrant (R-49-02): a nested request sets a pending flag and the outer apply
-//! runs `apply_current` once more when it finishes, so the latest state is shown.
+//! Installs the base stylesheet (`style.css`) on the default display once, at APPLICATION priority (T-49ba-001), and sets
+//! libadwaita's colour scheme from the stored mode. libadwaita follows the desktop's light or dark choice itself.
 
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
+use std::cell::RefCell;
 
-use gtk::glib::prelude::Cast as _;
-use gtk::gio::prelude::ListModelExt as _;
-use gtk::prelude::WidgetExt as _;
 use gtk::{gdk, CssProvider};
 
 use kuro_prefs::ui::ThemeMode;
@@ -19,121 +10,11 @@ use kuro_prefs::ui::ThemeMode;
 use super::{style, ThemeSettings};
 
 thread_local! {
-    /// The tint provider and the display it was added to. Added once; only its text changes.
-    static TINTS: RefCell<Option<(gdk::Display, CssProvider)>> = const { RefCell::new(None) };
-    /// The last parse error logged, so a broken sheet is reported once, not on every apply.
-    static LAST_ERROR: RefCell<Option<String>> = const { RefCell::new(None) };
-    /// Re-entrancy state: `applying` while `reapply` runs, `pending` for a nested request.
-    static GUARD: Guard = const { Guard { applying: Cell::new(false), pending: Cell::new(false) } };
-    /// The display and settings last applied, so a system change can re-apply them.
+    /// The display and settings last applied, so a later change can update them.
     static CURRENT: RefCell<Option<(gdk::Display, ThemeSettings)>> = const { RefCell::new(None) };
-    /// The dark flag last marked on the windows (T-49ba-003), for windows created later.
-    static WINDOW_DARK: Cell<bool> = const { Cell::new(false) };
 }
 
-/// The re-entrancy guard: one apply at a time, and at most one queued behind it.
-struct Guard {
-    applying: Cell<bool>,
-    pending: Cell<bool>,
-}
-
-impl Guard {
-    /// True when the caller may run. A nested caller gets false and leaves a pending request.
-    fn enter(&self) -> bool {
-        if self.applying.replace(true) {
-            self.pending.set(true);
-            false
-        } else {
-            true
-        }
-    }
-
-    /// Ends the outer run. True when a nested request arrived and one more apply is owed.
-    fn leave(&self) -> bool {
-        self.applying.set(false);
-        self.pending.replace(false)
-    }
-}
-
-/// Parses `css` into a fresh provider. Returns the first parse error, if any.
-pub fn build_provider(css: &str) -> Result<CssProvider, String> {
-    let provider = CssProvider::new();
-    let error: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
-    {
-        let error = error.clone();
-        provider.connect_parsing_error(move |_, _section, err| {
-            let mut slot = error.borrow_mut();
-            if slot.is_none() {
-                *slot = Some(err.message().to_string());
-            }
-        });
-    }
-    provider.load_from_string(css);
-    let first = error.borrow_mut().take();
-    match first {
-        Some(message) => Err(message),
-        None => Ok(provider),
-    }
-}
-
-/// Replaces the tint text with `css`. Returns false, and keeps the previous text, when the CSS
-/// does not parse. A call nested inside another `reapply` returns false and is queued: when the
-/// outer call finishes it re-applies the current settings once (R-49-02).
-pub fn reapply(display: &gdk::Display, css: &str) -> bool {
-    if !GUARD.with(Guard::enter) {
-        tracing::debug!("theme apply re-entered; queued");
-        return false;
-    }
-    let ok = set_tints(display, css);
-    if GUARD.with(Guard::leave) {
-        apply_current();
-    }
-    ok
-}
-
-/// Parse-checks `css`, then loads it into the tint provider. The provider is added to the display
-/// the first time only.
-fn set_tints(display: &gdk::Display, css: &str) -> bool {
-    load_into(&TINTS, display, css)
-}
-
-fn load_into(
-    slot: &'static std::thread::LocalKey<RefCell<Option<(gdk::Display, CssProvider)>>>,
-    display: &gdk::Display,
-    css: &str,
-) -> bool {
-    if let Err(message) = build_provider(css) {
-        LAST_ERROR.with(|last| {
-            let mut last = last.borrow_mut();
-            if last.as_deref() != Some(message.as_str()) {
-                tracing::warn!(error = %message, "generated theme CSS did not parse; keeping the previous theme");
-                *last = Some(message);
-            }
-        });
-        return false;
-    }
-    LAST_ERROR.with(|last| *last.borrow_mut() = None);
-    slot.with(|slot| {
-        let mut slot = slot.borrow_mut();
-        let provider = match slot.as_ref() {
-            Some((_, provider)) => provider.clone(),
-            None => {
-                let provider = CssProvider::new();
-                gtk::style_context_add_provider_for_display(
-                    display,
-                    &provider,
-                    gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
-                );
-                *slot = Some((display.clone(), provider.clone()));
-                provider
-            }
-        };
-        provider.load_from_string(css);
-    });
-    true
-}
-
-/// Installs the tint sheet and the base stylesheet, once, before the first window is presented (T-49ba-001).
+/// Installs the base stylesheet and applies `settings`, once, before the first window is presented (T-49ba-001).
 pub fn install(display: &gdk::Display, settings: ThemeSettings) -> bool {
     let applied = set_settings(display, settings);
     let base = CssProvider::new();
@@ -149,12 +30,6 @@ fn connect_parse_log(provider: &CssProvider) {
         let at = section.start_location();
         tracing::error!(line = at.lines() + 1, column = at.chars() + 1, error = %err.message(), "stylesheet parse error");
     });
-}
-
-/// Installs the tint sheet on `display`: the dark-aware `kb-active` rule, which cannot live in the
-/// static base sheet, and the widget rules (the player state layer, T-49a-010, follows the dark flag too).
-pub fn apply(display: &gdk::Display, dark: bool) -> bool {
-    reapply(display, &format!("{}{}", style::system_rules(dark), style::widget_rules(dark)))
 }
 
 /// The libadwaita colour scheme for a mode: System follows the desktop, Light and Dark force it.
@@ -173,19 +48,14 @@ pub fn sync_color_scheme(mode: ThemeMode) {
     }
 }
 
-/// Whether the app is dark now, as libadwaita decided it (the forced mode, else the desktop).
-fn style_dark() -> bool {
-    adw::is_initialized() && adw::StyleManager::default().is_dark()
-}
-
 pub fn set_settings(display: &gdk::Display, settings: ThemeSettings) -> bool {
     CURRENT.with(|c| *c.borrow_mut() = Some((display.clone(), settings)));
-    apply_current()
+    sync_color_scheme(settings.mode);
+    true
 }
 
-/// Changes part of the applied settings and applies them (palette, window marks, GTK preference). This is
-/// the one path every theme-mode change takes; the caller stores the value. A no-op
-/// without a display, before `install`, or when nothing changes.
+/// Changes part of the applied settings and applies them. This is the one path every theme-mode change takes; the caller
+/// stores the value. A no-op without a display, before `install`, or when nothing changes.
 pub fn update_settings(change: impl FnOnce(&mut ThemeSettings)) -> bool {
     let Some((display, mut settings)) = CURRENT.with(|c| c.borrow().clone()) else {
         return false;
@@ -195,61 +65,9 @@ pub fn update_settings(change: impl FnOnce(&mut ThemeSettings)) -> bool {
     settings == before || set_settings(&display, settings)
 }
 
-fn apply_current() -> bool {
-    let current = CURRENT.with(|c| c.borrow().clone());
-    let Some((display, settings)) = current else {
-        return false;
-    };
-    sync_color_scheme(settings.mode);
-    // libadwaita has already folded the mode in, so its answer is the forced mode's, or the desktop's under System
-    let dark = style_dark();
-    WINDOW_DARK.with(|m| m.set(dark));
-    mark_windows();
-    apply(&display, dark)
-}
-
-/// Sets the palette class on one window: `kb-dark` for the dark flag.
-fn mark_window(window: &gtk::Window) {
-    if WINDOW_DARK.with(Cell::get) {
-        window.add_css_class("kb-dark");
-    } else {
-        window.remove_css_class("kb-dark");
-    }
-}
-
-/// Sets the palette classes on every toplevel, so a change applies without a restart.
-fn mark_windows() {
-    if !gtk::is_initialized() {
-        return;
-    }
-    let windows = gtk::Window::toplevels();
-    for i in 0..windows.n_items() {
-        if let Some(window) = windows.item(i).and_then(|o| o.downcast::<gtk::Window>().ok()) {
-            mark_window(&window);
-        }
-    }
-}
-
-/// Marks a window created after the last apply (called from `main::build_window`).
-pub fn mark_new_window(window: &gtk::Window) {
-    mark_window(window);
-}
-
-/// Starts following the desktop colour scheme (T-49a-011): libadwaita reads the desktop, and every change of its
-/// dark flag re-applies the palette. Call once after the window is realized.
-pub fn follow_system() {
-    if adw::is_initialized() {
-        adw::StyleManager::default().connect_dark_notify(|_| {
-            apply_current();
-        });
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::style::BASE_CSS;
-    use kuro_prefs::ui::ThemeMode;
 
     // T-01a-021: Light and Dark force the scheme, System follows the desktop.
     #[test]
@@ -265,52 +83,7 @@ mod tests {
         assert!(!update_settings(|s| s.mode = ThemeMode::DARK));
     }
 
-    #[test]
-    fn a_nested_request_is_queued_and_run_once() {
-        let g = Guard { applying: Cell::new(false), pending: Cell::new(false) };
-        assert!(g.enter());
-        // Two nested requests collapse into one owed apply.
-        assert!(!g.enter());
-        assert!(!g.enter());
-        assert!(g.leave());
-        // The queue is empty afterwards and the guard is free again.
-        assert!(g.enter());
-        assert!(!g.leave());
-    }
-
-    #[test]
-    fn no_nested_request_owes_nothing() {
-        let g = Guard { applying: Cell::new(false), pending: Cell::new(false) };
-        assert!(g.enter());
-        assert!(!g.leave());
-    }
-
-    /// One tint provider for the life of the process, replaced text on each apply, and a broken sheet keeps
-    /// the previous text. Needs a display, and skips itself without one.
-    #[test]
-    fn tint_provider_keeps_one_provider_and_the_last_good_text() {
-        crate::testing::with_display(|| {
-            let display = gdk::Display::default().expect("a display");
-            assert!(build_provider(BASE_CSS).is_ok());
-            let light = style::system_rules(false);
-            let dark = style::system_rules(true);
-
-            assert!(reapply(&display, &light));
-            let first = TINTS.with(|slot| slot.borrow().as_ref().map(|(_, p)| p.clone())).expect("tint provider");
-            assert!(reapply(&display, &dark));
-            let second = TINTS.with(|slot| slot.borrow().as_ref().map(|(_, p)| p.clone())).expect("tint provider");
-            assert_eq!(first, second, "the tint provider is added once and reused");
-            // GTK stores the parsed sheet, so compare with a reference provider loaded from the same text.
-            let reference = CssProvider::new();
-            reference.load_from_string(&dark);
-            assert_eq!(second.to_str(), reference.to_str(), "the text is replaced");
-
-            assert!(!reapply(&display, "}}}} not css"), "a broken sheet is refused");
-            assert_eq!(second.to_str(), reference.to_str(), "the previous text is kept");
-        });
-    }
-
-    /// Only `theme` installs a stylesheet: the base sheet and the tint provider. A screen that adds its own provider
+    /// Only `theme` installs a stylesheet: the base sheet. A screen that adds its own provider
     /// brings back the per-screen sheets this module replaced. Reads the source files, so it needs no display.
     #[test]
     fn no_screen_adds_a_css_provider() {

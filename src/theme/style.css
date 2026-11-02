@@ -1,58 +1,7 @@
-/* Base stylesheet: loaded once at APPLICATION priority (T-49ba-001).
- * Only GTK named colours (the theme's own) are referenced here (T-49ba-045). Every
- * stylesheet rule of the app lives in this file or in the tint text; no screen adds its own provider.
- * Hover, press and focus states are libadwaita's own; the app styles only its selected states. */
-.kb-secondary-item { opacity: 0.78; }
-/* The selection and active tints are dark-aware: style::system_rules emits them. */
-
-/* Divider (T-49ba-032): values/themes.xml android:divider, a 1 px line in the foreground colour. */
-.kb-divider, separator.kb-divider {
-  min-height: 1px;
-  background-color: alpha(@theme_fg_color, 0.12);
-}
-
-.kb-button-text {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* Dialogs and popovers (T-49ba-030): the GTK surfaces keep their own radius and follow the palette. */
-window.dialog,
-popover.menu > contents {
-  background-color: @theme_base_color;
-}
-
-/* Dragged or selected download card (T-49ba-027): draggable_card_foreground, alpha 0.08. */
-.kb-draggable.kb-dragged,
-.kb-draggable:selected {
-  background-image: linear-gradient(alpha(@theme_selected_bg_color, 0.08), alpha(@theme_selected_bg_color, 0.08));
-}
-
-/* Modal scrim (T-49ba-049): values/themes.xml android:backgroundDimAmount 0.32. */
-.kb-scrim {
-  background-color: rgba(0, 0, 0, 0.32);
-}
-
-/* Splash page (T-49ba-020): windowSplashScreenBackground, #54759E light and #202125 dark. */
-.kb-splash {
-  background-color: #54759E;
-}
-.kb-splash.kb-dark {
-  background-color: #202125;
-}
-
-/* Tab-enter icon rotation (T-49ba-022): -gtk-icon-transform, the same curve as anim.rs. Reduced
- * motion needs no rule here: GTK turns CSS transitions off when gtk-enable-animations is false. */
-.kb-icon-rot {
-  transition: -gtk-icon-transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-.kb-rot-0 { -gtk-icon-transform: rotate(0deg); }
-.kb-rot-180 { -gtk-icon-transform: rotate(180deg); }
-.kb-rot-360 { -gtk-icon-transform: rotate(360deg); }
-.kb-icon-rot.kb-rot-0-slow {
-  transition-duration: 500ms;
-  -gtk-icon-transform: rotate(0deg);
-}
+/* The app's own stylesheet, loaded once at APPLICATION priority (T-49ba-001). Only for the app's own components that
+ * libadwaita has no class for (cover cards, badges, the reader, the calendar); everything else uses libadwaita's widgets
+ * and style classes (`accent`, `error`, `success`, `dim-label`, `caption`, `heading`, `flat`, `card`). Only GTK named
+ * colours are referenced here (T-49ba-045); no screen adds its own provider. */
 
 /* Main window (docs/design/main-window.md): sidebar badge, library header, cards. Theme colours only; the
  * spacing follows theme::tokens::SPACE_* (4, 8, 12, 16, 24). */
@@ -76,12 +25,6 @@ popover.menu > contents {
 .kb-library-context {
   font-weight: 600;
   color: alpha(@theme_fg_color, 0.7);
-}
-/* The default theme of GTK 4.14 and 4.16 puts a 12 px margin on every box inside a grid (newer GTK does not), which costs a
-   column and widens every gap. The grids size their own cells (widgets::cover_grid), so that margin is removed and a
-   grid lays out the same on every GTK version. */
-gridview box {
-  margin: 0;
 }
 /* The narrow window's bottom bar: bare icon buttons, no frame and no fill until hovered, pressed or switched on, so the tab
    buttons show the open tab with the "on" fill. The header's buttons are libadwaita's own (flat, with its hover). */
@@ -135,10 +78,6 @@ stackswitcher > button.text-button {
  * description's left edge and made the gaps wider than the flow box's spacing. */
 flowbox.kb-chips > flowboxchild {
   padding: 0;
-}
-/* the small line under a title: the "nightly" of the panel's title */
-.kb-subtitle {
-  font-size: 0.8em;
 }
 .kb-library-grid {
   background: none;
@@ -204,19 +143,13 @@ flowbox.kb-chips > flowboxchild {
   font-size: 1.1em;
 }
 
-/* Settings pages (pref_model): the flash of a highlighted row, the error line and the tracker check. */
+/* Settings pages (pref_model): the flash of a highlighted row. */
 .pref-flash {
   background-color: alpha(@theme_selected_bg_color, 0.18);
   transition: background-color 200ms ease;
 }
 .pref-flash-off {
   background-color: transparent;
-}
-.pref-error {
-  color: @error_color;
-}
-.tracker-check {
-  color: @success_color;
 }
 
 /* Reader (reader/theme.rs): the page background is one of these classes, set on the reader widget. The colours are the
@@ -245,24 +178,10 @@ flowbox.kb-chips > flowboxchild {
   background-image: linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);
 }
 
-/* The theme's selection colour for the filler mark of an episode row and the header's chapter marks. The unread dot and the
- * bookmark of a row use libadwaita's own `accent` class. */
-.chapter-primary,
-.episode-tertiary {
-  color: @theme_selected_bg_color;
-}
-
 /* The chapter and episode list (entry_core/list_view.rs): libadwaita's own rows, so hover, focus ring and selected fill come
  * from the theme. The list draws no background, so the leading slots (the info block) keep the page background. */
 listview.kb-item-list {
   background: none;
-}
-
-/* The count pill of the app bar and tab labels (shell/appbar.rs). Its background alpha depends on the dark flag, so
- * style::system_rules sets it. */
-.kuro-count-pill {
-  border-radius: 999px;
-  padding: 0 6px;
 }
 
 /* Upcoming calendar (updates/upcoming/calendar_view.rs): a circular day cell with a today ring and event dots. */
@@ -285,27 +204,13 @@ listview.kb-item-list {
   border-radius: 9999px;
 }
 
-/* The app's side lists (main panel, settings pages) sit on the panel's own background: a separate block behind the rows
- * would end after the last row and leave two shades in one panel (a GTK theme gives the list its own base colour).
- * Selection and hover keep libadwaita's look. */
-.navigation-sidebar {
-  background-color: transparent;
-}
-
-/* The status dot of a repo source's row (browse/sources_page.rs): green works, orange blocked for now, red broken. */
+/* The status dot of a repo source's row (browse/sources_page.rs), in the colour of libadwaita's `success`, `warning` or
+ * `error` class: green works, orange blocked for now, red broken. */
 .kb-status {
   min-width: 8px;
   min-height: 8px;
   border-radius: 999px;
-}
-.kb-status-active {
-  background-color: @success_color;
-}
-.kb-status-blocked {
-  background-color: @warning_color;
-}
-.kb-status-broken {
-  background-color: @error_color;
+  background-color: currentColor;
 }
 
 /* The reader's chapter list (reader/chapter_panel.rs): a panel over the right side of the pages, with the chapter being

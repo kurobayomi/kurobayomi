@@ -63,7 +63,7 @@ pub fn show(
     // the window title shows the title once; the body does not repeat it
     column.append(body);
     let error = Label::new(None);
-    error.add_css_class("pref-error");
+    error.add_css_class("error");
     error.set_wrap(true);
     error.set_xalign(0.0);
     error.set_visible(false);

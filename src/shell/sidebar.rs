@@ -199,7 +199,7 @@ fn title() -> GBox {
     names.set_valign(gtk::Align::Center);
     names.append(&gtk::Label::builder().label("Kurobayomi").css_classes(["title"]).build());
     let channel = if crate::channel::NIGHTLY { "nightly".to_string() } else { format!("stable {}", env!("CARGO_PKG_VERSION")) };
-    names.append(&gtk::Label::builder().label(channel).css_classes(["kb-subtitle", "dim-label"]).build());
+    names.append(&gtk::Label::builder().label(channel).css_classes(["caption", "dim-label"]).build());
     title.append(&names);
     title
 }

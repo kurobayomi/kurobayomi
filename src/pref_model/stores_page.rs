@@ -638,7 +638,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
         let helper = stores::helper(entry, &keys);
         if let Some(label) = &open.helper {
             label.set_text(&stores::helper_text(&helper));
-            if helper.is_error() { label.add_css_class("pref-error") } else { label.remove_css_class("pref-error") }
+            if helper.is_error() { label.add_css_class("error") } else { label.remove_css_class("error") }
         }
         open.dialog.set_confirm_enabled(stores::add_enabled(entry, &keys));
         if let Some(confirm) = &open.dialog.confirm {

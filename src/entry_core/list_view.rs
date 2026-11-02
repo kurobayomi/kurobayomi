@@ -118,7 +118,7 @@ fn row_widgets(kind: Kind, on_download: Rc<dyn Fn(Request)>) -> RowWidgets {
     text.append(&summary);
     let marker = Label::builder().xalign(0.0).hexpand(true).visible(false).css_classes(["dim-label", "caption"]).build();
     let bookmark = gtk::Image::builder().icon_name("bookmark-filled-symbolic").css_classes(["accent"]).valign(Align::Center).build();
-    let filler = Label::builder().label(tr(MsgKey::filler)).css_classes(["caption", "episode-tertiary"]).valign(Align::Center).build();
+    let filler = Label::builder().label(tr(MsgKey::filler)).css_classes(["caption", "accent"]).valign(Align::Center).build();
     let download = DownloadButton::new(kind, move |request| on_download(request));
     // the list's own row (a `row` node of libadwaita) draws the hover, the focus ring and the selection. The card fills
     // the row, so a press anywhere on it opens the row; its content is inset 16 px from the edge (with the row's 2 px of

@@ -1,216 +1,15 @@
-//! The `kb-*` component classes and their rules (`p2-rust-design.md` section 5.5), the base
-//! stylesheet, and the pure alpha and padding helpers of T-49b-028 and T-49b-029.
+//! The base stylesheet of the app: the few rules for its own components that libadwaita has no class for.
 
-
-/// The base stylesheet: GTK named colours and static rules, loaded with the tint rules.
+/// The base stylesheet, loaded once at APPLICATION priority.
 pub const BASE_CSS: &str = include_str!("style.css");
-
-/// CSS class names for the Kurobayomi component classes.
-pub mod class {
-    pub const ACTIVE: &str = "kb-active";
-    pub const PILL: &str = "kb-pill";
-    pub const PLAYER_RIPPLE: &str = "kb-player-ripple";
-    pub const TAB_PILL: &str = "kb-tab-pill";
-    pub const HIT_TARGET: &str = "kb-hit-target";
-    pub const INFO_BAR: &str = "kb-info-bar";
-    pub const DRAGGED: &str = "kb-dragged";
-    pub const FAST_THUMB: &str = "kb-fast-thumb";
-    pub const FAST_SHOWN: &str = "kb-fast-shown";
-    pub const BUTTON_FILLED: &str = "kb-button-filled";
-    pub const BUTTON_TEXT: &str = "kb-button-text";
-    pub const SHEET: &str = "kb-sheet";
-    /// A glyph in the primary colour (the info screen icon).
-    pub const PRIMARY_ICON: &str = "kb-primary-icon";
-    /// The app bar's count pill (shell/appbar.rs); its geometry is in style.css, its alpha in `system_rules`.
-    pub const COUNT_PILL: &str = "kuro-count-pill";
-}
-
-/// The dark-aware rules: the active tint follows the dark flag (amber in dark, darker amber in light; T-49b-010, T-49b-029), and the
-/// pill takes a GTK-theme stand-in for `surface_container_high` (T-49a-034). The app bar's count pill
-/// takes the same pill alpha over the window foreground.
-pub fn system_rules(dark: bool) -> String {
-    let active = if dark { "#ffeb3b" } else { "#ffc107" };
-    // the tab pill follows the generic pill, so its alpha background wins at equal specificity
-    format!(
-        ".{} {{ color: {active}; }}\n.{} {{ background-color: mix(@theme_bg_color, @theme_fg_color, 0.1); }}\n.{} {{ background-color: alpha(@theme_fg_color, {}); }}\n.{} {{ color: @theme_selected_bg_color; }}\n.{count_pill} {{ background-color: alpha(@theme_fg_color, {count_alpha}); }}\n",
-        class::ACTIVE,
-        class::PILL,
-        class::TAB_PILL,
-        crate::widgets::tabs::pill_alpha(dark),
-        class::PRIMARY_ICON,
-        count_pill = class::COUNT_PILL,
-        count_alpha = crate::widgets::tabs::pill_alpha(dark),
-    )
-}
-
-/// The fast-scroll thumb (T-49a-031): hidden by default, shown with a class, and faded by a CSS
-/// transition of `SCROLLBAR_FADE_MS`. Its colour is the primary accent.
-pub fn fast_thumb_rules() -> String {
-    format!(
-        ".{thumb} {{ opacity: 0; border-radius: 6px; background-color: @theme_selected_bg_color; transition: opacity {fade}ms linear; }}\n.{thumb}.{shown} {{ opacity: 1; transition: none; }}\n",
-        thumb = class::FAST_THUMB,
-        shown = class::FAST_SHOWN,
-        fade = crate::theme::tokens::SCROLLBAR_FADE_MS,
-    )
-}
-
-/// The rules that depend on the system dark flag or the tokens of the widget layer, added to the
-/// tint provider for every choice.
-pub fn widget_rules(system_dark: bool) -> String {
-    format!("{}{}{}", ripple_rules(system_dark), fast_thumb_rules(), widget_static_rules())
-}
-
-/// The widget classes of `widgets/`. They use GTK named colours only, so they follow the GTK theme
-/// and a picked scheme alike (the scheme overrides the named colours).
-pub fn widget_static_rules() -> String {
-    format!(
-        "\
-.{filled} {{ background-color: @theme_selected_bg_color; color: @theme_selected_fg_color; min-width: 58px; min-height: 40px; border-radius: 999px; padding: 0 24px; }}
-.{filled}:disabled {{ background-color: alpha(@theme_selected_bg_color, 0.12); color: alpha(@theme_fg_color, 0.38); }}
-.{text} {{ background: none; color: @theme_selected_bg_color; padding: 0 12px; }}
-.{text}:disabled {{ color: alpha(@theme_fg_color, 0.38); }}
-.{sheet} {{ background-color: @popover_bg_color; border-radius: 28px 28px 0 0; padding: 24px; }}
-.{pill} {{ padding: 1px 6px; border-radius: 999px; }}
-.{hit} {{ min-width: 48px; min-height: 48px; }}
-.{info_bar} {{ border-top: 1px solid alpha(@theme_fg_color, 0.12); padding: 8px 0 16px 0; }}
-",
-        filled = class::BUTTON_FILLED,
-        text = class::BUTTON_TEXT,
-        sheet = class::SHEET,
-        pill = class::PILL,
-        hit = class::HIT_TARGET,
-        info_bar = class::INFO_BAR,
-    )
-}
-
-/// The player state layer (T-49a-010): `RIPPLE_ALPHA` over hover, focus-visible, active and drag.
-/// White in the system dark mode and black in the system light mode, never the app scheme.
-pub fn ripple_rules(system_dark: bool) -> String {
-    let rgb = if system_dark { "255, 255, 255" } else { "0, 0, 0" };
-    format!(
-        ".{layer}:hover, .{layer}:focus-visible, .{layer}:active, .{layer}.{dragged} {{ background-color: rgba({rgb}, {alpha}); }}\n",
-        layer = class::PLAYER_RIPPLE,
-        dragged = class::DRAGGED,
-        alpha = crate::theme::tokens::RIPPLE_ALPHA,
-    )
-}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    #[test]
-    fn system_rules_follow_the_dark_flag() {
-        let dark = system_rules(true);
-        let light = system_rules(false);
-        assert!(dark.contains(".kb-active { color: #ffeb3b; }"));
-        assert!(light.contains(".kb-active { color: #ffc107; }"));
-    }
-
-    // T-49a-034: the pill geometry is always on; the colour is a GTK mix.
-    #[test]
-    fn pill_geometry_is_always_on_and_colour_is_a_gtk_mix() {
-        let rules = widget_rules(false);
-        assert!(rules.contains(".kb-pill { padding: 1px 6px; border-radius: 999px; }"));
-        assert!(system_rules(true).contains(".kb-pill { background-color: mix(@theme_bg_color"));
-    }
-
-    // hover and press come from libadwaita: the app's rules draw none
-    #[test]
-    fn the_generated_rules_draw_no_hover_state() {
-        for dark in [false, true] {
-            let rules = format!("{}{}{}", system_rules(dark), widget_static_rules(), fast_thumb_rules());
-            assert!(!rules.contains(":hover") && !rules.contains(":active"), "dark={dark}");
-        }
-    }
-
-    // T-49b-022: the tab pill rule comes after the generic pill rule, so its alpha background wins.
-    #[test]
-    fn tab_pill_rule_follows_the_pill_rule() {
-        for dark in [false, true] {
-            let system = system_rules(dark);
-            assert!(system.find(".kb-tab-pill {").unwrap() > system.find(".kb-pill {").unwrap(), "dark={dark}");
-        }
-    }
-
-    // T-49b-026: the info icon is primary, not the amber filter tint.
-    #[test]
-    fn primary_icon_class_uses_the_primary_role() {
-        assert!(system_rules(true).contains(".kb-primary-icon { color: @theme_selected_bg_color; }"));
-    }
-
-    #[test]
-    fn base_stylesheet_leaves_dark_aware_rules_to_the_generated_css() {
-        assert!(!BASE_CSS.contains(".kb-active"));
-    }
+    use super::BASE_CSS;
 
     #[test]
     fn base_stylesheet_braces_balance() {
         assert_eq!(BASE_CSS.matches('{').count(), BASE_CSS.matches('}').count());
-    }
-}
-
-#[cfg(test)]
-mod ripple_tests {
-    use super::{fast_thumb_rules, ripple_rules};
-
-    #[test]
-    fn fast_thumb_fades_over_the_scrollbar_duration() {
-        let css = fast_thumb_rules();
-        assert!(css.contains("transition: opacity 250ms"));
-        assert!(css.contains(".kb-fast-thumb.kb-fast-shown"));
-    }
-
-    #[test]
-    fn ripple_is_white_in_system_dark_and_black_in_system_light() {
-        // T-49a-010 / MANUAL-49-07
-        assert!(ripple_rules(true).contains("rgba(255, 255, 255, 0.1)"));
-        assert!(ripple_rules(false).contains("rgba(0, 0, 0, 0.1)"));
-    }
-
-    #[test]
-    fn ripple_covers_hover_focus_active_and_drag() {
-        let css = ripple_rules(true);
-        for state in [":hover", ":focus-visible", ":active", ".kb-dragged"] {
-            assert!(css.contains(state), "{state}");
-        }
-    }
-
-    // T-49b-013: `.kb-player-ripple`, alpha .1 for every state.
-    #[test]
-    fn player_ripple_class_and_alpha() {
-        assert_eq!(super::class::PLAYER_RIPPLE, "kb-player-ripple");
-        assert_eq!(crate::theme::tokens::RIPPLE_ALPHA, 0.1);
-        let css = ripple_rules(false);
-        assert!(css.contains(".kb-player-ripple:hover"));
-        assert!(css.contains(".kb-player-ripple.kb-dragged"));
-    }
-}
-
-
-#[cfg(test)]
-mod parse_tests {
-    /// The widget and system rules parse under `gtk::CssProvider`. Needs a display, and skips
-    /// itself without one.
-    #[test]
-    fn widget_rules_parse_under_css_provider() {
-        crate::testing::with_display(|| {
-            for dark in [false, true] {
-                let css = format!("{}{}", super::system_rules(dark), super::widget_rules(dark));
-                if let Err(message) = crate::theme::apply::build_provider(&css) {
-                    panic!("CSS did not parse: {message}");
-                }
-            }
-        });
-    }
-}
-
-#[cfg(test)]
-mod base_css_tests {
-    use super::BASE_CSS;
-
-    fn has(rule: &str) -> bool {
-        BASE_CSS.contains(rule)
     }
 
     /// T-49ba-045: the base sheet names only GTK named colours, so no rule refers to a colour that does not exist.
@@ -218,18 +17,7 @@ mod base_css_tests {
     fn base_sheet_references_only_gtk_named_colours() {
         // the GTK named colours: GTK themes define them, and so does libadwaita (its GTK 3 compatibility names), so they
         // resolve under libadwaita's own stylesheet and under distributions whose libadwaita keeps the GTK theme
-        const GTK: [&str; 9] = [
-            "theme_bg_color",
-            // the standard border colour (GTK's default theme and Breeze define it): the dialog outline
-            "borders",
-            "theme_fg_color",
-            "theme_base_color",
-            "theme_selected_bg_color",
-            "theme_selected_fg_color",
-            "error_color",
-            "success_color",
-            "warning_color",
-        ];
+        const GTK: [&str; 5] = ["theme_bg_color", "theme_fg_color", "theme_selected_bg_color", "theme_selected_fg_color", "borders"];
         let mut rest = BASE_CSS;
         while let Some(at) = rest.find('@') {
             let name: String = rest[at + 1..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '_').collect();
@@ -243,76 +31,16 @@ mod base_css_tests {
         }
     }
 
-    /// The declarations of the base-sheet rule for `selector`, on one line, or `None` when the sheet has no such rule.
-    fn declarations(selector: &str) -> Option<String> {
-        let start = BASE_CSS.find(&format!("{selector} {{"))? + selector.len() + 2;
-        let end = BASE_CSS[start..].find('}')? + start;
-        Some(BASE_CSS[start..end].split_whitespace().collect::<Vec<_>>().join(" "))
-    }
-
-    /// The rules of the screens that used to add their own provider now live in the base sheet, with the same
-    /// declarations. Nothing outside `theme` adds a provider (`apply::no_screen_adds_a_css_provider`).
+    /// The base sheet parses under `gtk::CssProvider`. Needs a display, and skips itself without one.
     #[test]
-    fn screen_rules_live_in_the_base_sheet() {
-        let rules = [
-            (".pref-flash", "background-color: alpha(@theme_selected_bg_color, 0.18);"),
-            (".pref-error", "color: @error_color;"),
-            (".tracker-check", "color: @success_color;"),
-            (".reader-bg-black", "background-color: #000000;"),
-            (".reader-bg-gray", "background-color: #202125;"),
-            (".reader-scrim", "background-color: rgba(0, 0, 0, 0.5);"),
-            (".reader-text-light", "color: #ffffff;"),
-            (".kuro-backdrop-fade", "linear-gradient(to bottom, alpha(@theme_bg_color, 0.3) 0%, alpha(@theme_bg_color, 0.45) 60%, @theme_bg_color 100%);"),
-            (".kuro-cal-day:focus-visible", "outline: 2px solid @theme_selected_bg_color;"),
-            (".kuro-cal-dot", "background-color: @theme_selected_bg_color;"),
-        ];
-        for (selector, declaration) in rules {
-            let body = declarations(selector).unwrap_or_else(|| panic!("{selector} is not in style.css"));
-            assert!(body.contains(declaration), "{selector}: {body}");
-        }
-    }
-
-    /// The count pill keeps its geometry in the base sheet; its alpha depends on the dark flag, so it is
-    /// generated with the other dark-aware rules.
-    #[test]
-    fn count_pill_alpha_follows_the_dark_flag() {
-        assert!(declarations(".kuro-count-pill").is_some_and(|b| b.contains("border-radius: 999px;")));
-        assert!(super::system_rules(true).contains(".kuro-count-pill { background-color: alpha(@theme_fg_color, 0.12); }"));
-        assert!(super::system_rules(false).contains(".kuro-count-pill { background-color: alpha(@theme_fg_color, 0.08); }"));
-    }
-
-    /// T-49ba-027: a dragged or selected download card gets alpha 0.08 of the selection colour.
-    #[test]
-    fn draggable_cards_tint_with_the_selection_colour() {
-        assert!(has(".kb-draggable.kb-dragged,"));
-        assert!(has("alpha(@theme_selected_bg_color, 0.08)"));
-    }
-
-    /// T-49ba-049: the modal scrim is black at 0.32.
-    #[test]
-    fn scrim_is_black_at_032() {
-        assert!(has(".kb-scrim {\n  background-color: rgba(0, 0, 0, 0.32);"));
-    }
-
-    /// T-49ba-020: the splash colours are the Android splash colours.
-    #[test]
-    fn splash_colours_match_the_android_resources() {
-        assert!(has(".kb-splash {\n  background-color: #54759E;"));
-        assert!(has(".kb-splash.kb-dark {\n  background-color: #202125;"));
-    }
-
-    /// T-49ba-032: dividers are one pixel of the foreground at 0.12.
-    #[test]
-    fn dividers_are_one_pixel_at_012() {
-        assert!(has(".kb-divider, separator.kb-divider {\n  min-height: 1px;\n  background-color: alpha(@theme_fg_color, 0.12);"));
-    }
-
-    /// T-49ba-022: the tab-enter rotation classes that `anim::rotate_icon` sets.
-    #[test]
-    fn rotation_classes_are_defined() {
-        for class in ["kb-rot-0 {", "kb-rot-180 {", "kb-rot-360 {", "kb-icon-rot.kb-rot-0-slow {"] {
-            assert!(has(class), "{class}");
-        }
-        assert!(has("transition: -gtk-icon-transform 300ms cubic-bezier(0.4, 0, 0.2, 1);"));
+    fn base_sheet_parses() {
+        crate::testing::with_display(|| {
+            let provider = gtk::CssProvider::new();
+            let failed = std::rc::Rc::new(std::cell::Cell::new(false));
+            let flag = std::rc::Rc::clone(&failed);
+            provider.connect_parsing_error(move |_, _, _| flag.set(true));
+            provider.load_from_string(BASE_CSS);
+            assert!(!failed.get(), "style.css did not parse");
+        });
     }
 }

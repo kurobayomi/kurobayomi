@@ -81,7 +81,7 @@ fn tracker_row(name: &str, logged_in: bool, on_login: std::rc::Rc<dyn Fn()>, on_
         let image = Image::from_icon_name("object-select-symbolic");
         image.set_pixel_size(TRACKER_CHECK_SIZE);
         image.set_tooltip_text(Some(&label));
-        image.add_css_class("tracker-check");
+        image.add_css_class("success");
         image.set_accessible_role(gtk::AccessibleRole::Img);
         image.update_property(&[gtk::accessible::Property::Label(&label)]);
         image

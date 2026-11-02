@@ -26,10 +26,9 @@ pub fn should_write(current: ThemeMode, next: ThemeMode) -> bool {
     current != next
 }
 
-/// Applies the mode through the theme's one path (`theme::apply::update_settings`): the palette, the window marks
-/// and `gtk-application-prefer-dark-theme` change together. Light and Dark force the GTK preference; System puts
-/// back the value the desktop had at startup and follows the portal, so it never forces light. A no-op without a
-/// display, and when the mode is already the applied one.
+/// Applies the mode through the theme's one path (`theme::apply::update_settings`), which sets libadwaita's colour
+/// scheme: Light and Dark force it, System follows the desktop. A no-op without a display, and when the mode is already
+/// the applied one.
 pub fn apply(mode: ThemeMode) {
     crate::theme::apply::update_settings(|settings| settings.mode = mode);
 }
