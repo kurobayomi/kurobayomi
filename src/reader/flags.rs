@@ -16,15 +16,24 @@ pub fn reading_mode_of(viewer_flags: i64) -> ReadingMode {
     ReadingMode::from_preference((viewer_flags & i64::from(READING_MODE_MASK)) as i32)
 }
 
-/// `getMangaReadingMode(resolveDefault = true)`: the manga's mode, or the preference when the manga has none.
-/// A corrupt global preference that is itself DEFAULT falls back to [`DEFAULT_READING_MODE_PREF`], so this never returns
-/// [`ReadingMode::Default`].
-pub fn resolve_reading_mode(viewer_flags: i64, default_pref: i32) -> ReadingMode {
+/// The tags that mark a title read as one vertical strip (webtoons, manhwa, manhua), compared without case.
+const VERTICAL_TAGS: [&str; 6] = ["webtoon", "webtoons", "manhwa", "manhua", "long strip", "longstrip"];
+
+/// The mode a title's tags call for, when they call for one: a webtoon, manhwa, manhua or long-strip title reads as
+/// the vertical strip. Anything else is `None` and follows the default.
+pub fn content_mode(genres: &[String]) -> Option<ReadingMode> {
+    genres.iter().any(|g| VERTICAL_TAGS.contains(&g.trim().to_lowercase().as_str())).then_some(ReadingMode::Webtoon)
+}
+
+/// `getMangaReadingMode(resolveDefault = true)`: the manga's own mode, else the mode its tags call for (`content`), else
+/// the preference. A corrupt global preference that is itself DEFAULT falls back to [`DEFAULT_READING_MODE_PREF`], so
+/// this never returns [`ReadingMode::Default`].
+pub fn resolve_reading_mode(viewer_flags: i64, content: Option<ReadingMode>, default_pref: i32) -> ReadingMode {
     match reading_mode_of(viewer_flags) {
-        ReadingMode::Default => match ReadingMode::from_preference(default_pref) {
+        ReadingMode::Default => content.unwrap_or_else(|| match ReadingMode::from_preference(default_pref) {
             ReadingMode::Default => ReadingMode::from_preference(DEFAULT_READING_MODE_PREF),
             mode => mode,
-        },
+        }),
         mode => mode,
     }
 }
@@ -93,17 +102,17 @@ mod tests {
 
     #[test]
     fn manga_mode_zero_resolves_to_preference_and_raw_is_kept_otherwise() {
-        assert_eq!(resolve_reading_mode(0, DEFAULT_READING_MODE_PREF), ReadingMode::LeftToRight);
-        assert_eq!(resolve_reading_mode(0, 2), ReadingMode::RightToLeft, "a preference of right to left is still honoured");
-        assert_eq!(resolve_reading_mode(0x3, DEFAULT_READING_MODE_PREF), ReadingMode::Vertical);
+        assert_eq!(resolve_reading_mode(0, None, DEFAULT_READING_MODE_PREF), ReadingMode::LeftToRight);
+        assert_eq!(resolve_reading_mode(0, None, 2), ReadingMode::RightToLeft, "a preference of right to left is still honoured");
+        assert_eq!(resolve_reading_mode(0x3, None, DEFAULT_READING_MODE_PREF), ReadingMode::Vertical);
     }
 
     #[test]
     fn e21_resolve_never_returns_default_even_with_a_corrupt_global() {
-        assert_eq!(resolve_reading_mode(0, 1), ReadingMode::LeftToRight);
-        assert_eq!(resolve_reading_mode(0, 0), ReadingMode::LeftToRight, "corrupt global falls back to LTR");
-        assert_eq!(resolve_reading_mode(0, 9), ReadingMode::LeftToRight);
-        assert_ne!(resolve_reading_mode(0, 0), ReadingMode::Default);
+        assert_eq!(resolve_reading_mode(0, None, 1), ReadingMode::LeftToRight);
+        assert_eq!(resolve_reading_mode(0, None, 0), ReadingMode::LeftToRight, "corrupt global falls back to LTR");
+        assert_eq!(resolve_reading_mode(0, None, 9), ReadingMode::LeftToRight);
+        assert_ne!(resolve_reading_mode(0, None, 0), ReadingMode::Default);
     }
 
     #[test]
@@ -119,5 +128,17 @@ mod tests {
         let webtoon = toggle_crop(ReadingMode::Webtoon, false, true);
         assert_eq!(webtoon, CropToggle { pref: CropPref::Webtoon, value: false });
         assert_eq!(crop_pref_for(ReadingMode::ContinuousVertical), CropPref::Webtoon);
+    }
+
+    #[test]
+    fn a_webtoon_title_reads_vertically_unless_it_has_a_mode_of_its_own() {
+        let tags = |list: &[&str]| list.iter().map(|t| (*t).to_owned()).collect::<Vec<_>>();
+        assert_eq!(content_mode(&tags(&["Action", "Manhwa"])), Some(ReadingMode::Webtoon));
+        assert_eq!(content_mode(&tags(&["Long Strip"])), Some(ReadingMode::Webtoon), "case and spaces do not matter");
+        assert_eq!(content_mode(&tags(&["Action", "Shounen"])), None, "other manga keeps the default");
+        let webtoon = content_mode(&tags(&["Webtoon"]));
+        assert_eq!(resolve_reading_mode(0, webtoon, DEFAULT_READING_MODE_PREF), ReadingMode::Webtoon);
+        assert_eq!(resolve_reading_mode(0x2, webtoon, DEFAULT_READING_MODE_PREF), ReadingMode::RightToLeft, "the title's own mode wins");
+        assert_eq!(resolve_reading_mode(0, None, 2), ReadingMode::RightToLeft, "no tag: the preference");
     }
 }

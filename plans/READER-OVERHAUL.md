@@ -76,9 +76,10 @@ are built once, on the shared pieces.
 
 ### Phase 3: reading features
 
-- **Reading mode from the content**, for a title with no choice of its own: Webtoon, Manhwa, Manhua or Long Strip in its
-  tags, or a first page much taller than wide, opens the vertical strip; other manga opens right to left; a choice the
-  user made for the title always wins. The global default setting stays as the fallback.
+- **Reading mode from the content** (done): a title with no mode of its own whose tags say Webtoon, Manhwa, Manhua or
+  Long Strip opens as the vertical strip. Everything else keeps the user's default (left to right, their decision of
+  2026-10-11; right to left stays a per-title choice), so Japanese manga is not switched by guess. A choice the user
+  made for a title always wins.
 - **Two pages side by side** in the page-by-page modes when the window is wider than tall: pages pair in reading order,
   a wide page (an existing spread) and the first page stand alone, and the pair follows the reading direction. A
   setting turns it on or off (Automatic, the default; Always; Never).
@@ -102,4 +103,5 @@ moves.
 ## Decisions (2026-11-02)
 
 - Two pages side by side: Automatic by window shape is the default, with Always and Never as the other choices.
-- Reading mode from the content: on for everyone, no setting; a mode the user picked for a title always wins.
+- Reading mode from the content: on for everyone, no setting, vertical strip only (tags); a mode the user picked for a
+  title always wins, and the left-to-right default of 2026-10-11 stays for everything else.

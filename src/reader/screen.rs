@@ -155,6 +155,8 @@ pub struct ReaderCore {
     session: RefCell<Option<ReaderSession>>,
     events: RefCell<Option<Receiver<ReaderEvent>>>,
     manga_title: RefCell<String>,
+    /// The mode the open title's tags call for (`flags::content_mode`), used when the title has no mode of its own.
+    content_mode: Cell<Option<ReadingMode>>,
     /// The delete queue was handed to the sink; a later close does not hand it over again.
     deletes_flushed: Cell<bool>,
 }
@@ -172,6 +174,7 @@ impl ReaderCore {
             session: RefCell::new(None),
             events: RefCell::new(None),
             manga_title: RefCell::new(String::new()),
+            content_mode: Cell::new(None),
             deletes_flushed: Cell::new(false),
         }
     }
@@ -247,6 +250,7 @@ impl ReaderCore {
             chapter.requested_page.set(page.clamp(0, pages.len().saturating_sub(1) as i64));
         }
         *self.manga_title.borrow_mut() = opened.manga.title.clone();
+        self.content_mode.set(flags::content_mode(opened.manga.genre.as_deref().unwrap_or_default()));
         let (tx, rx) = mpsc::channel();
         let mut session = ReaderSession::new(
             self.deps.manga_id,
@@ -557,9 +561,9 @@ impl ReaderCore {
     }
 
     fn mode(&self) -> kuro_prefs::reader::ReadingMode {
-        // the manga's own mode, else the default of the Settings page
+        // the manga's own mode, else the one its tags call for, else the default of the Settings page
         let viewer_flags = self.session.borrow().as_ref().map_or(0, |s| s.viewer_flags());
-        flags::resolve_reading_mode(viewer_flags, self.deps.prefs.default_reading_mode.get())
+        flags::resolve_reading_mode(viewer_flags, self.content_mode.get(), self.deps.prefs.default_reading_mode.get())
     }
 }
 
