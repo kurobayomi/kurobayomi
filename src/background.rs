@@ -10,7 +10,8 @@
 //! - [`run_local_async`]: a future that is not `Send` (the image service's), driven to its end on a blocking-pool thread.
 //!
 //! `done` always runs on the GTK main context, and only when the work finished: no widget is touched from a worker, as
-//! `done` is not `Send`. A long-lived worker (a writer thread, a proxy, the library worker) is a thread of its own, not a
+//! `done` is not `Send`. A job that crashed is logged and the user is told (`unknown_error`), so no spinner waits in
+//! silence; a job cancelled on purpose ends quietly. [`run_async_on`] hands the loss to `done` itself (`None`). A long-lived worker (a writer thread, a proxy, the library worker) is a thread of its own, not a
 //! job here.
 
 use std::future::Future;
@@ -29,7 +30,7 @@ where
     run_async_cancellable(CancellationToken::new(), call, deliver);
 }
 
-/// As [`run_async`], but the call is dropped when `cancel` fires, and then `deliver` never runs.
+/// As [`run_async`], but the call is dropped when `cancel` fires, and then `deliver` never runs (and nothing is said).
 pub fn run_async_cancellable<T, Call, Deliver>(cancel: CancellationToken, call: Call, deliver: Deliver)
 where
     T: Send + 'static,
@@ -37,6 +38,7 @@ where
     Deliver: FnOnce(T) + 'static,
 {
     let (sender, receiver) = bounded::<T>(1);
+    let cancel_seen = cancel.clone();
     tokio::spawn(async move {
         let value = tokio::select! {
             biased;
@@ -45,7 +47,7 @@ where
         };
         let _ = sender.send(value).await;
     });
-    deliver_on_main(receiver, deliver);
+    deliver_unless_cancelled(receiver, Some(cancel_seen), deliver);
 }
 
 /// Runs `call` on the runtime `on` (a source's own runtime) and passes its value to `done` on the GTK main context, or
@@ -111,12 +113,27 @@ where
 /// Waits on the GTK main context for the one value of `receiver` and passes it to `done`; a dropped sender passes
 /// nothing.
 fn deliver_on_main<T: 'static>(receiver: async_channel::Receiver<T>, done: impl FnOnce(T) + 'static) {
+    deliver_unless_cancelled(receiver, None, done);
+}
+
+/// [`deliver_on_main`] for work that `cancel` may stop on purpose: a cancelled job ends quietly, while one that ended
+/// without its value otherwise crashed, and says so ([`crashed`]) instead of leaving a spinner waiting in silence.
+fn deliver_unless_cancelled<T: 'static>(receiver: async_channel::Receiver<T>, cancel: Option<CancellationToken>, done: impl FnOnce(T) + 'static) {
     // the thread-default context: the GTK main context in the app, and a private one in the tests
     glib::MainContext::ref_thread_default().spawn_local(async move {
-        if let Ok(value) = receiver.recv().await {
-            done(value);
+        match receiver.recv().await {
+            Ok(value) => done(value),
+            Err(_) if cancel.is_some_and(|c| c.is_cancelled()) => {}
+            Err(_) => crashed(),
         }
     });
+}
+
+/// A background job that panicked: the panic is in the log already (the panic hook), so this adds what it was and tells
+/// the user that something failed.
+fn crashed() {
+    tracing::error!("a background job ended without its result: it panicked");
+    crate::toast::notify(kuro_i18n::tr(kuro_i18n::MsgKey::unknown_error));
 }
 
 #[cfg(test)]
@@ -214,6 +231,24 @@ mod tests {
             })
             .expect("the test thread takes its own main context");
     }
+    #[test]
+    fn a_crashed_job_never_delivers_and_does_not_hang_the_main_context() {
+        let context = glib::MainContext::new();
+        context
+            .with_thread_default(|| {
+                let (done_tx, done_rx) = mpsc::channel::<u32>();
+                run(
+                    || -> u32 { panic!("a test job crashes on purpose") },
+                    move |value| {
+                        let _ = done_tx.send(value);
+                    },
+                );
+                context.block_on(glib::timeout_future(Duration::from_millis(200)));
+                assert!(done_rx.try_recv().is_err(), "a crashed job has no value to deliver");
+            })
+            .expect("the test thread takes its own main context");
+    }
+
     /// The guard of this module: no code outside it hands off background work its own way. A one-shot hand-off (a
     /// spawned thread or task whose single value is awaited on the GTK side) and a direct GLib worker-pool call are
     /// this module's job; a stream of progress (a `while` loop over a channel) and a long-lived worker are not. Reads the
