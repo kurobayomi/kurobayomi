@@ -524,6 +524,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
 /// its servers load, a greyed-out "Quality: loading…" and the open menu refreshes when they are in), Audio, Subtitles,
 /// Speed and Chapters (a file that has them) as submenus, each marking what plays now; then Autoplay next episode and
 /// Fullscreen.
+/// All in one group: GTK sizes a menu without the separators between groups, so a second group made it scroll.
 fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Servers, refresh: &Rc<RefCell<Rc<dyn Fn()>>>) -> Vec<Item> {
     let mut items = Vec::new();
     let refresh = Rc::clone(refresh);
@@ -547,7 +548,7 @@ fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Serv
     }
     if let Some(autoplay) = player_prefs().map(|p| p.autoplay_enabled.clone()) {
         let on = autoplay.get();
-        items.push(Item::new(tr(MsgKey::ui_autoplay_next_episode), 1, move || {
+        items.push(Item::new(tr(MsgKey::ui_autoplay_next_episode), 0, move || {
             if let Err(e) = autoplay.set(!on) {
                 tracing::warn!(error = %e, "player: autoplay could not be saved");
             }
@@ -555,7 +556,7 @@ fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Serv
     }
     let fullscreen = window_of(page).is_some_and(|w| w.is_fullscreen());
     let page = page.downgrade();
-    items.push(Item::new(tr(MsgKey::pref_fullscreen), 1, move || {
+    items.push(Item::new(tr(MsgKey::pref_fullscreen), 0, move || {
         if let Some(page) = page.upgrade() {
             toggle_fullscreen(&page);
         }
