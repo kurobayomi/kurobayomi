@@ -300,7 +300,13 @@ fn choice(shared: &Shared, source: &Arc<dyn AnimeSource>, hoster: &str, video: &
         subtitle: None,
         current,
         enabled: true,
-        pick: Box::new(move || switch(&shared, Arc::clone(&source), pick.clone(), video.clone())),
+        pick: Box::new(move || {
+            // the quality picked is kept for the anime, as its audio and subtitles are
+            if let Some(height) = height(&video) {
+                super::super::remember_quality(shared.borrow().episode_id, height);
+            }
+            switch(&shared, Arc::clone(&source), pick.clone(), video.clone());
+        }),
     }
 }
 

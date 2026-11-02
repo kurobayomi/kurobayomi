@@ -38,7 +38,6 @@ impl PageStates {
     pub fn set_empty_look(&self, icon: &str, action: Option<&Button>) {
         self.empty.set_icon_name(Some(icon));
         if let Some(action) = action {
-            action.add_css_class("pill");
             self.empty.set_child(Some(action));
         }
     }

@@ -2004,7 +2004,7 @@ mod tests {
                     assert!(!crate::widgets::view_options::menu_labels(&model).iter().any(|l| l == "Refresh"), "Refresh is the header button, not a menu item");
                 }
             }
-            let fab = buttons.iter().find(|b| b.has_css_class("pill")).expect("the FAB");
+            let fab = buttons.iter().find(|b| b.has_css_class("suggested-action")).expect("the FAB");
             assert!(fab.is_visible() && fab.is_sensitive(), "an unseen episode exists");
             let (min, _, _, _) = page.measure(gtk::Orientation::Horizontal, -1);
             assert!(min <= 360, "no horizontal minimum above 360 px, got {min}");
@@ -2106,7 +2106,7 @@ mod tests {
             let _owner = ctx.acquire().expect("main context");
             let rt = kuro_core::runtime::build().expect("runtime");
             let (page, window, runner) = shown_page(&ctx, &rt, 3, 1, 1000);
-            let fab = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).find(|b| b.has_css_class("pill") && descendants(b.upcast_ref()).iter().any(|w| w.downcast_ref::<gtk::Image>().is_some_and(|i| i.icon_name().as_deref() == Some("media-playback-start-symbolic")))).expect("the Resume pill");
+            let fab = descendants(page.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).find(|b| b.has_css_class("suggested-action") && descendants(b.upcast_ref()).iter().any(|w| w.downcast_ref::<gtk::Image>().is_some_and(|i| i.icon_name().as_deref() == Some("media-playback-start-symbolic")))).expect("the Resume button");
             let fab_text = || descendants(fab.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).map(|l| l.label().to_string()).collect::<String>();
             assert_eq!(fab_text(), "Resume Episode 2", "the exact target: the first unseen episode");
 

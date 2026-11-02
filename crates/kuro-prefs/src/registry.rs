@@ -297,6 +297,9 @@ define_prefs! {
     "player_volume_last", Normal, Float, -1.0f32, "player", "player_volume_last";
     "anime_audio_lang_{id}", Normal, Str, "", "player.anime_audio_lang", "";
     "anime_subtitle_lang_{id}", Normal, Str, "", "player.anime_subtitle_lang", "";
+    "anime_quality_{id}", Normal, Int, 1080, "player.anime_quality", "";
+    "anime_auto_skip_opening_{id}", Normal, Bool, false, "player.anime_auto_skip_opening", "";
+    "anime_auto_skip_ending_{id}", Normal, Bool, false, "player.anime_auto_skip_ending", "";
 }
 
 /// Keys of features this desktop app does not have, and of settings the settings diet cut (docs/design/settings-diet.md).
@@ -700,7 +703,7 @@ mod tests {
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
         // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
         // (`MangaReaderPrefs`), then two pages side by side (`pref_two_pages`) and its value for one manga
-        assert_eq!(REGISTRY.len(), rows.len() + 22);
+        assert_eq!(REGISTRY.len(), rows.len() + 25);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
         assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
         assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");

@@ -110,7 +110,6 @@ fn with_action_bar(content: &gtk::Widget, action: &gtk::Button) -> gtk::Widget {
     content.set_vexpand(true);
     page.append(content);
     action.add_css_class("suggested-action");
-    action.add_css_class("pill");
     crate::ui::margins(action, 12);
     page.append(action);
     page.upcast()

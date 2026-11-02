@@ -334,6 +334,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&area));
     skip.place_above(&bar);
+    skip.mark_on(&seek);
     overlay.add_overlay(skip.widget());
     // the episode list floats over the video's right side (the reader's chapter list)
     let episodes = ChapterPanel::new(tr(MsgKey::episodes), tr(MsgKey::player_episode_list_search));
@@ -554,6 +555,19 @@ fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Serv
             }
         }).checked(on));
     }
+    if let Some(prefs) = anime_tracks(shared.borrow().episode_id) {
+        for (opening, pref, text) in [(true, prefs.auto_skip_opening(), MsgKey::player_auto_skip_openings), (false, prefs.auto_skip_ending(), MsgKey::player_auto_skip_endings)] {
+            let (on, shared) = (pref.get(), Rc::downgrade(shared));
+            items.push(Item::new(tr(text), 0, move || {
+                if let Err(e) = pref.set(!on) {
+                    tracing::warn!(error = %e, "player: the automatic skip could not be saved");
+                }
+                if let Some(shared) = shared.upgrade() {
+                    shared.borrow_mut().skip.set_auto(opening, !on);
+                }
+            }).checked(on));
+        }
+    }
     let fullscreen = window_of(page).is_some_and(|w| w.is_fullscreen());
     let page = page.downgrade();
     items.push(Item::new(tr(MsgKey::pref_fullscreen), 0, move || {
@@ -715,13 +729,33 @@ fn player_prefs() -> Option<kuro_prefs::player::PlayerPrefs> {
 
 /// The track languages of the anime that `episode_id` belongs to; `None` before the app data exists or for a row that
 /// cannot be read.
-fn anime_tracks(episode_id: i64) -> Option<kuro_prefs::player::AnimeTrackPrefs> {
+fn anime_tracks(episode_id: i64) -> Option<kuro_prefs::player::AnimePlayerPrefs> {
     if !crate::data::is_installed() {
         return None;
     }
     let app = crate::data::app();
     let episode = kuro_data::item::ItemRepo::new(std::sync::Arc::clone(&app.db)).by_id(episode_id).ok().flatten()?;
-    Some(kuro_prefs::player::AnimeTrackPrefs::new(app.base.store().clone(), episode.entry_id))
+    Some(kuro_prefs::player::AnimePlayerPrefs::new(app.base.store().clone(), episode.entry_id))
+}
+
+/// Whether the anime of `episode_id` skips its openings and its endings by itself (the player's menu).
+fn auto_skips(episode_id: i64) -> (bool, bool) {
+    anime_tracks(episode_id).map_or((false, false), |prefs| (prefs.auto_skip_opening().get(), prefs.auto_skip_ending().get()))
+}
+
+/// The quality to play `episode_id` at: the one its anime remembers from a quality picked in the player, else the
+/// Settings default.
+fn quality_for(episode_id: i64) -> i32 {
+    anime_tracks(episode_id).map_or_else(default_quality, |prefs| prefs.quality().get())
+}
+
+/// A quality picked in the player: kept for the anime of `episode_id`.
+fn remember_quality(episode_id: i64, height: i32) {
+    if let Some(prefs) = anime_tracks(episode_id)
+        && let Err(e) = prefs.quality().set(height)
+    {
+        tracing::warn!(error = %e, "player: the quality was not kept");
+    }
 }
 
 /// The subtitle and audio languages to pick first for `episode_id`: the ones its anime remembers from a track picked in

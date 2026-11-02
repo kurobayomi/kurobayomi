@@ -112,7 +112,6 @@ pub fn page(icon: Option<&str>, title: &str, detail: Option<&str>, actions: &[gt
         let row = gtk::Box::new(O::Horizontal, SPACE_S);
         row.set_halign(Align::Center);
         for action in actions {
-            action.add_css_class("pill");
             row.append(action);
         }
         page.set_child(Some(&row));
@@ -197,7 +196,7 @@ mod tests {
             let mut found = Vec::new();
             buttons(error.upcast_ref(), &mut found);
             assert_eq!(found.len(), 1);
-            assert!(found[0].has_css_class("pill") && found[0].has_css_class("suggested-action"));
+            assert!(found[0].has_css_class("suggested-action"));
             found[0].emit_clicked();
             assert_eq!(retried.get(), 1);
         });

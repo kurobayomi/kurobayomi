@@ -4,7 +4,12 @@
 //! are `kuro_player::skip` and `kuro_player::chapters`; this file reads mpv and the database and shows the button.
 //! Main thread only, except the AniSkip request, which runs on the app's async runtime and comes back over a channel.
 //! Every failure of that request is silent.
+//!
+//! An anime can have its openings or endings skipped by themselves (the player's menu, kept per anime): the button then
+//! counts down ("Don't skip", which cancels) and the segment is skipped when it reaches zero. The known segments are
+//! marked on the seek bar, at their start and end.
 
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk::prelude::*;
@@ -15,6 +20,7 @@ use kuro_player::aniskip::{self, TrackerRef};
 use kuro_player::chapters::{self, Segment};
 use kuro_player::mpv::MpvHandle;
 use kuro_player::skip::{Label, SkipConfig, SkipIntro, Tap};
+use kuro_player::types::ChapterType;
 use kuro_platform::system_paths::SystemPaths;
 use kuro_prefs::network::NetworkPrefs;
 use kuro_track::model::TrackerId;
@@ -32,6 +38,13 @@ pub struct State {
     load: u64,
     /// The label the button shows now; `None` hides it.
     label: Option<String>,
+    /// Openings and endings of this anime are skipped by themselves (read when the file's chapters are, then kept in
+    /// step with the menu).
+    auto: (bool, bool),
+    /// The whole second the countdown last moved on: it counts down once a second, the tick runs four times a second.
+    second: i64,
+    /// Bumped each time the chapters change, so the seek bar's marks are drawn again only then.
+    version: u64,
 }
 
 impl Default for State {
@@ -42,6 +55,9 @@ impl Default for State {
             pending: true,
             load: 0,
             label: None,
+            auto: (false, false),
+            second: -1,
+            version: 0,
         }
     }
 }
@@ -51,8 +67,29 @@ impl State {
     pub fn file_loaded(&mut self) {
         *self = Self {
             load: self.load + 1,
+            version: self.version + 1,
             ..Self::default()
         };
+    }
+
+    /// The anime's choice from the menu: openings (`opening`) or endings are skipped by themselves.
+    pub fn set_auto(&mut self, opening: bool, on: bool) {
+        if opening { self.auto.0 = on } else { self.auto.1 = on }
+    }
+
+    /// The seek bar's marks: the start and the end of each known opening and ending, as fractions of `duration`.
+    fn marks(&self, duration: f32) -> Vec<f64> {
+        if duration <= 0.0 {
+            return Vec::new();
+        }
+        let mut out = Vec::new();
+        for (index, segment) in self.chapters.iter().enumerate() {
+            if matches!(segment.kind, ChapterType::Opening | ChapterType::MixedOp | ChapterType::Ending) {
+                let end = self.chapters.get(index + 1).map_or(duration, |next| next.start);
+                out.extend([segment.start, end].map(|at| f64::from((at / duration).clamp(0.0, 1.0))));
+            }
+        }
+        out
     }
 }
 
@@ -61,6 +98,8 @@ impl State {
 pub struct Ui {
     revealer: gtk::Revealer,
     button: gtk::Button,
+    /// The seek bar whose marks show the known segments, and the chapter version they were drawn for.
+    seek: Rc<RefCell<Option<(gtk::Scale, u64)>>>,
 }
 
 impl Ui {
@@ -68,7 +107,6 @@ impl Ui {
     pub fn new(shared: &Shared) -> Self {
         let button = gtk::Button::new();
         button.add_css_class("suggested-action");
-        button.add_css_class("pill");
         button.set_focusable(false);
         button.set_focus_on_click(false);
         {
@@ -81,7 +119,12 @@ impl Ui {
         revealer.set_halign(gtk::Align::End);
         revealer.set_valign(gtk::Align::End);
         revealer.set_margin_end(crate::widgets::osd::MARGIN);
-        Self { revealer, button }
+        Self { revealer, button, seek: Rc::default() }
+    }
+
+    /// Marks the known openings and endings on `seek` from now on.
+    pub fn mark_on(&self, seek: &gtk::Scale) {
+        *self.seek.borrow_mut() = Some((seek.clone(), u64::MAX));
     }
 
     /// Keeps the button just above `bar` (the control bar, on the same overlay): its bottom margin is the bar's height
@@ -118,22 +161,55 @@ impl Ui {
 /// One tick of the player (every 250 ms): reads the file's chapters once its duration is known and starts its AniSkip
 /// lookup, then moves the button to the segment the position is in.
 pub fn tick(shared: &Shared, ui: &Ui) {
-    let (label, request) = {
+    let drawn = ui.seek.borrow().as_ref().map(|(_, drawn)| *drawn);
+    let (label, request, seek, toast, marks) = {
         let mut player = shared.borrow_mut();
         let mut request = None;
         if player.skip.pending && duration_s(&player) > 0.0 {
             player.skip.pending = false;
             let chapters = read_chapters(player.playback.mpv());
             player.skip.chapters = chapters;
+            player.skip.version += 1;
+            player.skip.auto = super::auto_skips(player.episode_id);
             request = aniskip_request(player.episode_id, player.skip.load, duration_s(&player));
         }
-        let position = position_s(&player);
+        let (position, duration) = (position_s(&player), duration_s(&player));
         let state = &mut player.skip;
-        let tick = state.machine.on_tick(&state.chapters, position);
+        // the countdown runs for a segment kind this anime skips by itself
+        let kind = chapters::current_chapter(&state.chapters, position).map(|index| state.chapters[index].kind);
+        state.machine.set_countdown(match kind {
+            Some(ChapterType::Opening | ChapterType::MixedOp) => state.auto.0,
+            Some(ChapterType::Ending) => state.auto.1,
+            _ => false,
+        });
+        let second = position as i64;
+        let tick = if second != state.second {
+            state.second = second;
+            state.machine.on_tick(&state.chapters, position)
+        } else {
+            state.machine.sync(&state.chapters, position)
+        };
         state.label = next_label(state.label.take(), tick.label);
-        (state.label.clone(), request)
+        let marks = drawn.filter(|drawn| *drawn != state.version).map(|_| (state.version, state.marks(duration)));
+        (state.label.clone(), request, tick.seek, tick.toast, marks)
     };
     ui.show(label.as_deref());
+    if let Some(seek) = seek {
+        if let Err(e) = shared.borrow().playback.seek_to_ms(seek.position * 1000) {
+            tracing::warn!(error = %e, "player: the automatic skip failed");
+        }
+        crate::toast::notify(seek.text);
+    }
+    if let Some(text) = toast {
+        crate::toast::notify(text);
+    }
+    if let (Some((version, at)), Some((scale, drawn))) = (marks, ui.seek.borrow_mut().as_mut()) {
+        *drawn = version;
+        scale.clear_marks();
+        for fraction in at {
+            scale.add_mark(fraction, gtk::PositionType::Bottom, None);
+        }
+    }
     if let Some(request) = request {
         start_aniskip(shared, request);
     }
@@ -259,6 +335,7 @@ fn start_aniskip(shared: &Shared, request: Request) {
             let merged = chapters::with_timestamps(&player.skip.chapters, &stamps, Some(duration as i32));
             if let Some(merged) = merged {
                 player.skip.chapters = merged;
+                player.skip.version += 1;
             }
         },
     );

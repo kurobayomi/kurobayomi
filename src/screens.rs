@@ -174,7 +174,7 @@ pub(crate) fn fab(overlay: &gtk::Overlay, label: &str, icon: &str) -> Button {
     let h = GBox::new(O::Horizontal, SPACE_S);
     h.append(&gtk::Image::from_icon_name(icon));
     h.append(&Label::new(Some(label)));
-    let b = Button::builder().child(&h).css_classes(["suggested-action", "pill"]).halign(Align::End).valign(Align::End).build();
+    let b = Button::builder().child(&h).css_classes(["suggested-action"]).halign(Align::End).valign(Align::End).build();
     margins(&b, 18);
     overlay.add_overlay(&b);
     b

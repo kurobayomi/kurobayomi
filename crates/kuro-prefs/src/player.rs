@@ -2,7 +2,7 @@
 //! "mark as seen" rule.
 //!
 //! The settings diet kept the player keys here: the volume at start (and the last one used), the autoplay switch and the
-//! default quality; [`AnimeTrackPrefs`] holds the track languages of one anime. The gesture, decoder, aspect,
+//! default quality; [`AnimePlayerPrefs`] holds the track languages of one anime. The gesture, decoder, aspect,
 //! speed, subtitle, advanced player and detach-window keys were cut: their hard-coded defaults are read where they
 //! are used, and the keys are in `registry::DROPPED_KEYS`.
 
@@ -34,16 +34,17 @@ define_prefs! {
     }
 }
 
-/// The audio and subtitle languages of one anime (user, 2026-11-02): a track picked in the player keeps its language for
-/// the title, so its next episodes start with it. A key never written reads as the Settings language
-/// (`pref_audio_lang`, `pref_subtitle_lang`) as it is now.
+/// What the player keeps for one anime (user, 2026-11-02): the language of a track picked in it, the quality picked in it,
+/// and whether its openings and endings are skipped by themselves, so its next episodes start the same way. A key never
+/// written reads as the Settings value as it is now (`pref_audio_lang`, `pref_subtitle_lang`, the default quality); the
+/// skips are off until turned on for the anime.
 #[derive(Clone)]
-pub struct AnimeTrackPrefs {
+pub struct AnimePlayerPrefs {
     store: PrefStore,
     anime_id: i64,
 }
 
-impl AnimeTrackPrefs {
+impl AnimePlayerPrefs {
     pub fn new(store: PrefStore, anime_id: i64) -> Self {
         Self { store, anime_id }
     }
@@ -54,6 +55,22 @@ impl AnimeTrackPrefs {
 
     pub fn subtitle_lang(&self) -> Pref<String> {
         self.own("anime_subtitle_lang", "pref_subtitle_lang")
+    }
+
+    /// The video height picked for the anime; the Settings default quality until one is picked.
+    pub fn quality(&self) -> Pref<i32> {
+        let settings = PlayerPrefs::new(self.store.clone()).default_quality.get();
+        self.store.pref(format!("anime_quality_{}", self.anime_id), settings)
+    }
+
+    /// Openings of this anime are skipped by themselves (after a short countdown that can be cancelled).
+    pub fn auto_skip_opening(&self) -> Pref<bool> {
+        self.store.pref(format!("anime_auto_skip_opening_{}", self.anime_id), false)
+    }
+
+    /// Endings of this anime are skipped by themselves (after a short countdown that can be cancelled).
+    pub fn auto_skip_ending(&self) -> Pref<bool> {
+        self.store.pref(format!("anime_auto_skip_ending_{}", self.anime_id), false)
     }
 
     /// The anime's key `<prefix>_<id>`, read fresh each time so an unset key follows the Settings language.
@@ -81,14 +98,19 @@ mod tests {
     #[test]
     fn an_anime_follows_the_settings_languages_until_a_track_is_picked_for_it() {
         let store = PrefStore::in_memory();
-        let (one, two) = (AnimeTrackPrefs::new(store.clone(), 1), AnimeTrackPrefs::new(store.clone(), 2));
+        let (one, two) = (AnimePlayerPrefs::new(store.clone(), 1), AnimePlayerPrefs::new(store.clone(), 2));
         store.pref("pref_subtitle_lang", String::new()).set("en".to_owned()).unwrap();
         assert_eq!((one.subtitle_lang().get(), two.subtitle_lang().get()), ("en".to_owned(), "en".to_owned()));
         one.subtitle_lang().set("ja".to_owned()).unwrap();
         one.audio_lang().set("ja".to_owned()).unwrap();
         assert_eq!((one.subtitle_lang().get(), one.audio_lang().get()), ("ja".to_owned(), "ja".to_owned()), "the picks of anime 1");
         assert_eq!((two.subtitle_lang().get(), two.audio_lang().get()), ("en".to_owned(), String::new()), "anime 2 keeps the Settings");
-        for key in [one.subtitle_lang().key().to_owned(), one.audio_lang().key().to_owned()] {
+        assert_eq!(one.quality().get(), 1080, "the Settings default until one is picked");
+        one.quality().set(720).unwrap();
+        one.auto_skip_opening().set(true).unwrap();
+        assert_eq!((one.quality().get(), two.quality().get()), (720, 1080));
+        assert!(one.auto_skip_opening().get() && !two.auto_skip_opening().get() && !one.auto_skip_ending().get());
+        for key in [one.subtitle_lang().key().to_owned(), one.audio_lang().key().to_owned(), one.quality().key().to_owned(), one.auto_skip_opening().key().to_owned(), one.auto_skip_ending().key().to_owned()] {
             assert_eq!(lookup(&key).and_then(|(_, id)| id), Some("1"), "{key} is a registered family");
         }
     }

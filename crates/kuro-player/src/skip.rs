@@ -96,6 +96,12 @@ impl SkipIntro {
         }
     }
 
+    /// Skips the segment now playing by itself after the countdown (`netflix`), or shows the button only. The player sets
+    /// it per segment kind from the anime's choices; a countdown already running for the segment is kept.
+    pub fn set_countdown(&mut self, on: bool) {
+        self.config.netflix = on;
+    }
+
     /// The countdown value now.
     pub fn waiting(&self) -> i32 {
         self.waiting

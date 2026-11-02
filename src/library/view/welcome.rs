@@ -35,7 +35,6 @@ impl Welcome {
 
         let add = gtk::Button::builder().label(tr(MsgKey::add_source_repository)).halign(Align::Center).build();
         add.add_css_class("suggested-action");
-        add.add_css_class("pill");
         add.connect_clicked(|_| crate::browse::mount::open_repos_to_add());
         page.append(&add);
 

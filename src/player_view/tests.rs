@@ -292,7 +292,7 @@ fn the_control_bar_names_every_control_and_a_playing_video_shows_no_error() {
         let failure = all.iter().find(|w| w.is::<adw::StatusPage>()).expect("the error page");
         assert!(!failure.is_visible(), "a video that plays shows no error");
         // the skip button sits above the bar, not under it
-        let skip = all.iter().find(|w| w.is::<gtk::Revealer>() && w.first_child().is_some_and(|b| b.has_css_class("pill"))).expect("the skip button");
+        let skip = all.iter().find(|w| w.is::<gtk::Revealer>() && w.first_child().is_some_and(|b| b.has_css_class("suggested-action"))).expect("the skip button");
         let bar_top = bar.compute_bounds(&window).map(|b| b.y()).expect("the bar on screen");
         let skip_bottom = window.height() as f32 - skip.margin_bottom() as f32;
         assert!(skip.margin_bottom() > 0 && skip_bottom <= bar_top, "skip button bottom {skip_bottom} above the bar top {bar_top}");

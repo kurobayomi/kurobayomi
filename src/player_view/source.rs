@@ -93,7 +93,7 @@ pub fn resolve_episode(found: SourceEpisode, done: impl FnOnce(Result<Media, Str
     let s_episode = to_s_episode(&episode);
     let (preferred, preferred_audio) = super::preferred_languages(episode.id);
     // read here: the app data lives on the GTK thread, the stream is chosen on the source's runtime
-    let quality = super::default_quality();
+    let quality = super::quality_for(episode.id);
     let busy = crate::toast::busy(&tr(MsgKey::loading));
     crate::background::run_async_on(
         &handle,

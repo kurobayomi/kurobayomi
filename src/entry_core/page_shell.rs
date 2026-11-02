@@ -73,7 +73,7 @@ pub fn fab_button() -> (Button, Label) {
     let content = GBox::new(O::Horizontal, SPACE_S);
     content.append(&gtk::Image::from_icon_name("media-playback-start-symbolic"));
     content.append(&label);
-    let button = Button::builder().child(&content).css_classes(["suggested-action", "pill"]).build();
+    let button = Button::builder().child(&content).css_classes(["suggested-action"]).build();
     button.set_focus_on_click(false);
     (button, label)
 }

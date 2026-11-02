@@ -647,6 +647,8 @@ pref_mpv_input = Edit MPV input file for keyboard mapping configuration
 
 # source: i18n-aniyomi
 player_skip_action = Skip { $arg1 }
+player_auto_skip_openings = Skip openings automatically
+player_auto_skip_endings = Skip endings automatically
 
 # source: i18n-aniyomi
 player_intro_skipped = { $arg1 } skipped
