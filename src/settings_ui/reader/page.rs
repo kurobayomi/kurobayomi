@@ -15,8 +15,8 @@ use crate::settings_ui::rows::{group, int_choice, item, switch};
 pub fn reading_modes() -> [(i32, String); 6] {
     [
         (0, tr(MsgKey::reading_mode_adaptive)),
-        (1, tr(MsgKey::left_to_right_viewer)),
         (2, tr(MsgKey::right_to_left_viewer)),
+        (1, tr(MsgKey::left_to_right_viewer)),
         (3, tr(MsgKey::vertical_viewer)),
         (4, tr(MsgKey::webtoon_viewer)),
         (5, tr(MsgKey::vertical_plus_viewer)),
@@ -137,6 +137,7 @@ mod tests {
     fn the_reading_mode_offers_the_five_modes_and_the_background_the_four_colours() {
         assert_eq!(reading_modes().len(), 6);
         assert_eq!(reading_modes()[0], (0, "Adaptive".to_string()), "Adaptive first, as the default");
+        assert_eq!(reading_modes()[1].0, 2, "then right to left, the direction Adaptive turns by default");
         assert_eq!(backgrounds().len(), 4);
         assert_eq!(scale_types().len(), 6);
         assert_eq!(zoom_starts().len(), 4);

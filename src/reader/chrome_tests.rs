@@ -170,6 +170,7 @@ fn the_menu_holds_every_reader_setting_and_no_browser_or_share_entries() {
         .map(|(target, mode)| (mode_label(*mode).to_owned(), Some("reader.mode".to_owned()), Some((*target).to_owned())))
         .collect();
     assert_eq!(web[0].1, modes, "five radio items on one action, each with its mode as the target");
+    assert_eq!(modes[0].0, "Right to left", "right to left first, as the default reads");
     assert_eq!(web[1].0.as_deref(), Some("Page layout"));
     assert_eq!(web[1].1, radios("pages", &Choice::PageLayout.options()));
     assert_eq!(web[1].1.iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), ["Two pages when wide", "Two pages", "One page"]);

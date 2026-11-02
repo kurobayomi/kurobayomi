@@ -31,11 +31,11 @@ const ACTION_CROP: &str = "crop";
 const ACTION_SPLIT: &str = "split";
 const ACTION_SET_COVER: &str = "set-cover";
 
-/// The five modes the menu offers, with the string each radio item carries as its action target. Default is not a
-/// choice: a Default manga reads in the preference's mode, which is one of these.
+/// The five modes the menu offers, with the string each radio item carries as its action target, right to left first
+/// as the default reads. Default is not a choice: a Default manga reads in the preference's mode, which is one of these.
 pub const MODES: [(&str, ReadingMode); 5] = [
-    ("ltr", ReadingMode::LeftToRight),
     ("rtl", ReadingMode::RightToLeft),
+    ("ltr", ReadingMode::LeftToRight),
     ("vertical", ReadingMode::Vertical),
     ("webtoon", ReadingMode::Webtoon),
     ("webtoon-gaps", ReadingMode::ContinuousVertical),
