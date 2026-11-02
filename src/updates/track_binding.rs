@@ -2,7 +2,7 @@
 //! favourite is written, on the add path and on the confirm path alike, because both reach the store's `after_add`.
 //!
 //! The tracker services are owned by the tracking layer. It hands its [`TrackCtx`] to [`install`] when it starts them;
-//! until then a binder finds no context and binds nothing, which is also what a user with no logged-in tracker gets.
+//! a bind asked for before that waits for them. A user with no logged-in tracker gets nothing bound.
 
 use std::sync::{Arc, RwLock};
 
@@ -14,12 +14,12 @@ use crate::browse::entries::TrackerBinder;
 static CTX: RwLock<Option<Arc<TrackCtx>>> = RwLock::new(None);
 
 thread_local! {
-    /// The open entry pages, told on the GTK thread when auto-track bound an entry. A watcher returns false once its
+    /// The open entry pages, told on the GTK thread when the binders ran for an entry. A watcher returns false once its
     /// page is gone and is then dropped.
     static WATCHERS: std::cell::RefCell<Vec<Box<dyn Fn(i64) -> bool>>> = std::cell::RefCell::default();
 }
 
-/// Registers a page that wants to hear about auto-track binds (`f` gets the entry id). GTK thread only.
+/// Registers a page that wants to hear about binds (`f` gets the entry id). GTK thread only.
 pub fn watch_binds(f: impl Fn(i64) -> bool + 'static) {
     WATCHERS.with(|w| w.borrow_mut().push(Box::new(f)));
 }
@@ -48,35 +48,51 @@ pub fn binder(kind: Kind) -> TrackerBinder {
         if incognito.as_ref().is_some_and(|on| on.get()) {
             return;
         }
-        let (Some(ctx), Some(runtime)) = (current(), runtime.as_ref()) else { return };
+        let Some(runtime) = runtime.clone() else { return };
         let (title, source) = (title.to_owned(), source.to_string());
-        runtime.spawn(async move {
-            let failures = match kind {
-                Kind::Anime => kuro_track::bind::bind_enhanced_anime(&ctx, id, &title, &source).await,
-                Kind::Manga => kuro_track::bind::bind_enhanced_manga(&ctx, id, &title, &source).await,
-            };
-            for (tracker, error) in failures {
-                tracing::warn!(entry = id, tracker = tracker.0, %error, "an enhanced tracker could not be bound");
-            }
-            let (bound_on, failed) = match kind {
-                Kind::Anime => kuro_track::auto_bind::auto_bind_anime(&ctx, id, &title).await,
-                Kind::Manga => kuro_track::auto_bind::auto_bind_manga(&ctx, id, &title).await,
-            };
-            for (tracker, error) in failed {
-                tracing::warn!(entry = id, tracker = tracker.0, %error, "auto-track could not bind the title");
-            }
-            let names: Vec<String> = bound_on.iter().filter_map(|t| ctx.trackers.get(*t)).map(|t| t.name().to_owned()).collect();
-            if !names.is_empty() {
-                let text = kuro_i18n::trf(
-                    kuro_i18n::MsgKey::track_auto_bound,
-                    &[("title", kuro_i18n::Arg::Str(&title)), ("trackers", kuro_i18n::Arg::Str(&names.join(", ")))],
-                );
+        let run = move |ctx: Arc<TrackCtx>| {
+            runtime.spawn(async move {
+                let failures = match kind {
+                    Kind::Anime => kuro_track::bind::bind_enhanced_anime(&ctx, id, &title, &source).await,
+                    Kind::Manga => kuro_track::bind::bind_enhanced_manga(&ctx, id, &title, &source).await,
+                };
+                for (tracker, error) in failures {
+                    tracing::warn!(entry = id, tracker = tracker.0, %error, "an enhanced tracker could not be bound");
+                }
+                let (bound_on, failed) = match kind {
+                    Kind::Anime => kuro_track::auto_bind::auto_bind_anime(&ctx, id, &title).await,
+                    Kind::Manga => kuro_track::auto_bind::auto_bind_manga(&ctx, id, &title).await,
+                };
+                for (tracker, error) in failed {
+                    tracing::warn!(entry = id, tracker = tracker.0, %error, "auto-track could not bind the title");
+                }
+                let names: Vec<String> = bound_on.iter().filter_map(|t| ctx.trackers.get(*t)).map(|t| t.name().to_owned()).collect();
+                let text = (!names.is_empty()).then(|| {
+                    kuro_i18n::trf(
+                        kuro_i18n::MsgKey::track_auto_bound,
+                        &[("title", kuro_i18n::Arg::Str(&title)), ("trackers", kuro_i18n::Arg::Str(&names.join(", ")))],
+                    )
+                });
+                // the page reads the count again either way: an enhanced tracker binds without a notification
                 gtk::glib::MainContext::default().invoke(move || {
-                    crate::toast::notify(text);
+                    if let Some(text) = text {
+                        crate::toast::notify(text);
+                    }
                     bound(id);
                 });
-            }
-        });
+            });
+        };
+        match current() {
+            Some(ctx) => run(ctx),
+            // the tracker services start in the background: an add right after launch binds once they are up
+            None => gtk::glib::MainContext::default().invoke(move || {
+                crate::settings_ui::tracker_host::when_ready(move || {
+                    if let Some(ctx) = current() {
+                        run(ctx);
+                    }
+                });
+            }),
+        }
     })
 }
 

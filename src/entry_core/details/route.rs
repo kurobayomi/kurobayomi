@@ -556,7 +556,7 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     let weak = Rc::downgrade(&view);
     *weak_view.borrow_mut() = weak.clone();
     view.apply_width(first_width());
-    // auto-track binds in the background after an add: the Tracking button reads the count again when it lands
+    // the trackers bind in the background after an add: the Tracking button reads the count again when they are done
     crate::updates::track_binding::watch_binds({
         let weak = weak.clone();
         move |bound_id| {
@@ -775,21 +775,9 @@ impl View {
                 if let Some(m) = &loaded {
                     let large = self.two_pane.get().unwrap_or(false);
                     self.expansion.set(Expansion::new(large, m.from_source));
-                    // the first open after launch loads before the tracker services are up (none published, count 0):
-                    // once they are, count the bound trackers again for the tracking button, and pull the progress made
-                    // in another app once per open of a library entry
+                    // progress made in another app reaches the trackers first: pull it once per open
                     if first {
-                        let runner = Rc::downgrade(&self.runner);
-                        let (kind, entry_id, source_id, favorite) = (self.env.kind, m.entry.id, m.entry.source, m.entry.favorite);
-                        crate::settings_ui::tracker_host::when_ready(move || {
-                            crate::entry_core::tracking::session::refresh_from_host();
-                            if favorite {
-                                crate::entry_core::tracking::actions::pull_progress(kind, entry_id);
-                            }
-                            if let Some(runner) = runner.upgrade() {
-                                runner.send(EntryCmd::ReadTracking { entry_id, source_id });
-                            }
-                        });
+                        self.sync_tracking(m.entry.id, m.entry.source, m.entry.favorite);
                     }
                 }
                 *self.model.borrow_mut() = loaded.map(|b| *b);
@@ -1087,7 +1075,27 @@ impl View {
             m.entry.id
         };
         self.runner.send(EntryCmd::Refresh { entry_id });
+        let tracking = self.model.borrow().as_ref().map(|m| (m.entry.source, m.entry.favorite));
+        if let Some((source_id, favorite)) = tracking {
+            self.sync_tracking(entry_id, source_id, favorite);
+        }
         self.render();
+    }
+
+    /// Counts the bound trackers again for the tracking button and, for a library entry, pulls the progress made in
+    /// another app. Waits for the tracker services: the first open after launch comes before they are up.
+    fn sync_tracking(&self, entry_id: i64, source_id: i64, favorite: bool) {
+        let runner = Rc::downgrade(&self.runner);
+        let kind = self.env.kind;
+        crate::settings_ui::tracker_host::when_ready(move || {
+            crate::entry_core::tracking::session::refresh_from_host();
+            if favorite {
+                crate::entry_core::tracking::actions::pull_progress(kind, entry_id);
+            }
+            if let Some(runner) = runner.upgrade() {
+                runner.send(EntryCmd::ReadTracking { entry_id, source_id });
+            }
+        });
     }
 
     /// Puts `dialog` in the slot: the one on screen closes first, so the last request wins. Returns the name of the
