@@ -41,6 +41,10 @@ use crate::hidden_pages::{ANSWER_TIMEOUT, FETCH_JS, HiddenPages, IDLE_CLOSE, PAG
 
 /// How often the loop looks at the pages that load and at the idle ones.
 const TICK: Duration = Duration::from_millis(250);
+/// How long the WebView2 engine may take to make a site's page. Its first start in a session is cold (it sets up its
+/// profile and browser process) and can pass the site check's [`READY_TIMEOUT`] on a busy or slow machine, so making
+/// the page has its own budget, under the caller's `ANSWER_TIMEOUT`; the check's time starts once the page exists.
+const CREATE_TIMEOUT: Duration = Duration::from_secs(60);
 /// The size the unshown pages lay out at: a common desktop window, as the check expects a real one.
 const PAGE_SIZE: (i32, i32) = (1280, 800);
 /// Chromium switches of the pages' browser: an unshown page is otherwise taken for a background tab, whose timers are
@@ -341,7 +345,7 @@ impl Pages {
                 continue;
             }
             let Some(view) = site.view.clone() else {
-                if now.duration_since(site.since) > READY_TIMEOUT {
+                if now.duration_since(site.since) > CREATE_TIMEOUT {
                     fail(&mut site.queue, "the site's hidden page could not be made in time");
                     dropped.push(origin.clone());
                 }
