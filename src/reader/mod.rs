@@ -48,7 +48,6 @@
 pub mod backlight;
 pub mod blend_box;
 pub mod cache;
-pub mod crop_borders;
 pub mod decode_guard;
 pub mod decoded_lru;
 pub mod delete_queue;

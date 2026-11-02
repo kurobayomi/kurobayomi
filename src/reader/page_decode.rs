@@ -97,11 +97,12 @@ pub const MIN_DELAY_MS: u32 = 10;
 /// The frames of a page (T-44a-051), through the app's one decoder (`kuro_images::decode`: every raster format, JPEG XL,
 /// HEIF and AVIF, turned by its EXIF orientation). An animated GIF or WebP gives every frame with its delay, clamped to
 /// [`MIN_DELAY_MS`], at most [`MAX_FRAMES`]. Anything else, and a single-frame animation, is one frame with no delay.
-pub fn decode_frames(bytes: &[u8]) -> Result<Vec<Frame>, DecodeError> {
+/// `crop` cuts uniform borders off (the shared rule, `kuro_images::decode`).
+pub fn decode_frames(bytes: &[u8], crop: bool) -> Result<Vec<Frame>, DecodeError> {
     if bytes.is_empty() {
         return Err(DecodeError::Corrupt);
     }
-    let frames = kuro_images::decode::decode_frames(bytes, &page_options()).map_err(decode_error)?;
+    let frames = kuro_images::decode::decode_frames(bytes, &page_options(crop)).map_err(decode_error)?;
     let animated = frames.len() > 1;
     Ok(frames
         .into_iter()
@@ -110,9 +111,9 @@ pub fn decode_frames(bytes: &[u8]) -> Result<Vec<Frame>, DecodeError> {
         .collect())
 }
 
-/// The decode options of a reader page: the original size, up to the page pixel limit.
-fn page_options() -> kuro_images::DecodeOptions {
-    kuro_images::DecodeOptions { max_pixels: kuro_images::decode::PAGE_MAX_PIXELS, ..kuro_images::DecodeOptions::default() }
+/// The decode options of a reader page: the original size, up to the page pixel limit, borders cut off when `crop`.
+fn page_options(crop: bool) -> kuro_images::DecodeOptions {
+    kuro_images::DecodeOptions { max_pixels: kuro_images::decode::PAGE_MAX_PIXELS, crop_borders: crop, ..kuro_images::DecodeOptions::default() }
 }
 
 fn page_of(picture: kuro_images::Decoded) -> DecodedPage {
@@ -166,7 +167,7 @@ pub fn decode_rgba(bytes: &[u8]) -> Result<DecodedPage, DecodeError> {
     if bytes.is_empty() {
         return Err(DecodeError::Corrupt);
     }
-    kuro_images::decode::decode(bytes, &page_options()).map(page_of).map_err(decode_error)
+    kuro_images::decode::decode(bytes, &page_options(false)).map(page_of).map_err(decode_error)
 }
 
 #[cfg(test)]
@@ -257,7 +258,7 @@ mod tests {
                 ])
                 .expect("encode");
         }
-        let frames = decode_frames(&bytes).expect("gif");
+        let frames = decode_frames(&bytes, false).expect("gif");
         assert_eq!(frames.iter().map(|f| f.delay_ms).collect::<Vec<_>>(), vec![50, MIN_DELAY_MS]);
         assert_eq!((frames[0].page.width, frames[0].page.height), (4, 4));
         assert!(frames[0].page.rgba[0] > 200 && frames[0].page.rgba[1] < 50, "the first frame is the red one");
@@ -303,7 +304,7 @@ mod tests {
 
     #[test]
     fn t052_a_still_png_is_one_frame_without_a_delay() {
-        let frames = decode_frames(&encoded(image::ImageFormat::Png, 3, 2)).expect("png");
+        let frames = decode_frames(&encoded(image::ImageFormat::Png, 3, 2), false).expect("png");
         assert_eq!(frames.len(), 1);
         assert_eq!(frames[0].delay_ms, 0);
     }
@@ -317,7 +318,7 @@ mod tests {
     fn a_jpeg_xl_page_decodes_as_kagane_sends_it() {
         // the reader decodes through the shared decoder, which reads JPEG XL (the format Kagane's page host prefers)
         let bytes = include_bytes!("../../crates/kuro-images/tests/fixtures/jxl_still_96.jxl");
-        let frames = decode_frames(bytes).expect("a JPEG XL page decodes");
+        let frames = decode_frames(bytes, false).expect("a JPEG XL page decodes");
         assert_eq!(frames.len(), 1, "one still frame");
         assert!(frames[0].page.width > 0 && frames[0].page.height > 0 && frames[0].delay_ms == 0);
     }

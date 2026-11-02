@@ -20,7 +20,6 @@ use gtk::prelude::*;
 use gtk::subclass::prelude::ObjectSubclassIsExt;
 use gtk::{gdk, glib, graphene};
 
-use crate::reader::crop_borders;
 use crate::reader::decode_guard::{self, Ticket};
 use kuro_core::image::background::Background;
 use crate::reader::decoded_lru::{ByteLru, DEFAULT_BUDGET_BYTES};
@@ -49,12 +48,11 @@ fn decode_animation(bytes: &[u8], width: Option<u32>, intent: DecodeIntent, crop
     let mut frames = Vec::new();
     // read once per page: a change of the threshold applies to pages decoded after it (T-44a-060)
     let tile_edge = current_tile_edge();
-    for (index, frame) in page_decode::decode_frames(bytes)?.into_iter().enumerate() {
+    for (index, frame) in page_decode::decode_frames(bytes, crop)?.into_iter().enumerate() {
         let (page, split) = page_transform::apply(frame.page, intent);
         if index == 0 {
             changed = split;
         }
-        let page = if crop { crop_borders::crop_borders(page) } else { page };
         let page = match width {
             Some(width) => page_decode::fit_to_width(page, width),
             None => page,
