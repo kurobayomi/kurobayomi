@@ -768,7 +768,7 @@ pub fn episode_title(anime: &str, episode: &str) -> page_header::MediaTitle {
 
 /// The title of episode row `episode_id`, or the file name of `path` when the row or its entry is missing.
 fn title_or_file(episode_id: i64, path: &Path) -> page_header::MediaTitle {
-    row_title(episode_id).unwrap_or_else(|| page_header::MediaTitle::new(&path.file_name().map_or_else(|| "Player".to_owned(), |n| n.to_string_lossy().into_owned()), ""))
+    row_title(episode_id).unwrap_or_else(|| page_header::MediaTitle::new(&path.file_name().map_or_else(|| tr(MsgKey::label_player), |n| n.to_string_lossy().into_owned()), ""))
 }
 
 /// The anime and the episode of row `episode_id`; `None` before the app data exists or when the row is missing.

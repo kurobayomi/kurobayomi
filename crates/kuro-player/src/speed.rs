@@ -9,9 +9,9 @@ pub fn next_speed(current: f32) -> f32 {
     if current >= 2.0 { 0.25 } else { current + 0.25 }
 }
 
-/// Speed button text, `%.2fx`.
+/// Speed text, `1.50x` in English (`player_speed`, so the number follows the language).
 pub fn speed_label(speed: f32) -> String {
-    format!("{speed:.2}x")
+    kuro_i18n::trf(kuro_i18n::MsgKey::player_speed, &[("arg1", kuro_i18n::Arg::Dec(f64::from(speed)))])
 }
 
 /// The slider range (`PlaybackSpeedSheet`, E67): 0.01 to 6.00, continuous.

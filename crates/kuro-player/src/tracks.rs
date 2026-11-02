@@ -79,7 +79,7 @@ pub fn load_track_lists(props: &impl TrackProps) -> TrackLists {
         subtitles: Vec::new(),
         audio: vec![VideoTrack {
             id: TRACK_NONE,
-            name: "Off".to_owned(),
+            name: kuro_i18n::tr(kuro_i18n::MsgKey::off),
             language: None,
         }],
     };
@@ -139,13 +139,14 @@ pub fn track_label(id: i64, name: &str, language: Option<&str>) -> String {
     if id == TRACK_NONE {
         return name.to_owned();
     }
+    use kuro_i18n::{Arg, MsgKey, trf};
     let has_name = !name.trim().is_empty();
     let lang = language.filter(|l| !l.trim().is_empty());
+    let number = ("arg1", Arg::Int(id));
     match (lang, has_name) {
-        (None, true) => format!("#{id}: {name}"),
-        (Some(lang), true) => format!("#{id}: {name} ({lang})"),
-        (Some(lang), false) => format!("#{id}: {lang}"),
-        (None, false) => format!("#{id}: "),
+        (Some(lang), true) => trf(MsgKey::player_sheets_track_title_w_lang, &[number, ("arg2", Arg::Str(name)), ("arg3", Arg::Str(lang))]),
+        (Some(lang), false) => trf(MsgKey::player_sheets_track_lang_wo_title, &[number, ("arg2", Arg::Str(lang))]),
+        (None, _) => trf(MsgKey::player_sheets_track_title_wo_lang, &[number, ("arg2", Arg::Str(if has_name { name } else { "" }))]),
     }
 }
 
