@@ -360,6 +360,15 @@ fn normalised(x: f64, y: f64, width: f64, height: f64) -> (f64, f64) {
 }
 
 /// The drag threshold from the desktop settings, which is the touch slop of a pan.
+
+/// How long the strip glides on after a mouse drag at the fit size, as a share of the release speed.
+const GLIDE_SECONDS: f64 = 0.3;
+
+/// Whether `gesture` is driven by a mouse (or a touchpad's click and drag), not a touchscreen or a pen.
+fn is_mouse(gesture: &impl IsA<gtk::Gesture>) -> bool {
+    gesture.device().is_some_and(|device| matches!(device.source(), gtk::gdk::InputSource::Mouse | gtk::gdk::InputSource::Touchpad))
+}
+
 fn recognizer_slop() -> f64 {
     gtk::Settings::default().map_or(8.0, |s| f64::from(s.property::<i32>("gtk-dnd-drag-threshold").max(0)))
 }
@@ -1591,21 +1600,31 @@ impl WebtoonInner {
         drag.set_propagation_phase(gtk::PropagationPhase::Capture);
         let slop = recognizer_slop();
         let applied = Rc::new(Cell::new((0.0, 0.0)));
-        let (weak, seen) = (self.me.clone(), Rc::clone(&applied));
-        drag.connect_drag_begin(move |_, _, _| {
+        // where the strip was when a mouse drag began, for a drag at the fit size (`None`: not such a drag)
+        let pressed_at = Rc::new(Cell::new(None::<f64>));
+        let (weak, seen, from) = (self.me.clone(), Rc::clone(&applied), Rc::clone(&pressed_at));
+        drag.connect_drag_begin(move |gesture, _, _| {
             seen.set((0.0, 0.0));
             if let Some(this) = weak.upgrade() {
                 this.quick.borrow_mut().take();
                 this.stop_zoom_anim();
+                // a touchscreen scrolls the strip by itself (the scrolled window's kinetic scrolling); a mouse does not
+                from.set(is_mouse(gesture).then(|| this.root.vadjustment().value()));
             }
         });
         let weak = self.me.clone();
+        let from = Rc::clone(&pressed_at);
         drag.connect_drag_update(move |_, dx, dy| {
             let Some(this) = weak.upgrade() else { return };
             if this.quick_scale_move(dy) {
                 return;
             }
             if this.zoom.borrow().scale() <= 1.0 {
+                // at the fit size a mouse drag moves the strip with the pointer, as a finger does on a phone
+                if let Some(start) = from.get().filter(|_| dy.abs() >= slop || dx.abs() >= slop) {
+                    this.root.vadjustment().set_value(start - dy);
+                    this.root.set_cursor_from_name(Some("grabbing"));
+                }
                 return;
             }
             // the first `slop` pixels of a drag are a tap that wobbled, not a pan (touch slop)
@@ -1614,21 +1633,30 @@ impl WebtoonInner {
             this.zoom_drag(ex - px, ey - py);
         });
         let weak = self.me.clone();
+        let from = Rc::clone(&pressed_at);
         drag.connect_drag_end(move |_, _, _| {
             let Some(this) = weak.upgrade() else { return };
+            from.set(None);
+            this.root.set_cursor(None);
             if this.quick.borrow_mut().take().is_some() {
                 this.pinch_end();
             }
         });
         self.frame.add_controller(drag);
 
-        // a fling glides the zoomed strip on from the release (T-44a-041)
+        // a fling glides the zoomed strip on from the release (T-44a-041); at the fit size a mouse drag glides the strip
         let swipe = gtk::GestureSwipe::new();
         swipe.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = self.me.clone();
-        swipe.connect_swipe(move |_, vx, vy| {
+        swipe.connect_swipe(move |gesture, vx, vy| {
             if let Some(this) = weak.upgrade() {
-                this.fling((vx, vy));
+                if this.zoom.borrow().scale() <= 1.0 {
+                    if is_mouse(gesture) {
+                        this.glide(vy);
+                    }
+                } else {
+                    this.fling((vx, vy));
+                }
             }
         });
         self.frame.add_controller(swipe);
@@ -1664,6 +1692,14 @@ impl WebtoonInner {
         if let Some(anim) = anim {
             self.run_zoom_anim(anim);
         }
+    }
+
+    /// The strip glides on after a mouse drag at the fit size: a third of a second of the release speed (`vy`, pixels a
+    /// second, positive downward), at most a viewport.
+    fn glide(&self, vy: f64) {
+        let adj = self.root.vadjustment();
+        let target = adj.value() + clamp_step(-vy * GLIDE_SECONDS, self.root.height());
+        animate(&self.root, adj, Rc::clone(&self.anim), target, true, || {});
     }
 
     /// Scrolls by `delta` pixels, animated when page transitions are on (B§7.4).

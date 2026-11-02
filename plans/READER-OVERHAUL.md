@@ -43,7 +43,6 @@ so all three share the fetch and decode slots and one decoded-image cache. The r
 3. **Mouse drag does not scroll a webtoon at normal size.** The drag code only pans when zoomed in, and GTK's own drag
    scrolling reacts to touch only. The page-by-page modes do take mouse drags.
 4. **Page errors never say why.** Offline, blocked by the site, or a damaged file all show "The image couldn't be loaded".
-5. **No keys for the next or previous chapter.** Arrows, Space, Page Up/Down, Home/End, zoom, F11 and Escape work.
 
 ### Already right (keep)
 
@@ -86,7 +85,6 @@ are built once, on the shared pieces.
 - **Drag to scroll a webtoon with the mouse** at any zoom, with the same momentum the page modes have.
 - **Page errors say why**: no connection, the site refused the image (with the HTTP status), or the image could not be
   read; Retry and Open in browser stay.
-- **Chapter keys**: `[` and `]` (and Ctrl+Page Up / Ctrl+Page Down) go to the previous and next chapter.
 
 ### Phase 4: split the big files
 
