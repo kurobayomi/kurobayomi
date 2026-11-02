@@ -69,7 +69,7 @@ pub struct MigrateEntriesView {
 
 impl MigrateEntriesView {
     pub fn new(env: MigrateEnv) -> Rc<Self> {
-        let root = gtk::Stack::new();
+        let root = crate::widgets::status::switcher();
         root.add_named(&crate::widgets::status::loading(None), Some("loading"));
         let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
         list.set_vexpand(true);

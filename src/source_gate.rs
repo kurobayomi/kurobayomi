@@ -5,13 +5,9 @@
 use std::sync::OnceLock;
 
 use gtk::prelude::*;
-use gtk::{Stack, StackTransitionType, Widget, glib};
+use gtk::{Widget, glib};
 use kuro_core::sources::SourceGate;
 use tokio::sync::watch;
-
-/// Length of the crossfade from the spinner to the content.
-// No call site until the source screens land (T-01a-037 wiring).
-pub const CROSSFADE_MS: u32 = 150;
 
 static LOADED: OnceLock<watch::Sender<bool>> = OnceLock::new();
 
@@ -46,10 +42,7 @@ pub fn when_sources_ready(gate: &SourceGate, content: &impl IsA<Widget>) -> Widg
         return content;
     }
     let spinner = crate::widgets::status::loading(None);
-    let stack = Stack::builder()
-        .transition_type(StackTransitionType::Crossfade)
-        .transition_duration(CROSSFADE_MS)
-        .build();
+    let stack = crate::widgets::status::switcher();
     stack.add_named(&spinner, Some("spinner"));
     stack.add_named(&content, Some("content"));
     stack.set_visible_child_name("spinner");

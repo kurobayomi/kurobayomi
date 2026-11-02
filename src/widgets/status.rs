@@ -12,6 +12,15 @@ use crate::theme::tokens::{SPACE_M, SPACE_S};
 /// The size of the spinner of a loading page, in px.
 const SPINNER_PX: i32 = 48;
 
+/// How long a page's state switcher fades between loading, content, empty and error.
+pub const SWITCH_FADE_MS: u32 = 150;
+
+/// The switcher between a page's states (loading, content, empty, error): one crossfade of [`SWITCH_FADE_MS`] for every
+/// page, so content never pops in. GTK drops the fade when the desktop turns animations off.
+pub fn switcher() -> gtk::Stack {
+    gtk::Stack::builder().transition_type(gtk::StackTransitionType::Crossfade).transition_duration(SWITCH_FADE_MS).build()
+}
+
 /// The large turning spinner of a loading page, centred in the room it is given.
 pub fn spinner() -> gtk::Spinner {
     let spinner = gtk::Spinner::builder().spinning(true).halign(Align::Center).valign(Align::Center).build();

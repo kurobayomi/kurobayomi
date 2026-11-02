@@ -43,8 +43,16 @@ async fn cover_bytes(service: &ImageService, art: &ArtRef, custom: &Path) -> Opt
 pub fn build(art: Option<&ArtRef>) -> gtk::Overlay {
     let picture = gtk::Picture::builder().content_fit(gtk::ContentFit::Cover).can_shrink(true).hexpand(true).vexpand(true).opacity(BACKDROP_ALPHA).build();
     let fade = gtk::Box::builder().css_classes([FADE_CLASS]).hexpand(true).vexpand(true).build();
+    // the picture fades in when it is ready, like the cover in front of it, instead of popping in
+    let reveal = gtk::Revealer::builder()
+        .transition_type(gtk::RevealerTransitionType::Crossfade)
+        .transition_duration(crate::widgets::status::SWITCH_FADE_MS)
+        .child(&picture)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
     let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&picture));
+    overlay.set_child(Some(&reveal));
     overlay.add_overlay(&fade);
     overlay.set_can_target(false);
     if let Some(art) = art.filter(|a| a.url.is_some()) {
@@ -56,7 +64,7 @@ pub fn build(art: Option<&ArtRef>) -> gtk::Overlay {
 fn load(art: ArtRef, picture: &gtk::Picture) {
     let key = cache_key(art.url.as_deref().unwrap_or_default(), art.last_modified);
     if let Some(texture) = cached(&key) {
-        picture.set_paintable(Some(&texture));
+        show(picture, &texture);
         return;
     }
     let Some(service) = cover_view::service() else { return };
@@ -73,8 +81,16 @@ fn load(art: ArtRef, picture: &gtk::Picture) {
         let texture: gdk::Texture = gdk::MemoryTexture::new(w as i32, h as i32, gdk::MemoryFormat::R8g8b8a8, &bytes, (w * 4) as usize).upcast();
         CACHE.with(|c| c.borrow_mut().insert(key, texture.clone()));
         if let Some(picture) = picture.upgrade() {
-            picture.set_paintable(Some(&texture));
+            show(&picture, &texture);
         }
         },
     );
+}
+
+/// Puts `texture` in the backdrop and fades it in.
+fn show(picture: &gtk::Picture, texture: &gdk::Texture) {
+    picture.set_paintable(Some(texture));
+    if let Some(reveal) = picture.parent().and_downcast::<gtk::Revealer>() {
+        reveal.set_reveal_child(true);
+    }
 }

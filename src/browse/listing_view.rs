@@ -182,7 +182,7 @@ impl ListingView {
             )
         };
         let empty = crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None);
-        let stack = gtk::Stack::new();
+        let stack = crate::widgets::status::switcher();
         stack.add_named(&crate::widgets::status::loading(None), Some("spinner"));
         stack.add_named(&stub, Some("stub"));
         stack.add_named(&error_slot, Some("error"));

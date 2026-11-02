@@ -96,7 +96,7 @@ impl SourcePrefsPage {
     pub fn new(prefs: SourcePrefs, on_changed: Rc<dyn Fn(&str)>, ready: watch::Receiver<bool>) -> Self {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let scroller = gtk::ScrolledWindow::builder().child(&column).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build();
-        let stack = gtk::Stack::new();
+        let stack = crate::widgets::status::switcher();
         stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
         stack.add_named(&scroller, Some("list"));
         stack.add_named(&crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None), Some("empty"));

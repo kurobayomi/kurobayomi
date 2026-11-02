@@ -15,7 +15,7 @@ use crate::theme::tokens::{SPACE_L, SPACE_S};
 /// The stack of a details page with its `loading` child (a spinner) and its `missing` child (not found, with Back). The
 /// page adds its `ready` child.
 pub fn state_stack() -> gtk::Stack {
-    let stack = gtk::Stack::new();
+    let stack = crate::widgets::status::switcher();
     stack.add_named(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))), Some("loading"));
     let back_missing = Button::with_label(&tr(MsgKey::action_webview_back));
     back_missing.connect_clicked(|_| ui::pop());

@@ -6,7 +6,7 @@
 use std::rc::Rc;
 
 use gtk::prelude::*;
-use gtk::{Button, Stack, StackTransitionType};
+use gtk::{Button, Stack};
 
 use crate::updates::list::PageState;
 use crate::widgets::status;
@@ -21,7 +21,8 @@ pub struct PageStates {
 impl PageStates {
     /// The stack with its four children. `list` is the page's list widget; `on_retry` runs the load again.
     pub fn new(list: &impl IsA<gtk::Widget>, on_retry: impl Fn() + 'static) -> Self {
-        let stack = Stack::builder().transition_type(StackTransitionType::Crossfade).vexpand(true).build();
+        let stack = status::switcher();
+        stack.set_vexpand(true);
         stack.add_named(&status::loading(None), Some("loading"));
 
         // the empty look of the Library page (docs/design/other-tabs.md); the screen sets its icon and action

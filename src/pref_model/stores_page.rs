@@ -198,7 +198,7 @@ pub fn build<T: Keyed + Send + 'static>(
     texts: Texts,
     subscribe: impl FnOnce(Box<dyn Fn(Vec<T>)>),
 ) -> (Built, StoresPage<T>) {
-    let stack = gtk::Stack::new();
+    let stack = crate::widgets::status::switcher();
     stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
     stack.add_named(&crate::widgets::status::empty("dialog-information-symbolic", &texts.empty, None), Some("empty"));
     let list = crate::ui::boxed_list();

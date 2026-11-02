@@ -77,7 +77,7 @@ impl SourcesPage {
         let column = crate::ui::column();
         let scroller = crate::ui::scrolled(&column);
         let empty = sources_empty();
-        let stack = gtk::Stack::new();
+        let stack = crate::widgets::status::switcher();
         stack.add_named(&loading_sources(), Some("spinner"));
         stack.add_named(&empty, Some("empty"));
         stack.add_named(&scroller, Some("list"));
