@@ -36,9 +36,8 @@
 //! - Volume keys (T-43a-071 against T-44a-015): the paging stays, as the opt-in of T-44a-015. `reader_volume_keys` is off by
 //!   default, the keys are claimed only while it is on and the menu is hidden (`viewers::keys`), and the preference keys are
 //!   kept. T-43a-071 (P3, drop) is read as "not used by default"; the plan text of T-43a-071 should be amended to say so.
-//! - The reader settings window (`settings_window`) is a native modal window whose page is built from the shared pref_model
-//!   rows (`settings_ui::reader::page::layout_rows`), not from the spec items of `src/spec.rs`: the spec `Item` has no preference
-//!   key. Each row writes its key straight away. The settings diet kept six reader settings and cut the dependent rows, so no row is disabled by a rule.
+//! - The reader settings live in the top bar's menu (`chrome::overflow_menu`), the open manga's own values, written at
+//!   once so the reader follows them live; Settings > Reader holds the defaults. There is no reader settings window.
 //! - The reader's top bar is the shared header of `widgets::page_header`, the same design as the player's. Pages open at the
 //!   left-to-right default; right to left is a per-manga choice that the reader remembers (a mode picked from the content
 //!   is phase 3 of `plans/READER-OVERHAUL.md`). The page slider sits at the bottom.
@@ -88,7 +87,6 @@ pub mod rules;
 pub mod screen;
 pub mod session;
 pub mod source_pages;
-pub mod settings_window;
 pub mod sheet;
 pub mod state;
 pub mod sync;

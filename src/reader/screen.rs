@@ -50,7 +50,6 @@ use super::nav_overlay::{self, NavOverlay};
 use super::navigator::{Navigator, NavigatorState};
 use super::overlay::Tint;
 use super::session::{AdjacentOutcome, ReaderEvent, ReaderSession, ReaderStore, TrackUpdate, open_list};
-use super::settings_window;
 use super::sheet::{self, Sheet};
 use super::source_pages;
 use super::sync::{self, Effect};
@@ -366,11 +365,6 @@ impl ReaderCore {
         self.session.borrow().as_ref()?.current_chapter().map(|c| c.chapter.id)
     }
 
-    /// The source url of the chapter being read.
-    pub fn chapter_url(&self) -> Option<String> {
-        self.session.borrow().as_ref()?.current_chapter().map(|c| c.chapter.url.clone())
-    }
-
     /// Flips the bookmark of the current chapter and writes it. Returns the new state.
     pub fn toggle_bookmark(&self) -> Option<Result<bool, String>> {
         self.session.borrow().as_ref()?.toggle_bookmark()
@@ -478,15 +472,28 @@ impl ReaderCore {
         self.reader_prefs().crop_borders().get()
     }
 
-    /// What the top bar's menu shows: the mode, crop and page layout of the open manga.
+    /// What the top bar's menu shows: the open manga's own reader settings.
     pub fn menu_state(&self) -> chrome::MenuState {
-        chrome::MenuState { mode: self.reading_mode(), crop: self.crop_on(), pages: self.reader_prefs().two_pages().get() }
+        let prefs = self.reader_prefs();
+        chrome::MenuState {
+            mode: self.reading_mode(),
+            crop: self.crop_on(),
+            split: prefs.dual_page_split_paged().get(),
+            choices: chrome::Choice::ALL.map(|choice| choice_pref(&prefs, choice).get()),
+        }
     }
 
-    /// Stores the page layout of the open manga (`pref_two_pages`); the viewer follows the stored value at once.
-    pub fn set_page_layout(&self, code: i32) {
-        if let Err(e) = self.reader_prefs().two_pages().set(code) {
-            tracing::warn!(error = %e, "the page layout could not be saved");
+    /// Stores a menu choice for the open manga; the viewer follows the stored value at once.
+    pub fn set_choice(&self, choice: chrome::Choice, code: i32) {
+        if let Err(e) = choice_pref(&self.reader_prefs(), choice).set(code) {
+            tracing::warn!(error = %e, ?choice, "a reader setting could not be saved");
+        }
+    }
+
+    /// Stores Split wide pages for the open manga.
+    pub fn set_split(&self, on: bool) {
+        if let Err(e) = self.reader_prefs().dual_page_split_paged().set(on) {
+            tracing::warn!(error = %e, "split wide pages could not be saved");
         }
     }
 
@@ -1291,19 +1298,6 @@ fn toggle_crop(screen: &Screen) {
 
 /// The reader settings window (T-043a-046, T-043a-047). Its mode row applies to every manga at once; the other rows write
 /// their keys, which the open reader follows.
-fn open_settings(screen: &Rc<Screen>) {
-    let Some(window) = window_of(screen) else { return };
-    let mode_weak = Rc::downgrade(screen);
-    let on_mode: Rc<dyn Fn(ReadingMode)> = Rc::new(move |mode| {
-        if let Some(s) = mode_weak.upgrade() {
-            s.core.apply_mode(mode);
-            drain_events(&s);
-            refresh(&s);
-        }
-    });
-    settings_window::open(&window, &screen.core.reader_prefs(), screen.core.reading_mode(), on_mode);
-}
-
 /// The initial load. Clears a failure card, shows the spinner, waits for the source manager, then loads.
 fn start(screen: &Rc<Screen>) {
     if let Some(card) = screen.stack.child_by_name(PAGE_CARD) {
@@ -1599,17 +1593,22 @@ fn menu_handlers(me: &Weak<Screen>) -> MenuHandlers {
             refresh(&s);
         }),
         on_crop: run(me, |s| toggle_crop(s)),
-        on_pages: {
+        on_split: {
             let me = me.clone();
-            Rc::new(move |code| {
+            Rc::new(move |on| {
                 if let Some(s) = me.upgrade() {
-                    s.core.set_page_layout(code);
+                    s.core.set_split(on);
                 }
             })
         },
-        on_settings: run(me, open_settings),
-        on_open_browser: run(me, open_in_browser),
-        on_share: run(me, share_chapter),
+        on_choice: {
+            let me = me.clone();
+            Rc::new(move |choice, code| {
+                if let Some(s) = me.upgrade() {
+                    s.core.set_choice(choice, code);
+                }
+            })
+        },
         on_set_cover: run(me, |screen| match screen.core.visible_page() {
             Some(page) => set_cover(screen, &page),
             None => {
@@ -1619,26 +1618,13 @@ fn menu_handlers(me: &Weak<Screen>) -> MenuHandlers {
     }
 }
 
-/// The chapter's web address, or an error toast when it has none.
-fn chapter_web_url(screen: &Screen) -> Option<String> {
-    let url = screen.core.chapter_url().and_then(|u| chrome::web_url(&u));
-    if url.is_none() {
-        screen.toaster.show(tr(MsgKey::unknown_error), ToastLength::Short);
-    }
-    url
-}
-
-/// Opens the chapter in the web view or the browser.
-fn open_in_browser(screen: &Rc<Screen>) {
-    let Some(url) = chapter_web_url(screen) else { return };
-    crate::ui::open_link(&url, window_of(screen).as_ref());
-}
-
-/// Shares (copies) the chapter's web address.
-fn share_chapter(screen: &Rc<Screen>) {
-    let Some(url) = chapter_web_url(screen) else { return };
-    if let Some(root) = screen.root.upgrade() {
-        root.clipboard().set_text(&url);
+/// The open manga's preference behind a menu choice.
+fn choice_pref(prefs: &MangaReaderPrefs, choice: chrome::Choice) -> kuro_prefs::pref::Pref<i32> {
+    match choice {
+        chrome::Choice::PageLayout => prefs.two_pages(),
+        chrome::Choice::Background => prefs.reader_theme(),
+        chrome::Choice::ScaleType => prefs.image_scale_type(),
+        chrome::Choice::ZoomStart => prefs.zoom_start(),
     }
 }
 

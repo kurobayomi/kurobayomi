@@ -9,7 +9,7 @@ use std::rc::Rc;
 use gtk::prelude::*;
 use kuro_prefs::reader::ReadingMode;
 
-use super::chrome::{MODES, MenuHandlers, MenuState, PAGE_LAYOUTS, TopBar, TopBarActions, build_top_bar, menu_actions, mode_label, overflow_menu, page_layout_label, sync_menu_state};
+use super::chrome::{Choice, MODES, MenuHandlers, MenuState, TopBar, TopBarActions, build_top_bar, menu_actions, mode_label, overflow_menu, sync_menu_state};
 use super::navigator::{Navigator, NavigatorState};
 
 /// Every button under `root`, in tree order.
@@ -120,8 +120,11 @@ fn all_of<T: IsA<gtk::Widget>>(root: &gtk::Widget) -> Vec<T> {
 fn items_of(menu: &gtk::gio::MenuModel) -> Vec<(String, Option<String>, Option<String>)> {
     (0..menu.n_items())
         .map(|i| {
-            let text = |name: &str| menu.item_attribute_value(i, name, None).and_then(|v| v.get::<String>());
-            (text("label").unwrap_or_default(), text("action"), text("target"))
+            let value = |name: &str| menu.item_attribute_value(i, name, None);
+            let text = |name: &str| value(name).and_then(|v| v.get::<String>());
+            // a radio target is the mode's name or a stored code
+            let target = value("target").and_then(|v| v.get::<String>().or_else(|| v.get::<i32>().map(|n| n.to_string())));
+            (text("label").unwrap_or_default(), text("action"), target)
         })
         .collect()
 }
@@ -142,67 +145,99 @@ fn item(label: &str, action: &str) -> (String, Option<String>, Option<String>) {
     (label.to_owned(), Some(action.to_owned()), None)
 }
 
+/// The submenus of a section: each one's label and its items.
+fn submenus_of(section: &gtk::gio::MenuModel) -> Vec<(String, Vec<(String, Option<String>, Option<String>)>)> {
+    (0..section.n_items())
+        .filter_map(|i| {
+            let sub = section.item_link(i, "submenu")?;
+            let label = section.item_attribute_value(i, "label", None).and_then(|v| v.get::<String>()).unwrap_or_default();
+            Some((label, items_of(&sub)))
+        })
+        .collect()
+}
+
+fn radios(action: &str, options: &[(i32, String)]) -> Vec<(String, Option<String>, Option<String>)> {
+    options.iter().map(|(code, label)| (label.clone(), Some(format!("reader.{action}")), Some(code.to_string()))).collect()
+}
+
 #[test]
-fn the_menu_model_has_five_radio_modes_then_crop_and_settings_then_the_source_entries() {
+fn the_menu_holds_every_reader_setting_and_no_browser_or_share_entries() {
     let web = sections_of(true);
-    assert_eq!(web.len(), 4);
+    assert_eq!(web.len(), 3, "reading mode, page layout, then the page settings");
     assert_eq!(web[0].0.as_deref(), Some(tr(MsgKey::pref_category_reading_mode)).as_deref());
     let modes: Vec<_> = MODES
         .iter()
         .map(|(target, mode)| (mode_label(*mode).to_owned(), Some("reader.mode".to_owned()), Some((*target).to_owned())))
         .collect();
     assert_eq!(web[0].1, modes, "five radio items on one action, each with its mode as the target");
-    assert_eq!(modes.len(), 5);
-    assert_eq!(modes[0].0, "Left to right");
     assert_eq!(web[1].0.as_deref(), Some("Page layout"));
-    let layouts: Vec<_> = PAGE_LAYOUTS.iter().map(|(target, code)| (page_layout_label(*code), Some("reader.pages".to_owned()), Some((*target).to_owned()))).collect();
-    assert_eq!(web[1].1, layouts);
-    assert_eq!(layouts.iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), ["Two pages when wide", "Two pages", "One page"]);
-    assert_eq!(web[2].1, [item(&tr(MsgKey::pref_crop_borders), "reader.crop"), item(&tr(MsgKey::reader_menu_reader_settings), "reader.settings")]);
-    assert_eq!(web[3].1, [item(&tr(MsgKey::action_open_in_browser), "reader.open-browser"), item(&tr(MsgKey::action_share), "reader.share")]);
-    assert_eq!(sections_of(false)[3].1, [item(&tr(MsgKey::set_as_cover), "reader.set-cover")], "a local manga sets the cover instead");
+    assert_eq!(web[1].1, radios("pages", &Choice::PageLayout.options()));
+    assert_eq!(web[1].1.iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), ["Two pages when wide", "Two pages", "One page"]);
+    let page = overflow_menu(true).item_link(2, "section").unwrap();
+    let checks: Vec<_> = items_of(&page).into_iter().filter(|(_, action, _)| action.is_some()).collect();
+    assert_eq!(checks, [item(&tr(MsgKey::pref_crop_borders), "reader.crop"), item(&tr(MsgKey::pref_dual_page_split), "reader.split")]);
+    let subs = submenus_of(&page);
+    assert_eq!(
+        subs,
+        [
+            (tr(MsgKey::pref_reader_theme), radios("background", &Choice::Background.options())),
+            (tr(MsgKey::pref_image_scale_type), radios("scale", &Choice::ScaleType.options())),
+            (tr(MsgKey::pref_zoom_start), radios("zoom-start", &Choice::ZoomStart.options())),
+        ]
+    );
+    let all: Vec<String> = web.iter().flat_map(|(_, items)| items.iter().map(|i| i.0.clone())).chain(subs.iter().map(|s| s.0.clone())).collect();
+    for gone in [tr(MsgKey::action_open_in_browser), tr(MsgKey::action_share), tr(MsgKey::reader_menu_reader_settings)] {
+        assert!(!all.contains(&gone), "{gone} is not in the menu");
+    }
+    let local = sections_of(false);
+    assert_eq!(local.len(), 4);
+    assert_eq!(local[3].1, [item(&tr(MsgKey::set_as_cover), "reader.set-cover")], "a local manga can set the page as its cover");
 }
 
 #[test]
-fn choosing_a_radio_mode_applies_it_and_the_state_is_the_current_mode() {
+fn choosing_in_the_menu_stores_it_and_the_states_follow_the_open_manga() {
     let chosen: Rc<RefCell<Vec<ReadingMode>>> = Rc::default();
     let crops = Rc::new(std::cell::Cell::new(0));
-    let layouts: Rc<RefCell<Vec<i32>>> = Rc::default();
-    let (sink, crop_sink, layout_sink) = (Rc::clone(&chosen), Rc::clone(&crops), Rc::clone(&layouts));
-    let noop: Rc<dyn Fn()> = Rc::new(|| {});
+    let picks: Rc<RefCell<Vec<(Choice, i32)>>> = Rc::default();
+    let splits: Rc<RefCell<Vec<bool>>> = Rc::default();
+    let (sink, crop_sink, pick_sink, split_sink) = (Rc::clone(&chosen), Rc::clone(&crops), Rc::clone(&picks), Rc::clone(&splits));
     let handlers = MenuHandlers {
         on_mode: Rc::new(move |mode| sink.borrow_mut().push(mode)),
         on_crop: Rc::new(move || crop_sink.set(crop_sink.get() + 1)),
-        on_pages: Rc::new(move |code| layout_sink.borrow_mut().push(code)),
-        on_settings: Rc::clone(&noop),
-        on_open_browser: Rc::clone(&noop),
-        on_share: Rc::clone(&noop),
-        on_set_cover: noop,
+        on_split: Rc::new(move |on| split_sink.borrow_mut().push(on)),
+        on_choice: Rc::new(move |choice, code| pick_sink.borrow_mut().push((choice, code))),
+        on_set_cover: Rc::new(|| {}),
     };
-    let group = menu_actions(MenuState { mode: ReadingMode::RightToLeft, crop: true, pages: 0 }, handlers);
+    let group = menu_actions(MenuState { mode: ReadingMode::RightToLeft, crop: true, split: false, choices: [0, 1, 1, 1] }, handlers);
     let state = |name: &str| group.action_state(name).expect("a stateful action");
     assert_eq!(state("mode").str(), Some("rtl"), "the state is the current mode");
-    assert_eq!(state("crop").get::<bool>(), Some(true));
+    assert_eq!((state("crop").get::<bool>(), state("split").get::<bool>()), (Some(true), Some(false)));
+    assert_eq!((state("pages").get::<i32>(), state("background").get::<i32>()), (Some(0), Some(1)));
 
     group.change_action_state("mode", &"webtoon".to_variant());
     assert_eq!(*chosen.borrow(), [ReadingMode::Webtoon], "the choice applies at once");
-    assert_eq!(state("mode").str(), Some("webtoon"));
     group.change_action_state("mode", &"nonsense".to_variant());
     assert_eq!(chosen.borrow().len(), 1, "an unknown target does nothing");
-
     group.change_action_state("crop", &false.to_variant());
     assert_eq!((crops.get(), state("crop").get::<bool>()), (1, Some(false)));
+    group.change_action_state("split", &true.to_variant());
+    group.change_action_state("pages", &2.to_variant());
+    group.change_action_state("background", &3.to_variant());
+    group.change_action_state("scale", &99.to_variant());
+    assert_eq!(*splits.borrow(), [true]);
+    assert_eq!(*picks.borrow(), [(Choice::PageLayout, 2), (Choice::Background, 3)], "a code the choice does not offer does nothing");
 
-    assert_eq!(state("pages").str(), Some("auto"));
-    assert!(group.is_action_enabled("pages"), "right to left can show two pages");
-    group.change_action_state("pages", &"one".to_variant());
-    assert_eq!(*layouts.borrow(), [2], "One page stores its code");
-
-    sync_menu_state(&group, MenuState { mode: ReadingMode::LeftToRight, crop: true, pages: 1 });
-    assert_eq!((state("mode").str(), state("crop").get::<bool>(), state("pages").str()), (Some("ltr"), Some(true), Some("two")));
-    assert_eq!((chosen.borrow().len(), crops.get(), layouts.borrow().len()), (1, 1, 1), "syncing the states runs no handler");
-    sync_menu_state(&group, MenuState { mode: ReadingMode::Webtoon, crop: true, pages: 1 });
-    assert!(!group.is_action_enabled("pages"), "the page layout is greyed out in a scrolling mode");
+    sync_menu_state(&group, MenuState { mode: ReadingMode::LeftToRight, crop: true, split: true, choices: [1, 2, 3, 4] });
+    assert_eq!((state("mode").str(), state("pages").get::<i32>(), state("zoom-start").get::<i32>()), (Some("ltr"), Some(1), Some(4)));
+    assert_eq!((chosen.borrow().len(), crops.get(), picks.borrow().len(), splits.borrow().len()), (1, 1, 2, 1), "syncing runs no handler");
+    assert!(["pages", "split", "scale", "zoom-start", "background"].iter().all(|a| group.is_action_enabled(a)));
+    sync_menu_state(&group, MenuState { mode: ReadingMode::Vertical, crop: true, split: true, choices: [1, 2, 3, 4] });
+    assert!(!group.is_action_enabled("pages") && group.is_action_enabled("scale"), "vertical pages turn one at a time, never side by side");
+    sync_menu_state(&group, MenuState { mode: ReadingMode::Webtoon, crop: true, split: true, choices: [1, 2, 3, 4] });
+    for greyed in ["pages", "split", "scale", "zoom-start"] {
+        assert!(!group.is_action_enabled(greyed), "{greyed} does nothing in the strip");
+    }
+    assert!(group.is_action_enabled("background") && group.is_action_enabled("crop"));
 }
 
 #[test]

@@ -5,7 +5,7 @@
 //! `set_viewer_bits`, which merges under the mask inside one transaction.
 //!
 //! Reader preferences do not go through this actor: `Pref::set` updates the preference store's memory at once and
-//! the store's own flusher thread saves it, so the GTK thread never waits on a file (see `settings_window`).
+//! the store's own flusher thread saves it, so the GTK thread never waits on a file (the menu's settings, `chrome`).
 
 use kuro_i18n::{MsgKey, tr};
 use std::collections::BTreeMap;

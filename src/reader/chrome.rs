@@ -28,10 +28,7 @@ pub fn error_card_message(error: &LoadError) -> String {
 pub const ACTION_GROUP: &str = "reader";
 const ACTION_MODE: &str = "mode";
 const ACTION_CROP: &str = "crop";
-const ACTION_PAGES: &str = "pages";
-const ACTION_SETTINGS: &str = "settings";
-const ACTION_OPEN_BROWSER: &str = "open-browser";
-const ACTION_SHARE: &str = "share";
+const ACTION_SPLIT: &str = "split";
 const ACTION_SET_COVER: &str = "set-cover";
 
 /// The five modes the menu offers, with the string each radio item carries as its action target. Default is not a
@@ -65,11 +62,11 @@ fn mode_from_target(target: &str) -> Option<ReadingMode> {
     MODES.iter().find(|(t, _)| *t == target).map(|(_, mode)| *mode)
 }
 
-/// The page layouts the menu offers (`pref_two_pages`), with the string each radio item carries: two pages when the
-/// window is wide (the default), always two, always one. They apply in the left-to-right and right-to-left modes only.
-pub const PAGE_LAYOUTS: [(&str, i32); 3] = [("auto", 0), ("two", 1), ("one", 2)];
+/// The page layout codes (`pref_two_pages`): two pages when the window is wide (the default), always two, always one.
+/// They apply in the left-to-right and right-to-left modes only.
+pub const PAGE_LAYOUTS: [i32; 3] = [0, 1, 2];
 
-/// The label of a page layout, in the menu and the settings window.
+/// The label of a page layout, in the menu and on the settings page.
 pub fn page_layout_label(code: i32) -> String {
     tr(match code {
         1 => MsgKey::two_pages_always,
@@ -78,8 +75,9 @@ pub fn page_layout_label(code: i32) -> String {
     })
 }
 
-fn layout_target(code: i32) -> &'static str {
-    PAGE_LAYOUTS.iter().find(|(_, c)| *c == code).map_or("auto", |(target, _)| target)
+/// Whether `mode` shows one page at a time (left to right, right to left, vertical), not a scrolling strip.
+fn page_by_page(mode: ReadingMode) -> bool {
+    mode.viewer_type() == Ok(kuro_prefs::reader::ViewerType::Pager)
 }
 
 /// Whether the page layout applies in `mode`: the page-by-page modes that turn sideways.
@@ -87,13 +85,80 @@ pub fn page_layout_applies(mode: ReadingMode) -> bool {
     matches!(mode, ReadingMode::LeftToRight | ReadingMode::RightToLeft)
 }
 
+/// The reader settings the menu offers as one choice of several, each a radio group on an action of its own whose
+/// state is the stored code. The labels and codes are the ones the Settings page shows (`settings_ui::reader::page`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Choice {
+    /// `pref_two_pages`, a section of its own under the reading mode.
+    PageLayout,
+    /// `pref_reader_theme_key`.
+    Background,
+    /// `pref_image_scale_type_key`.
+    ScaleType,
+    /// `pref_zoom_start_key`.
+    ZoomStart,
+}
+
+impl Choice {
+    pub const ALL: [Choice; 4] = [Choice::PageLayout, Choice::Background, Choice::ScaleType, Choice::ZoomStart];
+
+    fn action(self) -> &'static str {
+        match self {
+            Choice::PageLayout => "pages",
+            Choice::Background => "background",
+            Choice::ScaleType => "scale",
+            Choice::ZoomStart => "zoom-start",
+        }
+    }
+
+    fn title(self) -> String {
+        tr(match self {
+            Choice::PageLayout => MsgKey::pref_two_pages,
+            Choice::Background => MsgKey::pref_reader_theme,
+            Choice::ScaleType => MsgKey::pref_image_scale_type,
+            Choice::ZoomStart => MsgKey::pref_zoom_start,
+        })
+    }
+
+    /// The codes and labels, in menu order.
+    pub fn options(self) -> Vec<(i32, String)> {
+        use crate::settings_ui::reader::page as rows;
+        match self {
+            Choice::PageLayout => PAGE_LAYOUTS.iter().map(|&code| (code, page_layout_label(code))).collect(),
+            Choice::Background => rows::backgrounds().to_vec(),
+            Choice::ScaleType => rows::scale_types().to_vec(),
+            Choice::ZoomStart => rows::zoom_starts().to_vec(),
+        }
+    }
+
+    /// Whether the choice does anything in `mode`: the page layout in the sideways modes, the scale and the zoom start
+    /// in the page-by-page modes (the strip fits the width), the background everywhere.
+    pub fn applies(self, mode: ReadingMode) -> bool {
+        match self {
+            Choice::PageLayout => page_layout_applies(mode),
+            Choice::Background => true,
+            Choice::ScaleType | Choice::ZoomStart => page_by_page(mode),
+        }
+    }
+}
+
 fn detailed(action: &str) -> String {
     format!("{ACTION_GROUP}.{action}")
 }
 
-/// The model of the top bar's menu: Reading mode (five radio items), Page layout (three radio items, for the sideways
-/// modes), Crop borders and Reader settings, then Open in browser and Share for an HTTP source, or Set as cover (the page
-/// on screen) for any other source (a local manga).
+fn radio_items(choice: Choice) -> gio::Menu {
+    let items = gio::Menu::new();
+    for (code, label) in choice.options() {
+        let item = gio::MenuItem::new(Some(&label), None);
+        item.set_action_and_target_value(Some(&detailed(choice.action())), Some(&code.to_variant()));
+        items.append_item(&item);
+    }
+    items
+}
+
+/// The model of the top bar's menu, every reader setting in it (user, 2026-11-02: no separate settings window): Reading
+/// mode (five radio items), Page layout (three), then Crop borders and Split wide pages, and Background color, Scale
+/// type and Zoom start position as submenus. A local manga adds Set as cover (the page on screen).
 pub fn overflow_menu(is_http_source: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     let modes = gio::Menu::new();
@@ -103,25 +168,19 @@ pub fn overflow_menu(is_http_source: bool) -> gio::Menu {
         modes.append_item(&item);
     }
     menu.append_section(Some(&tr(MsgKey::pref_category_reading_mode)), &modes);
-    let layouts = gio::Menu::new();
-    for (target, code) in PAGE_LAYOUTS {
-        let item = gio::MenuItem::new(Some(&page_layout_label(code)), None);
-        item.set_action_and_target_value(Some(&detailed(ACTION_PAGES)), Some(&target.to_variant()));
-        layouts.append_item(&item);
-    }
-    menu.append_section(Some(&tr(MsgKey::pref_two_pages)), &layouts);
-    let reader = gio::Menu::new();
-    reader.append(Some(&tr(MsgKey::pref_crop_borders)), Some(&detailed(ACTION_CROP)));
-    reader.append(Some(&tr(MsgKey::reader_menu_reader_settings)), Some(&detailed(ACTION_SETTINGS)));
-    menu.append_section(None, &reader);
+    menu.append_section(Some(&Choice::PageLayout.title()), &radio_items(Choice::PageLayout));
     let page = gio::Menu::new();
-    if is_http_source {
-        page.append(Some(&tr(MsgKey::action_open_in_browser)), Some(&detailed(ACTION_OPEN_BROWSER)));
-        page.append(Some(&tr(MsgKey::action_share)), Some(&detailed(ACTION_SHARE)));
-    } else {
-        page.append(Some(&tr(MsgKey::set_as_cover)), Some(&detailed(ACTION_SET_COVER)));
+    page.append(Some(&tr(MsgKey::pref_crop_borders)), Some(&detailed(ACTION_CROP)));
+    page.append(Some(&tr(MsgKey::pref_dual_page_split)), Some(&detailed(ACTION_SPLIT)));
+    for choice in [Choice::Background, Choice::ScaleType, Choice::ZoomStart] {
+        page.append_submenu(Some(&choice.title()), &radio_items(choice));
     }
     menu.append_section(None, &page);
+    if !is_http_source {
+        let local = gio::Menu::new();
+        local.append(Some(&tr(MsgKey::set_as_cover)), Some(&detailed(ACTION_SET_COVER)));
+        menu.append_section(None, &local);
+    }
     menu
 }
 
@@ -131,22 +190,36 @@ pub struct MenuHandlers {
     pub on_mode: Rc<dyn Fn(ReadingMode)>,
     /// The Crop borders switch was flipped.
     pub on_crop: Rc<dyn Fn()>,
-    /// A page layout was chosen (`pref_two_pages` code): store it for this manga, the pager follows at once.
-    pub on_pages: Rc<dyn Fn(i32)>,
-    pub on_settings: Rc<dyn Fn()>,
-    pub on_open_browser: Rc<dyn Fn()>,
-    pub on_share: Rc<dyn Fn()>,
+    /// Split wide pages was switched to the value given: store it for this manga.
+    pub on_split: Rc<dyn Fn(bool)>,
+    /// A choice was made (its stored code): store it for this manga. The reader follows the stored values at once.
+    pub on_choice: Rc<dyn Fn(Choice, i32)>,
     pub on_set_cover: Rc<dyn Fn()>,
 }
 
-/// The actions the menu items name, with the mode, crop and page layout states as given. The page installs the group
-/// under [`ACTION_GROUP`]; [`sync_menu_state`] keeps the states current.
+/// What the menu's radio and check items show: the open manga's values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MenuState {
+    pub mode: ReadingMode,
+    pub crop: bool,
+    pub split: bool,
+    /// The code of each [`Choice`], in [`Choice::ALL`] order.
+    pub choices: [i32; 4],
+}
+
+impl MenuState {
+    fn code(&self, choice: Choice) -> i32 {
+        self.choices[Choice::ALL.iter().position(|c| *c == choice).unwrap_or(0)]
+    }
+}
+
+/// The actions the menu items name, with the states given. The page installs the group under [`ACTION_GROUP`];
+/// [`sync_menu_state`] keeps the states current.
 pub fn menu_actions(state: MenuState, handlers: MenuHandlers) -> gio::SimpleActionGroup {
-    let MenuHandlers { on_mode, on_crop, on_pages, on_settings, on_open_browser, on_share, on_set_cover } = handlers;
-    let MenuState { mode, crop, pages } = state;
+    let MenuHandlers { on_mode, on_crop, on_split, on_choice, on_set_cover } = handlers;
     let group = gio::SimpleActionGroup::new();
 
-    let mode_action = gio::SimpleAction::new_stateful(ACTION_MODE, Some(glib::VariantTy::STRING), &mode_target(mode).to_variant());
+    let mode_action = gio::SimpleAction::new_stateful(ACTION_MODE, Some(glib::VariantTy::STRING), &mode_target(state.mode).to_variant());
     mode_action.connect_change_state(move |action, value| {
         let Some(value) = value else { return };
         let Some(mode) = value.str().and_then(mode_from_target) else { return };
@@ -155,7 +228,7 @@ pub fn menu_actions(state: MenuState, handlers: MenuHandlers) -> gio::SimpleActi
     });
     group.add_action(&mode_action);
 
-    let crop_action = gio::SimpleAction::new_stateful(ACTION_CROP, None, &crop.to_variant());
+    let crop_action = gio::SimpleAction::new_stateful(ACTION_CROP, None, &state.crop.to_variant());
     crop_action.connect_change_state(move |action, value| {
         let Some(value) = value else { return };
         action.set_state(value);
@@ -163,59 +236,65 @@ pub fn menu_actions(state: MenuState, handlers: MenuHandlers) -> gio::SimpleActi
     });
     group.add_action(&crop_action);
 
-    let pages_action = gio::SimpleAction::new_stateful(ACTION_PAGES, Some(glib::VariantTy::STRING), &layout_target(pages).to_variant());
-    pages_action.set_enabled(page_layout_applies(mode));
-    pages_action.connect_change_state(move |action, value| {
-        let Some(value) = value else { return };
-        let Some(code) = value.str().and_then(|t| PAGE_LAYOUTS.iter().find(|(target, _)| *target == t)).map(|(_, code)| *code) else { return };
-        action.set_state(value);
-        on_pages(code);
+    let split_action = gio::SimpleAction::new_stateful(ACTION_SPLIT, None, &state.split.to_variant());
+    split_action.connect_change_state(move |action, value| {
+        let Some(on) = value.and_then(glib::Variant::get::<bool>) else { return };
+        action.set_state(&on.to_variant());
+        on_split(on);
     });
-    group.add_action(&pages_action);
+    group.add_action(&split_action);
 
-    for (name, run) in [
-        (ACTION_SETTINGS, on_settings),
-        (ACTION_OPEN_BROWSER, on_open_browser),
-        (ACTION_SHARE, on_share),
-        (ACTION_SET_COVER, on_set_cover),
-    ] {
-        let action = gio::SimpleAction::new(name, None);
-        action.connect_activate(move |_, _| run());
+    for choice in Choice::ALL {
+        let action = gio::SimpleAction::new_stateful(choice.action(), Some(glib::VariantTy::INT32), &state.code(choice).to_variant());
+        let on_choice = Rc::clone(&on_choice);
+        action.connect_change_state(move |action, value| {
+            let Some(code) = value.and_then(glib::Variant::get::<i32>) else { return };
+            if !choice.options().iter().any(|(c, _)| *c == code) {
+                return;
+            }
+            action.set_state(&code.to_variant());
+            on_choice(choice, code);
+        });
         group.add_action(&action);
     }
+
+    let cover = gio::SimpleAction::new(ACTION_SET_COVER, None);
+    cover.connect_activate(move |_, _| on_set_cover());
+    group.add_action(&cover);
+    sync_enabled(&group, state.mode);
     group
 }
 
-/// What the menu's radio and check items show.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MenuState {
-    pub mode: ReadingMode,
-    pub crop: bool,
-    /// The page layout (`pref_two_pages` code).
-    pub pages: i32,
-}
-
-/// Writes the states without running their handlers. The page layout is greyed out in the scrolling modes.
+/// Writes the states without running their handlers.
 pub fn sync_menu_state(group: &gio::SimpleActionGroup, state: MenuState) {
-    let action = |name: &str| group.lookup_action(name).and_then(|a| a.downcast::<gio::SimpleAction>().ok());
     let set = |name: &str, value: glib::Variant| {
-        if let Some(action) = action(name) {
+        if let Some(action) = simple_action(group, name) {
             action.set_state(&value);
         }
     };
     set(ACTION_MODE, mode_target(state.mode).to_variant());
     set(ACTION_CROP, state.crop.to_variant());
-    set(ACTION_PAGES, layout_target(state.pages).to_variant());
-    if let Some(pages) = action(ACTION_PAGES) {
-        pages.set_enabled(page_layout_applies(state.mode));
+    set(ACTION_SPLIT, state.split.to_variant());
+    for choice in Choice::ALL {
+        set(choice.action(), state.code(choice).to_variant());
+    }
+    sync_enabled(group, state.mode);
+}
+
+/// Greys out what does nothing in `mode` (the page-by-page settings while the strip scrolls).
+fn sync_enabled(group: &gio::SimpleActionGroup, mode: ReadingMode) {
+    for choice in Choice::ALL {
+        if let Some(action) = simple_action(group, choice.action()) {
+            action.set_enabled(choice.applies(mode));
+        }
+    }
+    if let Some(split) = simple_action(group, ACTION_SPLIT) {
+        split.set_enabled(page_by_page(mode));
     }
 }
 
-/// The web address of a chapter for the overflow entries: only an absolute http or https url has one. A relative
-/// source url needs the source's base url, which the reader does not have.
-pub fn web_url(chapter_url: &str) -> Option<String> {
-    let url = chapter_url.trim();
-    (url.starts_with("https://") || url.starts_with("http://")).then(|| url.to_owned())
+fn simple_action(group: &gio::SimpleActionGroup, name: &str) -> Option<gio::SimpleAction> {
+    group.lookup_action(name).and_then(|a| a.downcast::<gio::SimpleAction>().ok())
 }
 
 /// The bookmark action's label for the chapter's state.
@@ -310,13 +389,6 @@ mod tests {
             error_card_message(&error),
             "The chapter is not downloaded. Turn off downloaded-only mode or download it first."
         );
-    }
-
-    #[test]
-    fn only_an_absolute_chapter_url_has_a_web_address() {
-        assert_eq!(web_url(" https://example.org/c/1 ").as_deref(), Some("https://example.org/c/1"));
-        assert_eq!(web_url("/c/1"), None);
-        assert_eq!(web_url(""), None);
     }
 
     #[test]

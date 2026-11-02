@@ -1,5 +1,5 @@
 //! The reader's bottom sheet (T-043a-079): the page actions. A revealer over a scrim inside the reader's overlay; Escape
-//! and a click outside the sheet dismiss it. The reader settings are a native window (`settings_window`). The confirm
+//! and a click outside the sheet dismiss it. The reader settings are in the top bar's menu (`chrome`). The confirm
 //! prompt uses the shared dialog. No libadwaita.
 
 use kuro_i18n::{MsgKey, tr};
