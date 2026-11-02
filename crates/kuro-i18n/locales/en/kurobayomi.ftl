@@ -647,6 +647,7 @@ pref_mpv_input = Edit MPV input file for keyboard mapping configuration
 
 # source: i18n-aniyomi
 player_skip_action = Skip { $arg1 }
+player_skip_ahead = Skip { $seconds } s
 
 # source: i18n-aniyomi
 player_intro_skipped = { $arg1 } skipped

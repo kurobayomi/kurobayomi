@@ -4,6 +4,9 @@
 //! are `kuro_player::skip` and `kuro_player::chapters`; this file reads mpv and the database and shows the button.
 //! Main thread only, except the AniSkip request, which runs on the app's async runtime and comes back over a channel.
 //! Every failure of that request is silent.
+//!
+//! A file with no opening known (no such chapter, and AniSkip has none: new seasons often have no times yet) offers
+//! "Skip 85 s" during its first minutes instead (user, 2026-11-02): the usual length of an opening, once per file.
 
 use std::rc::Rc;
 
@@ -32,6 +35,10 @@ pub struct State {
     load: u64,
     /// The label the button shows now; `None` hides it.
     label: Option<String>,
+    /// The button shows the fallback ("Skip 85 s") rather than a known segment.
+    fallback: bool,
+    /// The fallback was used for this file, so it is not offered again.
+    fallback_used: bool,
 }
 
 impl Default for State {
@@ -42,6 +49,8 @@ impl Default for State {
             pending: true,
             load: 0,
             label: None,
+            fallback: false,
+            fallback_used: false,
         }
     }
 }
@@ -127,10 +136,12 @@ pub fn tick(shared: &Shared, ui: &Ui) {
             player.skip.chapters = chapters;
             request = aniskip_request(player.episode_id, player.skip.load, duration_s(&player));
         }
-        let position = position_s(&player);
+        let (position, duration) = (position_s(&player), duration_s(&player));
         let state = &mut player.skip;
         let tick = state.machine.on_tick(&state.chapters, position);
-        state.label = next_label(state.label.take(), tick.label);
+        let known = next_label(if state.fallback { None } else { state.label.take() }, tick.label);
+        state.fallback = known.is_none() && fallback_shown(has_opening(&state.chapters), state.fallback_used, position, duration);
+        state.label = if state.fallback { Some(fallback_label()) } else { known };
         (state.label.clone(), request)
     };
     ui.show(label.as_deref());
@@ -139,10 +150,19 @@ pub fn tick(shared: &Shared, ui: &Ui) {
     }
 }
 
-/// The button was pressed: playback jumps to the end of the segment, and the "skipped" text shows as a toast.
+/// The button was pressed: playback jumps to the end of the segment, and the "skipped" text shows as a toast. The
+/// fallback jumps [`FALLBACK_SKIP_S`] ahead, once.
 fn skip(shared: &Shared) {
     let mut player = shared.borrow_mut();
     let (position, duration) = (position_s(&player), duration_s(&player));
+    if player.skip.fallback {
+        player.skip.fallback_used = true;
+        let target = (position + FALLBACK_SKIP_S).min(duration);
+        if let Err(e) = player.playback.seek_to_ms((f64::from(target) * 1000.0) as i64) {
+            tracing::warn!(error = %e, "player: the skip seek failed");
+        }
+        return;
+    }
     let (tap, target) = {
         let state = &mut player.skip;
         let tap = state.machine.on_skip(&state.chapters, position);
@@ -156,6 +176,28 @@ fn skip(shared: &Shared) {
     }
     drop(player);
     crate::toast::notify(seek.text);
+}
+
+/// How far the fallback jumps: the usual length of an opening, in seconds.
+pub const FALLBACK_SKIP_S: f32 = 85.0;
+
+/// The fallback is offered during the first minutes of a file, where openings sit.
+pub const FALLBACK_WINDOW_S: f32 = 180.0;
+
+/// Whether to offer the fallback: no opening is known, it was not used yet, the position is in the first minutes, and
+/// the file is long enough to have an opening (an episode, not a clip).
+pub fn fallback_shown(opening_known: bool, used: bool, position: f32, duration: f32) -> bool {
+    !opening_known && !used && position < FALLBACK_WINDOW_S && duration > FALLBACK_WINDOW_S + FALLBACK_SKIP_S
+}
+
+/// Whether the file's chapters (with AniSkip's) name an opening.
+fn has_opening(list: &[Segment]) -> bool {
+    list.iter().any(|segment| matches!(segment.kind, kuro_player::types::ChapterType::Opening | kuro_player::types::ChapterType::MixedOp))
+}
+
+/// "Skip 85 s".
+fn fallback_label() -> String {
+    kuro_i18n::trf(kuro_i18n::MsgKey::player_skip_ahead, &[("seconds", kuro_i18n::Arg::Int(FALLBACK_SKIP_S as i64))])
 }
 
 /// Where a skip from `position` goes: the start of the next chapter, or the end of the file when the chapter now
@@ -314,6 +356,16 @@ mod tests {
     }
 
     /// The label shows the segment's skip text inside an opening or an ending and nothing elsewhere.
+    #[test]
+    fn the_fallback_shows_in_the_first_minutes_of_an_episode_with_no_opening_known_once() {
+        let episode = 24.0 * 60.0;
+        assert!(fallback_shown(false, false, 10.0, episode), "no opening known, early in an episode");
+        assert!(!fallback_shown(true, false, 10.0, episode), "a known opening shows its own button");
+        assert!(!fallback_shown(false, true, 10.0, episode), "once per file");
+        assert!(!fallback_shown(false, false, FALLBACK_WINDOW_S, episode), "past the first minutes");
+        assert!(!fallback_shown(false, false, 10.0, 120.0), "a short clip has no opening");
+    }
+
     #[test]
     fn the_label_follows_the_segment_the_position_is_in() {
         let list = chapters();
