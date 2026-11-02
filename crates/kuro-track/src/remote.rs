@@ -458,8 +458,6 @@ mod tests {
 
 #[cfg(test)]
 mod property_tests {
-    use std::sync::{Arc, Mutex};
-
     use super::*;
     use crate::fakes::{
         FakeAnime, MemAnimeRepo, MemSecrets, SCORES, STATUS_COMPLETED, STATUS_PLANNED, new_log,
@@ -548,39 +546,11 @@ mod property_tests {
         }
     }
 
-    #[derive(Clone, Default)]
-    struct Captured(Arc<Mutex<Vec<u8>>>);
-
-    impl std::io::Write for Captured {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
-        }
-    }
-
-    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
-        type Writer = Captured;
-
-        fn make_writer(&'a self) -> Captured {
-            self.clone()
-        }
-    }
-
     /// TT-27-067. The failure text carries a code, a state and a token in its redirect query. The log line names the
     /// failure and none of the secrets.
     #[tokio::test]
     async fn tr_27_067_captured_log_never_contains_a_token() {
-        let captured = Captured::default();
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(captured.clone())
-            .with_max_level(tracing::Level::DEBUG)
-            .with_ansi(false)
-            .finish();
-        let _guard = tracing::subscriber::set_default(subscriber);
+        let (captured, _guard) = crate::fakes::capture_logs(tracing::Level::DEBUG);
 
         let tr = tracker();
         *tr.fail.lock().unwrap() = Some(
@@ -590,7 +560,7 @@ mod property_tests {
         let repo = MemAnimeRepo::default();
         assert!(update_remote_anime(&planned(12), &tr, &repo).await.is_err());
 
-        let text = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+        let text = captured.text();
         assert!(text.contains("remote update failed"), "{text}");
         for secret in ["SECRET-CODE", "SECRET-STATE", "SECRET-TOKEN"] {
             assert!(!text.contains(secret), "{text}");

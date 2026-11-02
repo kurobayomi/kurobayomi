@@ -5,11 +5,25 @@ name: Nightly
 # always serves the newest build (Shelly's StaticUrl update check watches the AppImage's); the commit hash is in the
 # release title and notes. Stable builds are tagged releases and have their own workflow.
 on:
-  # runs after the CI workflow finished, and only when its tests passed
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  # starts with the CI workflow on the same push (the same paths), so the builds run while the tests do; `publish` waits
+  # for that commit's CI run and goes ahead only when its tests passed
+  push:
     branches: [main]
+    paths:
+      - 'crates/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'assets/**'
+      - 'spec/**'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'scripts/**'
+      # the Windows installer's script: a change to it must reach a nightly
+      - 'dist/**'
+      - 'ci/**'
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/appimage.yml'
   workflow_dispatch:
 
 # The newest commit always wins: a newer run cancels the builds of an older one (each build job has its own group with
@@ -23,8 +37,8 @@ permissions:
   packages: read
 
 env:
-  # the commit that passed CI, or the current one for a manual run
-  SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  # the pushed commit, or the current one for a manual run
+  SHA: ${{ github.sha }}
 
 # bash, as on the plain runners: in a container a step's default shell is sh
 defaults:
@@ -33,7 +47,6 @@ defaults:
 
 jobs:
   appimage:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     concurrency:
       group: nightly-build-appimage
       cancel-in-progress: true
@@ -113,7 +126,6 @@ jobs:
   # The Windows nightly: the app with every DLL and the GTK data it needs (scripts/bundle-windows.sh), packed as the
   # installer (dist/windows/kurobayomi.iss), installed and tried on the runner, then handed to the publish job.
   windows:
-    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     concurrency:
       group: nightly-build-windows
       cancel-in-progress: true
@@ -135,7 +147,7 @@ jobs:
           install: git
           pacboy: >-
             toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
-            gtk4:p mpv:p dav1d:p libarchive:p
+            gtk4:p libadwaita:p mpv:p dav1d:p libarchive:p
 
       - name: Cache the build
         uses: Swatinem/rust-cache@v2
@@ -237,6 +249,23 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.SHA }}
+
+      # the builds ran beside the tests: publish only a commit whose CI run passed (a manual run skips the wait)
+      - name: Wait for the CI tests of this commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for _ in $(seq 1 120); do
+            run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${SHA}&event=push" --jq '.workflow_runs[0] | "\(.status) \(.conclusion)"')"
+            case "$run" in
+              "completed success") echo "CI passed for $SHA"; exit 0 ;;
+              completed*) echo "CI did not pass for $SHA ($run): not publishing"; exit 1 ;;
+            esac
+            sleep 30
+          done
+          echo "CI for $SHA did not finish within an hour: not publishing"
+          exit 1
 
       - uses: actions/download-artifact@v4
         with:

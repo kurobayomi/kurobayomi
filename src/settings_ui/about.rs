@@ -7,6 +7,7 @@
 //! the labels of the debug-info page's own groups. The Check for updates row runs its own copy of the manual check so it
 //! knows when the check ends: a spinner shows while it runs and a second tap is ignored (T-47a-094). Aniyomi's "no
 //! longer supported" toast belongs to an Android API level; Linux has no such rule, so the row has no EOL branch.
+use crate::ui::DialogOpen as _;
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -24,6 +25,7 @@ use crate::settings_ui::changelog;
 use crate::settings_ui::clipboard::copy_to_clipboard;
 use crate::settings_ui::rows::{item, tap_item, text, TapRow};
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 pub fn version_title() -> String {
     tr(MsgKey::ext_info_version)
@@ -70,42 +72,30 @@ pub fn version_row() -> PreferenceItem {
 /// row.
 fn update_center_row() -> PreferenceItem {
     use crate::appimage_update::{self as update, Status};
-    use crate::pref_model::widgets::row::{self, RowSpec};
+    use crate::widgets::row::{self, RowSpec};
     PreferenceItem::Custom {
         title: version_title().to_owned(),
         build: Rc::new(|| {
             let button = gtk::Button::new();
             button.set_valign(gtk::Align::Center);
-            let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let spinner = crate::ui::inline_spinner();
             let pause = crate::ui::icon_button("media-playback-pause-symbolic", &tr(MsgKey::action_pause));
             let cancel = crate::ui::icon_button("window-close-symbolic", &tr(MsgKey::action_cancel));
             for download_button in [&pause, &cancel] {
                 download_button.set_valign(gtk::Align::Center);
                 download_button.add_css_class("flat");
             }
-            let end = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            // the download's bar and its spinner come first, then the buttons
+            let bar_spinner = crate::ui::inline_spinner();
+            let bar = gtk::ProgressBar::builder().valign(gtk::Align::Center).width_request(120).build();
+            let end = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+            end.append(&bar_spinner);
+            end.append(&bar);
             end.append(&spinner);
             end.append(&pause);
             end.append(&cancel);
             end.append(&button);
-            let subtitle = version_subtitle();
-            let built = row::build(RowSpec { title: &version_title(), subtitle: Some(&subtitle), icon: None, trailing: Some(end.upcast_ref()), on_click: None });
-            let content = built.row.child().and_downcast::<gtk::Box>().expect("the row content");
-            built.row.set_child(None::<&gtk::Widget>);
-            let state = gtk::Label::builder().xalign(0.0).wrap(true).css_classes(built.subtitle.css_classes()).build();
-            // the state line with the download's spinner right after its text, then the bar
-            let bar_spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
-            let state_row = gtk::Box::builder().spacing(6).build();
-            state_row.append(&state);
-            state_row.append(&bar_spinner);
-            let bar = gtk::ProgressBar::builder().margin_top(6).build();
-            if let Some(column) = built.subtitle.parent().and_downcast::<gtk::Box>() {
-                column.append(&state_row);
-                column.append(&bar);
-            }
-            let copy = gtk::GestureClick::new();
-            copy.connect_released(|_, _, _, _| copy_to_clipboard(&current_debug_block()));
-            content.add_controller(copy);
+            let built = row::build(RowSpec { title: &version_title(), subtitle: Some(&version_subtitle()), icon: None, trailing: Some(end.upcast_ref()), on_click: Some(Rc::new(|| copy_to_clipboard(&current_debug_block()))) });
             button.connect_clicked(|_| match update::status() {
                 Status::Installed(_) => crate::whats_new::restart(),
                 _ => update::check(),
@@ -115,16 +105,19 @@ fn update_center_row() -> PreferenceItem {
                 _ => update::pause(),
             });
             cancel.connect_clicked(|_| update::cancel());
-            let weak = (button.downgrade(), spinner.downgrade(), state.downgrade(), bar.downgrade(), bar_spinner.downgrade(), pause.downgrade(), cancel.downgrade());
+            let weak = (button.downgrade(), spinner.downgrade(), built.downgrade(), bar.downgrade(), bar_spinner.downgrade(), pause.downgrade(), cancel.downgrade());
             update::watch(move |status| {
-                let (Some(button), Some(spinner), Some(state), Some(bar), Some(bar_spinner), Some(pause), Some(cancel)) =
+                let (Some(button), Some(spinner), Some(row), Some(bar), Some(bar_spinner), Some(pause), Some(cancel)) =
                     (weak.0.upgrade(), weak.1.upgrade(), weak.2.upgrade(), weak.3.upgrade(), weak.4.upgrade(), weak.5.upgrade(), weak.6.upgrade())
                 else {
                     return false;
                 };
                 let line = status.line();
-                state.set_visible(line.is_some());
-                state.set_label(line.as_deref().unwrap_or_default());
+                // the state of the update goes under the build
+                row::set_subtitle(&row, Some(&match line {
+                    Some(line) => format!("{}\n{line}", version_subtitle()),
+                    None => version_subtitle(),
+                }));
                 bar.set_visible(status.fraction().is_some());
                 bar_spinner.set_visible(matches!(status, Status::Downloading { .. }));
                 bar.set_fraction(status.fraction().unwrap_or(0.0));
@@ -154,7 +147,7 @@ fn update_center_row() -> PreferenceItem {
                 }
                 true
             });
-            content.upcast()
+            built.upcast()
         }),
     }
 }
@@ -297,7 +290,7 @@ fn run_check(done: impl FnOnce(Result<Outcome, ReleaseError>) + 'static) {
 /// version, the notes (markdown) in a scrolling body, the release page when there is one, and the buttons: `primary` after
 /// Not now, or Close alone. Escape closes it.
 pub fn notes_dialog(heading: &str, version: &str, notes_markdown: &str, link: Option<&str>, primary: Option<DialogButton>) {
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let icon = gtk::Image::builder().icon_name("software-update-available-symbolic").pixel_size(48).halign(gtk::Align::Center).build();
     icon.set_accessible_role(gtk::AccessibleRole::Presentation);
     column.append(&icon);
@@ -325,7 +318,7 @@ pub fn notes_dialog(heading: &str, version: &str, notes_markdown: &str, link: Op
         Some(primary) => vec![DialogButton::cancel(tr(MsgKey::action_not_now)), primary],
         None => vec![DialogButton::cancel(&tr(MsgKey::action_close))],
     };
-    crate::ui::dialog(heading, &column, 520, buttons).present();
+    crate::ui::dialog(heading, &column, 520, buttons).open();
 }
 
 /// The update page of a newer stable release. Decision (T-47ba-032): there is no in-place install for a stable build
@@ -371,7 +364,7 @@ pub fn check_row() -> PreferenceItem {
         return text(&app_update::check_row_title(), None, false);
     }
     let spinner: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
-        let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+        let spinner = crate::ui::inline_spinner();
         spinner.set_visible(false);
         spinner.upcast()
     });
@@ -395,8 +388,10 @@ fn whats_new_row() -> PreferenceItem {
 /// The bottom row of links: the project page and the issue tracker.
 fn links_row() -> PreferenceItem {
     let build: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
-        let bar = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+        let bar = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_M);
         bar.set_halign(gtk::Align::Center);
+        // the column's spacing plus this make the 24 px between two groups
+        bar.set_margin_top(SPACE_M);
         for (label, url) in [("GitHub", PROJECT_URL), (&tr(MsgKey::ui_report_an_issue), ISSUES_URL)] {
             let button = gtk::Button::with_label(label);
             button.add_css_class("flat");

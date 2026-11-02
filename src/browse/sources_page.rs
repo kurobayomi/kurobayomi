@@ -14,6 +14,8 @@ use tokio::sync::watch;
 
 use super::glue::{follow_ready, keep_alive};
 use super::icons::IconCache;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 #[cfg(test)]
 use super::icons::SourceIcon;
 use super::sources::{ListInput, LOCAL_SOURCE_ID, Section, SourceRow, language_line, section_title, source_list};
@@ -179,7 +181,7 @@ impl Inner {
             let icon = state.icons.get(source.id, false, source.is_stub, file.is_some(), source.id == LOCAL_SOURCE_ID);
             (icon, file, home)
         };
-        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_XS);
         if let Some(status) = crate::recipe_sources::status(source.id) {
             actions.append(&status_dot(status));
         }
@@ -217,21 +219,14 @@ fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
         Status::Blocked => ("kb-status-blocked", tr(MsgKey::source_status_blocked)),
         Status::Broken => ("kb-status-broken", tr(MsgKey::source_status_broken)),
     };
-    let dot = gtk::Box::builder().valign(gtk::Align::Center).margin_end(6).css_classes(["kb-status", class]).tooltip_text(&text).build();
+    let dot = gtk::Box::builder().valign(gtk::Align::Center).margin_end(SPACE_S).css_classes(["kb-status", class]).tooltip_text(&text).build();
     dot.update_property(&[gtk::accessible::Property::Label(&text)]);
     dot
 }
 
 /// The loading state of a Sources tab: the page spinner with its "Loading sources…" line under it.
-fn loading_sources() -> gtk::Box {
-    let page = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    page.set_halign(gtk::Align::Center);
-    page.set_valign(gtk::Align::Center);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
-    spinner.set_vexpand(false);
-    page.append(&spinner);
-    page.append(&gtk::Label::new(Some(&super::texts::loading_sources())));
-    page
+fn loading_sources() -> gtk::Widget {
+    crate::widgets::status::loading(Some(&super::texts::loading_sources()))
 }
 
 /// The right-click menu of a source row: Open (its Popular listing), Open website when the source has a site, and for a
@@ -266,10 +261,10 @@ fn section_list(column: &gtk::Box, list: &mut Option<gtk::ListBox>) -> gtk::List
 }
 
 /// The empty Sources tab: no source is listed yet, so its one action opens the repository list.
-pub(super) fn sources_empty() -> gtk::Box {
+pub(super) fn sources_empty() -> adw::StatusPage {
     let repos = gtk::Button::with_label(&tr(MsgKey::label_extension_repos));
     repos.connect_clicked(move |_| super::mount::open_repos());
-    super::look::empty_state("system-search-symbolic", &tr(MsgKey::source_empty_screen), std::slice::from_ref(&repos)).0
+    crate::widgets::status::empty_with("system-search-symbolic", &tr(MsgKey::source_empty_screen), None, std::slice::from_ref(&repos))
 }
 
 #[cfg(test)]

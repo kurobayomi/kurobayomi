@@ -11,6 +11,7 @@ use kuro_prefs::values::PrefType;
 
 use crate::pref_model::bind::{self, Veto};
 use crate::pref_model::model::{ItemCommon, Preference, PreferenceGroup, PreferenceItem};
+use crate::theme::tokens::{SPACE_L};
 
 pub fn group(title: &str, items: Vec<PreferenceItem>) -> Preference {
     Preference::Group(PreferenceGroup::new(title, items))
@@ -41,8 +42,8 @@ pub fn text(title: &str, subtitle: Option<&str>, enabled: bool) -> PreferenceIte
 /// The live parts of a row built by [`tap_item`], handed to its tap handler.
 #[derive(Clone)]
 pub struct TapRow {
-    /// The row's subtitle label.
-    pub subtitle: gtk::Label,
+    /// The row, whose subtitle the handler may change (`widgets::row::set_subtitle`).
+    pub row: adw::ActionRow,
     /// The widget [`tap_item`]'s `trailing` builder made, if there was one.
     pub trailing: Option<gtk::Widget>,
 }
@@ -57,42 +58,27 @@ pub fn tap_item(
     logo: Option<&'static [u8]>,
     on_tap: Rc<dyn Fn(&TapRow)>,
 ) -> PreferenceItem {
-    use crate::pref_model::widgets::row::{self, RowSpec};
-    use gtk::prelude::*;
+    use crate::widgets::row::{self, RowSpec};
+    use adw::prelude::*;
     let (label, sub) = (title.to_owned(), subtitle.map(str::to_owned));
     PreferenceItem::Custom {
         title: title.to_owned(),
         build: Rc::new(move || {
             let end = trailing.as_ref().map(|make| make());
             let built = row::build(RowSpec { title: &label, subtitle: sub.as_deref(), icon: None, trailing: end.as_ref(), on_click: None });
-            let content = built.row.child().and_downcast::<gtk::Box>().expect("the row content");
-            built.row.set_child(None::<&gtk::Widget>);
             if let Some(image) = logo.and_then(logo_image) {
-                content.prepend(&image);
+                built.add_prefix(&image);
             }
-            content.set_focusable(enabled);
-            content.set_sensitive(enabled);
-            content.set_cursor_from_name(enabled.then_some("pointer"));
-            let parts = TapRow { subtitle: built.subtitle.clone(), trailing: end };
-            let tap = {
-                let on_tap = Rc::clone(&on_tap);
-                Rc::new(move || on_tap(&parts))
-            };
-            let click = gtk::GestureClick::new();
-            let on_click = Rc::clone(&tap);
-            click.connect_released(move |_, _, _, _| on_click());
-            content.add_controller(click);
-            let keys = gtk::EventControllerKey::new();
-            keys.connect_key_pressed(move |_, key, _, _| {
-                if crate::pref_model::widgets::dialog::is_enter(key) || key == gtk::gdk::Key::space {
-                    tap();
-                    gtk::glib::Propagation::Stop
-                } else {
-                    gtk::glib::Propagation::Proceed
+            built.set_sensitive(enabled);
+            // the handler gets the row back with the trailing widget; a weak handle keeps the row from owning itself
+            built.set_activatable(true);
+            let (weak, on_tap) = (built.downgrade(), Rc::clone(&on_tap));
+            crate::widgets::row_activate::on_activate(&built, move |_| {
+                if let Some(row) = weak.upgrade() {
+                    on_tap(&TapRow { row, trailing: end.clone() });
                 }
             });
-            content.add_controller(keys);
-            content.upcast()
+            built.upcast()
         }),
     }
 }
@@ -104,7 +90,7 @@ pub(crate) fn logo_image(bytes: &'static [u8]) -> Option<gtk::Image> {
     let texture = gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_static(bytes)).ok()?;
     let image = gtk::Image::from_paintable(Some(&texture));
     image.set_pixel_size(24);
-    image.set_margin_end(16);
+    image.set_margin_end(SPACE_L);
     image.set_accessible_role(gtk::AccessibleRole::Presentation);
     Some(image)
 }

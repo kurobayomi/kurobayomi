@@ -87,7 +87,7 @@ pub fn transition(kind: Kind, previous: &State, next: &State) -> Option<Nav> {
 /// The page widget for a state: the title with the page spinner while it works, the empty state when nothing was found,
 /// or the error state with its buttons. The buttons run `on_retry` and `on_search_instead`. Navigation is not done here
 /// (see [`transition`]).
-pub fn widget(state: &State, on_retry: impl Fn() + 'static, on_search_instead: impl Fn() + 'static) -> gtk::Box {
+pub fn widget(state: &State, on_retry: impl Fn() + 'static, on_search_instead: impl Fn() + 'static) -> gtk::Widget {
     use kuro_i18n::{tr, MsgKey};
     let shown = view(state);
     if shown.retry || shown.search_instead {
@@ -102,23 +102,12 @@ pub fn widget(state: &State, on_retry: impl Fn() + 'static, on_search_instead: i
             search.connect_clicked(move |_| on_search_instead());
             buttons.push(search);
         }
-        let message = match &shown.message {
-            Some(reason) => format!("{}\n{reason}", shown.title),
-            None => shown.title.clone(),
-        };
-        return crate::browse::look::empty_state("dialog-error-symbolic", &message, &buttons).0;
+        return crate::widgets::status::error_with(&shown.title, shown.message.as_deref(), &buttons).upcast();
     }
     if !shown.spinner {
-        return crate::browse::look::empty_state("system-search-symbolic", &shown.title, &[]).0;
+        return crate::widgets::status::empty("system-search-symbolic", &shown.title, None).upcast();
     }
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 12);
-    column.set_halign(gtk::Align::Center);
-    column.set_valign(gtk::Align::Center);
-    column.append(&gtk::Label::builder().label(shown.title.as_str()).css_classes(["kb-empty-title"]).build());
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
-    spinner.set_vexpand(false);
-    column.append(&spinner);
-    column
+    crate::widgets::status::loading(Some(&shown.title))
 }
 
 /// Delivers the result of one resolve. It must run on the GTK thread.

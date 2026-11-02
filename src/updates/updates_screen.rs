@@ -12,7 +12,7 @@ use std::time::Duration;
 use chrono::{Local, Months};
 use gtk::gdk::{self, ModifierType};
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Box as GBox, Button, CheckButton, GestureClick, Image, Label, ListBox, Orientation as O};
 use kuro_domain::dates::ListRow;
 use kuro_platform::kind::Kind;
@@ -30,7 +30,6 @@ use crate::updates::download_host;
 use crate::updates::download_state::{Change, DiskCache, DownloadState};
 use crate::browse::look;
 use crate::updates::feed::{self, FeedRow, Gesture, Press};
-use crate::updates::row_texts;
 use crate::updates::format;
 use crate::updates::history::COALESCE_MS;
 use crate::updates::{copy, open_route, qualities};
@@ -40,6 +39,8 @@ use crate::updates::updates_dialog::confirm_bulk_delete;
 use crate::updates::updates_page::{self, BackAction, UpdatesLoad, back_action, cover_click_enabled};
 use crate::widgets::context_menu::{self, Item};
 use crate::widgets::download_button::{DownloadButton, Request};
+use crate::theme::tokens::{SPACE_M, SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 /// The icon of the empty feed.
 const EMPTY_ICON: &str = "software-update-available-symbolic";
@@ -362,24 +363,33 @@ impl UpdatesScreen {
             diet::LIBRARY_DATE_FORMAT,
             kuro_i18n::current_locale().tag,
         );
-        let mut current: Option<ListBox> = None;
+        // each list with the rows the feed has selected: libadwaita draws their selected fill
+        let mut lists: Vec<(ListBox, Vec<gtk::ListBoxRow>)> = Vec::new();
         for item in items {
             match item {
                 ListRow::Header(text) => {
                     self.col.append(&crate::ui::heading(&text));
                     let list = crate::ui::boxed_list();
                     self.col.append(&list);
-                    current = Some(list);
+                    lists.push((list, Vec::new()));
                 }
                 ListRow::Item(i) => {
-                    let list = current.get_or_insert_with(|| {
+                    if lists.is_empty() {
                         let list = crate::ui::boxed_list();
                         self.col.append(&list);
-                        list
-                    });
-                    list.append(&self.row(&rows[i], mode));
+                        lists.push((list, Vec::new()));
+                    }
+                    let Some((list, picked)) = lists.last_mut() else { continue };
+                    let row = self.row(&rows[i], mode);
+                    list.append(&row);
+                    if rows[i].selected {
+                        picked.push(row);
+                    }
                 }
             }
+        }
+        for (list, picked) in lists {
+            crate::widgets::selection_mirror::mirror_list_box(&list, picked);
         }
         if let Some(footer) = updates_page::limit_footer(all.len()) {
             self.col.append(&crate::ui::dim(&footer));
@@ -387,11 +397,11 @@ impl UpdatesScreen {
     }
 
     /// One feed row (`look::list_row`): the selection check, the unread dot and the cover lead, the title sits over a line
-    /// of bookmark, fillermark, unit name and progress, and the download indicator ends the row. A read or seen row dims
-    /// the title and the unit name to 0.38.
+    /// of unit name and progress, and the bookmark, fillermark and download indicator end the row. A read or seen row
+    /// dims to 0.38.
     fn row(self: &Rc<Self>, feed_row: &FeedRow, mode: bool) -> gtk::ListBoxRow {
         let row = &feed_row.row;
-        let lead = GBox::new(O::Horizontal, 12);
+        let lead = GBox::new(O::Horizontal, SPACE_M);
         let check = CheckButton::builder().active(feed_row.selected).visible(mode).can_target(false).valign(gtk::Align::Center).build();
         lead.append(&check);
         let dot = Image::from_icon_name("media-record-symbolic");
@@ -415,40 +425,35 @@ impl UpdatesScreen {
         cover.add_controller(cover_tap);
         lead.append(&cover);
 
-        let list_row = look::list_row(Some(lead.upcast()), &row.entry_title, None, Some(self.download_button(feed_row, mode).upcast()));
-        list_row.set_activatable(false);
-        list_row.set_widget_name(&feed::row_name(row.item_id));
-        let alpha = updates_page::row_alpha(row.done);
-        let texts = row_texts(&list_row);
-        if let Some(title) = texts.first_child() {
-            title.set_opacity(alpha);
-        }
-        let detail = GBox::new(O::Horizontal, 4);
+        // the bookmark and filler marks sit before the download indicator
+        let end = GBox::new(O::Horizontal, SPACE_XS);
         if row.bookmark {
             let star = Image::from_icon_name("starred-symbolic");
             star.set_pixel_size(14);
             star.add_css_class("accent");
-            detail.append(&star);
+            star.set_valign(gtk::Align::Center);
+            end.append(&star);
         }
         if row.fillermark && self.kind.is_anime() {
             // the stock theme has no tertiary colour; the warning colour keeps it apart from the bookmark
             let tag = Image::from_icon_name("tag-symbolic");
             tag.set_pixel_size(14);
             tag.add_css_class("warning");
-            detail.append(&tag);
+            tag.set_valign(gtk::Align::Center);
+            end.append(&tag);
         }
-        let name = Label::builder().label(&row.item_name).xalign(0.0).single_line_mode(true).ellipsize(gtk::pango::EllipsizeMode::End).build();
-        name.set_opacity(alpha);
-        detail.append(&name);
-        if let Some(progress) = updates_page::progress_text(self.kind, row.done, row.progress, row.total_seconds) {
-            detail.append(&Label::builder().label(progress).css_classes(["dim-label"]).build());
-        }
-        texts.append(&detail);
-        if feed_row.selected {
-            list_row.add_css_class(crate::theme::style::class::SELECTED);
-        }
-        self.attach_gestures(&list_row, row.item_id);
-        list_row
+        end.append(&self.download_button(feed_row, mode));
+        let detail = match updates_page::progress_text(self.kind, row.done, row.progress, row.total_seconds) {
+            Some(progress) => format!("{} · {progress}", row.item_name),
+            None => row.item_name.clone(),
+        };
+        let list_row = look::list_row(Some(lead.upcast()), &row.entry_title, Some(&detail), Some(end.upcast()));
+        list_row.set_title_lines(1);
+        list_row.set_subtitle_lines(1);
+        list_row.set_widget_name(&feed::row_name(row.item_id));
+        list_row.set_opacity(updates_page::row_alpha(row.done));
+        self.attach_gestures(list_row.upcast_ref(), row.item_id);
+        list_row.upcast()
     }
 
     /// Tap, Ctrl+click and Shift+click on a row, and its right-click menu (a long press on a touch screen), whose Select
@@ -755,11 +760,11 @@ impl UpdatesScreen {
         }
     }
 
-    /// The download button of a row (`widgets::download_button`): a click starts, retries, cancels, or offers Delete. It
+    /// The download button of a row (`widgets::download_button`): a click starts, retries, or opens its Pause, Cancel or Delete menu. It
     /// is off while selecting, as the cover tap is.
     fn download_button(self: &Rc<Self>, feed_row: &FeedRow, mode: bool) -> gtk::Button {
         let (weak, id) = (Rc::downgrade(self), feed_row.row.item_id);
-        let button = DownloadButton::new(move |request| {
+        let button = DownloadButton::new(self.kind, move |request| {
             let action = match request {
                 Request::Start => DownloadAction::Start,
                 Request::Cancel => DownloadAction::Cancel,
@@ -806,7 +811,7 @@ impl UpdatesScreen {
     }
 
     fn bar_button(self: &Rc<Self>, action: BarAction, kind: Kind) -> Button {
-        let content = GBox::new(O::Horizontal, 6);
+        let content = GBox::new(O::Horizontal, SPACE_S);
         content.append(&Image::from_icon_name(bottom_bar::icon(action)));
         content.append(&Label::new(Some(&tr(bottom_bar::label(action, kind)))));
         let button = Button::new();

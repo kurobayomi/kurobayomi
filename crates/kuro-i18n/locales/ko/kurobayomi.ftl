@@ -282,8 +282,6 @@ pref_anime_library_update_categories_details = 제외된 카테고리의 애니�
 
 unofficial_extension_message_aniyomi = 이 확장 앱은 Aniyomi의 공식 확장 앱이 아닙니다.
 
-unofficial_anime_extension_message = 이 확장 앱은 Aniyomi의 공식 확장 앱이 아닙니다.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = 제외된 카테고리

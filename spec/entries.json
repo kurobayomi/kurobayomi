@@ -2002,7 +2002,7 @@
     {
      "id": "add_repo",
      "title": "Add repo",
-     "text": "Add additional repos to Aniyomi. This should be a URL that ends with \"index.min.json\".",
+     "text": "Add additional repos to Kurobayomi. This should be a URL that ends with \"index.min.json\".",
      "groups": [
       {
        "title": null,

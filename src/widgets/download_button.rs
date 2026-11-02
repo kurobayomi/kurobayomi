@@ -1,17 +1,21 @@
 //! The one download button of the app: chapter and episode rows, Updates rows and the download queue all use it. It
 //! draws the five download states and turns a click into a request that its owner runs. Not downloaded is the download
-//! arrow, Queued a hollow circle, Downloading the same circle filling clockwise with the progress (drawn in the theme
-//! accent), Downloaded a check, and Error a retry arrow. A click starts (or retries), a click while queued or
-//! downloading cancels at once, and a click on a downloaded item offers Delete in a small popover.
+//! arrow, Queued a clock, Downloading a circle filling clockwise with the progress (drawn in the accent colour: the
+//! toolkit has no determinate circular indicator), Downloaded a check, and Error the error icon, each with a tooltip.
+//! A click starts (or retries). A click while queued or downloading opens a native popover menu with Pause (Resume while
+//! the queue is paused) and Cancel, and a click on a downloaded item offers Delete in the same kind of menu. Pause and
+//! Resume act on the whole queue of the kind (the download manager has no per-item pause); Cancel and Delete are the
+//! owner's requests.
 
 use std::cell::Cell;
 use std::f64::consts::{FRAC_PI_2, TAU};
 use std::rc::Rc;
 
 use gtk::prelude::*;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use kuro_downloads::DownloadState;
-use kuro_i18n::{MsgKey, tr};
+use kuro_i18n::{Arg, MsgKey, tr, trf};
+use kuro_platform::kind::Kind;
 
 use crate::theme::icons::Icon;
 
@@ -45,12 +49,33 @@ pub fn look(state: DownloadState, percent: u8) -> Look {
     }
 }
 
-/// What a click asks for. `Delete` is asked only after the popover's Delete button.
-pub fn on_click(look: Look) -> Request {
+/// One item of the popover menu a click opens.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Choice {
+    Pause,
+    Resume,
+    Cancel,
+    Delete,
+}
+
+impl Choice {
+    fn label(self) -> MsgKey {
+        match self {
+            Choice::Pause => MsgKey::action_pause,
+            Choice::Resume => MsgKey::action_resume,
+            Choice::Cancel => MsgKey::action_cancel,
+            Choice::Delete => MsgKey::action_delete,
+        }
+    }
+}
+
+/// The menu a click on `look` opens: Pause (Resume while the queue of the kind is paused) and Cancel for an item that is
+/// queued or downloading, Delete for a downloaded one. No menu means the click acts at once: Start, or a retry.
+pub fn menu(look: Look, running: bool) -> Vec<Choice> {
     match look {
-        Look::NotDownloaded | Look::Error => Request::Start,
-        Look::Queued | Look::Downloading(_) => Request::Cancel,
-        Look::Downloaded => Request::Delete,
+        Look::NotDownloaded | Look::Error => Vec::new(),
+        Look::Queued | Look::Downloading(_) => vec![if running { Choice::Pause } else { Choice::Resume }, Choice::Cancel],
+        Look::Downloaded => vec![Choice::Delete],
     }
 }
 
@@ -60,35 +85,38 @@ pub fn arc(percent: u8) -> (f64, f64) {
     (start, start + TAU * f64::from(percent.min(100)) / 100.0)
 }
 
-/// The icon of the looks that draw one; the queued and downloading looks draw the circle.
+/// The icon of the looks that draw one; the downloading look draws the progress circle.
 fn icon_name(look: Look) -> Option<&'static str> {
     match look {
         Look::NotDownloaded => Some(Icon::DownloadCircle.name()),
+        Look::Queued => Some("document-open-recent-symbolic"),
         Look::Downloaded => Some("object-select-symbolic"),
-        Look::Error => Some("view-refresh-symbolic"),
-        Look::Queued | Look::Downloading(_) => None,
+        Look::Error => Some("dialog-error-symbolic"),
+        Look::Downloading(_) => None,
     }
 }
 
-/// The tooltip and accessible label: what a click does, with the percent while downloading.
+/// The tooltip and accessible label: the state, with the percent while downloading.
 fn tooltip(look: Look) -> String {
     match look {
         Look::NotDownloaded => tr(MsgKey::action_download),
-        Look::Queued => tr(MsgKey::action_cancel),
-        Look::Downloading(percent) => format!("{} ({percent}%)", tr(MsgKey::action_cancel)),
+        Look::Queued => tr(MsgKey::download_queued),
+        Look::Downloading(percent) => trf(MsgKey::download_downloading, &[("arg1", Arg::Int(i64::from(percent)))]),
         Look::Downloaded => tr(MsgKey::label_downloaded),
-        Look::Error => tr(MsgKey::action_retry),
+        Look::Error => tr(MsgKey::download_failed_retry),
     }
 }
+
+/// The action group of the popover menu on the button.
+const GROUP: &str = "dl";
 
 /// The side of the drawn circle in px, the size of a symbolic icon in a flat button.
 const SIZE: i32 = 18;
 
-/// The theme accent from the style context: the app palette's primary, then the GTK accent, then the selection colour.
+/// libadwaita's accent colour from the style context, the text colour when it has none.
 #[allow(deprecated)]
 fn accent(area: &gtk::DrawingArea) -> gdk::RGBA {
-    let context = area.style_context();
-    ["kuro_primary", "accent_color", "theme_selected_bg_color"].iter().find_map(|name| context.lookup_color(name)).unwrap_or_else(|| area.color())
+    area.style_context().lookup_color("accent_color").unwrap_or_else(|| area.color())
 }
 
 /// The hollow circle, and for a download in progress the wedge of its percent inside it. The panel's Downloads item draws
@@ -112,18 +140,20 @@ pub(crate) fn draw(area: &gtk::DrawingArea, cr: &gtk::cairo::Context, width: i32
     }
 }
 
-/// The small popover of a downloaded item: one Delete button.
-fn offer_delete(button: &gtk::Button, on_request: Rc<dyn Fn(Request)>) {
-    let popover = gtk::Popover::new();
-    let delete = gtk::Button::builder().label(tr(MsgKey::action_delete)).css_classes(["flat", "destructive-action"]).build();
-    delete.connect_clicked({
-        let popover = popover.clone();
-        move |_| {
-            popover.popdown();
-            on_request(Request::Delete);
-        }
-    });
-    popover.set_child(Some(&delete));
+/// The popover menu of `choices`, a native `gtk::PopoverMenu` over a `gio::Menu` of actions on the button. `run` gets the
+/// picked choice once the menu has closed.
+fn open_menu(button: &gtk::Button, choices: &[Choice], run: Rc<dyn Fn(Choice)>) {
+    let (model, group) = (gio::Menu::new(), gio::SimpleActionGroup::new());
+    for (n, choice) in choices.iter().copied().enumerate() {
+        let name = format!("item{n}");
+        let action = gio::SimpleAction::new(&name, None);
+        let run = Rc::clone(&run);
+        action.connect_activate(move |_, _| run(choice));
+        group.add_action(&action);
+        model.append(Some(&tr(choice.label())), Some(&format!("{GROUP}.{name}")));
+    }
+    button.insert_action_group(GROUP, Some(&group));
+    let popover = gtk::PopoverMenu::from_model(Some(&model));
     popover.set_parent(button);
     // the popover is parented to a button that a list may recycle, so it goes once closed
     popover.connect_closed(|p| {
@@ -144,8 +174,8 @@ pub struct DownloadButton {
 }
 
 impl DownloadButton {
-    /// A button showing Not downloaded. `on_request` runs a click's request.
-    pub fn new(on_request: impl Fn(Request) + 'static) -> Self {
+    /// A button showing Not downloaded, for an item of `kind`. `on_request` runs a click's request.
+    pub fn new(kind: Kind, on_request: impl Fn(Request) + 'static) -> Self {
         let icon = gtk::Image::new();
         let ring = gtk::DrawingArea::builder().content_width(SIZE).content_height(SIZE).halign(gtk::Align::Center).valign(gtk::Align::Center).build();
         let stack = gtk::Stack::new();
@@ -160,9 +190,22 @@ impl DownloadButton {
         let on_request: Rc<dyn Fn(Request)> = Rc::new(on_request);
         widget.connect_clicked({
             let look = Rc::clone(&look);
-            move |button| match on_click(look.get()) {
-                Request::Delete => offer_delete(button, Rc::clone(&on_request)),
-                request => on_request(request),
+            move |button| {
+                let choices = menu(look.get(), crate::downloads::live::lane_running(kind));
+                if choices.is_empty() {
+                    return on_request(Request::Start);
+                }
+                let on_request = Rc::clone(&on_request);
+                open_menu(
+                    button,
+                    &choices,
+                    Rc::new(move |choice| match choice {
+                        Choice::Pause => crate::downloads::live::pause(kind),
+                        Choice::Resume => crate::downloads::live::resume(kind),
+                        Choice::Cancel => on_request(Request::Cancel),
+                        Choice::Delete => on_request(Request::Delete),
+                    }),
+                );
             }
         });
         let this = Self { widget, stack, icon, ring, look };
@@ -182,6 +225,12 @@ impl DownloadButton {
         match icon_name(look) {
             Some(name) => {
                 self.icon.set_icon_name(Some(name));
+                // the failed state is the error icon in the error colour
+                if look == Look::Error {
+                    self.icon.add_css_class("error");
+                } else {
+                    self.icon.remove_css_class("error");
+                }
                 self.stack.set_visible_child_name("icon");
             }
             None => {
@@ -210,12 +259,13 @@ mod tests {
     }
 
     #[test]
-    fn a_click_starts_retries_cancels_or_offers_delete() {
-        assert_eq!(on_click(Look::NotDownloaded), Request::Start);
-        assert_eq!(on_click(Look::Error), Request::Start, "an error retries");
-        assert_eq!(on_click(Look::Queued), Request::Cancel);
-        assert_eq!(on_click(Look::Downloading(60)), Request::Cancel);
-        assert_eq!(on_click(Look::Downloaded), Request::Delete);
+    fn a_click_starts_or_retries_at_once_and_otherwise_opens_a_menu() {
+        assert!(menu(Look::NotDownloaded, true).is_empty(), "Start has no menu");
+        assert!(menu(Look::Error, true).is_empty(), "an error retries at once");
+        assert_eq!(menu(Look::Queued, true), [Choice::Pause, Choice::Cancel]);
+        assert_eq!(menu(Look::Downloading(60), true), [Choice::Pause, Choice::Cancel]);
+        assert_eq!(menu(Look::Downloading(60), false), [Choice::Resume, Choice::Cancel], "a paused queue offers Resume");
+        assert_eq!(menu(Look::Downloaded, true), [Choice::Delete]);
     }
 
     #[test]
@@ -230,15 +280,51 @@ mod tests {
     }
 
     #[test]
-    fn the_button_shows_the_state_it_is_given() {
+    fn the_button_shows_the_state_it_is_given_with_a_tooltip_for_each() {
         crate::testing::with_display(|| {
-            let button = DownloadButton::new(|_| {});
+            let button = DownloadButton::new(Kind::Manga, |_| {});
+            let shows = |state, percent, icon: Option<&str>, tip: &str| {
+                button.set(state, percent);
+                assert_eq!(button.icon.icon_name().as_deref().filter(|_| icon.is_some()), icon);
+                assert_eq!(button.stack.visible_child_name().as_deref(), Some(if icon.is_some() { "icon" } else { "ring" }));
+                assert_eq!(button.widget.tooltip_text().as_deref(), Some(tip));
+            };
             assert_eq!(button.stack.visible_child_name().as_deref(), Some("icon"));
-            button.set(DownloadState::Downloading, 40);
-            assert_eq!(button.stack.visible_child_name().as_deref(), Some("ring"));
-            assert_eq!(button.widget.tooltip_text().as_deref(), Some("Cancel (40%)"));
+            shows(DownloadState::NotDownloaded, 0, Some(Icon::DownloadCircle.name()), "Download");
+            shows(DownloadState::Queue, 0, Some("document-open-recent-symbolic"), "Queued");
+            shows(DownloadState::Downloading, 40, None, "Downloading (40%)");
+            shows(DownloadState::Downloaded, 0, Some("object-select-symbolic"), "Downloaded");
+            shows(DownloadState::Error, 0, Some("dialog-error-symbolic"), "Download failed. Click to retry.");
+            assert!(button.icon.has_css_class("error"), "the failed state is red");
             button.set(DownloadState::Downloaded, 0);
-            assert_eq!(button.icon.icon_name().as_deref(), Some("object-select-symbolic"));
+            assert!(!button.icon.has_css_class("error"));
+        });
+    }
+
+    /// A click while queued opens the native menu with Pause and Cancel, and Cancel reaches the owner; a click on a
+    /// not-downloaded button starts at once.
+    #[test]
+    fn a_click_on_a_queued_item_opens_the_pause_and_cancel_menu() {
+        crate::testing::with_display(|| {
+            let requests: Rc<std::cell::RefCell<Vec<Request>>> = Rc::default();
+            let button = DownloadButton::new(Kind::Anime, {
+                let requests = Rc::clone(&requests);
+                move |request| requests.borrow_mut().push(request)
+            });
+            let window = gtk::Window::builder().child(&button.widget).build();
+            window.present();
+            button.widget.emit_clicked();
+            assert_eq!(*requests.borrow(), [Request::Start], "not downloaded: no menu");
+            button.set(DownloadState::Queue, 0);
+            button.widget.emit_clicked();
+            let popover = button.widget.last_child().and_downcast::<gtk::PopoverMenu>().expect("the menu is on the button");
+            let model = popover.menu_model().expect("a menu model");
+            let labels: Vec<String> = (0..model.n_items()).filter_map(|i| model.item_attribute_value(i, "label", None)).filter_map(|v| v.get::<String>()).collect();
+            assert_eq!(labels, ["Pause", "Cancel"]);
+            assert_eq!(*requests.borrow(), [Request::Start], "opening the menu asks for nothing");
+            button.widget.activate_action("dl.item1", None).expect("the Cancel item");
+            assert_eq!(*requests.borrow(), [Request::Start, Request::Cancel]);
+            window.destroy();
         });
     }
 }

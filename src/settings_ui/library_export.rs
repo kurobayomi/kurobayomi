@@ -1,8 +1,9 @@
 //! The Library List row under Data and storage, Export (task T-47a-091). The row opens the "Select data to include"
 //! dialog; Export asks for a save file and writes the favourites as CSV (`library_csv`). The favourites are read when the
 //! dialog opens, so Export is never pressed while they are still loading.
+use crate::ui::DialogOpen as _;
 use kuro_i18n::{MsgKey, tr};
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_data::entry::EntryRepo;
 use kuro_platform::kind::Kind;
 
@@ -10,6 +11,7 @@ use crate::pref_model::model::PreferenceItem;
 use crate::settings_ui::library_csv::{self, Columns, Entry};
 use crate::settings_ui::rows::text;
 use crate::ui::{DialogButton, Role};
+use crate::theme::tokens::{SPACE_S};
 
 pub fn row_title() -> String {
     tr(MsgKey::library_list)
@@ -67,7 +69,7 @@ fn open_dialog() {
     let boxes: [gtk::CheckButton; 4] = ["Title", "Type", "Author", "Artist"].map(|label| gtk::CheckButton::with_label(label));
     apply(&boxes, Columns::ALL);
 
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let heading = gtk::Label::new(Some(&dialog_title()));
     heading.add_css_class("heading");
     heading.set_halign(gtk::Align::Start);
@@ -83,7 +85,7 @@ fn open_dialog() {
     }
 
     // the Export button needs the window as the parent of the save dialog, which is built after the buttons
-    let window: std::rc::Rc<std::cell::OnceCell<gtk::Window>> = std::rc::Rc::default();
+    let window: std::rc::Rc<std::cell::OnceCell<adw::Dialog>> = std::rc::Rc::default();
     let export_window = std::rc::Rc::clone(&window);
     let export = DialogButton::keep_open_unless(&tr(MsgKey::export), Role::Suggested, move || {
         let Some(close) = export_window.get().cloned() else { return false };
@@ -92,7 +94,7 @@ fn open_dialog() {
         let dialog = gtk::FileDialog::new();
         dialog.set_initial_name(Some(library_csv::FILE_NAME));
         let done = close.clone();
-        dialog.save(Some(&close), None::<&gtk::gio::Cancellable>, move |result| {
+        dialog.save(Some(&crate::ui::window()), None::<&gtk::gio::Cancellable>, move |result| {
             let Some(path) = result.ok().and_then(|file| file.path()) else { return };
             match std::fs::write(&path, body.as_bytes()) {
                 Ok(()) => crate::toast::notify(library_csv::exported()),
@@ -107,7 +109,7 @@ fn open_dialog() {
     });
     let built = crate::ui::dialog(&row_title(), &column, 320, vec![DialogButton::cancel(&tr(MsgKey::action_cancel)), export]);
     let _ = window.set(built.clone());
-    built.present();
+    built.open();
 }
 
 /// The Export group with the Library List row.

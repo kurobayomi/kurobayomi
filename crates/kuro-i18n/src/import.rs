@@ -642,6 +642,9 @@ pub const DROPPED_NAMES: &[&str] = &[
     "onboarding_permission_action_grant",
     "onboarding_guides_new_user",
     "onboarding_guides_returning_user",
+    // texts that name Aniyomi as the app (some translations do): replaced in `kurobayomi-extra.ftl`
+    "download_queue_size_warning",
+    "unofficial_anime_extension_message",
 ];
 
 /// The dropped names whose id `kurobayomi-extra.ftl` defines again with a text that names no removed feature.
@@ -656,6 +659,8 @@ pub const REPLACED_NAMES: &[&str] = &[
     "left_to_right_viewer",
     "right_to_left_viewer",
     "vertical_viewer",
+    "download_queue_size_warning",
+    "unofficial_anime_extension_message",
 ];
 
 /// Base entries after the overlap rule: Aniyomi names first in source order, then core names that

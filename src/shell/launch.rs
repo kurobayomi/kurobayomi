@@ -350,20 +350,15 @@ mod tests {
                 let field = wait_for_deep_link_field(&win).unwrap_or_else(|| panic!("{link}: the deep-link dialog did not open"));
                 assert_eq!(field.text(), "https://a.test/i.json", "{link}: the dialog shows the parked address");
                 assert!(!field.is_editable(), "{link}: the address is read-only");
-                for window in gtk::Window::list_toplevels().into_iter().filter_map(|w| w.downcast::<gtk::Window>().ok()) {
-                    if window.transient_for().as_ref() == Some(win.upcast_ref()) {
-                        window.destroy();
-                    }
-                }
             }
         });
     }
 
-    /// The read-only entry of a dialog that is open over `win`, found by running the main loop for up to 5 seconds.
+    /// The read-only entry of the dialog that is open over `win`, found by running the main loop for up to 5 seconds.
     fn wait_for_deep_link_field(win: &gtk::ApplicationWindow) -> Option<gtk::Entry> {
         fn find(widget: &gtk::Widget) -> Option<gtk::Entry> {
-            if let Ok(entry) = widget.clone().downcast::<gtk::Entry>() {
-                return Some(entry);
+            if let Some(entry) = widget.downcast_ref::<gtk::Entry>().filter(|e| !e.is_editable()) {
+                return Some(entry.clone());
             }
             let mut child = widget.first_child();
             while let Some(c) = child {
@@ -376,11 +371,8 @@ mod tests {
         }
         let end = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while std::time::Instant::now() < end {
-            let dialogs = gtk::Window::list_toplevels().into_iter().filter_map(|w| w.downcast::<gtk::Window>().ok());
-            for window in dialogs.filter(|w| w.transient_for().as_ref() == Some(win.upcast_ref())) {
-                if let Some(entry) = window.child().and_then(|c| find(&c)) {
-                    return Some(entry);
-                }
+            if let Some(entry) = find(win.upcast_ref()) {
+                return Some(entry);
             }
             gtk::glib::MainContext::default().iteration(false);
             std::thread::sleep(std::time::Duration::from_millis(10));

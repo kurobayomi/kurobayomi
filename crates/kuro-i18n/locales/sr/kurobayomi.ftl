@@ -542,8 +542,6 @@ pref_anime_library_update_categories_details = Аниме у искључени�
 
 unofficial_extension_message_aniyomi = Ово проширење није са званичне листе.
 
-unofficial_anime_extension_message = Ово проширење није са званичне листе.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = Искључене категорије

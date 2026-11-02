@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = এই মাংগাৰ সকলো অধ্য
 
 download_insufficient_space = নিৰ্ধাৰিত স্থলাভাবে ডাউনলোড কৰিব পৰা নগ'ল
 
-download_queue_size_warning = সতর্কতা: বৃহৎ মাচৰ ডাউনলোডে উৎসবোৰ ধীৰ আৰু/অথবা Aniyomi বন্ধ কৰিব পাৰে। অধিক জানিবলৈ টেপ কৰক।
-
 pref_invalidate_download_cache_summary = এপ্লিকেচনক ডাউনলোড কৰা অধ্যায় আৰু এপিচ'ড পুনৰ পৰীক্ষা কৰিবলৈ মন্না কৰক
 
 label_player_settings = প্লেয়াৰ সংহতি
@@ -729,8 +727,6 @@ pref_manga_library_update_categories_details = বাদ দিয়া শ্�
 pref_anime_library_update_categories_details = বাদ দিয়া শ্ৰেণীত থকা এনিমে, অন্তৰ্ভুক্ত শ্ৰেণীত থাকিলেও আপডেট নহ’ব।
 
 unofficial_extension_message_aniyomi = এই এক্সটেনশ্যন আনুষ্ঠানিক তালিকাৰ পৰা নহয়।
-
-unofficial_anime_extension_message = এই এনিমে এক্সটেনশ্যন আনুষ্ঠানিক তালিকাৰ পৰা নহয়।
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

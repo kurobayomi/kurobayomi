@@ -176,7 +176,7 @@ Columns: version is the crates.io max stable on 2026-10-08. MSRV is that release
 
 | Crate | Version | MSRV | Licence | Features | Areas | Decision and reason | Rejected |
 |---|---|---|---|---|---|---|---|
-| gtk4 (package name) | 0.11.5 | 1.92 | MIT | `v4_16` | all UI areas | Required toolkit. Dependency name in the root crate is `gtk` (as in the mockup): `gtk = { package = "gtk4", version = "0.11.5", features = ["v4_16"] }`. Gives `gtk::FileDialog`, `gtk::AlertDialog`, `gtk::UriLauncher`, `gtk::GridView`, `gtk::ListView`, `gtk::Revealer`, `gtk::Overlay`, `gtk::GestureZoom` (GTK 4.16 APIs). | libadwaita (`adw`) forbidden by the brief; relm4 (second component model, area:37/38/40 rejected) |
+| gtk4 (package name) | 0.11.5 | 1.92 | MIT | `v4_16` | all UI areas | Required toolkit. Dependency name in the root crate is `gtk` (as in the mockup): `gtk = { package = "gtk4", version = "0.11.5", features = ["v4_16"] }`. Gives `gtk::FileDialog`, `gtk::AlertDialog`, `gtk::UriLauncher`, `gtk::GridView`, `gtk::ListView`, `gtk::Revealer`, `gtk::Overlay`, `gtk::GestureZoom` (GTK 4.16 APIs). | libadwaita (`adw`) was forbidden by the brief until 2026-11-01, now used (plans/LIBADWAITA-MIGRATION.md); relm4 (second component model, area:37/38/40 rejected) |
 | gio, gdk4, gdk-pixbuf, pango, cairo, graphene, gsk4 | 0.22.x / 0.11.x | 1.92 | MIT | via gtk4 | UI | Re-exported through gtk4 or pulled by it. Never pinned directly (C-46). | direct pins |
 
 ### 3.3 Storage

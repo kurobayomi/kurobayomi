@@ -15,6 +15,8 @@ use crate::entry_core::backdrop_view;
 use crate::entry_core::header::{Field, HeaderModel, SearchRequest, cover_size};
 use crate::entry_core::cover_view::CoverView;
 use crate::widgets::context_menu;
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 /// Draws a button of the action row in `tone`: the primary colour at full opacity, or the foreground at 0.38 alpha.
 pub fn apply_tone(widget: &impl IsA<gtk::Widget>, tone: Tone) {
@@ -132,7 +134,7 @@ fn field_menu(copy: &str, global: Option<&SearchRequest>, h: &Handlers) -> Vec<c
 }
 
 fn icon_row(icon: &str, content: &impl IsA<gtk::Widget>, centered: bool) -> GBox {
-    let row = GBox::new(O::Horizontal, 6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     row.set_halign(if centered { Align::Center } else { Align::Start });
     row.append(&gtk::Image::from_icon_name(icon));
     row.append(content);
@@ -176,7 +178,7 @@ pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) 
     cover.set_valign(Align::Start);
 
     let xalign = if large { 0.5 } else { 0.0 };
-    let info = GBox::new(O::Vertical, 4);
+    let info = GBox::new(O::Vertical, SPACE_XS);
     info.set_hexpand(true);
     // at the top of the cover: centred, a text taller than the cover spilled over the action row below
     info.set_valign(Align::Center);
@@ -193,7 +195,7 @@ pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) 
         info.append(&icon_row("document-edit-symbolic", &artist, large));
     }
     info.append(&icon_row(model.status_icon, &Label::builder().label(&model.status).css_classes(["dim-label"]).build(), large));
-    let source_row = GBox::new(O::Horizontal, 6);
+    let source_row = GBox::new(O::Horizontal, SPACE_S);
     source_row.set_halign(if large { Align::Center } else { Align::Start });
     source_row.append(&gtk::Image::from_icon_name("network-server-symbolic"));
     source_row.append(&field_label(model, Field::Source, &model.source, &["dim-label"], xalign, h));
@@ -204,10 +206,10 @@ pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) 
     info.append(&source_row);
 
     let root = GBox::new(if large { O::Vertical } else { O::Horizontal }, 16);
-    root.set_margin_start(16);
-    root.set_margin_end(16);
-    root.set_margin_top(16);
-    root.set_margin_bottom(12);
+    root.set_margin_start(SPACE_L);
+    root.set_margin_end(SPACE_L);
+    root.set_margin_top(SPACE_L);
+    root.set_margin_bottom(SPACE_M);
     if large {
         cover.set_halign(Align::Center);
     }

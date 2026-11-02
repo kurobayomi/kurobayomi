@@ -131,12 +131,12 @@ fn reveal_dump(path: &std::path::Path, text: &str) {
 
 /// Builds the dump off the GTK thread. The row is insensitive until it is done, then it shows `Crash logs copied to the
 /// clipboard` for 4 s or `Failed to get logs` for 2 s in place of its subtitle.
-fn share_crash_logs(row: &gtk::Widget, subtitle: &gtk::Label) {
+fn share_crash_logs(row: &adw::ActionRow) {
     row.set_sensitive(false);
     let debug = dump_debug_info();
     let (manga, anime): (Vec<kuro_core::crash_dump::ExtensionStatus>, Vec<kuro_core::crash_dump::ExtensionStatus>) = (Vec::new(), Vec::new());
     let dirs = kuro_platform::system_paths::SystemPaths::system().map(|p| (kuro_platform::paths::Paths::cache_dir(&p), kuro_platform::paths::Paths::log_dir(&p)));
-    let (row, subtitle) = (row.clone(), subtitle.clone());
+    let row = row.clone();
     gtk::glib::spawn_future_local(async move {
         let done = match dirs {
             Ok((cache, logs)) => gtk::gio::spawn_blocking(move || write_crash_dump(&cache, &logs, &debug, &manga, &anime)).await.map_err(|_| "the dump task panicked".to_owned()).and_then(|r| r.map_err(|e| e.to_string())),
@@ -152,43 +152,28 @@ fn share_crash_logs(row: &gtk::Widget, subtitle: &gtk::Label) {
                 (failed_text(), FAILED_STATUS)
             }
         };
-        crate::pref_model::widgets::row::set_subtitle(&subtitle, Some(&text));
+        crate::widgets::row::set_subtitle(&row, Some(&text));
         row.set_sensitive(true);
-        gtk::glib::timeout_add_local_once(shown, move || crate::pref_model::widgets::row::set_subtitle(&subtitle, Some(&share_subtitle())));
+        gtk::glib::timeout_add_local_once(shown, move || crate::widgets::row::set_subtitle(&row, Some(&share_subtitle())));
     });
 }
 
 /// The Share crash logs row: a tap builds `<cache>/crash/kurobayomi_crash_logs.txt`, copies the text and reveals the file.
 pub fn share_crash_logs_row() -> PreferenceItem {
-    use crate::pref_model::widgets::row::{self, RowSpec};
+    use crate::widgets::row::{self, RowSpec};
     PreferenceItem::Custom {
         title: tr(MsgKey::pref_dump_crash_logs).to_owned(),
         build: Rc::new(|| {
-            let built = row::build(RowSpec { title: &tr(MsgKey::pref_dump_crash_logs), subtitle: Some(&share_subtitle()), icon: None, trailing: None, on_click: None });
-            let content = built.row.child().and_downcast::<gtk::Box>().expect("the row content");
-            built.row.set_child(None::<&gtk::Widget>);
-            content.set_focusable(true);
-            content.set_cursor_from_name(Some("pointer"));
-            let (target, subtitle) = (content.clone().upcast::<gtk::Widget>(), built.subtitle.clone());
-            let tap = {
-                let (target, subtitle) = (target.clone(), subtitle.clone());
-                Rc::new(move || if target.is_sensitive() { share_crash_logs(&target, &subtitle) })
-            };
-            let click = gtk::GestureClick::new();
-            let on_click = Rc::clone(&tap);
-            click.connect_released(move |_, _, _, _| on_click());
-            content.add_controller(click);
-            let keys = gtk::EventControllerKey::new();
-            keys.connect_key_pressed(move |_, key, _, _| {
-                if crate::pref_model::widgets::dialog::is_enter(key) || key == gtk::gdk::Key::space {
-                    tap();
-                    gtk::glib::Propagation::Stop
-                } else {
-                    gtk::glib::Propagation::Proceed
+            let row = row::build(RowSpec { title: &tr(MsgKey::pref_dump_crash_logs), subtitle: Some(&share_subtitle()), icon: None, trailing: None, on_click: None });
+            row.set_activatable(true);
+            // a weak handle keeps the row from owning its own handler; a disabled row ignores taps
+            let weak = row.downgrade();
+            crate::widgets::row_activate::on_activate(&row, move |_| {
+                if let Some(row) = weak.upgrade().filter(|row| row.is_sensitive()) {
+                    share_crash_logs(&row);
                 }
             });
-            content.add_controller(keys);
-            content.upcast()
+            row.upcast()
         }),
     }
 }

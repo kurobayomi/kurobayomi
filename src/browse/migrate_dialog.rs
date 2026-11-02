@@ -14,7 +14,7 @@
 use std::cell::OnceCell;
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 use kuro_source::anime::model::FetchType;
 
@@ -22,7 +22,8 @@ use super::dialogs::DialogSlot;
 use super::migrate_engine::MigratePlan;
 use super::migrate_flags::{self, RunGuard, options, preselected};
 use kuro_platform::kind::Kind;
-use crate::ui::{DialogButton, Role};
+use crate::ui::{DialogButton, DialogOpen as _, Role};
+use crate::theme::tokens::{SPACE_S};
 
 /// A button of the dialog, in display order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -116,7 +117,7 @@ pub struct MigrateHandlers {
 
 struct Dialog {
     /// Weak: the window owns the dialog (`keep_alive`), so a strong link would be a cycle.
-    window: gtk::glib::WeakRef<gtk::Window>,
+    window: gtk::glib::WeakRef<adw::Dialog>,
     checks: Vec<(u32, gtk::CheckButton)>,
     body: gtk::Box,
     spinner: gtk::Spinner,
@@ -132,8 +133,11 @@ impl Dialog {
         self.body.set_opacity(if running { 0.3 } else { 1.0 });
         self.body.set_sensitive(!running);
         self.spinner.set_visible(running);
-        self.spinner.set_spinning(running);
         self.row.set_visible(!running);
+        // Escape and the close button do nothing while a run goes
+        if let Some(window) = self.window.upgrade() {
+            window.set_can_close(!running);
+        }
     }
 
     /// Copy (`replace` false) and Migrate (`replace` true). A second request while one runs is refused: the guard is
@@ -186,9 +190,9 @@ fn button_row(widget: &gtk::Widget) -> Option<gtk::Box> {
 
 /// Shows the dialog over `anchor`'s window. Ctrl+Enter migrates and Ctrl+Shift+Enter copies when migrating is possible.
 /// `saved` is the bitmap the options start from. While a run is going the window refuses to close, so Escape does nothing.
-pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, saved: i32, handlers: MigrateHandlers) -> gtk::Window {
+pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, saved: i32, handlers: MigrateHandlers) -> adw::Dialog {
     let plan = plan(facts, saved);
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let checks: Vec<(u32, gtk::CheckButton)> = plan
         .flags
         .iter()
@@ -201,7 +205,7 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
         .collect();
     match &plan.message {
         Some(message) => {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
             row.append(&gtk::Image::from_icon_name("dialog-error-symbolic"));
             row.append(&gtk::Label::builder().label(message).wrap(true).xalign(0.0).css_classes(["error"]).build());
             body.append(&row);
@@ -210,7 +214,7 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
     }
     let error = gtk::Label::builder().visible(false).wrap(true).xalign(0.0).max_width_chars(50).css_classes(["error"]).build();
     body.append(&error);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
+    let spinner = crate::widgets::status::spinner();
     spinner.set_visible(false);
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&body));
@@ -242,14 +246,10 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
         })
         .collect();
     let window = crate::ui::dialog(&tr(MsgKey::migration_dialog_what_to_include), &overlay, 420, buttons);
-    window.set_transient_for(anchor.upcast_ref::<gtk::Widget>().root().and_downcast::<gtk::Window>().as_ref());
-    let row = button_row(window.child().expect("child").upcast_ref()).expect("the button row");
+    let row = button_row(&crate::ui::dialog_content(&window).expect("content")).expect("the button row");
 
     let dialog = Rc::new(Dialog { window: window.downgrade(), checks, body, spinner, error, row, guard: RunGuard::default(), handlers });
     let _ = cell.set(Rc::clone(&dialog));
-    // a running migration cannot be dismissed: Escape and the close button end up here
-    let running = Rc::clone(&dialog);
-    window.connect_close_request(move |_| if running.guard.is_running() { gtk::glib::Propagation::Stop } else { gtk::glib::Propagation::Proceed });
     slot.adopt(&window);
 
     if plan.actions.contains(&Action::Migrate) {
@@ -258,7 +258,7 @@ pub fn show(slot: &DialogSlot, anchor: &impl IsA<gtk::Widget>, facts: Facts, sav
     }
     // the dialog lives as long as its window
     super::glue::keep_alive(&window, &dialog);
-    window.present();
+    window.open_over(anchor);
     window
 }
 
@@ -313,7 +313,7 @@ mod pure_tests {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::cell::{Cell, RefCell};
+    use std::cell::RefCell;
 
     use super::*;
     use crate::browse::dialogs::buttons_of;
@@ -333,11 +333,11 @@ pub(crate) mod tests {
         }
     }
 
-    fn labels(window: &gtk::Window) -> Vec<String> {
+    fn labels(window: &adw::Dialog) -> Vec<String> {
         buttons_of(window).iter().filter_map(|b| b.label()).map(|l| l.to_string()).collect()
     }
 
-    fn all<T: IsA<gtk::Widget>>(window: &gtk::Window) -> Vec<T> {
+    fn all<T: IsA<gtk::Widget>>(window: &adw::Dialog) -> Vec<T> {
         fn walk<T: IsA<gtk::Widget>>(widget: &gtk::Widget, out: &mut Vec<T>) {
             if let Some(found) = widget.downcast_ref::<T>() {
                 out.push(found.clone());
@@ -349,7 +349,7 @@ pub(crate) mod tests {
             }
         }
         let mut out = Vec::new();
-        walk(window.child().expect("child").upcast_ref(), &mut out);
+        walk(&crate::ui::dialog_content(window).expect("content"), &mut out);
         out
     }
 
@@ -365,11 +365,11 @@ pub(crate) mod tests {
     }
 
     impl Rig {
-        fn open(&self, facts: Facts, saved: i32) -> gtk::Window {
+        fn open(&self, facts: Facts, saved: i32) -> adw::Dialog {
             show(&self.slot, &self.anchor, facts, saved, handlers(&self.log, &self.pending))
         }
 
-        fn plain(&self, kind: Kind) -> gtk::Window {
+        fn plain(&self, kind: Kind) -> adw::Dialog {
             self.open(Facts { kind, old: FetchType::Episodes, new: FetchType::Episodes, custom_cover: false, custom_background: false, downloads: false }, i32::MAX)
         }
 
@@ -417,11 +417,11 @@ pub(crate) mod tests {
         let checks = all::<gtk::CheckButton>(&window);
         assert_eq!(checks.iter().map(|c| c.is_active()).collect::<Vec<_>>(), [true, false, false, false, false], "only the saved bit starts ticked");
         let buttons = buttons_of(&window);
-        let spinner = all::<gtk::Spinner>(&window).remove(0);
-        assert!(!spinner.is_visible(), "no spinner before a run");
+        let spinner = all::<gtk::Spinner>(&window).into_iter().next().expect("the spinner");
+        assert!(!spinner.get_visible(), "no spinner before a run");
         buttons[1].emit_clicked();
         assert_eq!(*rig.log.borrow(), ["run replace=false flags=1"]);
-        assert!(spinner.is_visible() && spinner.is_spinning(), "T-41a-035: the spinner shows while the run goes");
+        assert!(spinner.get_visible(), "T-41a-035: the spinner shows while the run goes");
         assert!(buttons.iter().all(|b| !b.is_visible()), "and the buttons are hidden");
         let body = checks[0].parent().expect("body");
         assert!((body.opacity() - 0.3).abs() < 0.01, "the options sit under a 70 % cover");
@@ -436,16 +436,9 @@ pub(crate) mod tests {
     fn escape_and_the_close_button_do_nothing_while_a_run_goes() {
         let rig = rig();
         let window = rig.plain(Kind::Manga);
-        let closes = Rc::new(Cell::new(0));
-        let counted = Rc::clone(&closes);
-        window.connect_close_request(move |_| {
-            counted.set(counted.get() + 1);
-            gtk::glib::Propagation::Proceed
-        });
         buttons_of(&window)[2].emit_clicked();
-        window.close();
+        assert!(!window.close(), "the close request is refused while it runs");
         assert!(rig.slot.current().is_some(), "the dialog is still the slot's while it runs");
-        assert_eq!(closes.get(), 0, "the close request was refused before it reached anything else");
         rig.answer(Ok(()));
         assert!(rig.slot.current().is_none());
     }
@@ -456,14 +449,14 @@ pub(crate) mod tests {
         let buttons = buttons_of(&window);
         buttons[2].emit_clicked();
         rig.answer(Err("disk full".into()));
-        let text: Vec<String> = all::<gtk::Label>(&window).iter().filter(|l| l.is_visible()).map(|l| l.label().to_string()).collect();
+        let text: Vec<String> = all::<gtk::Label>(&window).iter().filter(|l| l.get_visible()).map(|l| l.label().to_string()).collect();
         assert!(text.contains(&"Migration failed: disk full".to_owned()), "{text:?}");
-        assert!(buttons.iter().all(|b| b.is_visible() && b.is_sensitive()), "the buttons come back");
+        assert!(buttons.iter().all(|b| b.get_visible() && b.parent().is_some_and(|row| row.get_visible()) && b.is_sensitive()), "the buttons come back");
         assert!(!rig.log.borrow().contains(&"finished".to_owned()), "the page is not left");
         assert!(rig.slot.current().is_some(), "the dialog stays open");
         buttons[1].emit_clicked();
         assert_eq!(rig.pending.borrow().len(), 1, "a new run starts");
-        assert!(!all::<gtk::Label>(&window).iter().any(|l| l.is_visible() && l.label().starts_with("Migration failed")), "the old error is cleared");
+        assert!(!all::<gtk::Label>(&window).iter().any(|l| l.get_visible() && l.label().starts_with("Migration failed")), "the old error is cleared");
         rig.answer(Ok(()));
     }
 

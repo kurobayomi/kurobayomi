@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 # On by default so the app loads each verified component through the WASM host (T-20a-001). It links wasmtime through
-# kuro-source-wasm; build with `--no-default-features` to leave it out.
+# kuro-source-wasm; build with `--no-default-features` to leave it out (`instantiate_off.rs` then refuses every plug-in).
 default = ["wasm"]
 wasm = ["dep:kuro-source-wasm"]
 

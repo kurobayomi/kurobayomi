@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Reiniciar todos los capítulos de este manga
 
 download_insufficient_space = No se podía descargar debido al poco espacio de almacenamiento
 
-download_queue_size_warning = Advertencia: Las descargas grandes pueden llevar a que las fuentes se vuelvan cada vez más lentas y en casos extremos que los servidores limiten o impidan el acceso a Aniyomi. Toca aquí para más información.
-
 pref_invalidate_download_cache_summary = Forzar a la aplicación a volver a comprobar los capítulos descargados
 
 label_player_settings = Ajustes del reproductor
@@ -739,8 +737,6 @@ pref_manga_library_update_categories_details = El manga de las categorías exclu
 pref_anime_library_update_categories_details = El anime de las categorías excluidas no se actualizará, ni siquiera si pertenece a alguna de las categorías que sí estén incluidas.
 
 unofficial_extension_message_aniyomi = Esta extensión no es de la lista oficial de extensiones de Aniyomi.
-
-unofficial_anime_extension_message = Esta extensión no pertenece a la lista oficial de extensiones de Aniyomi.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

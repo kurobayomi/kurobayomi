@@ -45,7 +45,7 @@ pub fn when_sources_ready(gate: &SourceGate, content: &impl IsA<Widget>) -> Widg
     if initial(*ready.borrow_and_update()) == Shown::Content {
         return content;
     }
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
+    let spinner = crate::widgets::status::loading(None);
     let stack = Stack::builder()
         .transition_type(StackTransitionType::Crossfade)
         .transition_duration(CROSSFADE_MS)

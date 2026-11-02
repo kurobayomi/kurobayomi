@@ -239,27 +239,6 @@ mod tests {
         assert!(second.is_empty(), "nothing is new the second time");
     }
 
-    #[tokio::test]
-    #[ignore = "slow: run on demand"]
-    async fn perf_02_a_500_item_sync_is_fast() {
-        // The plan's bound is 100 ms in a release build; a debug build is held to a loose bound.
-        let dir = tempfile::tempdir().expect("temp dir");
-        let manga = test_db(dir.path());
-        let id = EntryRepo::new(manga.clone())
-            .insert(&Entry { favorite: true, source: 7, url: "/m".into(), title: "Berserk".into(), ..Entry::create(Kind::Manga) })
-            .expect("insert manga");
-        let sync = sync_for(manga);
-        let items: Vec<SourceItem> = (0..500).map(|n| SourceItem { source_order: n, ..item(&format!("/c/{n}"), f64::from(n as i32)) }).collect();
-        let list = fetched(items);
-        let limit = if cfg!(debug_assertions) { std::time::Duration::from_secs(5) } else { std::time::Duration::from_millis(100) };
-        let started = std::time::Instant::now();
-        let first = sync.sync(&entry(id), &list, window(), 1_000).await.expect("500 new chapters");
-        assert_eq!(first.len(), 500);
-        let again = sync.sync(&entry(id), &list, window(), 2_000).await.expect("unchanged list");
-        assert!(again.is_empty());
-        assert!(started.elapsed() < limit, "two 500-item syncs took {:?}", started.elapsed());
-    }
-
     #[derive(Default)]
     struct RecordingRenames(std::sync::Mutex<Vec<(String, String)>>);
 

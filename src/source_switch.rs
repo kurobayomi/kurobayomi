@@ -7,16 +7,18 @@
 //! A source is known by its numeric id once it has loaded; `source_keys` remembers which entry each id came from, so a
 //! source that is off now is still recognised by its titles.
 
+use crate::ui::DialogOpen as _;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_extensions::repo::{Entry, Index, Status};
 use kuro_i18n::{Arg, MsgKey, tr, tr_plural, trf};
 use kuro_platform::kind::Kind;
 use kuro_prefs::source::SourcePrefs;
 use kuro_source::SourceError;
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 /// Whether the source of entry `key` is on.
 pub fn is_on(prefs: &SourcePrefs, key: &str) -> bool {
@@ -287,7 +289,7 @@ pub fn confirm_off(key: String, name: &str, done: impl Fn(bool) + 'static) {
     }
     let done = Rc::new(done);
     let (cancelled, confirmed) = (Rc::clone(&done), done);
-    let body = crate::ui::message(&tr_plural(MsgKey::source_switch_off_body, count, &[]));
+    let body = tr_plural(MsgKey::source_switch_off_body, count, &[]);
     let title = trf(MsgKey::source_switch_off_title, &[("source", Arg::Str(name))]);
     let buttons = vec![
         crate::ui::DialogButton::cancel(tr(MsgKey::action_cancel)),
@@ -296,7 +298,7 @@ pub fn confirm_off(key: String, name: &str, done: impl Fn(bool) + 'static) {
             confirmed(true);
         }),
     ];
-    crate::ui::dialog_or_dismiss(&title, &body, 420, buttons, move || cancelled(false)).present();
+    crate::ui::alert(&title, &body, buttons, move || cancelled(false)).open();
 }
 
 /// When source `source_id` is off: shows "This source is off" with a Turn on button, which turns it on and then runs
@@ -360,7 +362,7 @@ pub fn open_picker(link: &str) {
     let filter = Rc::new(std::cell::RefCell::new(SourceFilter::default()));
     let Some((list, _)) = sources_list(link, Rc::clone(&filter)) else { return };
     let repo = index.name.clone().filter(|name| !name.trim().is_empty()).unwrap_or_else(|| link.to_owned());
-    let col = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let col = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
     col.append(&crate::ui::message(&tr(MsgKey::source_switch_picker_intro)));
     let search = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).hexpand(true).build();
     col.append(&search);
@@ -376,7 +378,7 @@ pub fn open_picker(link: &str) {
     let window = crate::ui::dialog(&title, &col, 480, vec![crate::ui::DialogButton::new(tr(MsgKey::action_ok), crate::ui::Role::Suggested, || {})]);
     // type to search, as GNOME lists do: typing anywhere in the dialog goes to the search field
     search.set_key_capture_widget(Some(&window));
-    window.present();
+    window.open();
 }
 
 /// What a picker row is found by: the source's name, language, kind and description.
@@ -388,7 +390,7 @@ fn search_text(entry: &Entry) -> String {
 }
 
 /// One row of the picker: icon, name, language and kind, and the switch.
-fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow {
+fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow {
     let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
     let mut subtitle = format!("{} · {kind}", crate::browse::names::localized_display_name(&entry.lang));
     if let Some(about) = crate::recipe_sources::described(entry) {
@@ -399,7 +401,7 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
     }
     let switch = gtk::Switch::builder().active(is_on(prefs, &entry.id)).valign(gtk::Align::Center).build();
     switch.update_property(&[gtk::accessible::Property::Label(&entry.name)]);
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+    let spinner = crate::ui::inline_spinner();
     spinner.set_visible(false);
     let (key, name) = (entry.id.clone(), entry.name.clone());
     let spinner_weak = spinner.downgrade();
@@ -437,16 +439,14 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> gtk::ListBoxRow
         }
         gtk::glib::Propagation::Stop
     });
-    let suffix = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let suffix = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
     suffix.append(&spinner);
     suffix.append(&switch);
     let row = crate::ui::row(&entry.name, Some(&subtitle), Some(suffix.upcast()));
     if let Some(icon) = crate::recipe_sources::saved_icon(link, entry) {
-        if let Some(line) = row.child().and_downcast::<gtk::Box>() {
-            let picture = gtk::Image::from_file(icon);
-            picture.set_pixel_size(32);
-            line.prepend(&picture);
-        }
+        let picture = gtk::Image::from_file(icon);
+        picture.set_pixel_size(32);
+        row.add_prefix(&picture);
     }
     row
 }
@@ -634,10 +634,11 @@ mod tests {
     }
 
     /// The suffix of a picker row: its spinner and its switch.
-    fn picker_switch(row: &gtk::ListBoxRow) -> gtk::Switch {
-        let line = row.child().and_downcast::<gtk::Box>().expect("the row's line");
-        let suffix = line.last_child().and_downcast::<gtk::Box>().expect("the spinner and switch end the row");
-        suffix.last_child().and_downcast::<gtk::Switch>().expect("the switch ends the suffix")
+    fn picker_switch(row: &adw::ActionRow) -> gtk::Switch {
+        fn find(widget: &gtk::Widget) -> Option<gtk::Switch> {
+            widget.downcast_ref::<gtk::Switch>().cloned().or_else(|| std::iter::successors(widget.first_child(), |c| c.next_sibling()).find_map(|c| find(&c)))
+        }
+        find(row.upcast_ref()).expect("the switch in the row")
     }
 
     /// A turn-on shows the row's spinner and locks the switch until it ends; the row starts with the spinner hidden.

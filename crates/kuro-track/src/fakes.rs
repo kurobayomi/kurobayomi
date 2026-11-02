@@ -1054,3 +1054,43 @@ pub fn manga_binding(manga_id: i64, tracker: TrackerId, last_read: f64) -> Manga
         private: false,
     }
 }
+
+/// A log writer that keeps everything in memory, for the logging tests.
+#[derive(Clone, Default)]
+pub struct Captured(Arc<Mutex<Vec<u8>>>);
+
+impl Captured {
+    pub fn text(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().unwrap()).into_owned()
+    }
+}
+
+impl std::io::Write for Captured {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
+    type Writer = Captured;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+/// Captures the log lines of this thread at `level` and above until the guard drops. Tests run in parallel, so another
+/// thread may have cached a log statement as unwatched just before this subscriber arrived; the cache is rebuilt after
+/// installing it, or that statement would stay silent here and the test fail at random.
+pub fn capture_logs(level: tracing::Level) -> (Captured, tracing::subscriber::DefaultGuard) {
+    let captured = Captured::default();
+    let subscriber = tracing_subscriber::fmt().with_writer(captured.clone()).with_ansi(false).with_max_level(level).finish();
+    let guard = tracing::subscriber::set_default(subscriber);
+    tracing::callsite::rebuild_interest_cache();
+    (captured, guard)
+}

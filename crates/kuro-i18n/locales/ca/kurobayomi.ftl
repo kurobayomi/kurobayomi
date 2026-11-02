@@ -268,8 +268,6 @@ pref_anime_library_update_categories_details = L'anime de categories excloses no
 
 unofficial_extension_message_aniyomi = Aquesta extensió no és de la llista oficial d'extensions d'Aniyomi.
 
-unofficial_anime_extension_message = Aquesta extensió no és del llistat d'extensions oficials d'Aniyomi.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = Categories excloses

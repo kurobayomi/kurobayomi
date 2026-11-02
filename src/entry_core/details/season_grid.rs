@@ -10,6 +10,7 @@ use gtk::{Align, Box as GBox, Label, Orientation as O};
 use kuro_domain::entries::season_display::SeasonDisplayMode;
 
 use super::season_tile::{self, SeasonItem, Tile, edge_badges, list_badges};
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XS};
 
 /// What decides how the grid draws and how many columns it takes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,11 +54,11 @@ impl SeasonGrid {
         let widget = gtk::FlowBox::builder()
             .selection_mode(gtk::SelectionMode::None)
             .homogeneous(true)
-            .row_spacing(8)
-            .column_spacing(8)
-            .margin_start(16)
-            .margin_end(16)
-            .margin_bottom(8)
+            .row_spacing(SPACE_S.unsigned_abs())
+            .column_spacing(SPACE_S.unsigned_abs())
+            .margin_start(SPACE_L)
+            .margin_end(SPACE_L)
+            .margin_bottom(SPACE_S)
             .visible(false)
             .build();
         Self { widget, on_open, on_continue }
@@ -85,7 +86,7 @@ impl SeasonGrid {
                 let (on_continue, id) = (Rc::clone(on_continue), item.id);
                 let overlay = gtk::Overlay::new();
                 overlay.set_child(Some(&button));
-                let play = gtk::Button::builder().icon_name("media-playback-start-symbolic").css_classes(["circular", "osd"]).valign(Align::End).halign(Align::End).margin_end(8).margin_bottom(8).build();
+                let play = gtk::Button::builder().icon_name("media-playback-start-symbolic").css_classes(["circular", "osd"]).valign(Align::End).halign(Align::End).margin_end(SPACE_S).margin_bottom(SPACE_S).build();
                 play.connect_clicked(move |_| on_continue(id));
                 overlay.add_overlay(&play);
                 self.widget.insert(&overlay, -1);
@@ -96,7 +97,7 @@ impl SeasonGrid {
     }
 
     fn grid_tile(&self, tile: &Tile, art: &kuro_images::art::ArtRef, cover_width: i32) -> GBox {
-        let content = GBox::new(O::Vertical, 4);
+        let content = GBox::new(O::Vertical, SPACE_XS);
         // downloads and unseen sit on the start edge of the cover, the language on its end edge (T-39a-033)
         let cover = gtk::Overlay::new();
         cover.set_child(Some(&crate::browse::look::cover(tile.title.as_deref().unwrap_or_default(), Some(art), cover_width, cover_width * 3 / 2)));
@@ -108,9 +109,9 @@ impl SeasonGrid {
             let row = GBox::new(O::Horizontal, 2);
             row.set_halign(align);
             row.set_valign(Align::Start);
-            row.set_margin_top(4);
-            row.set_margin_start(4);
-            row.set_margin_end(4);
+            row.set_margin_top(SPACE_XS);
+            row.set_margin_start(SPACE_XS);
+            row.set_margin_end(SPACE_XS);
             for text in texts {
                 row.append(&Label::builder().label(text).css_classes(["caption", "osd"]).build());
             }
@@ -124,11 +125,11 @@ impl SeasonGrid {
     }
 
     fn list_row(&self, tile: &Tile, art: &kuro_images::art::ArtRef, row_px: i32) -> GBox {
-        let row = GBox::new(O::Horizontal, 12);
+        let row = GBox::new(O::Horizontal, SPACE_M);
         row.set_height_request(row_px);
         let cover_height = (row_px - 2 * crate::entry_core::list_row::PAD_VERTICAL).max(1);
         row.append(&crate::browse::look::row_cover(tile.title.as_deref().unwrap_or_default(), Some(art), cover_height * 2 / 3, cover_height));
-        let text = GBox::new(O::Vertical, 4);
+        let text = GBox::new(O::Vertical, SPACE_XS);
         text.set_hexpand(true);
         if let Some(title) = &tile.title {
             text.append(&Label::builder().label(title).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build());

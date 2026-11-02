@@ -15,6 +15,7 @@ use gtk::{Align, Box as GBox, GestureClick, Label, Orientation as O};
 use kuro_i18n::{MsgKey, tr};
 
 use crate::updates::upcoming::calendar::{self, CalKey};
+use crate::theme::tokens::{SPACE_M, SPACE_XS};
 
 /// The title slide, forward from below and backward from above (B§8.2).
 const TITLE_SLIDE_MS: u32 = 200;
@@ -60,7 +61,7 @@ impl CalendarView {
             title.add_named(&Label::builder().xalign(0.0).css_classes(["title-3"]).build(), Some(name));
         }
         let view = Rc::new(Self {
-            root: GBox::new(O::Vertical, 4),
+            root: GBox::new(O::Vertical, SPACE_XS),
             title,
             title_on_a: Cell::new(true),
             grid_slot: GBox::new(O::Vertical, 0),
@@ -143,8 +144,8 @@ impl CalendarView {
     }
 
     fn build_header(self: &Rc<Self>) {
-        let header = GBox::new(O::Horizontal, 4);
-        header.set_margin_start(12);
+        let header = GBox::new(O::Horizontal, SPACE_XS);
+        header.set_margin_start(SPACE_M);
         header.append(&self.title);
         for (icon, tip, delta) in [("go-previous-symbolic", MsgKey::upcoming_calendar_prev, -1), ("go-next-symbolic", MsgKey::upcoming_calendar_next, 1)] {
             let button = crate::ui::icon_button(icon, &tr(tip));
@@ -196,7 +197,7 @@ impl CalendarView {
         let dots = GBox::new(O::Horizontal, 2);
         dots.set_halign(Align::Center);
         dots.set_valign(Align::End);
-        dots.set_margin_bottom(4);
+        dots.set_margin_bottom(SPACE_XS);
         dots.set_can_target(false);
         let diameter = calendar::DOT_DIAMETER.round() as i32;
         for alpha in calendar::dots(count) {

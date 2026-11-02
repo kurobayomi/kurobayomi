@@ -12,7 +12,7 @@ use kuro_prefs::pref::Pref;
 use super::super::bind::{self, Outcome, Veto, WriteGate};
 use super::super::model::{multi_select_labels, Entry, ItemCommon};
 use super::dialog::{self, Dialog};
-use super::row::{self, set_subtitle, PrefRow, RowSpec};
+use crate::widgets::row::{self, set_subtitle, RowSpec};
 use super::CHECK_ROW_MIN;
 
 /// The selection restricted to keys that exist in `entries`, in entries order.
@@ -24,7 +24,7 @@ pub fn keep_known(entries: &[Entry], selected: &BTreeSet<String>) -> BTreeSet<St
         .collect()
 }
 
-pub fn row(common: &ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry>, veto: Veto<BTreeSet<String>>) -> PrefRow {
+pub fn row(common: &ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry>, veto: Veto<BTreeSet<String>>) -> adw::ActionRow {
     let entries = Rc::new(entries);
     let stored = Rc::new(RefCell::new(pref.get()));
     let built = row::build(RowSpec {
@@ -34,11 +34,11 @@ pub fn row(common: &ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry
         trailing: None,
         on_click: None,
     });
-    built.row.set_sensitive(common.enabled);
-    built.row.set_activatable(common.enabled);
+    built.set_sensitive(common.enabled);
+    built.set_activatable(common.enabled);
 
     let refresh: Rc<dyn Fn(&BTreeSet<String>)> = {
-        let (subtitle, template, entries) = (built.subtitle.clone(), common.subtitle.clone(), entries.clone());
+        let (subtitle, template, entries) = (built.clone(), common.subtitle.clone(), entries.clone());
         Rc::new(move |selected: &BTreeSet<String>| {
             let text = template
                 .as_deref()
@@ -51,7 +51,7 @@ pub fn row(common: &ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry
     {
         let (stored, refresh, entries, pref, veto, gate) =
             (stored.clone(), refresh.clone(), entries.clone(), pref.clone(), veto.clone(), gate.clone());
-        crate::widgets::row_activate::on_activate(&built.row, move |row| {
+        crate::widgets::row_activate::on_activate(&built, move |row| {
             let Some(parent) = row.root().and_downcast::<gtk::Window>() else {
                 return;
             };
@@ -76,7 +76,7 @@ pub fn row(common: &ItemCommon, pref: Pref<BTreeSet<String>>, entries: Vec<Entry
         });
     }
 
-    let weak = built.row.downgrade();
+    let weak = built.downgrade();
     bind::follow(&pref, move || weak.upgrade().is_some(), move |value: BTreeSet<String>| {
         *stored.borrow_mut() = value.clone();
         refresh(&value);

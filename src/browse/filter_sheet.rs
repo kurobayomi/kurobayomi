@@ -14,6 +14,7 @@ use kuro_source::filter_sheet::{ItemView, SheetItem, sort_descending};
 
 use super::filters::SourceFilters;
 use super::sheet::{SheetButton, on_button, select_label};
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 const INDENT_PX: i32 = 16;
 /// The popover's width, and the height past which its rows scroll.
@@ -37,10 +38,10 @@ impl FilterSheetView {
         let reset = gtk::Button::with_label(&tr(MsgKey::action_reset));
         let apply = gtk::Button::with_label(&tr(MsgKey::action_apply));
         apply.add_css_class("suggested-action");
-        let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-        buttons.set_margin_start(12);
-        buttons.set_margin_end(12);
-        buttons.set_margin_bottom(12);
+        let buttons = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+        buttons.set_margin_start(SPACE_M);
+        buttons.set_margin_end(SPACE_M);
+        buttons.set_margin_bottom(SPACE_M);
         reset.set_hexpand(true);
         reset.set_halign(gtk::Align::Start);
         buttons.append(&reset);
@@ -106,7 +107,7 @@ impl FilterSheetView {
         let row = match &item.view {
             ItemView::Heading { name } => {
                 let label = gtk::Label::builder().label(name).xalign(0.0).css_classes(["heading"]).build();
-                label.set_margin_top(8);
+                label.set_margin_top(SPACE_S);
                 label.upcast::<gtk::Widget>()
             }
             ItemView::Divider => gtk::Separator::new(gtk::Orientation::Horizontal).upcast(),
@@ -130,7 +131,7 @@ impl FilterSheetView {
                     TriStateState::Include => ("checkbox-checked-symbolic", None),
                     TriStateState::Exclude => ("checkbox-mixed-symbolic", Some("error")),
                 };
-                let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                let content = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
                 let image = gtk::Image::from_icon_name(icon);
                 if let Some(class) = class {
                     image.add_css_class(class);
@@ -179,7 +180,7 @@ impl FilterSheetView {
                         }
                     }
                 });
-                let line = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                let line = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
                 line.append(&gtk::Label::builder().label(label).xalign(0.0).hexpand(true).build());
                 line.append(&drop);
                 line.upcast()
@@ -194,7 +195,7 @@ impl FilterSheetView {
                             Some(false) => "view-sort-ascending-symbolic",
                             None => "content-loading-symbolic",
                         };
-                        let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+                        let content = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
                         content.append(&gtk::Image::from_icon_name(icon));
                         content.append(&gtk::Label::new(Some(option)));
                         let button = gtk::Button::builder().child(&content).css_classes(["flat"]).halign(gtk::Align::Start).build();
@@ -211,7 +212,7 @@ impl FilterSheetView {
                 column.upcast()
             }
             ItemView::Group { label, expanded, children } => {
-                let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
                 column.append(&self.expander(label, *expanded, &path));
                 if *expanded {
                     for child in children {
@@ -224,17 +225,17 @@ impl FilterSheetView {
         row.set_margin_start(depth * INDENT_PX);
         if depth == 0 {
             // a top-level item is one row of the boxed list, with the list's inner padding
-            row.set_margin_start(12);
-            row.set_margin_end(12);
-            row.set_margin_top(6);
-            row.set_margin_bottom(6);
+            row.set_margin_start(SPACE_M);
+            row.set_margin_end(SPACE_M);
+            row.set_margin_top(SPACE_S);
+            row.set_margin_bottom(SPACE_S);
         }
         row
     }
 
     /// The header of a group or sort box: its name and an arrow that opens and closes it.
     fn expander(self: &Rc<Self>, label: &str, expanded: bool, path: &[usize]) -> gtk::Button {
-        let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        let content = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
         content.append(&gtk::Label::builder().label(label).xalign(0.0).hexpand(true).build());
         content.append(&gtk::Image::from_icon_name(if expanded { "pan-up-symbolic" } else { "pan-down-symbolic" }));
         let button = gtk::Button::builder().child(&content).css_classes(["flat"]).build();

@@ -9,12 +9,13 @@ use kuro_data::anime_relation::AnimeRelationGroup;
 use kuro_prefs::library::LibraryDisplayMode;
 
 use super::related_pack::{self as pack, Align, MAX_ITEMS_PER_ROW, RELATED_ITEM_WIDTH};
+use crate::theme::tokens::{SPACE_L, SPACE_S, SPACE_XS};
 
 /// One related item: its cover, and its title when the mode shows one.
 fn item(entry: &kuro_data::entry::Entry, mode: LibraryDisplayMode, on_open: &Rc<dyn Fn(i64)>) -> Button {
     let (title, favorite, id) = (entry.title.as_str(), entry.favorite, entry.id);
     let style = pack::item_style(mode, favorite);
-    let content = GBox::new(O::Vertical, 4);
+    let content = GBox::new(O::Vertical, SPACE_XS);
     let cover = crate::browse::look::cover(title, Some(&crate::browse::look::entry_art(entry)), RELATED_ITEM_WIDTH, RELATED_ITEM_WIDTH * 3 / 2);
     cover.set_opacity(style.cover_alpha);
     content.append(&cover);
@@ -41,20 +42,20 @@ pub fn section(groups: &[AnimeRelationGroup], mode: LibraryDisplayMode, on_open:
     }
     let sizes: Vec<usize> = groups.iter().map(|g| g.anime.len()).collect();
     let (small, multi) = pack::partition(&sizes);
-    let root = GBox::new(O::Vertical, 8);
-    root.set_margin_bottom(16);
+    let root = GBox::new(O::Vertical, SPACE_S);
+    root.set_margin_bottom(SPACE_L);
 
     let small_sizes: Vec<usize> = small.iter().map(|&i| sizes[i]).collect();
     for row in pack::pack_rows(&small_sizes, MAX_ITEMS_PER_ROW) {
-        let grid = Grid::builder().column_homogeneous(true).column_spacing(4).margin_start(8).margin_end(8).build();
+        let grid = Grid::builder().column_homogeneous(true).column_spacing(SPACE_XS).margin_start(SPACE_S).margin_end(SPACE_S).build();
         let row_sizes: Vec<usize> = row.iter().map(|&k| small_sizes[k]).collect();
         let starts = pack::start_slots(&row_sizes);
         for (k, &slot) in row.iter().enumerate() {
             let group = &groups[small[slot]];
             let (start, size) = (starts[k], row_sizes[k]);
-            let column = GBox::new(O::Vertical, 4);
+            let column = GBox::new(O::Vertical, SPACE_XS);
             column.append(&heading(&group.name));
-            let items = GBox::new(O::Horizontal, 4);
+            let items = GBox::new(O::Horizontal, SPACE_XS);
             for entry in &group.anime {
                 items.append(&item(entry, mode, &on_open));
             }
@@ -71,9 +72,9 @@ pub fn section(groups: &[AnimeRelationGroup], mode: LibraryDisplayMode, on_open:
 
     for index in multi {
         let group = &groups[index];
-        let items = GBox::new(O::Horizontal, 4);
-        items.set_margin_start(8);
-        items.set_margin_end(8);
+        let items = GBox::new(O::Horizontal, SPACE_XS);
+        items.set_margin_start(SPACE_S);
+        items.set_margin_end(SPACE_S);
         for entry in &group.anime {
             items.append(&item(entry, mode, &on_open));
         }
@@ -90,8 +91,8 @@ fn heading(text: &str) -> Label {
 
 fn heading_with_margin(text: &str) -> Label {
     let label = heading(text);
-    label.set_margin_start(8);
-    label.set_margin_end(8);
-    label.set_margin_top(8);
+    label.set_margin_start(SPACE_S);
+    label.set_margin_end(SPACE_S);
+    label.set_margin_top(SPACE_S);
     label
 }

@@ -23,6 +23,7 @@ use kuro_i18n::{MsgKey, tr};
 
 use crate::backup_run::NothingInstalled;
 use crate::screens::Built;
+use crate::theme::tokens::{SPACE_M, SPACE_S};
 
 /// What starts a run. The app registers it with the adapters over its databases and preferences.
 pub struct BackupHost {
@@ -116,7 +117,7 @@ fn with_action_bar(content: &gtk::Widget, action: &gtk::Button) -> gtk::Widget {
 }
 
 /// A check row: the whole row toggles the box.
-fn check_row(label: &str, active: bool) -> (gtk::ListBoxRow, gtk::CheckButton) {
+fn check_row(label: &str, active: bool) -> (adw::ActionRow, gtk::CheckButton) {
     let check = gtk::CheckButton::new();
     check.set_active(active);
     let row = crate::ui::row(label, None, Some(check.clone().upcast()));
@@ -133,7 +134,7 @@ pub fn create_page() -> Option<Built> {
     let screen = Rc::new(RefCell::new(CreateScreen::default()));
     let updating = Rc::new(Cell::new(false));
     let column = crate::ui::column();
-    let mut rows: Vec<(OptionId, gtk::ListBoxRow, gtk::CheckButton)> = Vec::new();
+    let mut rows: Vec<(OptionId, adw::ActionRow, gtk::CheckButton)> = Vec::new();
     for card in [Card::Library, Card::Settings, Card::Extensions] {
         column.append(&crate::ui::heading(&card_title(card)));
         let list = crate::ui::boxed_list();
@@ -232,8 +233,8 @@ pub fn restore_page() -> Option<Built> {
     let updating = Rc::new(Cell::new(false));
 
     let column = crate::ui::column();
-    let checking = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    checking.append(&crate::ui::loading(crate::ui::LoadSize::Inline));
+    let checking = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+    checking.append(&crate::ui::inline_spinner());
     checking.append(&gtk::Label::new(Some(&crate::backup_host::shown(text::CHECKING_BACKUP))));
     column.append(&checking);
     let choose = gtk::Button::with_label(&tr(MsgKey::file_select_backup));
@@ -243,10 +244,10 @@ pub fn restore_page() -> Option<Built> {
     // the backup summary sits in a one-row boxed list: the same rounded card as the option lists under it
     let frame = crate::ui::boxed_list();
     frame.append(&gtk::ListBoxRow::builder().child(&card).activatable(false).build());
-    card.set_margin_start(12);
-    card.set_margin_end(12);
-    card.set_margin_top(12);
-    card.set_margin_bottom(12);
+    card.set_margin_start(SPACE_M);
+    card.set_margin_end(SPACE_M);
+    card.set_margin_top(SPACE_M);
+    card.set_margin_bottom(SPACE_M);
     column.append(&frame);
     let options_list = crate::ui::boxed_list();
     let mut checks = Vec::new();

@@ -5,6 +5,8 @@ use crate::ui::*;
 use gtk::prelude::*;
 use gtk::{Align, Box as GBox, Button, Label, Orientation as O};
 use kuro_platform::kind::Kind;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 pub struct Built {
     pub content: gtk::Widget,
@@ -65,7 +67,7 @@ pub fn build(id: &str) -> GBox {
         Some(b) => {
             // a page with its own one-row header (the kind pages) is used as it is
             let p = match b.content.clone().downcast::<GBox>() {
-                Ok(own) if own.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>()) => own,
+                Ok(own) if own.first_child().is_some_and(|w| w.is::<adw::HeaderBar>()) => own,
                 _ => page(&crate::spec::shown(&s.title), &b.content, b.end, true),
             };
             tag(&p, id);
@@ -154,7 +156,7 @@ pub(crate) fn unavailable(id: &str) -> Option<Built> {
 
 fn empty_built(id: &str) -> Built {
     let text = screen(id).empty.unwrap_or_else(|| kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found));
-    Built { content: crate::browse::look::empty_state("system-search-symbolic", &text, &[]).0.upcast(), end: vec![] }
+    Built { content: crate::widgets::status::empty("system-search-symbolic", &text, None).upcast(), end: vec![] }
 }
 
 /// Opens the spec dialog `dialog` of screen `id`, its text naming `name` where it has `%s` (the delete-category
@@ -168,7 +170,7 @@ pub(crate) fn dialog_then_named(id: &str, dialog: &str, name: &str, on_ok: impl 
 }
 
 pub(crate) fn fab(overlay: &gtk::Overlay, label: &str, icon: &str) -> Button {
-    let h = GBox::new(O::Horizontal, 6);
+    let h = GBox::new(O::Horizontal, SPACE_S);
     h.append(&gtk::Image::from_icon_name(icon));
     h.append(&Label::new(Some(label)));
     let b = Button::builder().child(&h).css_classes(["suggested-action", "pill"]).halign(Align::End).valign(Align::End).build();
@@ -203,7 +205,7 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
         let name = if anime { "anime" } else { "manga" };
         kinds.add_titled(&b.content, Some(name), if anime { "Anime" } else { "Manga" });
         let mut rest = b.end.into_iter().peekable();
-        let actions = GBox::new(O::Horizontal, 4);
+        let actions = GBox::new(O::Horizontal, SPACE_XS);
         let bar: gtk::Widget = match rest.next_if(|w| w.is::<gtk::SearchEntry>()).and_downcast::<gtk::SearchEntry>() {
             // keys typed in this kind's content open its bar; the other kind's content is hidden and takes none
             Some(entry) => {
@@ -276,7 +278,7 @@ fn downloads_view(kind: Kind) -> Built {
     }
     let library = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::label_library));
     library.connect_clicked(|_| open("library"));
-    let (page, _) = crate::browse::look::empty_state("folder-download-symbolic", &screen("download_queue").empty.unwrap_or_default(), std::slice::from_ref(&library));
+    let page = crate::widgets::status::empty_with("folder-download-symbolic", &screen("download_queue").empty.unwrap_or_default(), None, std::slice::from_ref(&library));
     // nothing to filter, so no search
     Built { content: page.upcast(), end: vec![] }
 }
@@ -357,12 +359,18 @@ pub(crate) mod alone {
         all
     }
 
-    /// The toast overlay of a test: the label the toast presenter writes to.
-    pub fn toast_label() -> gtk::Label {
-        let overlay = gtk::Overlay::new();
-        crate::toast::attach(&overlay);
-        let revealer = overlay.last_child().and_downcast::<gtk::Revealer>().expect("the toast revealer");
-        revealer.child().and_then(|bar| bar.first_child()).and_downcast::<gtk::Label>().expect("the toast label")
+    /// The toast layer of a test: `text()` is the title of the toast on screen.
+    pub struct ToastText;
+
+    impl ToastText {
+        pub fn text(&self) -> String {
+            crate::toast::current().and_then(|t| t.title()).map(|t| t.to_string()).unwrap_or_default()
+        }
+    }
+
+    pub fn toast_label() -> ToastText {
+        crate::toast::attach(&adw::ToastOverlay::new());
+        ToastText
     }
 }
 
@@ -405,10 +413,10 @@ mod tests {
         use kuro_data::entry::{Entry, EntryRepo};
         use kuro_data::item::{Item, ItemRepo};
         alone::run(module_path!(), "opening_by_id_reaches_the_entry_page_the_reader_and_the_source_not_installed_toast", |ctx| {
-            let (nav, _window) = crate::testing::nav();
+            let _ = crate::testing::nav();
             let toast = alone::toast_label();
             let app = crate::data::app();
-            let top = || nav.visible_child().map(|c| c.widget_name().to_string());
+            let top = crate::ui::visible_page_name;
             let (entries, items) = (EntryRepo::new(app.db.clone()), ItemRepo::new(app.db.clone()));
             let manga = |source: i64, url: &str| {
                 let id = entries.insert(&Entry { source, url: url.into(), title: url.into(), ..Entry::create(Kind::Manga) }).expect("manga");
@@ -462,7 +470,7 @@ mod tests {
             let mut all = vec![page.clone().upcast::<gtk::Widget>()];
             shown(page.upcast_ref(), &mut all);
             let count = |f: &dyn Fn(&gtk::Widget) -> bool| all.iter().filter(|w| f(w)).count();
-            assert_eq!(count(&|w| w.is::<gtk::HeaderBar>()), 1, "one header row");
+            assert_eq!(count(&|w| w.is::<adw::HeaderBar>()), 1, "one header row");
             assert_eq!(count(&|w| w.is::<gtk::ListBoxRow>()), 0, "no made-up queue rows");
             assert_eq!(count(&|w| w.downcast_ref::<Label>().is_some_and(|l| l.label() == "No downloads")), 1);
             assert_eq!(count(&|w| w.downcast_ref::<Button>().is_some_and(|b| b.label().as_deref() == Some("Library"))), 1, "one action");
@@ -476,7 +484,7 @@ mod tests {
     fn the_library_header_is_one_row_with_each_control_once() {
         crate::testing::with_display(|| {
             let page = kind_page([view("anime grid"), view("manga grid")], false);
-            assert!(page.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>()), "the header row comes first");
+            assert!(page.first_child().is_some_and(|w| w.is::<adw::HeaderBar>()), "the header row comes first");
             let bars = page.first_child().and_then(|w| w.next_sibling()).and_then(|row| row.next_sibling()).expect("the search bars follow the header and its narrow switch row");
             assert!(bars.is::<gtk::Stack>() && bars.next_sibling().is_some_and(|w| w.next_sibling().is_none()), "then the views");
             let mut all = vec![];

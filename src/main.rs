@@ -11,9 +11,9 @@ mod backup_run;
 mod backup_schedule;
 mod bind;
 mod cache_limit;
+mod banner;
 mod category_picker;
 mod duplicate_dialog;
-mod clamp;
 mod cli;
 // the thumbnail renderer is called by the cover loader, which does not exist yet
 mod feed;
@@ -136,8 +136,9 @@ fn main() -> glib::ExitCode {
 
     // a second launch is forwarded to the running instance by GApplication; dev variables run a window of their own
     let unique = kuro_platform::single_instance::is_unique(|v| std::env::var(v).is_ok());
-    let app = gtk::Application::builder().application_id(channel::APP_ID).flags(shell::launch::app_flags(unique)).build();
-    shell::launch::connect(&app);
+    // libadwaita draws the widgets and owns light/dark (plans/LIBADWAITA-MIGRATION.md)
+    let app = adw::Application::builder().application_id(channel::APP_ID).flags(shell::launch::app_flags(unique)).build();
+    shell::launch::connect(app.upcast_ref());
     // the preferences get up to 2 s to reach the disk when the application shuts down (T-02a-038)
     app.connect_shutdown(|_| {
         if data::is_installed() {
@@ -152,7 +153,7 @@ fn main() -> glib::ExitCode {
             win.present();
             return;
         }
-        build_ui(app);
+        build_ui(app.upcast_ref());
     });
     // live queries of the entry screens are spawned on the runtime, so the GTK thread enters it while the app runs
     let code = {
@@ -217,29 +218,26 @@ fn build_ui(app: &gtk::Application) {
 fn build_window(app: &gtk::Application) {
     // the theme is applied before the first widget is built (T-36a-061)
     shell::Shell::build(theme::startup).build_widget().expect("the theme was applied by Shell::build");
-    let win = gtk::ApplicationWindow::builder()
+    let adw_win = adw::ApplicationWindow::builder()
         .application(app)
         .title(channel::APP_NAME)
         .default_width(1180)
         .default_height(780)
         .build();
+    // the rest of the shell takes the GTK window it is
+    let win: gtk::ApplicationWindow = adw_win.clone().upcast();
     // dev hook: KUROBAYOMI_SIZE=WxH opens at that size, set before any page is built so they lay out for it
     if let Some((w, h)) = std::env::var("KUROBAYOMI_SIZE").ok().and_then(|v| v.split_once('x').map(|(w, h)| (w.parse().unwrap_or(1180), h.parse().unwrap_or(780)))) {
         win.set_default_size(w, h);
     }
-    // each page brings its own header bar, so the window titlebar stays empty. It is hidden, not just empty: GTK gives a
-    // visible titlebar widget the theme's titlebar height (the built-in `.titlebar:not(headerbar)` min-height), which
-    // shows as an empty band above the app's header. A hidden one takes no space and GTK does not add a default one.
-    let titlebar = GBox::new(O::Horizontal, 0);
-    titlebar.set_visible(false);
-    win.set_titlebar(Some(&titlebar));
+    // each page brings its own header bar; an AdwApplicationWindow has no titlebar of its own
 
     // [sidebar | content nav stack], plus a bottom tab bar that replaces the sidebar when narrow
-    let nav = gtk::Stack::new();
-    nav.set_transition_type(gtk::StackTransitionType::SlideLeftRight);
+    let nav = adw::NavigationView::new();
     nav.set_vexpand(true);
     nav.set_hexpand(true);
-    nav.set_hhomogeneous(false);
+    // every page handles Escape itself (`ui::pop`)
+    nav.set_pop_on_escape(false);
     ui::nav_init(&nav, &win);
     // the download managers start before the tab pages, so the Downloads page shows the live queue
     let host = shell::Shell::get().expect("the shell is installed in main");
@@ -249,7 +247,8 @@ fn build_window(app: &gtk::Application) {
     let base = &data::app().base;
     incognito::attach(app, base.incognito_mode.clone());
     let tabs = tabs();
-    nav.add_child(&tabs);
+    // the tabs are the root page: the first page of a navigation view is never popped
+    ui::push(&tabs);
     let sidebar = shell::sidebar::build(&tabs);
     let prefs = settings_ui::route::prefs();
     settings_ui::appearance::open_start_tab(&tabs, &prefs);
@@ -257,20 +256,26 @@ fn build_window(app: &gtk::Application) {
     let home = host.home_tabs(prefs.ui.start_screen.get());
     shell::tabs::bind(&tabs, &home);
     let sep = gtk::Separator::new(O::Vertical);
+    // the sidebar and its separator: the narrow breakpoint hides each of them, the immersive rule hides this box
+    let side = GBox::new(O::Horizontal, 0);
+    side.append(&sidebar);
+    side.append(&sep);
     let row = GBox::new(O::Horizontal, 0);
-    row.append(&sidebar);
-    row.append(&sep);
+    row.append(&side);
     row.append(&nav);
+    // the bottom bar stands in for the sidebar: hidden until the narrow breakpoint shows it
     let bottom = shell::sidebar::bottom_bar(&tabs);
+    bottom.set_visible(false);
+    shell::layout::add_narrow_breakpoint(&adw_win, &[sidebar.upcast_ref(), sep.upcast_ref()], &[bottom.upcast_ref()]);
+    let content = adw::ToolbarView::builder().content(&row).vexpand(true).build();
+    content.add_bottom_bar(&bottom);
     let outer = GBox::new(O::Vertical, 0);
-    row.set_vexpand(true);
-    outer.append(&row);
-    outer.append(&bottom);
+    outer.append(&content);
     // the toast layer sits over the whole window (T-12a-014)
-    let overlay = gtk::Overlay::new();
+    let overlay = adw::ToastOverlay::new();
     overlay.set_child(Some(&outer));
     net_client::set_toaster(toast::attach(&overlay));
-    win.set_child(Some(&overlay));
+    adw::prelude::AdwApplicationWindowExt::set_content(&adw_win, Some(&overlay));
     // the app-state banners above everything: indexing and downloaded only (T-36a-018)
     let banners = std::rc::Rc::new(shell::banners::Banners::new());
     outer.prepend(&banners.widget);
@@ -297,21 +302,15 @@ fn build_window(app: &gtk::Application) {
 
     // reader/player are immersive: no sidebar or tab bar while they're on screen
     let refresh = {
-        let (win, nav) = (win.clone(), nav.clone());
+        let (side, content) = (side.clone(), content.clone());
         move || {
-            let immersive = nav.visible_child().is_some_and(|c| matches!(c.widget_name().as_str(), "screen:reader" | "screen:player"));
-            let (width, _) = window_size::size_of(&win);
-            let chrome = shell::layout::chrome_for(width, win.is_maximized());
-            let shown = shell::layout::visibility(chrome, immersive);
-            sidebar.set_visible(shown.sidebar);
-            // a narrow window packs its header buttons tighter (`style.css`, `.kb-narrow`)
-            if shown.bottom_bar { win.add_css_class("kb-narrow") } else { win.remove_css_class("kb-narrow") }
-            sep.set_visible(shown.sidebar);
-            bottom.set_visible(shown.bottom_bar);
+            let immersive = ui::visible_page_name().is_some_and(|name| matches!(name.as_str(), "screen:reader" | "screen:player"));
+            side.set_visible(!immersive);
+            content.set_reveal_bottom_bars(!immersive);
         }
     };
     let r = refresh.clone();
-    nav.connect_visible_child_notify(move |_| r());
+    ui::connect_page_changed(move || r());
     let r = refresh.clone();
     tabs.connect_visible_child_name_notify(move |_| r());
     // a search belongs to its tab: leaving the tab closes it
@@ -321,14 +320,8 @@ fn build_window(app: &gtk::Application) {
             ui::close_searches(&page);
         }
     });
-    let r = refresh.clone();
-    win.connect_default_width_notify(move |_| r());
-    let r = refresh.clone();
-    win.connect_default_height_notify(move |_| r());
-    let r = refresh.clone();
-    win.connect_maximized_notify(move |_| r());
     window_size::watch(&win);
-    theme::attach_window(&win);
+    theme::apply::mark_new_window(win.upcast_ref());
     local_flow::ui::attach(&win);
     refresh();
     win.present();
@@ -380,10 +373,28 @@ fn build_window(app: &gtk::Application) {
     // dev hooks: KUROBAYOMI_OPEN=<screen id> starts on that screen; KUROBAYOMI_SMOKE=1 opens every
     // screen, sheet and dialog once and quits (a panic or GTK critical shows up in the output)
     if let Ok(id) = std::env::var("KUROBAYOMI_OPEN") {
-        ui::open(&id);
-        if let Some(sh) = std::env::var("KUROBAYOMI_SHEET").ok().and_then(|n| ui::screen(&id).sheets.into_iter().find(|s| s.id == n)) {
-            ui::show_sheet(&sh);
-        }
+        // after the start tab is bound, so a tab id switches to that tab
+        glib::timeout_add_local_once(std::time::Duration::from_millis(1500), move || {
+            ui::open(&id);
+            if let Some(sh) = std::env::var("KUROBAYOMI_SHEET").ok().and_then(|n| ui::screen(&id).sheets.into_iter().find(|s| s.id == n)) {
+                ui::show_sheet(&sh);
+            }
+        });
+    }
+    // dev hooks: KUROBAYOMI_ENTRY=<anime|manga>:<row id> opens that entry's page; KUROBAYOMI_SOURCE=<anime|manga>:<source id>
+    // opens that source's popular listing (screenshots of pages that a click normally reaches)
+    let hook = |name: &str| {
+        std::env::var(name).ok().and_then(|v| {
+            let (kind, id) = v.split_once(':')?;
+            Some((if kind == "anime" { kuro_platform::kind::Kind::Anime } else { kuro_platform::kind::Kind::Manga }, id.parse::<i64>().ok()?))
+        })
+    };
+    if let Some((kind, id)) = hook("KUROBAYOMI_ENTRY") {
+        screens::open_entry(kind, id);
+    }
+    if let Some((kind, source_id)) = hook("KUROBAYOMI_SOURCE") {
+        let query = kuro_domain::source::browse::BrowseQuery::Popular;
+        browse::pending::open(browse::route::BrowseRoute::BrowseSource { kind, source_id, query, migrating: false });
     }
     // KUROBAYOMI_SHOT=file.png renders the window to a PNG and quits (no focus-dependent screenshots)
     if let Ok(path) = std::env::var("KUROBAYOMI_SHOT") {
@@ -475,7 +486,7 @@ fn tabs() -> gtk::Stack {
         let Some(b) = screens::body(&n.id) else { continue };
         // a page that starts with its own one-row header (Library, Updates, History, Browse) is used as it is; the
         // sidebar already names the tab, so it carries no title
-        let own_header = b.content.first_child().is_some_and(|w| w.is::<gtk::HeaderBar>());
+        let own_header = b.content.first_child().is_some_and(|w| w.is::<adw::HeaderBar>());
         let page: gtk::Widget = if own_header { b.content } else { ui::page(&spec::shown(&ui::screen(&n.id).title), &b.content, b.end, false).upcast() };
         tabs.add_titled(&page, Some(&n.id), &spec::shown(&n.title)).set_icon_name(&n.icon);
     }

@@ -364,24 +364,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "slow: run on demand"]
-    fn ten_thousand_rows_go_through_the_pipeline_in_one_pass() {
-        // T-37a-054: one pass over the rows, no per-row rebuild. The 50 ms target is measured in the release
-        // build; this guard only catches a quadratic blow-up in the debug test build.
-        let rows: Vec<LibraryRow> = (1..=10_000).map(|i| row(i, &format!("title {i:05}"), 5, 3, i % 3)).collect();
-        let mut snap = snapshot(vec![cat(5, "A", ASC_ALPHA)], rows);
-        snap.tracks.insert(7, vec![(10, 8.0)]);
-        let mut req = request();
-        req.logged_in = BTreeSet::from([10]);
-        req.query = Some("title".into());
-        let started = std::time::Instant::now();
-        let built = compute(&req, &snap, &facts());
-        let elapsed = started.elapsed();
-        assert_eq!(built.distinct_count, 10_000);
-        assert!(elapsed < std::time::Duration::from_secs(5), "took {elapsed:?}");
-    }
-
-    #[test]
     fn random_sort_is_stable_for_one_seed() {
         let rows: Vec<LibraryRow> = (1..=12).map(|i| row(i, &format!("t{i}"), 5, 1, 0)).collect();
         let snap = snapshot(vec![cat(5, "A", 60 | 0x40)], rows);

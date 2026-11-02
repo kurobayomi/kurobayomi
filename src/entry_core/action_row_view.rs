@@ -13,6 +13,7 @@ use crate::entry_core::action_row::{
     tracking_visible, webview_visible,
 };
 use crate::entry_core::header_view::{LibraryButton, apply_tone};
+use crate::theme::tokens::{SPACE_L, SPACE_S};
 
 /// What the row shows, resolved by the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,9 +87,9 @@ impl ActionRow {
     ) -> Self {
         let root = GBox::new(O::Horizontal, 0);
         root.set_homogeneous(true);
-        root.set_margin_start(16);
-        root.set_margin_end(16);
-        root.set_margin_top(8);
+        root.set_margin_start(SPACE_L);
+        root.set_margin_end(SPACE_L);
+        root.set_margin_top(SPACE_S);
 
         let library = LibraryButton::new();
         library.button.set_hexpand(true);

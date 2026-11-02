@@ -5,9 +5,6 @@
 #[cfg(test)]
 use kuro_platform::kind::Kind;
 
-/// Duration of a forward or back slide, in milliseconds (T-36a-002).
-pub const TRANSITION_MS: u32 = 250;
-
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
 #[cfg(test)]
 /// One page of the stack. Only `Home` is ever the root.

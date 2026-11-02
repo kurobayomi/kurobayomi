@@ -12,17 +12,17 @@ use super::grid::{CELL_MARGIN_PX, badge_visible, cell_alpha};
 use super::icons::{ICON_HEIGHT_PX, IconRef, SourceIcon, fallback_glyph, fetch_icon, http_get, icon_cache_root, icon_ref, load_icon, placeholder_rgba};
 use super::listing::ListItem;
 use super::primitives::EmptyAction;
+use crate::theme::tokens::{SPACE_M, SPACE_S, SPACE_XS};
 
-/// A centred message with its action buttons, in the order given: `look::empty_state_with` with the buttons of
-/// `EmptyAction` (icon and words, so a person who does not know the icon still reads what the button does).
-/// `on_action` runs for the button pressed.
-pub fn empty_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(EmptyAction) + Clone + 'static) -> GBox {
+/// The error page of a listing: `widgets::status::error_with` with the buttons of `EmptyAction`, in the order given (icon and
+/// words, so a person who does not know the icon still reads what the button does). `on_action` runs for the button pressed.
+pub fn error_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(EmptyAction) + Clone + 'static) -> adw::StatusPage {
     let buttons: Vec<Button> = actions
         .iter()
         .copied()
         .take(super::primitives::EMPTY_ACTION_LIMIT)
         .map(|action| {
-            let content = GBox::new(O::Horizontal, 6);
+            let content = GBox::new(O::Horizontal, SPACE_S);
             content.append(&Image::from_icon_name(action.icon()));
             content.append(&Label::new(Some(&action.label())));
             let button = Button::new();
@@ -33,7 +33,7 @@ pub fn empty_state(message: &str, actions: &[EmptyAction], on_action: impl Fn(Em
             button
         })
         .collect();
-    super::look::empty_state("dialog-error-symbolic", message, &buttons).0
+    crate::widgets::status::error_with(message, None, &buttons)
 }
 
 /// The icon of a row, 40 px square. A built-in glyph is tinted with the error colour for a stub or an untrusted
@@ -118,7 +118,7 @@ pub fn source_row(
     icon_file: Option<&str>,
     stub: bool,
     action: Option<&gtk::Widget>,
-) -> GBox {
+) -> adw::ActionRow {
     source_row_with(name, language, icon, icon_file, None, stub, false, action)
 }
 
@@ -135,8 +135,8 @@ pub fn source_row_with(
     stub: bool,
     failing: bool,
     action: Option<&gtk::Widget>,
-) -> GBox {
-    // the shared row of `look`; the notes of a stub or a failing source go under the language in its text column
+) -> adw::ActionRow {
+    // the shared row of `look`; the notes of a stub or a failing source go in red before the action
     let cover: gtk::Widget = if let Some(path) = picture {
         repo_picture(path).upcast()
     } else if icon == SourceIcon::Letter && icon_file.is_none() {
@@ -144,28 +144,16 @@ pub fn source_row_with(
     } else {
         icon_image(icon, icon_file).upcast()
     };
-    let row = row_line(super::look::list_row(Some(cover.clone()), name, language, action.cloned()));
-    let text = cover.next_sibling().and_downcast::<GBox>().expect("the row's text column follows the icon");
-    if stub {
-        let note = Label::new(Some(&tr(kuro_i18n::MsgKey::not_installed)));
-        note.set_xalign(0.0);
-        note.add_css_class("error");
-        text.append(&note);
+    let notes = [stub.then(|| tr(kuro_i18n::MsgKey::not_installed)), (failing && !stub).then(super::errors::not_working_badge)];
+    let trailing = GBox::new(O::Horizontal, SPACE_S);
+    for note in notes.into_iter().flatten() {
+        trailing.append(&Label::builder().label(note).css_classes(["error"]).build());
     }
-    if failing && !stub {
-        let note = Label::new(Some(&super::errors::not_working_badge()));
-        note.set_xalign(0.0);
-        note.add_css_class("error");
-        text.append(&note);
+    if let Some(action) = action {
+        trailing.append(action);
     }
-    row
-}
-
-/// The line of a `look::list_row`, taken out of its row so a caller can wrap it in its own `list_row` (activation, menu).
-fn row_line(row: gtk::ListBoxRow) -> GBox {
-    let line = row.child().and_downcast::<GBox>().expect("a list row's line is a Box");
-    row.set_child(None::<&gtk::Widget>);
-    line
+    let has_trailing = trailing.first_child().is_some();
+    super::look::list_row(Some(cover), name, language, has_trailing.then(|| trailing.upcast()))
 }
 
 /// What a cover load calls when it has the picture.
@@ -258,7 +246,7 @@ fn remote_cover(service: std::sync::Arc<kuro_images::fetch::ImageService>, runti
 
 /// A cover: the placeholder frame with the picture over it. Only this widget carries the favourite alpha, so the
 /// title and the badge next to it stay at full strength (B§2.7).
-fn cover_widget(item: &ListItem, width: i32, height: i32, load: &CoverLoader, guard: &CoverGuard) -> gtk::Overlay {
+pub(super) fn cover_widget(item: &ListItem, width: i32, height: i32, load: &CoverLoader, guard: &CoverGuard) -> gtk::Overlay {
     // the library card's look: rounded corners, and the title's initials until the picture draws
     let overlay = gtk::Overlay::new();
     overlay.add_css_class("kb-card-cover");
@@ -287,8 +275,8 @@ fn in_library_badge() -> Label {
     let badge = super::look::badge(&tr(kuro_i18n::MsgKey::in_library), true);
     badge.set_halign(Align::Start);
     badge.set_valign(Align::Start);
-    badge.set_margin_start(4);
-    badge.set_margin_top(4);
+    badge.set_margin_start(SPACE_XS);
+    badge.set_margin_top(SPACE_XS);
     badge
 }
 
@@ -320,7 +308,7 @@ pub fn grid_cell_lines(
     cover_width: i32,
     title_lines: i32,
 ) -> GBox {
-    let cell = GBox::new(O::Vertical, 4);
+    let cell = GBox::new(O::Vertical, SPACE_XS);
     for margin in [GBox::set_margin_start, GBox::set_margin_end, GBox::set_margin_top, GBox::set_margin_bottom] {
         margin(&cell, CELL_MARGIN_PX);
     }
@@ -354,23 +342,35 @@ pub fn grid_cell_lines(
     cell
 }
 
-/// A list row: a small cover, the title on one line, and the In library badge at the end for favourites.
+/// The cell of the list-mode listing, a cell of a `gtk::ListView` (the view's `rich-list` class gives it its insets): a
+/// small cover, the title on one line, and the In library badge at the end for favourites.
 pub fn list_cell(item: Option<&ListItem>, load: &CoverLoader, guard: &CoverGuard) -> GBox {
-    let Some(item) = item else { return GBox::new(O::Horizontal, 12) };
+    let line = GBox::new(O::Horizontal, SPACE_M);
+    let Some(item) = item else { return line };
     let size = super::look::SMALL;
     let cover = cover_widget(item, size.width, size.height, load, guard);
-    let badge = badge_visible(item.favorite).then(|| super::look::badge(&tr(kuro_i18n::MsgKey::in_library), true).upcast::<gtk::Widget>());
-    row_line(super::look::list_row(Some(cover.upcast()), &item.title, None, badge))
+    cover.set_valign(Align::Center);
+    line.append(&cover);
+    let title = crate::ui::row_title(&item.title);
+    title.set_hexpand(true);
+    title.set_valign(Align::Center);
+    line.append(&title);
+    if badge_visible(item.favorite) {
+        let badge = super::look::badge(&tr(kuro_i18n::MsgKey::in_library), true);
+        line.append(&badge);
+    }
+    line
 }
 
-/// A boxed-list row around `child`: activating the row (a click, Enter or Space, through `widgets::row_activate`) runs
-/// `on_primary`; a right-click, the Menu key or Shift+F10 (and a long press on a touch screen) opens the menu of the
-/// items `menu` returns (`widgets::context_menu`). The menu gestures never activate the row.
-pub fn list_row(child: &impl IsA<gtk::Widget>, on_primary: impl Fn() + 'static, menu: impl Fn() -> Vec<crate::widgets::context_menu::Item> + 'static) -> gtk::ListBoxRow {
-    let row = gtk::ListBoxRow::builder().child(child).build();
-    crate::widgets::row_activate::on_activate(&row, move |_| on_primary());
-    crate::widgets::context_menu::attach(&row, move |_, _| menu());
-    row
+/// Makes `row` (a [`super::look::list_row`] or a source row) a row of a list of pages: activating it (a click, Enter or
+/// Space, through `widgets::row_activate`) runs `on_primary`; a right-click, the Menu key or Shift+F10 (and a long press
+/// on a touch screen) opens the menu of the items `menu` returns (`widgets::context_menu`). The menu gestures never
+/// activate the row.
+pub fn list_row(row: &adw::ActionRow, on_primary: impl Fn() + 'static, menu: impl Fn() -> Vec<crate::widgets::context_menu::Item> + 'static) -> gtk::ListBoxRow {
+    row.set_activatable(true);
+    crate::widgets::row_activate::on_activate(row, move |_| on_primary());
+    crate::widgets::context_menu::attach(row, move |_, _| menu());
+    row.clone().upcast()
 }
 
 #[cfg(test)]
@@ -379,15 +379,27 @@ pub(crate) mod tests {
 
     use super::*;
 
+    /// The icon or tile in the prefix of a source row: the first widget below it that wears the row cover class or is
+    /// a plain icon.
+    fn icon_of(row: &adw::ActionRow) -> gtk::Widget {
+        fn find(w: &gtk::Widget) -> Option<gtk::Widget> {
+            if w.has_css_class("kb-row-cover") || w.is::<Image>() {
+                return Some(w.clone());
+            }
+            std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| find(&c))
+        }
+        find(row.upcast_ref()).expect("the icon slot")
+    }
+
     #[test]
     fn a_source_without_an_icon_shows_a_letter_tile_and_one_with_its_own_icon_keeps_it() {
         crate::testing::with_display(|| {
             let letter = source_row("MangaDex", None, SourceIcon::Letter, None, false, None);
-            let tile = letter.first_child().expect("the icon slot");
+            let tile = icon_of(&letter);
             assert!(tile.has_css_class("kb-cover-initials") && tile.has_css_class("kb-row-cover"));
             assert_eq!(tile.first_child().and_downcast::<Label>().expect("the letter").label(), "M");
             let plain = source_row("Local", None, SourceIcon::Local, None, false, None);
-            assert!(plain.first_child().is_some_and(|w| w.is::<Image>()));
+            assert!(icon_of(&plain).is::<Image>());
         });
     }
 
@@ -398,7 +410,7 @@ pub(crate) mod tests {
             let file = dir.path().join("icon.png");
             image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 255])).save(&file).expect("a png");
             let row = source_row_with("Repo", None, SourceIcon::Letter, None, Some(&file), false, false, None);
-            let picture = row.first_child().and_downcast::<gtk::Image>().expect("the saved icon");
+            let picture = icon_of(&row).downcast::<gtk::Image>().expect("the saved icon");
             assert!(picture.has_css_class("kb-row-cover"), "the letter tile's rounded corners");
             assert_eq!(picture.pixel_size(), ICON_HEIGHT_PX);
         });
@@ -515,7 +527,7 @@ pub(crate) mod tests {
     fn a_row_click_activates_and_a_right_click_or_the_menu_key_asks_for_the_menu() {
         let (clicks, menus) = (Rc::new(Cell::new(0)), Rc::new(Cell::new(0)));
         let (c, m) = (Rc::clone(&clicks), Rc::clone(&menus));
-        let row = list_row(&GBox::new(O::Horizontal, 0), move || c.set(c.get() + 1), move || {
+        let row = list_row(&crate::widgets::row::plain("Row", None, None), move || c.set(c.get() + 1), move || {
             m.set(m.get() + 1);
             Vec::new()
         });

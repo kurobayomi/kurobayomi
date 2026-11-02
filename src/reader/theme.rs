@@ -34,9 +34,9 @@ pub fn background_for(theme: i32, system_dark: bool) -> Background {
     }
 }
 
-/// Whether the desktop asks for a dark theme. Read through GTK settings, since libadwaita is not used.
+/// Whether the app is dark: libadwaita's answer, which follows the desktop unless the theme mode forces one.
 pub fn system_prefers_dark() -> bool {
-    gtk::Settings::default().is_some_and(|s| s.is_gtk_application_prefer_dark_theme())
+    adw::is_initialized() && adw::StyleManager::default().is_dark()
 }
 
 /// Whether the reader's text is light (`isDarkBackground`, B§1.4): themes 1 and 2 are dark, automatic is dark when

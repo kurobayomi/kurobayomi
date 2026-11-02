@@ -1,7 +1,6 @@
 //! The contract every settings screen of this module meets (task T-47a-006), and the settings search (tasks T-47a-004
 //! and T-47a-008): the index of every row of the main and player screens, the matcher, and the results page.
 use kuro_i18n::{MsgKey, tr};
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk::prelude::*;
@@ -12,6 +11,7 @@ use crate::pref_model::highlight;
 use crate::pref_model::model::{Preference, PreferenceItem};
 use crate::screens::{built, Built};
 use crate::settings_ui::route;
+use crate::widgets::row::{self, RowSpec};
 
 /// The main index, in index order (Android `settingScreens`). About is not indexed.
 pub const MAIN_SCREENS: [&str; 6] = [
@@ -151,23 +151,14 @@ fn clear(list: &gtk::ListBox) {
     }
 }
 
-fn result_row(hit: &Hit) -> gtk::ListBoxRow {
-    let title = gtk::Label::builder().label(&hit.title).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).build();
-    let crumb = gtk::Label::builder().label(&hit.crumb).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).build();
-    crumb.add_css_class("dim-label");
-    crumb.add_css_class("caption");
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 2);
-    body.set_margin_top(crate::ui::ROW_PAD_V);
-    body.set_margin_bottom(crate::ui::ROW_PAD_V);
-    body.set_margin_start(crate::ui::ROW_PAD_H);
-    body.set_margin_end(crate::ui::ROW_PAD_H);
-    body.set_size_request(-1, crate::ui::ROW_MIN_HEIGHT - 2 * crate::ui::ROW_PAD_V);
-    body.set_valign(gtk::Align::Center);
-    body.append(&title);
-    body.append(&crumb);
-    let row = gtk::ListBoxRow::new();
-    row.set_child(Some(&body));
-    row
+/// One result: the setting's title over its crumb. Activating it highlights the setting on its screen and opens the screen.
+fn result_row(hit: &Hit) -> adw::ActionRow {
+    let (key, screen) = (hit.key.clone(), hit.screen.clone());
+    let open: Rc<dyn Fn()> = Rc::new(move || {
+        highlight::request(key.clone());
+        crate::ui::open(&screen);
+    });
+    row::build(RowSpec { title: &hit.title, subtitle: Some(&hit.crumb), icon: None, trailing: None, on_click: Some(open) })
 }
 
 /// The settings search over every screen.
@@ -201,15 +192,14 @@ fn search_page(player_only: bool) -> Option<Built> {
     let results = crate::ui::boxed_list();
     results.set_visible(false);
     col.append(&results);
-    let hint = crate::ui::status("system-search-symbolic", &tr(MsgKey::ui_type_to_search_every_setting));
+    let hint = crate::widgets::status::empty("system-search-symbolic", &tr(MsgKey::ui_type_to_search_every_setting), None);
     col.append(&hint);
-    let empty = crate::ui::status("system-search-symbolic", &tr(MsgKey::no_results_found));
+    let empty = crate::widgets::status::empty("system-search-symbolic", &tr(MsgKey::no_results_found), None);
     empty.set_visible(false);
     col.append(&empty);
 
-    let shown: Rc<RefCell<Vec<Hit>>> = Rc::new(RefCell::new(Vec::new()));
     {
-        let (results, hint, empty, shown) = (results.clone(), hint.clone(), empty.clone(), Rc::clone(&shown));
+        let (results, hint, empty) = (results.clone(), hint.clone(), empty.clone());
         entry.connect_search_changed(move |entry| {
             clear(&results);
             let query = entry.text();
@@ -220,16 +210,6 @@ fn search_page(player_only: bool) -> Option<Built> {
             for hit in &found {
                 results.append(&result_row(hit));
             }
-            *shown.borrow_mut() = found;
-        });
-    }
-    {
-        let shown = Rc::clone(&shown);
-        results.connect_row_activated(move |_, row| {
-            let hit = usize::try_from(row.index()).ok().and_then(|at| shown.borrow().get(at).cloned());
-            let Some(hit) = hit else { return };
-            highlight::request(hit.key.clone());
-            crate::ui::open(&hit.screen);
         });
     }
     entry.connect_activate(|entry| {

@@ -1,12 +1,14 @@
 //! The in-app shortcut help dialog (T-38a-046): a two-column list of `shortcuts::help()`, opened with F1 or `?` on the
 //! manga and anime details pages.
 
+use crate::ui::DialogOpen as _;
 use kuro_i18n::{MsgKey, tr};
 use gtk::prelude::*;
 use gtk::Label;
 
 use super::shortcuts::help;
 use crate::ui::{self, DialogButton, Role};
+use crate::theme::tokens::{SPACE_S, SPACE_XL};
 
 /// Whether this key opens the help dialog.
 pub fn is_help_key(key: gtk::gdk::Key) -> bool {
@@ -15,7 +17,7 @@ pub fn is_help_key(key: gtk::gdk::Key) -> bool {
 
 /// The grid of the help list: the keys on the left, what they do on the right.
 pub fn grid() -> gtk::Grid {
-    let grid = gtk::Grid::builder().row_spacing(8).column_spacing(24).build();
+    let grid = gtk::Grid::builder().row_spacing(SPACE_S).column_spacing(SPACE_XL).build();
     for (row, (keys, what)) in help().iter().enumerate() {
         let keys = Label::builder().label(keys.as_str()).xalign(0.0).css_classes(["monospace"]).build();
         let what = Label::builder().label(what.as_str()).xalign(0.0).wrap(true).build();
@@ -28,7 +30,7 @@ pub fn grid() -> gtk::Grid {
 /// Opens the dialog.
 pub fn open() {
     let buttons = vec![DialogButton::new(&tr(MsgKey::action_close), Role::Suggested, || {})];
-    ui::dialog(&tr(MsgKey::ui_keyboard_shortcuts), &grid(), 420, buttons).present();
+    ui::dialog(&tr(MsgKey::ui_keyboard_shortcuts), &grid(), 420, buttons).open();
 }
 
 #[cfg(test)]

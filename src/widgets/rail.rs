@@ -10,6 +10,18 @@ pub const ITEM_SPACING: i32 = 4;
 /// Padding inside one row in px.
 pub const ROW_PAD: i32 = 8;
 
+/// One row of a `navigation-sidebar` list (the app's panel and the settings pages' list): `content` padded by
+/// [`ROW_PAD`], the row spaced from its neighbours by [`ITEM_SPACING`]. Every such list builds its rows here, so two
+/// side lists have the same row pitch.
+pub fn row(content: &impl gtk::prelude::IsA<gtk::Widget>) -> gtk::ListBoxRow {
+    use gtk::prelude::*;
+    crate::ui::margins(content, ROW_PAD);
+    let row = gtk::ListBoxRow::builder().child(content).build();
+    row.set_margin_top(ITEM_SPACING / 2);
+    row.set_margin_bottom(ITEM_SPACING / 2);
+    row
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

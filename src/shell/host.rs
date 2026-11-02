@@ -2,6 +2,7 @@
 //! creates once, the queue of launch requests that arrive before the window exists, the home tab selection that
 //! survives layout changes, and the one download service.
 
+use crate::ui::DialogOpen as _;
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -137,9 +138,7 @@ impl Shell {
                 DialogButton::cancel(tr(MsgKey::action_cancel)),
                 DialogButton::new(&tr(MsgKey::ui_quit), Role::Destructive, move || quit.destroy()),
             ];
-            let dialog = crate::ui::dialog(&tr(MsgKey::ui_downloads_running), &crate::ui::message(CLOSE_PROMPT), 360, buttons);
-            dialog.set_transient_for(Some(win));
-            dialog.present();
+            crate::ui::alert(&tr(MsgKey::ui_downloads_running), CLOSE_PROMPT, buttons, || {}).open_over(win);
             gtk::glib::Propagation::Stop
         });
     }

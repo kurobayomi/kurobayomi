@@ -8,7 +8,7 @@
 //! value an older version stored reads as off. "Reverse order" is the ascending bit: every list sorts descending by
 //! default (newest first). The Downloaded check is held on, and greyed out, while the app-wide downloaded-only mode is on.
 
-use gtk::prelude::*;
+use crate::ui::DialogOpen as _;
 use kuro_db::flags::item as c;
 use kuro_db::flags::season as sf;
 use kuro_domain::entries::season_display::SeasonDisplayMode;
@@ -264,9 +264,8 @@ impl Spec {
 /// new titles and are written to every title of the library.
 pub fn confirm_default(on_ok: impl Fn() + 'static) {
     let text = tr(MsgKey::ui_every_title_in_your_library_takes_these_list);
-    let body = ui::message(&text);
     let buttons = vec![DialogButton::cancel(tr(MsgKey::action_cancel)), DialogButton::new(&tr(MsgKey::ui_use_for_all_titles), Role::Suggested, on_ok)];
-    ui::dialog(&tr(MsgKey::ui_use_as_default_for_all_titles), &body, 380, buttons).present();
+    ui::alert(&tr(MsgKey::ui_use_as_default_for_all_titles), &text, buttons, || {}).open();
 }
 
 #[cfg(test)]

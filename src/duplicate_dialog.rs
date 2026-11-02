@@ -6,11 +6,11 @@
 use std::rc::Rc;
 
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 use kuro_platform::kind::Kind;
 
-use crate::ui::{self, DialogButton, Role};
+use crate::ui::{self, DialogButton, DialogOpen as _, Role};
 
 /// What the user chose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,7 +39,7 @@ pub fn label(kind: Kind, choice: DuplicateChoice) -> String {
 /// Opens the dialog. `on_closed` runs once however the dialog closes (a choice, Cancel, Escape or the close button),
 /// before a choice acts; `on_choice` runs with the choice after the dialog is closed. The window is returned so a page
 /// can keep it in its one dialog slot.
-pub fn open(kind: Kind, on_choice: impl Fn(DuplicateChoice) + 'static, on_closed: impl Fn() + 'static) -> gtk::Window {
+pub fn open(kind: Kind, on_choice: impl Fn(DuplicateChoice) + 'static, on_closed: impl Fn() + 'static) -> adw::Dialog {
     let on_choice: Rc<dyn Fn(DuplicateChoice)> = Rc::new(on_choice);
     let mut buttons = vec![DialogButton::cancel(tr(MsgKey::action_cancel))];
     for choice in CHOICES {
@@ -52,11 +52,8 @@ pub fn open(kind: Kind, on_choice: impl Fn(DuplicateChoice) + 'static, on_closed
         }));
     }
     let window = ui::dialog(&tr(MsgKey::are_you_sure), &ui::message(&tr(MsgKey::confirm_add_duplicate_manga)), 400, buttons);
-    window.connect_close_request(move |_| {
-        on_closed();
-        glib::Propagation::Proceed
-    });
-    window.present();
+    window.connect_closed(move |_| on_closed());
+    window.open();
     window
 }
 
@@ -73,7 +70,7 @@ mod tests {
         assert_eq!(label(Kind::Anime, DuplicateChoice::Migrate), label(Kind::Manga, DuplicateChoice::Migrate));
     }
 
-    fn buttons(window: &gtk::Window) -> Vec<gtk::Button> {
+    fn buttons(window: &adw::Dialog) -> Vec<gtk::Button> {
         fn walk(w: &gtk::Widget, out: &mut Vec<gtk::Button>) {
             if let Some(b) = w.downcast_ref::<gtk::Button>() {
                 out.push(b.clone());
@@ -85,7 +82,7 @@ mod tests {
             }
         }
         let mut out = Vec::new();
-        walk(&window.child().expect("child"), &mut out);
+        walk(&ui::dialog_content(window).expect("content"), &mut out);
         out.into_iter().filter(|b| b.label().is_some()).collect()
     }
 

@@ -15,7 +15,8 @@ type Callback = Rc<dyn Fn(&gtk::ListBoxRow)>;
 type Link = Rc<RefCell<Option<(glib::WeakRef<gtk::ListBox>, glib::SignalHandlerId)>>>;
 
 /// Runs `f` once each time `row` is activated by a click, Enter or Space.
-pub fn on_activate(row: &gtk::ListBoxRow, f: impl Fn(&gtk::ListBoxRow) + 'static) {
+pub fn on_activate(row: &impl IsA<gtk::ListBoxRow>, f: impl Fn(&gtk::ListBoxRow) + 'static) {
+    let row = row.upcast_ref::<gtk::ListBoxRow>();
     let f: Callback = Rc::new(f);
     let link: Link = Rc::default();
     attach(row, &f, &link);
@@ -133,7 +134,8 @@ mod tests {
 
 /// Test helper for the screens: the same call GTK makes for a mouse click on `row`.
 #[cfg(test)]
-pub fn click_row(row: &gtk::ListBoxRow) {
+pub fn click_row(row: &impl IsA<gtk::ListBoxRow>) {
+    let row = row.upcast_ref::<gtk::ListBoxRow>();
     let list = row.parent().and_downcast::<gtk::ListBox>().expect("the row is in a list");
     list.emit_by_name::<()>("row-activated", &[row]);
 }
@@ -165,7 +167,7 @@ mod site_tests {
     use super::*;
     use std::cell::Cell;
 
-    fn keyboard(row: &gtk::ListBoxRow) {
+    fn keyboard(row: &impl IsA<gtk::ListBoxRow>) {
         row.emit_by_name::<()>("activate", &[]);
     }
 
@@ -176,7 +178,7 @@ mod site_tests {
             let n = std::rc::Rc::new(Cell::new(0));
             let seen = std::rc::Rc::clone(&n);
             let common = crate::pref_model::model::ItemCommon::new("Reader");
-            let row = crate::pref_model::widgets::text::build(&common, Some(std::rc::Rc::new(move || seen.set(seen.get() + 1))), None).row;
+            let row = crate::pref_model::widgets::text::build(&common, Some(std::rc::Rc::new(move || seen.set(seen.get() + 1))), None);
             let list = gtk::ListBox::new();
             list.append(&row);
             click_row(&row);

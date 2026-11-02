@@ -380,8 +380,6 @@ pref_anime_library_update_categories_details = விலக்கப்பட்
 
 unofficial_extension_message_aniyomi = இந்த நீட்டிப்பு அதிகாரப்பூர்வ பட்டியலிலிருந்து அல்ல.
 
-unofficial_anime_extension_message = இந்த நீட்டிப்பு அதிகாரப்பூர்வ பட்டியலிலிருந்து அல்ல.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") } %
 
 pref_remove_exclude_categories_manga = விலக்கப்பட்ட மங்கா வகைகள்

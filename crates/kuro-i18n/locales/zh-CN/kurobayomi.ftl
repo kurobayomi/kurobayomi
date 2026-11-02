@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = 重置此漫画的所有章节
 
 download_insufficient_space = 存储空间不足，无法下载
 
-download_queue_size_warning = 警告：批量下载可能导致插件变慢，甚至会使站点屏蔽 Aniyomi。点击了解详情。
-
 pref_invalidate_download_cache_summary = 强制重新扫描已下载的章节和剧集
 
 label_player_settings = 播放器设置
@@ -729,8 +727,6 @@ pref_manga_library_update_categories_details = 排除优先于包含，同时属
 pref_anime_library_update_categories_details = 排除优先于包含，同时属于包含和排除分类的动画不会自动更新。
 
 unofficial_extension_message_aniyomi = 此插件不是 Aniyomi 官方插件。
-
-unofficial_anime_extension_message = 此插件不是Aniyomi官方插件。
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

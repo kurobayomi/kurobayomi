@@ -59,13 +59,6 @@ pub fn back_label() -> String {
 }
 
 #[cfg(test)]
-/// Opening the screen pushes; closing it pops (T-53a-051).
-pub fn transition(opening: bool) -> super::transitions::Spec {
-    let direction = if opening { super::transitions::Direction::Push } else { super::transitions::Direction::Pop };
-    super::transitions::spec(direction, super::transitions::animations_enabled())
-}
-
-#[cfg(test)]
 /// The overflow actions, in the order the menu lists them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Overflow {
@@ -140,16 +133,6 @@ mod tests {
         assert_eq!(back_step(true), BackStep::History);
         assert_eq!(back_step(false), BackStep::Close);
         assert_eq!(back_label(), "Back");
-    }
-
-    #[test]
-    fn open_and_close_follow_the_page_transitions() {
-        use super::super::transitions::{Direction, animations_enabled, spec};
-        crate::testing::with_display(|| {
-            let on = animations_enabled();
-            assert_eq!(transition(true), spec(Direction::Push, on));
-            assert_eq!(transition(false), spec(Direction::Pop, on));
-        });
     }
 
     #[test]

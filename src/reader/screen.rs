@@ -769,7 +769,7 @@ pub fn open_with(
 
     let viewer = gtk::Box::new(gtk::Orientation::Vertical, 0);
     viewer.set_vexpand(true);
-    let loading = gtk::Spinner::builder().halign(gtk::Align::Center).valign(gtk::Align::Center).spinning(true).build();
+    let loading = crate::widgets::status::loading(None);
     let stack = gtk::Stack::new();
     stack.set_vexpand(true);
     stack.add_named(&loading, Some(PAGE_LOADING));
@@ -2146,7 +2146,7 @@ mod tests {
             let screen = open(deps, &crate::reader::launch::open_gate(), toaster, || {});
             let root: gtk::Widget = screen.root.clone().upcast();
             let bars = crate::screens::alone::descendants(&root);
-            assert!(bars.iter().any(|w| w.is::<gtk::HeaderBar>()), "the reader shows its header bar while the chapter loads");
+            assert!(bars.iter().any(|w| w.is::<adw::HeaderBar>()), "the reader shows its header bar while the chapter loads");
         });
     }
 

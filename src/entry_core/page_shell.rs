@@ -5,63 +5,71 @@
 use std::cell::Cell;
 
 use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Button, Label, Orientation as O};
+use gtk::{Box as GBox, Button, Label, Orientation as O};
 use kuro_i18n::{MsgKey, tr};
 
 use crate::entry_core::details::layout::fab_expanded;
 use crate::ui;
+use crate::theme::tokens::{SPACE_L, SPACE_S};
 
 /// The stack of a details page with its `loading` child (a spinner) and its `missing` child (not found, with Back). The
 /// page adds its `ready` child.
 pub fn state_stack() -> gtk::Stack {
     let stack = gtk::Stack::new();
-    let spinner = ui::loading(ui::LoadSize::Page);
-    let loading = GBox::new(O::Vertical, 12);
-    loading.set_halign(Align::Center);
-    loading.set_valign(Align::Center);
-    loading.append(&spinner);
-    loading.append(&Label::new(Some(&tr(MsgKey::loading))));
-    stack.add_named(&loading, Some("loading"));
-    let missing_page = ui::status("dialog-error-symbolic", &tr(MsgKey::no_results_found));
+    stack.add_named(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))), Some("loading"));
     let back_missing = Button::with_label(&tr(MsgKey::action_webview_back));
-    back_missing.set_halign(Align::Center);
     back_missing.connect_clicked(|_| ui::pop());
-    missing_page.append(&back_missing);
+    let missing_page = crate::widgets::status::error_with(&tr(MsgKey::no_results_found), None, std::slice::from_ref(&back_missing));
     stack.add_named(&missing_page, Some("missing"));
     stack
 }
 
-/// The item header over the list (`ItemHeader`): the count and the missing warning. It is a plain row: the list
-/// options live in the one menu button of the top bar (`list_options`). `row` has the width and inset of the list's cards,
-/// so on a wide window the count stays over the first card instead of at the window's edge.
+/// The item header over the list (`ItemHeader`): the count and the missing warning, then one linked group (the list
+/// options, which hold sort and filter, and a search toggle) and the menu of the list's bulk actions. A search bar under
+/// the row opens with the toggle. `row` has the width and inset of the list's cards, so on a wide window the count stays
+/// over the first card instead of at the window's edge.
 pub struct ItemHeaderRow {
     pub row: gtk::Widget,
     pub count: Label,
     pub missing: Label,
-    /// "Download all", at the right end of the row; the page shows it for an entry that can queue downloads.
-    pub download_all: Button,
+    /// The text field of the search bar; the page reads its changes.
+    pub search: gtk::SearchEntry,
 }
 
-pub fn item_header_row() -> ItemHeaderRow {
+/// `options` is the list options button and `bulk` the menu button of the bulk actions, both made by the page. `page` is
+/// where Ctrl+F opens the search (`ui::search_row`).
+pub fn item_header_row(options: &gtk::Widget, bulk: &gtk::MenuButton, page: &impl IsA<gtk::Widget>) -> ItemHeaderRow {
     let count = Label::builder().xalign(0.0).hexpand(true).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build();
     let missing = Label::builder().xalign(1.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
-    let row = GBox::new(O::Horizontal, 8);
-    row.set_margin_top(6);
-    row.set_margin_bottom(6);
+    let entry = gtk::SearchEntry::builder().placeholder_text(tr(MsgKey::action_search_hint)).build();
+    let (bar, toggle) = ui::search_row(&entry, page);
+    // the page's single-letter keys (F list options, R refresh, W browser) need the letters, so typing does not open the
+    // search here; Ctrl+F, the toggle and Escape still do
+    bar.set_key_capture_widget(None::<&gtk::Widget>);
+    let linked = GBox::builder().css_classes(["linked"]).valign(gtk::Align::Center).build();
+    linked.append(options);
+    linked.append(&toggle);
+    let line = GBox::new(O::Horizontal, SPACE_S);
+    line.set_margin_top(SPACE_S);
+    line.set_margin_bottom(SPACE_S);
     // the inset of a card (`list_view`), so the count lines up with the first row
-    row.set_margin_start(16);
-    row.set_margin_end(16);
-    let download_all = Button::builder().label(&tr(MsgKey::ui_download_all)).css_classes(["flat"]).valign(gtk::Align::Center).visible(false).build();
-    row.append(&count);
-    row.append(&missing);
-    row.append(&download_all);
-    ItemHeaderRow { row: crate::clamp::clamp(&row, crate::entry_core::constants::LIST_MAX_WIDTH).upcast(), count, missing, download_all }
+    line.set_margin_start(SPACE_L);
+    line.set_margin_end(SPACE_L);
+    bulk.set_valign(gtk::Align::Center);
+    for w in [count.upcast_ref::<gtk::Widget>(), missing.upcast_ref(), linked.upcast_ref(), bulk.upcast_ref()] {
+        line.append(w);
+    }
+    ui::no_sticky_focus(&line);
+    let column = GBox::new(O::Vertical, 0);
+    column.append(&line);
+    column.append(&bar);
+    ItemHeaderRow { row: crate::ui::clamp(&column, crate::entry_core::constants::LIST_MAX_WIDTH).upcast(), count, missing, search: entry }
 }
 
 /// The Start or Resume button: the play icon and its label. The page places it over the list.
 pub fn fab_button() -> (Button, Label) {
     let label = Label::new(None);
-    let content = GBox::new(O::Horizontal, 8);
+    let content = GBox::new(O::Horizontal, SPACE_S);
     content.append(&gtk::Image::from_icon_name("media-playback-start-symbolic"));
     content.append(&label);
     let button = Button::builder().child(&content).css_classes(["suggested-action", "pill"]).build();
@@ -71,8 +79,8 @@ pub fn fab_button() -> (Button, Label) {
 
 /// The header bar and title label of a page built with `ui::page`, and a Back button packed at its start. Back clears a
 /// selection before it pops, so the page wires it, not `ui::page`.
-pub fn header_with_back(page: &GBox) -> (Option<gtk::HeaderBar>, Option<Label>, Button) {
-    let header = page.first_child().and_downcast::<gtk::HeaderBar>();
+pub fn header_with_back(page: &GBox) -> (Option<adw::HeaderBar>, Option<Label>, Button) {
+    let header = page.first_child().and_downcast::<adw::HeaderBar>();
     let title = header.as_ref().and_then(|h| h.title_widget()).and_downcast::<Label>();
     let back = Button::from_icon_name("go-previous-symbolic");
     back.set_tooltip_text(Some(&tr(MsgKey::action_webview_back)));
@@ -126,7 +134,7 @@ pub fn fab_label_shown(scroll: &Cell<(f64, bool)>, adj: &gtk::Adjustment) -> boo
 
 /// Fades the title and the header bar background with the scroll in the one-column layout, where the info block
 /// (`info_height` tall) is the first thing of the list. `keep_title` shows the title whatever the scroll.
-pub fn fade_header(title: Option<&Label>, bar: Option<&gtk::HeaderBar>, narrow: bool, value: f64, info_height: i32, keep_title: bool) {
+pub fn fade_header(title: Option<&Label>, bar: Option<&adw::HeaderBar>, narrow: bool, value: f64, info_height: i32, keep_title: bool) {
     let first_visible = value < f64::from(info_height);
     if let Some(label) = title {
         label.set_opacity(if keep_title || title_opaque(narrow, first_visible) { 1.0 } else { 0.0 });
@@ -176,6 +184,32 @@ pub(crate) mod test_util {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The list search is the app's one search (`ui::search_row`), but typing does not open it: the page's single-letter
+    /// keys need the letters.
+    #[test]
+    fn the_list_search_is_the_shared_one_and_leaves_the_letter_keys_alone() {
+        crate::testing::with_display(|| {
+            let page = GBox::new(O::Vertical, 0);
+            let header = item_header_row(Button::new().upcast_ref(), &gtk::MenuButton::new(), &page);
+            let mut stack = vec![header.row.clone()];
+            let mut bar = None;
+            while let Some(w) = stack.pop() {
+                if let Ok(b) = w.clone().downcast::<gtk::SearchBar>() {
+                    bar = Some(b);
+                    break;
+                }
+                let mut c = w.first_child();
+                while let Some(x) = c {
+                    c = x.next_sibling();
+                    stack.push(x);
+                }
+            }
+            let bar = bar.expect("the search bar");
+            assert!(bar.key_capture_widget().is_none(), "typing does not open the search");
+            assert_eq!(bar.child().and_then(|c| c.first_child()).as_ref(), Some(header.search.upcast_ref()), "the shared helper clamps the entry");
+        });
+    }
 
     #[test]
     fn the_button_label_hides_on_a_forward_scroll_and_shows_at_the_top_backward_and_at_the_end() {

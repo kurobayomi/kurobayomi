@@ -214,8 +214,6 @@ pref_anime_library_update_categories_details = انیمه‌های دسته‌�
 
 unofficial_extension_message_aniyomi = این افزونه از لیست افزونه‌های رسمی آنی‌یومی نیست.
 
-unofficial_anime_extension_message = این افزونه از لیست افزونه‌های رسمی آنی‌یومی نیست.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") } %
 
 pref_remove_exclude_categories_manga = دسته‌بندی‌های محذوف

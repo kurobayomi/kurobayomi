@@ -2,11 +2,12 @@
 //! renders once, then again on the GTK main loop whenever its live query publishes (see [`crate::watch::bind_watch`]).
 //! The library, history and updates screens have their own modules (`library`, `updates`).
 
+use crate::ui::DialogOpen as _;
 use kuro_i18n::{MsgKey, tr};
 use std::rc::Rc;
 
 use gtk::glib;
-use gtk::prelude::*;
+use adw::prelude::*;
 use gtk::{Box as GBox, Button, Label, ListBox, Orientation as O};
 use kuro_domain::category::model::Category;
 use kuro_platform::kind::Kind;
@@ -15,6 +16,8 @@ use crate::data;
 use crate::screens::dialog_then_named;
 use crate::ui::{boxed_list, column, icon_button, scrolled, screen, DialogButton, Role};
 use crate::watch::bind_watch;
+use crate::theme::tokens::{SPACE_XS};
+use crate::theme::tokens::{SPACE_S};
 
 /// A category write that failed is a toast; the list stays as the database has it.
 fn report<T, E: std::fmt::Display>(result: Result<T, E>) {
@@ -41,7 +44,7 @@ fn duplicate_category() -> String {
 fn name_dialog(dialog: &str, initial: &str, taken: impl Fn(&str) -> bool + 'static, on_ok: impl Fn(String) + 'static) {
     let Some(spec) = screen("categories").dialogs.into_iter().find(|d| d.id == dialog) else { return };
     let labels = if spec.buttons.is_empty() { vec!["Cancel".to_owned(), "OK".to_owned()] } else { spec.buttons.clone() };
-    let body = GBox::new(O::Vertical, 6);
+    let body = GBox::new(O::Vertical, SPACE_S);
     let entry = gtk::Entry::builder().text(initial).activates_default(true).build();
     body.append(&entry);
     let error = Label::builder().css_classes(["error"]).xalign(0.0).wrap(true).visible(false).build();
@@ -64,7 +67,7 @@ fn name_dialog(dialog: &str, initial: &str, taken: impl Fn(&str) -> bool + 'stat
         }
     };
     let win = crate::ui::dialog(&spec.title, &body, 380, vec![DialogButton::cancel(cancel), DialogButton::keep_open_unless(ok, Role::Suggested, save)]);
-    win.present();
+    win.open();
     entry.grab_focus();
 }
 
@@ -73,7 +76,7 @@ fn name_dialog(dialog: &str, initial: &str, taken: impl Fn(&str) -> bool + 'stat
 struct CategoryList {
     kind: Kind,
     list: ListBox,
-    empty: GBox,
+    empty: adw::StatusPage,
 }
 
 /// Whether a user category other than `except` already has the trimmed name `new` (the same exact-name rule the
@@ -140,7 +143,7 @@ impl CategoryList {
             drag.set_actions(gtk::gdk::DragAction::MOVE);
             drag.connect_prepare(move |_, _, _| Some(gtk::gdk::ContentProvider::for_value(&id.to_value())));
             handle.add_controller(drag);
-            let actions = GBox::new(O::Horizontal, 4);
+            let actions = GBox::new(O::Horizontal, SPACE_XS);
             for button in [edit.upcast_ref::<gtk::Widget>(), hide.upcast_ref(), del.upcast_ref()] {
                 actions.append(button);
             }
@@ -169,7 +172,7 @@ impl CategoryList {
 pub fn categories_content(kind: Kind) -> crate::screens::Built {
     let add = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::action_add_category));
     add.connect_clicked(move |_| add_category(kind));
-    let (empty, _) = crate::browse::look::empty_state("tag-symbolic", &screen("categories").empty.unwrap_or_default(), std::slice::from_ref(&add));
+    let empty = crate::widgets::status::empty_with("tag-symbolic", &screen("categories").empty.unwrap_or_default(), None, std::slice::from_ref(&add));
     let column = column();
     column.append(&boxed_list());
     column.append(&empty);
@@ -212,18 +215,24 @@ mod tests {
         assert!(!taken_by_user(&all, "reading", None), "names are exact, not case-folded, as in the service");
     }
 
-    /// The modal dialog on screen and its own buttons in order (the last one is OK).
-    fn confirm() -> (gtk::Window, Vec<Button>) {
-        let window = gtk::Window::list_toplevels().into_iter().filter_map(|w| w.downcast::<gtk::Window>().ok()).find(|w| w.is_modal() && w.is_visible()).expect("a dialog is on screen");
-        // the dialog's own buttons have labels; the title bar's window controls are icons
-        let buttons = descendants(window.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Button>().ok()).filter(|b| b.label().is_some()).collect();
+    /// The dialogs open over the main window, oldest first.
+    fn open_dialogs() -> Vec<adw::Dialog> {
+        descendants(crate::ui::window().upcast_ref()).into_iter().filter_map(|w| w.downcast::<adw::Dialog>().ok()).collect()
+    }
+
+    /// The dialog on screen and its own buttons in order (the last one is OK).
+    fn confirm() -> (adw::Dialog, Vec<Button>) {
+        let window = open_dialogs().pop().expect("a dialog is on screen");
+        // the dialog's own buttons have labels; the header's close button is an icon
+        let content = crate::ui::dialog_content(&window).expect("the dialog content");
+        let buttons = descendants(&content).into_iter().filter_map(|w| w.downcast::<Button>().ok()).filter(|b| b.label().is_some()).collect();
         (window, buttons)
     }
 
     /// [`confirm`] for a name dialog, with its entry.
-    fn dialog() -> (gtk::Window, gtk::Entry, Vec<Button>) {
+    fn dialog() -> (adw::Dialog, gtk::Entry, Vec<Button>) {
         let (window, buttons) = confirm();
-        let entry = descendants(window.upcast_ref()).into_iter().find_map(|w| w.downcast::<gtk::Entry>().ok()).expect("the name entry");
+        let entry = descendants(&crate::ui::dialog_content(&window).expect("the dialog content")).into_iter().find_map(|w| w.downcast::<gtk::Entry>().ok()).expect("the name entry");
         (window, entry, buttons)
     }
 
@@ -263,9 +272,9 @@ mod tests {
             let (_, _, again) = dialog();
             assert_eq!(again.len(), buttons.len(), "the dialog is still the one on screen");
             let error = descendants(window.upcast_ref()).into_iter().filter_map(|w| w.downcast::<Label>().ok()).find(|l| l.text() == duplicate_category()).expect("the duplicate error label");
-            assert!(error.is_visible(), "the duplicate-name error shows");
+            assert!(error.get_visible(), "the duplicate-name error shows");
             buttons.first().expect("Cancel").emit_clicked();
-            assert!(!window.is_visible(), "Cancel closes the dialog");
+            assert!(pump(ctx, || open_dialogs().is_empty()), "Cancel closes the dialog");
             assert_eq!(names(), ["Reading"], "the duplicate was not created");
 
             // rename

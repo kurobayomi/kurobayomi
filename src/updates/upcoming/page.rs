@@ -11,10 +11,11 @@ use std::rc::Rc;
 use chrono::{Local, NaiveDate, Weekday};
 use gtk::gdk;
 use gtk::glib;
+use crate::theme::tokens::SPACE_S;
 #[cfg(test)]
 use gtk::glib::translate::IntoGlib;
-use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Label, ListBoxRow, Orientation as O};
+use adw::prelude::*;
+use gtk::{Align, Box as GBox, Orientation as O};
 use kuro_platform::kind::Kind;
 use kuro_i18n::{MsgKey, tr};
 
@@ -218,11 +219,14 @@ impl UpcomingPage {
             self.calendar_slot.remove(&child);
         }
         let calendar = self.calendar.widget();
-        if calendar.parent().is_some() {
-            calendar.unparent();
+        if let Some(parent) = calendar.parent() {
+            match parent.downcast_ref::<adw::Clamp>() {
+                Some(clamp) => clamp.set_child(None::<&gtk::Widget>),
+                None => calendar.unparent(),
+            }
         }
         match shape.calendar_cap {
-            Some(max) => self.calendar_slot.append(&crate::clamp::clamp(calendar, max)),
+            Some(max) => self.calendar_slot.append(&crate::ui::clamp(calendar, max)),
             None => self.calendar_slot.append(calendar),
         }
         self.calendar_slot.set_valign(if shape.two_panels { Align::Start } else { Align::Fill });
@@ -275,15 +279,13 @@ impl UpcomingPage {
 
     /// One entry row: the book cover (initials until an image draws) and the title (two lines at most); activating
     /// the row (click, Enter or Space) opens the entry by id.
-    fn item(&self, entry: &Entry) -> ListBoxRow {
+    fn item(&self, entry: &Entry) -> adw::ActionRow {
         let art = look::cover_art(self.kind, entry.id, entry.source_id, entry.cover_url.clone(), true, entry.cover_last_modified);
         let cover = look::row_cover(&entry.title, Some(&art), look::MEDIUM.width, look::MEDIUM.height);
         let row = look::list_row(Some(cover), &entry.title, None, None);
         // a long title keeps its two lines
-        if let Some(title) = crate::updates::row_texts(&row).first_child().and_downcast::<Label>() {
-            title.set_wrap(true);
-            title.set_lines(2);
-        }
+        row.set_title_lines(2);
+        row.set_activatable(true);
         let (open, id) = (Rc::clone(&self.env.open), entry.id);
         crate::widgets::row_activate::on_activate(&row, move |_| open(id));
         row
@@ -303,11 +305,11 @@ impl UpcomingPage {
 
 /// The heading of a day (`ui::heading`) and a badge that says how many entries it has.
 fn heading(text: &str, count: u32) -> GBox {
-    let line = GBox::new(O::Horizontal, 8);
+    let line = GBox::new(O::Horizontal, SPACE_S);
     let label = crate::ui::heading(text);
-    // the margin goes on the line, so the badge sits level with the text
-    label.set_margin_top(0);
-    line.set_margin_top(12);
+    // the group gap goes on the line, so the badge sits level with the text
+    label.remove_css_class(crate::ui::GROUP_HEADING);
+    line.add_css_class(crate::ui::GROUP_HEADING);
     line.append(&label);
     line.append(&crate::browse::look::badge(&rows::badge_text(count), false));
     line
@@ -367,6 +369,7 @@ fn assemble(screen: Rc<UpcomingPage>) -> GBox {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use gtk::Label;
 
     use super::*;
 
@@ -413,6 +416,14 @@ mod tests {
         all
     }
 
+    /// The first widget at or under `w` that wears `class`.
+    fn first_with_class(w: &gtk::Widget, class: &str) -> Option<gtk::Widget> {
+        if w.has_css_class(class) {
+            return Some(w.clone());
+        }
+        std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| first_with_class(&c, class))
+    }
+
     const SINGLE: Shape = Shape { two_panels: false, calendar_cap: None };
     const TWO: Shape = Shape { two_panels: true, calendar_cap: Some(360) };
 
@@ -433,8 +444,7 @@ mod tests {
             let list = rows[2].clone().downcast::<gtk::ListBox>().expect("the day's entries are a list");
             assert!(list.has_css_class("boxed-list"));
             let row = list.row_at_index(0).expect("an entry row");
-            let line = row.child().expect("the row line");
-            let cover = line.first_child().expect("the cover leads the row");
+            let cover = first_with_class(row.upcast_ref(), "kb-row-cover").expect("the cover leads the row");
             assert_eq!(cover.size_request(), (look::MEDIUM.width, look::MEDIUM.height), "the medium row cover");
             assert!(cover.has_css_class("kb-row-cover") && cover.has_css_class("kb-cover-initials"), "no stored cover: the initials");
         });
@@ -449,7 +459,7 @@ mod tests {
             assert_eq!(page.paned.start_child().as_ref(), Some(page.calendar_slot.upcast_ref()), "the calendar is the start panel");
             assert_eq!(children(&page.content).len(), 3 * 2, "the list has no calendar row");
             let cap = page.calendar_slot.first_child().expect("the capped calendar");
-            assert_eq!(cap.type_().name(), "KurobayomiClamp", "the width is capped in the medium band");
+            assert_eq!(cap.type_().name(), "AdwClamp", "the width is capped in the medium band");
             assert_eq!(cap.first_child().as_ref(), Some(page.calendar.widget().upcast_ref()));
             page.apply_shape(Shape { two_panels: true, calendar_cap: None }, 1000);
             assert_eq!(page.calendar_slot.first_child().as_ref(), Some(page.calendar.widget().upcast_ref()), "uncapped above 840 px");
@@ -504,13 +514,11 @@ mod tests {
     #[test]
     fn upcoming_page_is_titled_upcoming_and_escape_pops_it() {
         crate::testing::with_display(|| {
-            let (stack, _window) = crate::testing::nav();
-            let base = GBox::new(O::Vertical, 0);
-            stack.add_child(&base);
-            stack.set_visible_child(&base);
+            let _ = crate::testing::nav();
+            crate::ui::push(&GBox::new(O::Vertical, 0));
             let page = assemble(page(&Rc::default()));
             crate::ui::push(&page);
-            let title = page.first_child().and_downcast::<gtk::HeaderBar>().and_then(|bar| bar.title_widget()).and_downcast::<Label>().expect("the title");
+            let title = page.first_child().and_downcast::<adw::HeaderBar>().and_then(|bar| bar.title_widget()).and_downcast::<Label>().expect("the title");
             assert_eq!(title.label(), "Upcoming");
             assert_eq!(page.widget_name(), "screen:upcoming");
             assert_eq!(crate::ui::page_stack().1, 1, "the page is on show");

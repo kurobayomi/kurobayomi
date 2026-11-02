@@ -39,6 +39,7 @@ use crate::library::load;
 use crate::library::query::{Built, Facts};
 use crate::library::select::Selection;
 use crate::library::worker::{Gate, Job, Reply, Worker};
+use crate::widgets::selection_mirror::SelectionMirror;
 use crate::widgets::context_menu::{self, Item};
 
 /// What the view reads from the app: storage, preferences and the lookups that live outside storage.
@@ -115,10 +116,11 @@ struct Inner {
     query: Option<String>,
     search_turn: u64,
     selection: Selection,
-    /// What the grid shows now: the entry id of each cell (`None` for the global search row) and the ids that were
-    /// selected. A selection change then rebinds only the cards whose selected state changed, not every card.
+    /// What the grid shows now: the entry id of each cell (`None` for the global search row). A selection change then keeps
+    /// the cards and only moves GTK's selection (`selection_mirror`).
     shown_ids: Vec<Option<i64>>,
-    shown_selected: std::collections::HashSet<i64>,
+    /// GTK's selection of the grid and the list: the entries the page has selected, so libadwaita draws the selected fill.
+    selection_mirror: Rc<SelectionMirror>,
     /// The view options menu button of the page header; its dot shows while a filter is on (T-37a-056).
     options: options::Options,
     /// The logged-in trackers of the last load, so a render never asks the secret store again.
@@ -140,8 +142,9 @@ struct Inner {
     list: gtk::ListView,
     /// Starts an update of the active category; busy while a pass of this kind runs (T-26a-102).
     refresh_button: gtk::Button,
-    empty: gtk::Box,
-    empty_label: gtk::Label,
+    empty: adw::StatusPage,
+    /// The spinner page shown until the first load has arrived (see [`PageState`]).
+    loading: gtk::Widget,
     global_button: gtk::Button,
     /// The action of an empty library that has a repository: open Browse (T-37a-053).
     empty_action: gtk::Button,
@@ -183,17 +186,14 @@ impl LibraryView {
         let options = options::Options::new(deps.kind);
 
         let tabs = tabs::TabStrip::new();
-        let grid = gtk::GridView::new(
-            Some(gtk::NoSelection::new(Some(store.clone()))),
-            Some(gtk::SignalListItemFactory::new()),
-        );
+        // the grid and the list share one selection model, which mirrors the page's selection
+        let selection = gtk::MultiSelection::new(Some(store.clone()));
+        let selection_mirror = SelectionMirror::new(&selection);
+        let grid = gtk::GridView::new(Some(selection.clone()), Some(gtk::SignalListItemFactory::new()));
         grid.set_vexpand(true);
         grid.set_single_click_activate(false);
         grid.add_css_class("kb-library-grid");
-        let list = gtk::ListView::new(
-            Some(gtk::NoSelection::new(Some(store.clone()))),
-            Some(gtk::SignalListItemFactory::new()),
-        );
+        let list = gtk::ListView::new(Some(selection), Some(gtk::SignalListItemFactory::new()));
         list.set_vexpand(true);
         list.set_single_click_activate(false);
         // the shared page scroller: it scrolls down only, so a wide grid never shows a sideways scrollbar
@@ -205,15 +205,17 @@ impl LibraryView {
         empty_action.add_css_class("suggested-action");
         empty_action.set_visible(false);
         // the shared empty state; the message and the two actions are set by `render`
-        let (empty, empty_label) = crate::browse::look::empty_state(
+        let empty = crate::widgets::status::empty_with(
             match deps.kind {
                 Kind::Anime => "video-x-generic-symbolic",
                 Kind::Manga => "accessories-dictionary-symbolic",
             },
             "",
+            None,
             &[global_button.clone(), empty_action.clone()],
         );
         let welcome = welcome::Welcome::new();
+        let loading = crate::widgets::status::loading(None);
 
         let bar_label = gtk::Label::new(None);
         // the shared selection header goes in here by `wire_bar`, which has the handlers' weak reference
@@ -233,9 +235,12 @@ impl LibraryView {
         // a drag on the grid's empty space selects the covers it touches (issue #7)
         let drag = crate::widgets::drag_select::DragSelect::new(&scroller);
         root.append(drag.widget());
+        root.append(&loading);
         root.append(&empty);
         root.append(welcome.widget());
         root.append(&bar);
+        // before the first load only the spinner shows: the grid, the empty page and the welcome view are shown by `render`
+        PageState::Loading.show(&scroller, &loading, &empty, welcome.widget());
 
         // the library opens on the tab it was left on (T-37a-017); an id that is no longer a page falls back to the first
         let remembered = remembered_category(&deps.prefs, deps.kind);
@@ -251,7 +256,7 @@ impl LibraryView {
             search_turn: 0,
             selection: Selection::default(),
             shown_ids: Vec::new(),
-            shown_selected: std::collections::HashSet::new(),
+            selection_mirror,
             options,
             logged_in: BTreeSet::new(),
             last_resume: HashMap::new(),
@@ -267,7 +272,7 @@ impl LibraryView {
             list,
             refresh_button,
             empty,
-            empty_label,
+            loading,
             global_button,
             empty_action,
             welcome,
@@ -735,6 +740,37 @@ fn active_index(st: &Inner) -> usize {
     clamp_page(st.page as i64, pages.len())
 }
 
+/// Which one view fills the library page: exactly one of the four is visible at any time.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PageState {
+    /// The first load has not arrived.
+    Loading,
+    /// The grid or the list of covers.
+    Grid,
+    /// Nothing to show (no match, no entries, filters), with a repository present.
+    Empty,
+    /// An empty library with no source repository yet.
+    Welcome,
+}
+
+impl PageState {
+    fn of(loaded: bool, has_items: bool, welcome: bool) -> Self {
+        match (loaded, has_items, welcome) {
+            (false, _, _) => Self::Loading,
+            (true, true, _) => Self::Grid,
+            (true, false, true) => Self::Welcome,
+            (true, false, false) => Self::Empty,
+        }
+    }
+
+    fn show(self, scroller: &gtk::ScrolledWindow, loading: &gtk::Widget, empty: &adw::StatusPage, welcome: &gtk::Box) {
+        scroller.set_visible(self == Self::Grid);
+        loading.set_visible(self == Self::Loading);
+        empty.set_visible(self == Self::Empty);
+        welcome.set_visible(self == Self::Welcome);
+    }
+}
+
 /// Redraws the toolbar, tabs, grid, empty state and selection bar from the current state.
 fn render(inner: &Rc<RefCell<Inner>>) {
     render_with(inner, false);
@@ -819,7 +855,7 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
         }
     };
 
-    let (title_label, tabs, store, scroller, empty, empty_label, global, bar, bar_label, header, sel_header, download) = {
+    let (title_label, tabs, store, scroller, empty, loading, global, bar, bar_label, header, sel_header, download) = {
         let st = inner.borrow();
         (
             st.title.clone(),
@@ -827,7 +863,7 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
             st.store.clone(),
             st.scroller.clone(),
             st.empty.clone(),
-            st.empty_label.clone(),
+            st.loading.clone(),
             st.global_button.clone(),
             st.bar.clone(),
             st.bar_label.clone(),
@@ -857,40 +893,33 @@ fn render_with(inner: &Rc<RefCell<Inner>>, selection_only: bool) {
     show_mode_view(inner);
     let ids: Vec<Option<i64>> = view.grid_cells.iter().map(|cell| if let Cell::Item(item) = cell { Some(item.row.id) } else { None }).collect();
     let selected: std::collections::HashSet<i64> = inner.borrow().selection.ids().iter().copied().collect();
-    let (same_cards, before) = {
+    let same_cards = {
         let st = inner.borrow();
-        (selection_only && st.shown_ids == ids && store.n_items() as usize == ids.len(), st.shown_selected.clone())
+        selection_only && st.shown_ids == ids && store.n_items() as usize == ids.len()
     };
-    if same_cards {
-        for (position, id) in ids.iter().enumerate() {
-            if id.is_some_and(|id| selected.contains(&id) != before.contains(&id)) {
-                // a new object at the position, so the grid rebinds this card (the same object would keep its widget)
-                store.splice(position as u32, 1, &[glib::BoxedAnyObject::new(view.grid_cells[position].clone())]);
-            }
-        }
-    } else {
+    if !same_cards {
         let objects: Vec<glib::BoxedAnyObject> = view.grid_cells.iter().cloned().map(glib::BoxedAnyObject::new).collect();
         store.splice(0, store.n_items(), objects.as_slice());
     }
-    {
+    let chosen = ids.iter().enumerate().filter(|(_, id)| id.is_some_and(|id| selected.contains(&id))).map(|(position, _)| position as u32).collect();
+    let mirror = {
         let mut st = inner.borrow_mut();
         st.shown_ids = ids;
-        st.shown_selected = selected;
-    }
+        st.selection_mirror.clone()
+    };
+    mirror.apply(chosen);
     let has_items = !view.items.is_empty();
-    scroller.set_visible(has_items);
+    let loaded = inner.borrow().built.is_some();
     let welcome_shown = !has_items && view.empty_action == Some(actions::EmptyLibraryAction::AddRepository);
-    empty.set_visible(!has_items && !welcome_shown);
-    empty_label.set_label(&view.empty_text);
+    let state = PageState::of(loaded, has_items, welcome_shown);
+    let welcome_widget = inner.borrow().welcome.widget().clone();
+    state.show(&scroller, &loading, &empty, &welcome_widget);
+    empty.set_title(&view.empty_text);
     global.set_visible(view.show_global);
     global.set_label(&view.global_label);
-    let (action, welcome) = {
-        let st = inner.borrow();
-        (st.empty_action.clone(), st.welcome.clone())
-    };
+    let action = inner.borrow().empty_action.clone();
     action.set_visible(view.empty_action == Some(actions::EmptyLibraryAction::Browse));
     action.set_label(&tr(MsgKey::browse));
-    welcome.widget().set_visible(welcome_shown);
     bar_label.set_label(&view.bar_text);
     bar.set_reveal_child(view.bar_open);
     header.iter().for_each(|w| w.set_visible(!view.bar_open));
@@ -1136,13 +1165,9 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         }
         Cell::Item(item) => item,
     };
-    let (mode, selected, show_continue_pref) = {
+    let (mode, show_continue_pref) = {
         let st = inner.borrow();
-        (
-            st.deps.prefs.display_mode.get(),
-            st.selection.contains(item.row.id),
-            diet::LIBRARY_CONTINUE_BUTTON,
-        )
+        (st.deps.prefs.display_mode.get(), diet::LIBRARY_CONTINUE_BUTTON)
     };
     let show_continue = actions::continue_visible(show_continue_pref, &item.row);
     let art = cover_art(&inner.borrow(), &item);
@@ -1167,9 +1192,9 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
     };
     let card = if mode == kuro_prefs::library::LibraryDisplayMode::List {
         let row_height = list_row_height(&inner.borrow());
-        card::build_list(&item, selected, show_continue, row_height, &extras)
+        card::build_list(&item, show_continue, row_height, &extras)
     } else {
-        card::build(&item, mode, selected, show_continue, &extras)
+        card::build(&item, mode, show_continue, &extras)
     };
     list_item.set_child(Some(&card.root));
     crate::widgets::drag_select::mark(&card.root, Some(item.row.id));
@@ -1400,6 +1425,52 @@ mod tests {
         assert_eq!(remembered_category(&prefs, Kind::Anime), 9);
     }
 
+    /// How many of the page's four views (grid, spinner, empty page, welcome) are visible, and which.
+    fn visible_views(inner: &Rc<RefCell<Inner>>) -> Vec<&'static str> {
+        let st = inner.borrow();
+        [("grid", st.scroller.is_visible()), ("loading", st.loading.is_visible()), ("empty", st.empty.is_visible()), ("welcome", st.welcome.widget().is_visible())]
+            .into_iter()
+            .filter_map(|(name, shown)| shown.then_some(name))
+            .collect()
+    }
+
+    #[test]
+    fn exactly_one_of_loading_grid_empty_and_welcome_shows_in_every_case() {
+        assert_eq!(PageState::of(false, false, false), PageState::Loading);
+        assert_eq!(PageState::of(false, true, true), PageState::Loading, "nothing else shows before the first load");
+        assert_eq!(PageState::of(true, true, false), PageState::Grid);
+        assert_eq!(PageState::of(true, false, true), PageState::Welcome, "no entries and no repository");
+        assert_eq!(PageState::of(true, false, false), PageState::Empty, "no entries but a repository");
+        crate::testing::with_display(|| {
+            let (scroller, loading, empty, welcome) = (gtk::ScrolledWindow::new(), crate::widgets::status::loading(None), crate::widgets::status::empty("x", "t", None), gtk::Box::new(O::Vertical, 0));
+            for (state, name) in [(PageState::Loading, "loading"), (PageState::Grid, "grid"), (PageState::Empty, "empty"), (PageState::Welcome, "welcome")] {
+                state.show(&scroller, &loading, &empty, &welcome);
+                let shown: Vec<&str> = [("grid", scroller.is_visible()), ("loading", loading.is_visible()), ("empty", empty.is_visible()), ("welcome", welcome.is_visible())]
+                    .into_iter()
+                    .filter_map(|(n, v)| v.then_some(n))
+                    .collect();
+                assert_eq!(shown, vec![name]);
+            }
+        });
+    }
+
+    #[test]
+    fn a_new_library_shows_only_the_spinner_until_the_load_arrives_and_then_one_view() {
+        crate::testing::with_display(|| {
+            let ctx = glib::MainContext::default();
+            let _owner = ctx.acquire().expect("main context");
+            let (_dir, view) = test_view(test_nav());
+            let inner = view.inner.clone();
+            assert_eq!(visible_views(&inner), vec!["loading"], "before the first load");
+            assert!(pump_until(|| inner.borrow().built.is_some()), "the worker reply arrives");
+            assert_eq!(visible_views(&inner), vec!["grid"], "one entry in the test library");
+            view.set_query("zzz");
+            assert!(pump_until(|| inner.borrow().built.as_ref().is_some_and(|b| b.distinct_count == 0)));
+            let shown = visible_views(&inner);
+            assert_eq!(shown.len(), 1, "a search with no match shows one view: {shown:?}");
+        });
+    }
+
     #[test]
     fn the_view_loads_the_worker_reply_and_renders_selection_and_search() {
         crate::testing::with_display(|| {
@@ -1432,7 +1503,7 @@ mod tests {
             let search_done = pump_until(|| inner.borrow().built.as_ref().is_some_and(|b| b.distinct_count == 0));
             assert!(search_done, "a search with no match empties the page");
             assert_eq!(inner.borrow().store.n_items(), 0);
-            assert_eq!(inner.borrow().empty_label.label().as_str(), "No results found");
+            assert_eq!(inner.borrow().empty.title().as_str(), "No results found");
 
             // Escape typed in the header's search entry arrives as stop-search and clears the query
             view.controls().0.emit_by_name::<()>("stop-search", &[]);

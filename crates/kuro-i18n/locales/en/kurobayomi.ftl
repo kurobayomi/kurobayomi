@@ -97,9 +97,6 @@ dialog_with_checkbox_reset = Reset all chapters for this manga
 download_insufficient_space = Couldn't download due to low storage space
 
 # source: i18n-aniyomi
-download_queue_size_warning = Warning: large bulk downloads may lead to sources becoming slower and/or blocking Aniyomi. Tap to learn more.
-
-# source: i18n-aniyomi
 pref_invalidate_download_cache_summary = Force app to recheck downloaded chapters and episodes
 
 # source: i18n-aniyomi
@@ -1244,9 +1241,6 @@ pref_anime_library_update_categories_details = Anime in excluded categories will
 
 # source: i18n-aniyomi
 unofficial_extension_message_aniyomi = This extension is not from the official list.
-
-# source: i18n-aniyomi
-unofficial_anime_extension_message = This extension is not from the official list.
 
 # source: i18n-aniyomi
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
@@ -5212,3 +5206,36 @@ player_episode_list_search = Episode number or name
 
 # source: kurobayomi
 window_keep_above = Keep above other windows
+
+# source: kurobayomi
+window_keep_above_unavailable = This desktop does not let apps keep a window on top. Use the window menu instead.
+
+# source: kurobayomi
+download_queue_size_warning = Warning: large bulk downloads may lead to sources becoming slower and/or blocking Kurobayomi. Tap to learn more.
+
+# source: kurobayomi
+unofficial_anime_extension_message = This extension is not from the official list.
+
+# source: kurobayomi
+home_title = Kurobayomi
+
+# source: kurobayomi
+download_queued = Queued
+
+# source: kurobayomi
+download_downloading = Downloading ({ $arg1 }%)
+
+# source: kurobayomi
+download_failed_retry = Download failed. Click to retry.
+
+# source: kurobayomi
+action_resume_item = Resume { $arg1 }
+
+# source: kurobayomi
+action_start_item = Start { $arg1 }
+
+# source: kurobayomi
+action_jump_to_unread = Jump to first unread
+
+# source: kurobayomi
+action_jump_to_unseen = Jump to first unseen

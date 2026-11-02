@@ -6,10 +6,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gtk::prelude::*;
+use adw::prelude::*;
 use kuro_i18n::{MsgKey, tr};
 
-use crate::ui;
+use crate::ui::{self, DialogOpen as _};
+use crate::theme::tokens::{SPACE_S, SPACE_XS};
 
 /// The rules behind the rows: their names, how each looks, and what a click does.
 pub trait Pick {
@@ -59,7 +60,7 @@ pub fn open<M: Pick + 'static>(
     on_ok: impl Fn(&M) + 'static,
     on_edit: impl Fn() + 'static,
     on_dismiss: impl Fn() + 'static,
-) -> gtk::Window {
+) -> adw::Dialog {
     let names = model.names();
     let model = Rc::new(RefCell::new(model));
     let body: gtk::Widget = if names.is_empty() {
@@ -69,7 +70,7 @@ pub fn open<M: Pick + 'static>(
         let checks: Vec<gtk::CheckButton> = names
             .iter()
             .map(|name| {
-                let check = gtk::CheckButton::builder().label(name).margin_start(8).margin_end(8).margin_top(4).margin_bottom(4).build();
+                let check = gtk::CheckButton::builder().label(name).margin_start(SPACE_S).margin_end(SPACE_S).margin_top(SPACE_XS).margin_bottom(SPACE_XS).build();
                 list.append(&gtk::ListBoxRow::builder().child(&check).build());
                 check
             })
@@ -123,7 +124,7 @@ pub fn open<M: Pick + 'static>(
         buttons.push(ui::DialogButton::new(tr(MsgKey::action_ok), ui::Role::Suggested, move || on_ok(&model.borrow())));
     }
     let window = ui::dialog_or_dismiss(&tr(MsgKey::action_move_category), &body, 360, buttons, on_dismiss);
-    window.present();
+    window.open();
     window
 }
 

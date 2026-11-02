@@ -59,10 +59,10 @@ impl<T> UpdatesLoad<T> {
     }
 }
 
-/// The opacity of the title and the unit name of a read or seen row.
+/// The opacity of a read or seen row.
 pub const READ_ALPHA: f64 = 0.38;
 
-/// The opacity of a row's title and unit name.
+/// The opacity of a row.
 pub fn row_alpha(done: bool) -> f64 {
     if done { READ_ALPHA } else { 1.0 }
 }

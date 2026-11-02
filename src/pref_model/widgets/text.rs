@@ -3,9 +3,9 @@
 use std::rc::Rc;
 
 use super::super::model::ItemCommon;
-use super::row::{self, PrefRow, RowSpec};
+use crate::widgets::row::{self, RowSpec};
 
-pub fn build(common: &ItemCommon, on_click: Option<Rc<dyn Fn()>>, trailing: Option<&gtk::Widget>) -> PrefRow {
+pub fn build(common: &ItemCommon, on_click: Option<Rc<dyn Fn()>>, trailing: Option<&gtk::Widget>) -> adw::ActionRow {
     row::build(RowSpec {
         title: &common.title,
         subtitle: common.subtitle.as_deref(),

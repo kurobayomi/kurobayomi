@@ -44,6 +44,5 @@ pub mod language;
 pub mod player_result;
 pub mod library_catalogue;
 pub mod search_provider;
-pub mod transitions;
 
 pub use host::Shell;

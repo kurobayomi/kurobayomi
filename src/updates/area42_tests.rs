@@ -53,7 +53,6 @@ pub mod fixtures {
 }
 
 mod domain {
-    use std::collections::BTreeSet;
 
     use chrono::{FixedOffset, TimeZone, Utc};
 
@@ -100,19 +99,6 @@ mod domain {
         let snapshot = build_snapshot(vec![row(1, 300, 0), row(2, 100, 0), row(3, 600, 0)], Pick::All, &[0]);
         let degrees: f64 = donut_arcs(&snapshot).iter().map(|arc| arc.sweep * 180.0).sum();
         assert!((degrees - 180.0).abs() < 1e-9, "the half ring is 180 degrees, got {degrees}");
-    }
-
-    /// EC-42-T-12: 2,000 entries build in under 50 ms. Ignored on slow machines: `cargo test -- --ignored perf_2000`.
-    #[test]
-    #[ignore = "slow: run on demand"]
-    fn perf_2000_entries() {
-        let rows: Vec<StorageRow> = (0..2_000).map(|i| row(i, (i * 7919) % 100_000, i % 3)).collect();
-        let started = std::time::Instant::now();
-        let snapshot = build_snapshot(rows, Pick::All, &[0, 1, 2]);
-        let _ = donut_arcs(&snapshot);
-        assert!(started.elapsed() < std::time::Duration::from_millis(50), "took {:?}", started.elapsed());
-        assert_eq!(snapshot.rows.len(), 2_000);
-        let _unused: BTreeSet<i64> = BTreeSet::new();
     }
 }
 

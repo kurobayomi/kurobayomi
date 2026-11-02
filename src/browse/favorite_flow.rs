@@ -66,7 +66,7 @@ impl FavoriteFlow {
 
     #[cfg(test)]
     /// The dialog on screen, if any.
-    pub fn dialog(&self) -> Option<gtk::Window> {
+    pub fn dialog(&self) -> Option<adw::Dialog> {
         self.dialogs.current()
     }
 
@@ -388,6 +388,7 @@ pub(crate) mod tests {
     use std::time::{Duration, Instant};
 
     use super::*;
+    use adw::prelude::*;
     use crate::browse::dialogs::buttons_of;
     use crate::browse::entries::fake::FakeStore;
 
@@ -446,7 +447,7 @@ pub(crate) mod tests {
         assert!(pump(|| rig.flow.dialog().is_some()), "the remove confirm opens");
         let window = rig.flow.dialog().expect("dialog");
         let confirm = remove_confirm("Berserk");
-        assert_eq!(window.title().map(|t| t.to_string()), Some(confirm.title));
+        assert_eq!(window.title().to_string(), confirm.title);
         let labels: Vec<String> = buttons_of(&window).iter().filter_map(|b| b.label().map(|l| l.to_string())).collect();
         assert_eq!(labels, [confirm.confirm, confirm.cancel]);
         assert!(rig.store.calls().iter().all(|c| !c.starts_with("favorite")), "nothing is written before the answer");
@@ -507,7 +508,7 @@ pub(crate) mod tests {
         second.title = "Other".into();
         rig.flow.long_press(second);
         assert!(pump(|| rig.flow.dialog().is_some_and(|w| w != first)));
-        assert_eq!(rig.flow.dialog().and_then(|w| w.title()).map(|t| t.to_string()), Some(remove_confirm("Other").title));
+        assert_eq!(rig.flow.dialog().map(|w| w.title().to_string()), Some(remove_confirm("Other").title));
         rig.flow.dialog().expect("dialog").close();
     }
 
@@ -548,7 +549,7 @@ pub(crate) mod tests {
                 }
             }
             let mut out = Vec::new();
-            walk(&window.child().expect("child"), &mut out);
+            walk(&crate::ui::dialog_content(&window).expect("child"), &mut out);
             out
         };
         assert_eq!(checks.len(), 2);
@@ -579,7 +580,7 @@ pub(crate) mod tests {
         ListItem { id, source_id: 5, url: format!("/series/{id}"), title: format!("T{id}"), favorite, cover: None }
     }
 
-    fn checks_of(window: &gtk::Window) -> Vec<gtk::CheckButton> {
+    fn checks_of(window: &adw::Dialog) -> Vec<gtk::CheckButton> {
         fn walk(w: &gtk::Widget, out: &mut Vec<gtk::CheckButton>) {
             if let Some(c) = w.downcast_ref::<gtk::CheckButton>() {
                 out.push(c.clone());
@@ -591,7 +592,7 @@ pub(crate) mod tests {
             }
         }
         let mut out = Vec::new();
-        walk(&window.child().expect("child"), &mut out);
+        walk(&crate::ui::dialog_content(&window).expect("child"), &mut out);
         out
     }
 

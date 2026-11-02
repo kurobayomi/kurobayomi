@@ -4,13 +4,14 @@
 
 use std::rc::Rc;
 
-use gtk::prelude::*;
-use gtk::{Align, Box as GBox, Button, GestureClick, ListBoxRow, Orientation as O};
+use adw::prelude::*;
+use gtk::{Align, Box as GBox, Button, GestureClick, Orientation as O};
 
 use crate::browse::look::list_row;
 use crate::widgets::context_menu::Item;
 use kuro_domain::dates::item_row_text;
 use kuro_i18n::{MsgKey, tr};
+use crate::theme::tokens::{SPACE_XS};
 
 /// The right-click item that opens the entry's page (no catalogue key yet, as in `updates::copy`).
 pub fn open_details() -> String {
@@ -37,7 +38,7 @@ pub struct RowActions {
 
 /// One history row (`look::list_row`). `in_library` decides whether the favorite button is shown. `cover` is the row's
 /// cover widget (`look::row_cover` at `look::MEDIUM`); a press on it opens the entry.
-pub fn history_row(title: &str, subtitle: &str, cover: &impl IsA<gtk::Widget>, in_library: bool, actions: RowActions) -> ListBoxRow {
+pub fn history_row(title: &str, subtitle: &str, cover: &impl IsA<gtk::Widget>, in_library: bool, actions: RowActions) -> adw::ActionRow {
     let cover = cover.as_ref();
     let open = GestureClick::new();
     let open_entry = actions.open_entry.clone();
@@ -48,7 +49,7 @@ pub fn history_row(title: &str, subtitle: &str, cover: &impl IsA<gtk::Widget>, i
     });
     cover.add_controller(open);
 
-    let buttons = GBox::new(O::Horizontal, 4);
+    let buttons = GBox::new(O::Horizontal, SPACE_XS);
     if !in_library {
         let favorite = Button::from_icon_name("starred-symbolic");
         favorite.set_tooltip_text(Some(&tr(MsgKey::add_to_library)));
@@ -68,10 +69,8 @@ pub fn history_row(title: &str, subtitle: &str, cover: &impl IsA<gtk::Widget>, i
 
     let row = list_row(Some(cover.clone()), title, Some(subtitle), Some(buttons.upcast()));
     // a long title keeps its two lines
-    if let Some(title) = crate::updates::row_texts(&row).first_child().and_downcast::<gtk::Label>() {
-        title.set_wrap(true);
-        title.set_lines(2);
-    }
+    row.set_title_lines(2);
+    row.set_activatable(true);
     let resume = actions.resume.clone();
     crate::widgets::row_activate::on_activate(&row, move |_| resume());
     crate::widgets::context_menu::attach(&row, move |_, _| menu(&actions));
@@ -122,8 +121,7 @@ mod tests {
             let actions = RowActions { open_entry: none.clone(), resume: none.clone(), remove: none.clone(), add_to_library: none };
             let cover = crate::browse::look::row_cover("Title", None, crate::browse::look::MEDIUM.width, crate::browse::look::MEDIUM.height);
             let row = history_row("Title", "Ch. 1", &cover, false, actions);
-            let line = row.child().expect("the row line");
-            assert_eq!(line.first_child().as_ref(), Some(&cover), "the cover leads the row");
+            assert!(cover.is_ancestor(&row), "the cover leads the row");
             assert_eq!(cover.size_request(), (53, 80), "the medium row cover");
         });
     }

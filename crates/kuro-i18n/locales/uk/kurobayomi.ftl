@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Скинути всі розділи цієї ма�
 
 download_insufficient_space = Не вдалося завантажити через брак місця
 
-download_queue_size_warning = Попередження: великі масові завантаження можуть призвести до уповільнення роботи джерел та/або блокування Aniyomi. Натисніть, щоб дізнатися більше.
-
 pref_invalidate_download_cache_summary = Примусово перевіряти завантажені розділи та епізоди за допомогою програми
 
 label_player_settings = Налаштування плеєра
@@ -741,8 +739,6 @@ pref_manga_library_update_categories_details = Манґу в виключени�
 pref_anime_library_update_categories_details = Аніме у виключених категоріях не оновлюватимуться, навіть якщо вони є у включених категоріях.
 
 unofficial_extension_message_aniyomi = Це розширення не входить до переліку офіційних розширень Aniyomi.
-
-unofficial_anime_extension_message = Це розширення не входить до офіційного списку розширень Aniyomi.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

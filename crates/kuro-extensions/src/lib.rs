@@ -5,3 +5,6 @@ pub mod repo;
 
 #[cfg(feature = "wasm")]
 pub mod instantiate;
+#[cfg(not(feature = "wasm"))]
+#[path = "instantiate_off.rs"]
+pub mod instantiate;

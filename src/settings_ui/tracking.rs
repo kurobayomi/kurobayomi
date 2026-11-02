@@ -26,6 +26,7 @@ use crate::pref_model::model::{Preference, PreferenceItem};
 use crate::pref_model::widgets::dialog;
 use crate::settings_ui::rows::{group, info, item, switch, switch_with, tap_item, TapRow};
 use crate::settings_ui::tracker_host::{self, now_ms, Host};
+use crate::theme::tokens::{SPACE_S};
 
 /// Shown when a row is tapped before the tracker services are built, or when they could not be.
 pub fn not_ready() -> String {
@@ -58,7 +59,7 @@ pub fn warning_rows(fallback: bool) -> Vec<Preference> {
 fn open_login_dialog(tracker: Arc<dyn Tracker>, changed: Rc<dyn Fn()>) {
     let name = tracker.name().to_owned();
     let form = LoginForm::for_tracker(tracker.as_ref());
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let user = gtk::Entry::builder().placeholder_text(username_label(tracker.id())).text(&form.username).build();
     let pass = gtk::PasswordEntry::builder().show_peek_icon(true).placeholder_text(&tr(MsgKey::password)).text(&form.password).build();
     column.append(&user);

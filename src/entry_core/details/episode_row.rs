@@ -28,12 +28,12 @@ fn progress(ep: &Item) -> Option<String> {
     }
 }
 
-/// The row of one episode. The second line is the date, the time left of a partly watched episode and the scanlator;
+/// The row of one episode. The second line is the date, the scanlator and the progress of a partly read or watched item;
 /// the summary shows only when summaries are on and it is not blank. `last_second_seen` and `total_seconds` hold
 /// milliseconds, as the player stores them (behaviour 3.4). The download state and the button are the page's to set.
 pub fn row(ep: &Item, display_number: bool, show_summaries: bool, selected: bool) -> RowItem {
     RowItem {
-        subtitle: subtitle(ep.date_upload, progress(ep), ep.scanlator.as_deref()),
+        subtitle: subtitle(ep.date_upload, ep.scanlator.as_deref(), progress(ep)),
         summary: ep.summary.clone().filter(|t| show_summaries && !t.trim().is_empty()),
         read: ep.done,
         bookmark: ep.bookmark,
@@ -82,13 +82,28 @@ mod tests {
         ep.fillermark = true;
         let shown = row(&ep, false, true, false);
         assert_eq!(shown.title, "Pilot");
-        assert_eq!(shown.subtitle, "12:30 left \u{2022} grp");
+        assert_eq!(shown.subtitle, "grp \u{b7} 12:30 left");
         assert_eq!(shown.summary.as_deref(), Some("plot"));
         assert!(shown.bookmark && shown.filler && !shown.read);
         let hidden = row(&ep, true, false, true);
         assert_eq!(hidden.title, "Episode -1");
         assert_eq!(hidden.summary, None, "summaries are off");
         assert!(hidden.selected);
+    }
+
+    /// The second line reads date, group, progress; a chapter shows the page it stopped at, and a read one no progress.
+    #[test]
+    fn a_chapter_row_reads_date_group_then_page_and_a_read_one_has_no_page() {
+        let mut chapter = Item::create(kuro_platform::kind::Kind::Manga);
+        chapter.scanlator = Some("Official".into());
+        chapter.date_upload = 86_400_000;
+        chapter.progress = 11;
+        let shown = row(&chapter, true, false, false);
+        assert!(!shown.read);
+        assert!(shown.subtitle.starts_with("1970-01-0") && shown.subtitle.ends_with(" \u{b7} Official \u{b7} Page: 12"), "{}", shown.subtitle);
+        chapter.done = true;
+        let read = row(&chapter, true, false, false);
+        assert!(read.read && read.subtitle.ends_with("Official"), "a read chapter shows no page: {}", read.subtitle);
     }
 
     #[test]

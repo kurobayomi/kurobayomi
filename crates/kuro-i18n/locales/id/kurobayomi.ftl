@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Reset semua bab untuk komik ini
 
 download_insufficient_space = Tidak dapat mengunduh dengan ruang penyimpanan yang hampir habis
 
-download_queue_size_warning = Peringatan: Unduhan massal dalam jumlah besar dapat menyebabkan sumber menjadi lebih lambat dan/atau memblokir Aniyomi. Ketuk untuk mengetahui lebih lanjut.
-
 pref_invalidate_download_cache_summary = Paksa aplikasi untuk memeriksa ulang bab dan episode yang diunduh
 
 label_player_settings = Pengaturan pemutar
@@ -739,8 +737,6 @@ pref_manga_library_update_categories_details = Manga dalam kategori yang dikecua
 pref_anime_library_update_categories_details = Anime dalam kategori yang dikecualikan tidak akan diperbarui meskipun masuk dalam kategori yang disertakan.
 
 unofficial_extension_message_aniyomi = Ektension ini bukan dari daftar ekstension official Aniyomi.
-
-unofficial_anime_extension_message = Ekstensi ini bukan dari daftar ekstensi resmi Aniyomi.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 

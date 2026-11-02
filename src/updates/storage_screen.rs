@@ -16,6 +16,7 @@ use crate::updates::copy;
 use crate::updates::history_dialog::{ConfirmCopy, show as show_confirm};
 use crate::updates::history::NOT_FOUND_TOAST_MS;
 use crate::updates::storage::{self, CategoryOption, DeleteOutcome, PageState, Selection, StorageRow, StorageSnapshot};
+use crate::theme::tokens::{SPACE_M, SPACE_S, SPACE_XL};
 
 /// Stroke of the donut arcs, in pixels.
 const DONUT_STROKE: f64 = 15.0;
@@ -60,9 +61,9 @@ impl StorageScreen {
     pub fn new(kind: Kind) -> Rc<Self> {
         Rc::new_cyclic(|weak: &Weak<Self>| {
             // the column spacing of the other pages (`ui::column`), unclamped: the page goes two columns from 720 px
-            let root = GBox::new(O::Vertical, 12);
+            let root = GBox::new(O::Vertical, SPACE_M);
             crate::ui::margins(&root, 16);
-            root.set_margin_bottom(24);
+            root.set_margin_bottom(SPACE_XL);
 
             let category = Label::builder().label(&tr(MsgKey::label_category)).xalign(0.0).css_classes(["heading"]).build();
             let dropdown = DropDown::from_strings(&[]);
@@ -85,14 +86,14 @@ impl StorageScreen {
                     screen.draw_donut(cr, f64::from(width), f64::from(height));
                 }
             });
-            let overlay_total = Label::builder().label("0 B").css_classes(["title-2"]).valign(Align::Start).margin_top(12).build();
+            let overlay_total = Label::builder().label("0 B").css_classes(["title-2"]).valign(Align::Start).margin_top(SPACE_M).build();
             let chart = Overlay::new();
             chart.set_child(Some(&donut));
             chart.add_overlay(&overlay_total);
 
-            let scanning = GBox::new(O::Horizontal, 8);
+            let scanning = GBox::new(O::Horizontal, SPACE_S);
             scanning.set_halign(Align::Center);
-            scanning.append(&crate::ui::loading(crate::ui::LoadSize::Inline));
+            scanning.append(&crate::ui::inline_spinner());
             scanning.append(&Label::new(Some(&copy::storage_scanning())));
 
             let list = crate::ui::boxed_list();
@@ -100,9 +101,9 @@ impl StorageScreen {
             let helper = crate::ui::dim(&copy::storage_empty_category());
             helper.set_visible(false);
 
-            let split = GBox::new(O::Vertical, 12);
-            let left = GBox::new(O::Vertical, 12);
-            let right = GBox::new(O::Vertical, 12);
+            let split = GBox::new(O::Vertical, SPACE_M);
+            let left = GBox::new(O::Vertical, SPACE_M);
+            let right = GBox::new(O::Vertical, SPACE_M);
             left.append(&category);
             left.append(&dropdown);
             left.append(&chart);

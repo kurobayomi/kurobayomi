@@ -18,21 +18,22 @@ mod tests {
     const KNOWN_BUILDERS: [&str; 7] = ["ui::page(", "page_header::header(", "screens::build(", "page_for(", "open_chapter(", "open_local_chapter(", "build_page("];
 
     /// Pushes of a page that a local helper builds with `ui::page` or `screens::build`, as (file under src, argument).
-    const ALLOWED: [(&str, &str); 3] = [
+    const ALLOWED: [(&str, &str); 4] = [
         ("browse/glue.rs", "&page"),                           // the categories page from screens::build
         ("settings_ui/route.rs", "&page"),                     // the categories page from screens::build
         ("settings_ui/licenses.rs", "&detail_page(&library)"), // ui::page
+        ("main.rs", "&tabs"),                                  // the root page: each tab brings its own header
     ];
 
     fn assert_has_header(what: &str, page: &gtk::Widget) {
-        let found = crate::screens::alone::descendants(page).iter().any(|w| w.is::<gtk::HeaderBar>());
+        let found = crate::screens::alone::descendants(page).iter().any(|w| w.is::<adw::HeaderBar>());
         assert!(found, "{what} is pushed without a header bar, so the window cannot be dragged or closed from it");
     }
 
     #[test]
     fn the_pages_that_can_be_built_in_a_test_have_a_header_bar() {
         crate::testing::with_display(|| {
-            let (stack, _window) = crate::testing::nav();
+            let _ = crate::testing::nav();
             for id in ["download_queue", "tracking_sheet", "new_update", "crash"] {
                 assert_has_header(id, crate::screens::build(id).upcast_ref());
             }
@@ -40,7 +41,7 @@ mod tests {
             let never: Rc<dyn Fn(String, Reply)> = Rc::new(|_: String, _: Reply| {});
             deep_link_page::install_resolver(Kind::Manga, never);
             deep_link_page::open(Kind::Manga, "https://example.test/series/1");
-            let shown = stack.visible_child().expect("the loading page is on show");
+            let shown = crate::ui::visible_child().expect("the loading page is on show");
             assert_has_header("the deep-link loading page", &shown);
         });
     }
@@ -59,11 +60,14 @@ mod tests {
     }
 
     #[test]
-    fn a_dialog_window_has_its_header_bar_as_its_titlebar() {
+    fn a_dialog_has_its_header_bar_above_its_content() {
         crate::testing::with_display(|| {
             let _ = crate::testing::nav();
-            let window = crate::ui::modal(&gtk::Label::new(Some("Title")).upcast(), &gtk::Label::new(Some("Body")), 200, 100);
-            assert!(window.titlebar().is_some_and(|bar| bar.is::<gtk::HeaderBar>()), "a dialog has its header bar");
+            let dialog = crate::ui::modal(&gtk::Label::new(Some("Title")).upcast(), &gtk::Label::new(Some("Body")), 200, 100);
+            let toolbar = adw::prelude::AdwDialogExt::child(&dialog).and_downcast::<adw::ToolbarView>().expect("a dialog is a toolbar view");
+            let header = crate::screens::alone::descendants(toolbar.upcast_ref()).into_iter().find_map(|w| w.downcast::<adw::HeaderBar>().ok());
+            assert!(header.is_some(), "a dialog has its header bar");
+            assert!(crate::ui::dialog_content(&dialog).is_some_and(|c| c.is::<gtk::Label>()), "the content sits under it");
         });
     }
 

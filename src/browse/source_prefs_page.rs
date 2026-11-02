@@ -18,6 +18,7 @@ use tokio::sync::watch;
 
 use super::dialogs::{ButtonStyle, DialogSlot, DialogSpec};
 use super::glue::{follow_ready, keep_alive};
+use crate::theme::tokens::{SPACE_L, SPACE_S, SPACE_XS};
 
 /// The entry a stored list value stands for. A value that matches none shows nothing.
 pub fn list_label(entries: &[String], values: &[String], stored: &str) -> Option<String> {
@@ -96,10 +97,9 @@ impl SourcePrefsPage {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
         let scroller = gtk::ScrolledWindow::builder().child(&column).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build();
         let stack = gtk::Stack::new();
-        stack.add_named(&crate::ui::loading(crate::ui::LoadSize::Page), Some("loading"));
+        stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
         stack.add_named(&scroller, Some("list"));
-        let empty = super::look::empty_state("view-list-symbolic", &tr(MsgKey::empty_screen), &[]).0;
-        stack.add_named(&empty, Some("empty"));
+        stack.add_named(&crate::widgets::status::empty("view-list-symbolic", &tr(MsgKey::empty_screen), None), Some("empty"));
         stack.set_vexpand(true);
         stack.set_visible_child_name("loading");
         let inner = Rc::new(Inner {
@@ -158,7 +158,7 @@ impl Inner {
     fn add_row(self: &Rc<Self>, into: &gtk::Box, pref: &SourcePref) {
         match pref {
             SourcePref::Category { title, children } => {
-                into.append(&gtk::Label::builder().label(title).xalign(0.0).css_classes(["heading"]).margin_start(16).margin_top(16).margin_bottom(4).build());
+                into.append(&gtk::Label::builder().label(title).xalign(0.0).css_classes(["heading"]).margin_start(SPACE_L).margin_top(SPACE_L).margin_bottom(SPACE_XS).build());
                 for child in children {
                     self.add_row(into, child);
                 }
@@ -200,11 +200,11 @@ impl Inner {
 
     /// A row: title over summary, with room at the end for the control. Returns the row and its summary label.
     fn row(&self, title: &str, pref: &SourcePref) -> (gtk::Box, gtk::Label) {
-        let row = gtk::Box::new(gtk::Orientation::Horizontal, 16);
-        row.set_margin_start(16);
-        row.set_margin_end(16);
-        row.set_margin_top(8);
-        row.set_margin_bottom(8);
+        let row = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_L);
+        row.set_margin_start(SPACE_L);
+        row.set_margin_end(SPACE_L);
+        row.set_margin_top(SPACE_S);
+        row.set_margin_bottom(SPACE_S);
         let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
         text.set_hexpand(true);
         text.append(&gtk::Label::builder().label(title).xalign(0.0).build());
@@ -364,6 +364,7 @@ pub(crate) mod tests {
     use kuro_prefs::store::PrefStore;
 
     use super::*;
+    use adw::prelude::*;
 
     fn declared() -> Vec<SourcePref> {
         let strings = |items: &[&str]| items.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
@@ -465,8 +466,8 @@ pub(crate) mod tests {
         // list: choosing an entry only selects it; Cancel writes nothing, OK writes it
         click(&rows[1]);
         let window = page.inner.dialogs.current().expect("the list dialog");
-        assert_eq!(window.title().map(|t| t.to_string()).as_deref(), Some("Size"), "the dialog title is the row title");
-        let radios = all::<gtk::CheckButton>(&window.child().expect("child"));
+        assert_eq!(window.title(), "Size", "the dialog title is the row title");
+        let radios = all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"));
         assert_eq!(radios.len(), 2);
         assert_eq!(crate::browse::dialogs::buttons_of(&window).len(), 2, "OK and Cancel");
         radios[1].set_active(true);
@@ -477,7 +478,7 @@ pub(crate) mod tests {
         assert!(page.inner.dialogs.current().is_none());
         click(&rows[1]);
         let window = page.inner.dialogs.current().expect("the list dialog");
-        all::<gtk::CheckButton>(&window.child().expect("child"))[1].set_active(true);
+        all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"))[1].set_active(true);
         crate::browse::dialogs::buttons_of(&window)[0].emit_clicked();
         assert_eq!(prefs.get_string("size").as_deref(), Some("l"));
         assert!(page.inner.dialogs.current().is_none());
@@ -486,7 +487,7 @@ pub(crate) mod tests {
         // multi choice: OK writes the set
         click(&rows[2]);
         let window = page.inner.dialogs.current().expect("the multi dialog");
-        let checks = all::<gtk::CheckButton>(&window.child().expect("child"));
+        let checks = all::<gtk::CheckButton>(&crate::ui::dialog_content(&window).expect("child"));
         assert!(checks[0].is_active() && !checks[1].is_active(), "the declared default is preselected");
         checks[1].set_active(true);
         checks[0].set_active(false);
@@ -496,7 +497,7 @@ pub(crate) mod tests {
         // text: the field has the input hints, Cancel writes nothing, OK writes the text
         click(&rows[3]);
         let window = page.inner.dialogs.current().expect("the text dialog");
-        let entry = all::<gtk::Entry>(&window.child().expect("child")).remove(0);
+        let entry = all::<gtk::Entry>(&crate::ui::dialog_content(&window).expect("child")).remove(0);
         assert_eq!(entry.text().as_str(), "example.org");
         assert_eq!(entry.input_hints(), gtk::InputHints::NO_SPELLCHECK | gtk::InputHints::PRIVATE);
         entry.set_text("mirror.test");
@@ -504,7 +505,7 @@ pub(crate) mod tests {
         assert_eq!(prefs.get_string("host"), None, "Cancel stores nothing");
         click(&rows[3]);
         let window = page.inner.dialogs.current().expect("dialog");
-        all::<gtk::Entry>(&window.child().expect("child")).remove(0).set_text("mirror.test");
+        all::<gtk::Entry>(&crate::ui::dialog_content(&window).expect("child")).remove(0).set_text("mirror.test");
         crate::browse::dialogs::buttons_of(&window)[0].emit_clicked();
         assert_eq!(prefs.get_string("host").as_deref(), Some("mirror.test"));
 

@@ -30,19 +30,10 @@ pub fn webtoon_card_height(viewport: i32) -> i32 {
 }
 
 /// The error card for a page: the message, Retry, and Open in browser when [`can_open_in_browser`] allows it.
-pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> gtk::Box {
-    let root = gtk::Box::new(gtk::Orientation::Vertical, 8);
-    root.set_halign(gtk::Align::Center);
-    root.set_valign(gtk::Align::Center);
-    root.set_margin_start(16);
-    root.set_margin_end(16);
-    let message = gtk::Label::new(Some(&page_error_text()));
-    message.set_justify(gtk::Justification::Center);
-    message.set_wrap(true);
-    root.append(&message);
+pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> adw::StatusPage {
     let retry = gtk::Button::with_label(&strings::retry());
     retry.connect_clicked(move |_| on_retry());
-    root.append(&retry);
+    let mut buttons = vec![retry];
     if can_open_in_browser(image_url.as_deref()) {
         let open = gtk::Button::with_label(&strings::action_open_in_browser());
         let url = image_url.unwrap_or_default();
@@ -50,9 +41,9 @@ pub fn card(on_retry: impl Fn() + 'static, image_url: Option<String>) -> gtk::Bo
             let window = button.root().and_downcast::<gtk::Window>();
             crate::ui::open_link(&url, window.as_ref());
         });
-        root.append(&open);
+        buttons.push(open);
     }
-    root
+    crate::widgets::status::error_with(&page_error_text(), None, &buttons)
 }
 
 #[cfg(test)]

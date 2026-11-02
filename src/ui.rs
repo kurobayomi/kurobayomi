@@ -1,14 +1,16 @@
 // Generic building blocks: navigation stack, spec item rows, sheets, dialogs, generic screens.
 use kuro_i18n::{MsgKey, tr};
 use crate::spec::{value_str, Dialog, Group, Item, Screen, Sheet, Spec};
-use gtk::prelude::*;
+use adw::prelude::NavigationPageExt;
+use adw::prelude::*;
 use gtk::{glib, Align, Box as GBox, Button, Label, ListBox, Orientation as O};
 use std::cell::OnceCell;
 use std::rc::Rc;
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XL, SPACE_XS};
 
 thread_local! {
     pub static SPEC: Spec = Spec::load();
-    static NAV: OnceCell<(gtk::Stack, gtk::ApplicationWindow)> = const { OnceCell::new() };
+    static NAV: OnceCell<(adw::NavigationView, gtk::ApplicationWindow)> = const { OnceCell::new() };
 }
 
 pub fn with_spec<R>(f: impl FnOnce(&Spec) -> R) -> R {
@@ -21,16 +23,12 @@ pub fn screen(id: &str) -> Screen {
 
 // ---------- navigation ----------
 
-pub fn nav_init(stack: &gtk::Stack, win: &gtk::ApplicationWindow) {
-    NAV.with(|n| n.set((stack.clone(), win.clone())).ok());
+pub fn nav_init(nav: &adw::NavigationView, win: &gtk::ApplicationWindow) {
+    NAV.with(|n| n.set((nav.clone(), win.clone())).ok());
 }
 
-fn nav() -> (gtk::Stack, gtk::ApplicationWindow) {
+fn nav() -> (adw::NavigationView, gtk::ApplicationWindow) {
     NAV.with(|n| n.get().cloned().expect("nav not initialised"))
-}
-
-pub fn stack() -> gtk::Stack {
-    nav().0
 }
 
 pub fn window() -> gtk::ApplicationWindow {
@@ -65,75 +63,73 @@ pub fn over_root(open: impl FnOnce()) {
     }
 }
 
+/// The navigation pages from the root up.
+fn pages(nav: &adw::NavigationView) -> Vec<adw::NavigationPage> {
+    let stack = nav.navigation_stack();
+    (0..stack.n_items()).filter_map(|i| stack.item(i).and_downcast::<adw::NavigationPage>()).collect()
+}
+
+/// A pushed widget as a navigation page. The widget keeps its own header bar, so the page has no title of its own.
+fn wrap(page: &impl IsA<gtk::Widget>) -> adw::NavigationPage {
+    adw::NavigationPage::builder().child(page).title("").build()
+}
+
+/// The widget on show: the child of the visible navigation page.
+pub fn visible_child() -> Option<gtk::Widget> {
+    nav().0.visible_page().and_then(|p| p.child())
+}
+
+/// The widget name of the page on show, such as `screen:reader`.
+pub fn visible_page_name() -> Option<String> {
+    visible_child().map(|w| w.widget_name().to_string())
+}
+
+/// Calls `f` each time the page on show changes (a push, a pop, a replace), as the change starts.
+pub fn connect_page_changed(f: impl Fn() + 'static) -> glib::SignalHandlerId {
+    nav().0.connect_visible_page_notify(move |_| f())
+}
+
+pub fn disconnect_page_changed(id: glib::SignalHandlerId) {
+    nav().0.disconnect(id);
+}
+
 pub fn push(page: &impl IsA<gtk::Widget>) {
     if OVER_ROOT.with(|flag| flag.replace(false)) {
         push_over_root(page);
         return;
     }
-    let stack = nav().0;
-    stack.add_child(page);
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Push);
-    stack.set_visible_child(page);
+    nav().0.push(&wrap(page));
 }
 
 pub fn pop() {
-    let stack = nav().0;
-    let Some(cur) = stack.visible_child() else { return };
-    let Some(prev) = cur.prev_sibling() else { return };
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&prev);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || stack.remove(&cur));
+    nav().0.pop();
 }
 
-/// The widget names of the stacked pages from the root up, and the index of the page on show. A page that was just
-/// popped stays in the list for a moment, so the index, not the length, says how deep the user is.
+/// The widget names of the stacked pages from the root up, and the index of the page on show (the last one: a popped
+/// page leaves the stack as the slide back starts).
 pub fn page_stack() -> (Vec<String>, usize) {
-    let stack = nav().0;
-    let mut names = Vec::new();
-    let mut shown = 0;
-    let visible = stack.visible_child();
-    let mut child = stack.first_child();
-    while let Some(c) = child {
-        if visible.as_ref() == Some(&c) {
-            shown = names.len();
-        }
-        names.push(c.widget_name().to_string());
-        child = c.next_sibling();
-    }
+    let names: Vec<String> = pages(&nav().0).iter().map(|p| p.child().map(|c| c.widget_name().to_string()).unwrap_or_default()).collect();
+    let shown = names.len().saturating_sub(1);
     (names, shown)
 }
 
 /// Shows the page at `index` of the stack (0 is the root) with one slide back, and drops the pages above it.
 pub fn pop_to(index: usize) {
-    let stack = nav().0;
-    let mut target = stack.first_child();
-    for _ in 0..index {
-        target = target.and_then(|w| w.next_sibling());
+    let nav = nav().0;
+    if let Some(target) = pages(&nav).get(index) {
+        nav.pop_to_page(target);
     }
-    let Some(target) = target else { return };
-    if stack.visible_child().as_ref() == Some(&target) {
-        return;
-    }
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&target);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
-        while let Some(w) = target.next_sibling() {
-            stack.remove(&w);
-        }
-    });
 }
 
 /// Pushes `page` straight over the root: one slide from the page on screen, then the pages that were between go.
 /// (Popping to the root first and then pushing played two slides.)
 pub fn push_over_root(page: &impl IsA<gtk::Widget>) {
-    let stack = nav().0;
-    let between: Vec<gtk::Widget> = std::iter::successors(stack.first_child().and_then(|r| r.next_sibling()), |w| w.next_sibling()).collect();
-    push(page);
-    glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
-        for w in between {
-            stack.remove(&w);
-        }
-    });
+    let nav = nav().0;
+    let new = wrap(page);
+    match pages(&nav).into_iter().next() {
+        Some(root) => nav.replace(&[root, new]),
+        None => nav.push(&new),
+    }
 }
 
 /// Drop every pushed page and show the root (sidebar destination clicked).
@@ -142,13 +138,7 @@ pub fn pop_to_root() {
     if OVER_ROOT.with(std::cell::Cell::get) {
         return;
     }
-    let stack = nav().0;
-    let Some(root) = stack.first_child() else { return };
-    crate::shell::transitions::apply(&stack, crate::shell::transitions::Direction::Pop);
-    stack.set_visible_child(&root);
-    while let Some(w) = root.next_sibling() {
-        stack.remove(&w);
-    }
+    pop_to(0);
 }
 
 /// Split the window-button layout like GNOME split headers: sidebar gets the left part,
@@ -185,11 +175,13 @@ pub fn quiet_menu(menu: gtk::MenuButton) -> gtk::MenuButton {
 
 /// A header bar of the main window. Every one joins one vertical size group, so the sidebar's bar and the page's bar
 /// next to it are always the same height, whatever the page puts in its own bar (a search entry is taller than a title).
-pub fn header_bar() -> gtk::HeaderBar {
+pub fn header_bar() -> adw::HeaderBar {
     thread_local! {
         static SAME_HEIGHT: gtk::SizeGroup = gtk::SizeGroup::new(gtk::SizeGroupMode::Vertical);
     }
-    let header = gtk::HeaderBar::new();
+    let header = adw::HeaderBar::new();
+    // the pages draw their own Back button
+    header.set_show_back_button(false);
     SAME_HEIGHT.with(|group| group.add_widget(&header));
     header
 }
@@ -201,32 +193,30 @@ thread_local! {
 
 /// The window buttons of a content header (the right part of the layout), with the pin just before them. Call it before
 /// packing anything else at the end, so the pin sits next to the window buttons.
-pub fn window_buttons(header: &gtk::HeaderBar) {
+pub fn window_buttons(header: &adw::HeaderBar) {
     header.set_decoration_layout(Some(&decoration(false)));
     header.pack_end(&pin_button());
 }
 
-/// Keeps the window above other windows while active. It hides itself where the system cannot do that (Wayland), and
-/// takes the window's state each time its page shows, so the pins of every page agree.
+/// Keeps the window above other windows while active. It always shows; where the desktop cannot do it (a Wayland
+/// session without KWin), a click springs back and says so. It takes the window's state each time its page shows, so the
+/// pins of every page agree.
 fn pin_button() -> gtk::ToggleButton {
     let pin = gtk::ToggleButton::builder().icon_name("view-pin-symbolic").tooltip_text(tr(MsgKey::window_keep_above)).build();
     pin.set_focus_on_click(false);
     let surface = |pin: &gtk::ToggleButton| pin.native().and_then(|n| n.surface());
-    pin.connect_realize(move |pin| {
-        if !surface(pin).is_some_and(|s| kuro_platform::window_level::can_keep_above(&s)) {
-            pin.set_visible(false);
-        }
-    });
     pin.connect_map(|pin| pin.set_active(PINNED.with(std::cell::Cell::get)));
     pin.connect_toggled(move |pin| {
         let above = pin.is_active();
         if above == PINNED.with(std::cell::Cell::get) {
             return;
         }
-        if surface(pin).is_some_and(|s| kuro_platform::window_level::set_keep_above(&s, above)) {
+        let reached = surface(pin).is_some_and(|s| kuro_platform::window_level::can_keep_above(&s) && kuro_platform::window_level::set_keep_above(&s, above));
+        if reached {
             PINNED.with(|p| p.set(above));
         } else {
             pin.set_active(!above);
+            crate::toast::notify(tr(MsgKey::window_keep_above_unavailable));
         }
     });
     pin
@@ -238,11 +228,11 @@ fn pin_button() -> gtk::ToggleButton {
 /// row, as phone apps put tabs under the toolbar. It also moves there while the sidebar shows once the header runs short
 /// of room ([`switch_fits`]): a switch kept in a full header would set the window's minimum width above that breakpoint,
 /// and the window could never get narrow. Append the returned row right under the header.
-pub fn switch_with_narrow_row(header: &gtk::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
+pub fn switch_with_narrow_row(header: &adw::HeaderBar, switch: &gtk::StackSwitcher) -> GBox {
     let row = GBox::new(O::Horizontal, 0);
     row.set_halign(Align::Center);
-    row.set_margin_top(6);
-    row.set_margin_bottom(6);
+    row.set_margin_top(SPACE_S);
+    row.set_margin_bottom(SPACE_S);
     if let Some(stack) = switch.stack() {
         row.append(&gtk::StackSwitcher::builder().stack(&stack).build());
     }
@@ -425,7 +415,7 @@ pub fn open(id: &str) {
         // sidebar destinations switch tabs instead of stacking a second copy; a hidden page (Downloads with an empty
         // queue) shows while it is open
         pop_to_root();
-        if let Some(tabs) = nav().0.first_child().and_downcast::<gtk::Stack>() {
+        if let Some(tabs) = pages(&nav().0).first().and_then(|p| p.child()).and_downcast::<gtk::Stack>() {
             if let Some(page) = tabs.child_by_name(id) {
                 page.set_visible(true);
             }
@@ -469,16 +459,19 @@ pub fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
     gtk::ScrolledWindow::builder().child(&child).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build()
 }
 
-pub use crate::clamp::clamp;
+/// `child` at most `max` px wide, centred; narrower windows shrink it down to its own minimum.
+pub fn clamp(child: &impl IsA<gtk::Widget>, max: i32) -> adw::Clamp {
+    adw::Clamp::builder().maximum_size(max).tightening_threshold(max).child(child).build()
+}
 
 /// The row of buttons at the top of a page, under its header: choices (the library's categories) or actions (Resume and
 /// Clear of the download queue). One spacing and one top margin, so every page's top row looks the same; the caller sets
 /// the start inset to line up with its own content.
 pub fn pill_row() -> GBox {
-    let row = GBox::new(O::Horizontal, 8);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     row.set_halign(Align::Start);
-    row.set_margin_top(8);
-    row.set_margin_bottom(4);
+    row.set_margin_top(SPACE_S);
+    row.set_margin_bottom(SPACE_XS);
     row
 }
 
@@ -560,19 +553,24 @@ pub fn margins(w: &impl IsA<gtk::Widget>, m: i32) {
 /// Centred column of boxed lists, at most [`PAGE_WIDTH`] wide once [`scrolled`] wraps it. The spacing scale is the
 /// Library's (4, 8, 12, 16, 24): 16 px gutters, 12 px between a heading and its list, 24 px between groups.
 pub fn column() -> GBox {
-    let b = GBox::new(O::Vertical, 12);
-    b.set_margin_start(16);
-    b.set_margin_end(16);
-    b.set_margin_top(16);
-    b.set_margin_bottom(24);
+    let b = GBox::new(O::Vertical, SPACE_M);
+    b.set_margin_start(SPACE_L);
+    b.set_margin_end(SPACE_L);
+    b.set_margin_top(SPACE_L);
+    b.set_margin_bottom(SPACE_XL);
     b.add_css_class("column");
     b
 }
 
-/// A group heading over a boxed list. With the column's 12 px spacing it leaves 24 px above and 12 px below.
+/// A group heading over a boxed list. With the column's 12 px spacing it leaves 24 px above and 12 px below, except the
+/// first child of the column, which sits at the column's own top margin like any other first child (`.kb-group-heading`
+/// in style.css).
 pub fn heading(text: &str) -> Label {
-    Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["heading"]).margin_top(12).build()
+    Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["heading", GROUP_HEADING]).build()
 }
+
+/// The style class of a group heading: the stylesheet adds the extra gap above every one but the first of a column.
+pub const GROUP_HEADING: &str = "kb-group-heading";
 
 pub fn dim(text: &str) -> Label {
     Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["dim-label", "caption"]).build()
@@ -590,10 +588,11 @@ pub fn title_matches(title: &str, query: &str) -> bool {
     title.to_lowercase().contains(&query.trim().to_lowercase())
 }
 
-/// The text of the first heading label under `w`: the title of a `browse::look::list_row`.
+/// The title of the first libadwaita row at or under `w`: the title of a `browse::look::list_row`, or of the heading of a
+/// row that holds a list of rows. A row with none has no title.
 fn row_title_text(w: &gtk::Widget) -> Option<String> {
-    if let Some(label) = w.downcast_ref::<Label>().filter(|l| l.has_css_class("heading")) {
-        return Some(label.text().to_string());
+    if let Some(row) = w.downcast_ref::<adw::PreferencesRow>() {
+        return Some(row.title().to_string());
     }
     std::iter::successors(w.first_child(), |c| c.next_sibling()).find_map(|c| row_title_text(&c))
 }
@@ -622,33 +621,9 @@ pub fn icon_button(icon: &str, tip: &str) -> Button {
     b
 }
 
-/// The row metrics every boxed list shares (this row and `pref_model::widgets::row`): 12 px sides, 8 px top and
-/// bottom, 12 px between the parts, at least 48 px tall.
-pub const ROW_PAD_H: i32 = 12;
-pub const ROW_PAD_V: i32 = 8;
-pub const ROW_MIN_HEIGHT: i32 = 48;
-
-/// Title/subtitle row with an optional trailing widget.
-pub fn row(title: &str, subtitle: Option<&str>, suffix: Option<gtk::Widget>) -> gtk::ListBoxRow {
-    let h = GBox::new(O::Horizontal, 12);
-    h.set_margin_start(ROW_PAD_H);
-    h.set_margin_end(ROW_PAD_H);
-    h.set_margin_top(ROW_PAD_V);
-    h.set_margin_bottom(ROW_PAD_V);
-    h.set_size_request(-1, ROW_MIN_HEIGHT - 2 * ROW_PAD_V);
-    let v = GBox::new(O::Vertical, 2);
-    v.set_hexpand(true);
-    v.set_valign(Align::Center);
-    v.append(&Label::builder().label(title).xalign(0.0).wrap(true).build());
-    if let Some(s) = subtitle.filter(|s| !s.is_empty()) {
-        v.append(&dim(s));
-    }
-    h.append(&v);
-    if let Some(s) = suffix {
-        s.set_valign(Align::Center);
-        h.append(&s);
-    }
-    gtk::ListBoxRow::builder().child(&h).build()
+/// Title/subtitle row with an optional trailing widget (`widgets::row`, the app's one row builder).
+pub fn row(title: &str, subtitle: Option<&str>, suffix: Option<gtk::Widget>) -> adw::ActionRow {
+    crate::widgets::row::plain(title, subtitle, suffix.as_ref())
 }
 
 /// The dim "opens a page" arrow at the end of a link row.
@@ -661,39 +636,21 @@ pub fn row_title(text: &str) -> Label {
     Label::builder().label(text).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["heading"]).build()
 }
 
-/// The two spinner sizes of the app: inside a button or a row, and as the state of a whole page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum LoadSize {
-    Inline,
-    Page,
-}
-
-/// A spinning spinner. `Inline` is 16 px, for a button or a row. `Page` is 32 px and centred, filling its parent: the
-/// "loading" state of a page.
-pub fn loading(size: LoadSize) -> gtk::Spinner {
-    let px = match size {
-        LoadSize::Inline => 16,
-        LoadSize::Page => 32,
-    };
-    let spinner = gtk::Spinner::builder().spinning(true).width_request(px).height_request(px).build();
-    if size == LoadSize::Page {
-        spinner.set_halign(Align::Center);
-        spinner.set_valign(Align::Center);
-        spinner.set_hexpand(true);
-        spinner.set_vexpand(true);
-    }
-    spinner
+/// A small spinning spinner (16 px) for inside a button or a row. The loading state of a whole page is
+/// `widgets::status::loading`.
+pub fn inline_spinner() -> gtk::Spinner {
+    gtk::Spinner::builder().spinning(true).width_request(16).height_request(16).build()
 }
 
 /// The bar of a page in selection mode, under its header: Cancel, the count, Select all. `count` is the caller's label
 /// (it sets the text as the selection changes); this gives it the look.
 pub fn selection_header(count: &Label, on_cancel: impl Fn() + 'static, on_select_all: impl Fn() + 'static) -> GBox {
     use kuro_i18n::{tr, MsgKey};
-    let bar = GBox::new(O::Horizontal, 8);
-    bar.set_margin_start(16);
-    bar.set_margin_end(16);
-    bar.set_margin_top(8);
-    bar.set_margin_bottom(4);
+    let bar = GBox::new(O::Horizontal, SPACE_S);
+    bar.set_margin_start(SPACE_L);
+    bar.set_margin_end(SPACE_L);
+    bar.set_margin_top(SPACE_S);
+    bar.set_margin_bottom(SPACE_XS);
     let cancel = Button::with_label(&tr(MsgKey::action_cancel));
     cancel.connect_clicked(move |_| on_cancel());
     count.set_hexpand(true);
@@ -713,7 +670,7 @@ pub fn selection_header(count: &Label, on_cancel: impl Fn() + 'static, on_select
 /// instead of widening the window (a hidden bar still counts toward the window's minimum width). [`action_bar_row`] is the
 /// row the buttons sit in, for buttons added later.
 pub fn action_bar(buttons: &[Button]) -> gtk::Revealer {
-    let row = GBox::new(O::Horizontal, 6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     for b in buttons {
         row.append(b);
     }
@@ -742,18 +699,6 @@ pub fn action_bar_row(bar: &gtk::Revealer) -> GBox {
         None
     }
     bar.child().as_ref().and_then(find).expect("an action bar has its row")
-}
-
-/// An empty state in the Library's look (docs/design/main-window.md): a large dim icon over the message. A caller with
-/// one matching action appends its button to the returned box.
-pub fn status(icon: &str, text: &str) -> GBox {
-    let b = GBox::new(O::Vertical, 12);
-    b.set_valign(Align::Center);
-    b.set_halign(Align::Center);
-    b.set_vexpand(true);
-    b.append(&gtk::Image::builder().icon_name(icon).pixel_size(64).css_classes(["dim-label"]).build());
-    b.append(&Label::builder().label(text).wrap(true).justify(gtk::Justification::Center).css_classes(["kb-empty-title"]).build());
-    b
 }
 
 pub fn linked(labels: &[String], active: usize) -> GBox {
@@ -905,8 +850,8 @@ pub const LEAD: &str = "kb-lead";
 /// Packs a page's lead box, with a pushed page's ⋮ menu (user, 2026-10-14), after Back. A tab page has no ⋮ menu (its
 /// actions are buttons at the end). The search toggle comes in first in the phone layout ([`search_follows_width`]).
 /// An empty box is hidden, so it takes no spacing. Call after Back and before anything else is packed at the start.
-pub fn pack_lead(header: &gtk::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
-    let lead = GBox::new(O::Horizontal, 4);
+pub fn pack_lead(header: &adw::HeaderBar, menu: Option<&gtk::Widget>) -> GBox {
+    let lead = GBox::new(O::Horizontal, SPACE_XS);
     lead.add_css_class(LEAD);
     if let Some(menu) = menu {
         lead.append(menu);
@@ -936,7 +881,7 @@ fn put_search(toggle: &gtk::Widget, lead: &GBox, end: &GBox, narrow: bool) {
 /// A page's search toggle: first in `lead` (the start of the header) in the phone layout, below
 /// `shell::layout::WIDE_MIN_WIDTH_PX`, and first in `end` (its actions at the end) in a wider window (user, 2026-10-25).
 /// Either box is hidden while empty, so it takes no spacing.
-pub fn search_follows_width(header: &gtk::HeaderBar, toggle: &gtk::Widget, lead: &GBox, end: &GBox) {
+pub fn search_follows_width(header: &adw::HeaderBar, toggle: &gtk::Widget, lead: &GBox, end: &GBox) {
     let place = {
         let (toggle, lead, end) = (toggle.clone(), lead.clone(), end.clone());
         move |narrow: bool| put_search(&toggle, &lead, &end, narrow)
@@ -983,17 +928,16 @@ impl HeaderActions {
 // ---------- spec items ----------
 
 pub fn item_row(item: &Item) -> Option<gtk::ListBoxRow> {
+    use crate::widgets::row as rows;
+    let shown_subtitle = |subtitle: &Option<String>| subtitle.as_deref().map(crate::spec::shown);
     Some(match item {
-        Item::Switch { title, subtitle, default } => switch_item_row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), default.as_bool().unwrap_or(false)),
+        Item::Switch { title, subtitle, default } => switch_item_row(&crate::spec::shown(title), shown_subtitle(subtitle).as_deref(), default.as_bool().unwrap_or(false)).upcast(),
         Item::List { title, subtitle, options, default } => {
             let labels = crate::spec::shown_all(options);
             let opts: Vec<&str> = labels.iter().map(String::as_str).collect();
-            let d = gtk::DropDown::from_strings(&opts);
             let def = value_str(default);
-            if let Some(i) = options.iter().position(|o| *o == def) {
-                d.set_selected(i as u32);
-            }
-            row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), Some(d.upcast()))
+            let selected = options.iter().position(|o| *o == def).unwrap_or(0);
+            rows::choice(&crate::spec::shown(title), shown_subtitle(subtitle).as_deref(), &opts, selected).upcast()
         }
         Item::Multi { title, subtitle, options, default } => {
             let defaults: Vec<String> = default.as_array().map(|a| a.iter().map(value_str).collect()).unwrap_or_default();
@@ -1004,7 +948,7 @@ pub fn item_row(item: &Item) -> Option<gtk::ListBoxRow> {
             }
             let pop = gtk::Popover::builder().child(&scrolled_max(&col, 360)).build();
             let mb = quiet_menu(gtk::MenuButton::builder().label(format!("{} selected", defaults.len())).popover(&pop).build());
-            row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), Some(mb.upcast()))
+            row(&crate::spec::shown(title), shown_subtitle(subtitle).as_deref(), Some(mb.upcast())).upcast()
         }
         Item::Slider { title, min, max, step, default, unit } => {
             let (min, max) = (min.unwrap_or(0.0), max.unwrap_or(100.0));
@@ -1020,66 +964,54 @@ pub fn item_row(item: &Item) -> Option<gtk::ListBoxRow> {
             sc.set_width_request(220);
             sc.set_draw_value(true);
             sc.set_digits(if step < 1.0 { 2 } else { 0 });
-            row(&crate::spec::shown(title), unit.as_deref(), Some(sc.upcast()))
+            row(&crate::spec::shown(title), unit.as_deref(), Some(sc.upcast())).upcast()
         }
-        Item::Text { title, subtitle, default } => {
-            let e = gtk::Entry::builder().text(value_str(default)).width_chars(18).build();
-            row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), Some(e.upcast()))
-        }
+        Item::Text { title, default, .. } => rows::entry(&crate::spec::shown(title), &value_str(default)).upcast(),
         Item::Tristate { title } => {
             // off → include (checked) → exclude (dash), like Aniyomi's TriStateItem
             let t = crate::tri_check::tri_check(kuro_prefs::checkbox::TriState::None(()), |_| {});
             let r = row(&crate::spec::shown(title), None, Some(t.widget().clone().upcast()));
             r.set_activatable(true);
             crate::widgets::row_activate::on_activate(&r, move |_| t.activate());
-            r
+            r.upcast()
         }
         Item::Sort { title, options } => {
             let labels = crate::spec::shown_all(options);
             let opts: Vec<&str> = labels.iter().map(String::as_str).collect();
-            let h = GBox::new(O::Horizontal, 6);
-            h.append(&gtk::DropDown::from_strings(&opts));
+            let r = rows::choice(&crate::spec::shown(title), None, &opts, 0);
             let dir = Button::from_icon_name("view-sort-ascending-symbolic");
+            dir.set_valign(Align::Center);
             dir.set_tooltip_text(Some(&tr(MsgKey::ui_ascending_descending)));
             dir.connect_clicked(|b| {
                 let up = b.icon_name().as_deref() == Some("view-sort-ascending-symbolic");
                 b.set_icon_name(if up { "view-sort-descending-symbolic" } else { "view-sort-ascending-symbolic" });
             });
-            h.append(&dir);
-            row(&crate::spec::shown(title), None, Some(h.upcast()))
+            r.add_suffix(&dir);
+            r.upcast()
         }
         Item::Chips { title, options, default } => {
             let def = value_str(default);
             let active = options.iter().position(|o| *o == def).unwrap_or(0);
             if options.len() <= 4 {
-                return Some(row(&crate::spec::shown(title), None, Some(linked(&crate::spec::shown_all(options), active).upcast())));
+                return Some(row(&crate::spec::shown(title), None, Some(linked(&crate::spec::shown_all(options), active).upcast())).upcast());
             }
-            // long chip lists (e.g. the 19 app themes) wrap under the title instead of widening the window
-            let flow = gtk::FlowBox::builder().selection_mode(gtk::SelectionMode::None).max_children_per_line(8).column_spacing(4).row_spacing(4).build();
-            let mut first: Option<gtk::ToggleButton> = None;
-            for (i, o) in options.iter().enumerate() {
-                let t = gtk::ToggleButton::builder().label(crate::spec::shown(o)).active(i == active).build();
-                match &first { Some(f) => t.set_group(Some(f)), None => first = Some(t.clone()) }
-                flow.insert(&t, -1);
-            }
-            let v = GBox::new(O::Vertical, 8);
-            margins(&v, 10);
-            v.append(&Label::builder().label(crate::spec::shown(title)).xalign(0.0).build());
-            v.append(&flow);
-            gtk::ListBoxRow::builder().child(&v).activatable(false).build()
+            // long chip lists (e.g. the 19 app themes) are a drop-down instead of widening the window
+            let labels = crate::spec::shown_all(options);
+            let opts: Vec<&str> = labels.iter().map(String::as_str).collect();
+            rows::choice(&crate::spec::shown(title), None, &opts, active).upcast()
         }
         Item::Link { title, subtitle, target } => {
-            let r = row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), Some(chevron().upcast()));
+            let r = row(&crate::spec::shown(title), shown_subtitle(subtitle).as_deref(), Some(chevron().upcast()));
             r.set_activatable(true);
             let t = target.clone();
             crate::widgets::row_activate::on_activate(&r, move |_| open(&t));
-            r
+            r.upcast()
         }
         Item::Action { title, subtitle } => {
             if crate::app_update::hides_row(title) {
                 return None;
             }
-            let r = row(&crate::spec::shown(title), subtitle.as_deref().map(crate::spec::shown).as_deref(), None);
+            let r = row(&crate::spec::shown(title), shown_subtitle(subtitle).as_deref(), None);
             r.set_activatable(true);
             let t = title.clone();
             crate::widgets::row_activate::on_activate(&r, move |r| {
@@ -1096,32 +1028,16 @@ pub fn item_row(item: &Item) -> Option<gtk::ListBoxRow> {
                     resolve(&id, &t);
                 }
             });
-            r
+            r.upcast()
         }
-        Item::Info { title } => {
-            let h = GBox::new(O::Horizontal, 12);
-            h.set_margin_start(ROW_PAD_H);
-            h.set_margin_end(ROW_PAD_H);
-            h.set_margin_top(12);
-            h.set_margin_bottom(12);
-            h.append(&gtk::Image::from_icon_name("dialog-information-symbolic"));
-            let l = dim(&crate::spec::shown(title));
-            l.set_hexpand(true);
-            h.append(&l);
-            gtk::ListBoxRow::builder().child(&h).activatable(false).build()
-        }
+        Item::Info { title } => rows::info(&crate::spec::shown(title))?.upcast(),
         Item::Unknown => return None,
     })
 }
 
-/// A switch row; a click or Enter flips the switch.
-fn switch_item_row(title: &str, subtitle: Option<&str>, default: bool) -> gtk::ListBoxRow {
-    let s = gtk::Switch::new();
-    s.set_active(default);
-    let r = row(title, subtitle, Some(s.clone().upcast()));
-    r.set_activatable(true);
-    crate::widgets::row_activate::on_activate(&r, move |_| s.set_active(!s.is_active()));
-    r
+/// A switch row: a click or Enter flips the switch.
+fn switch_item_row(title: &str, subtitle: Option<&str>, default: bool) -> adw::SwitchRow {
+    crate::widgets::row::switch(title, subtitle, None, default)
 }
 
 fn scrolled_max(child: &impl IsA<gtk::Widget>, h: i32) -> gtk::ScrolledWindow {
@@ -1130,38 +1046,62 @@ fn scrolled_max(child: &impl IsA<gtk::Widget>, h: i32) -> gtk::ScrolledWindow {
 
 pub fn groups_into(col: &GBox, groups: &[Group]) {
     for g in groups {
-        if let Some(t) = g.title.as_deref().filter(|t| !t.is_empty()) {
-            col.append(&heading(&crate::spec::shown(t)));
-        }
-        let l = boxed_list();
+        let group = crate::widgets::row::group(&g.title.as_deref().map(crate::spec::shown).unwrap_or_default());
+        let mut any = false;
         for it in &g.items {
             if let Some(r) = item_row(it) {
-                l.append(&r);
+                group.add(&r);
+                any = true;
             }
         }
-        if l.first_child().is_some() {
-            col.append(&l);
+        if any {
+            col.append(&group);
         }
     }
 }
 
 // ---------- sheets & dialogs ----------
 
-pub fn modal(title: &gtk::Widget, content: &impl IsA<gtk::Widget>, w: i32, h: i32) -> gtk::Window {
-    let header = gtk::HeaderBar::new();
-    header.set_decoration_layout(Some(&decoration(false)));
+/// Opens an `adw::Dialog` over the main window, or over the widget the caller names.
+pub trait DialogOpen {
+    fn open(&self);
+    fn open_over(&self, parent: &impl IsA<gtk::Widget>);
+}
+
+impl<T: IsA<adw::Dialog>> DialogOpen for T {
+    fn open(&self) {
+        match window_opt() {
+            Some(win) => self.open_over(&win),
+            None => self.upcast_ref::<adw::Dialog>().present(None::<&gtk::Widget>),
+        }
+    }
+
+    fn open_over(&self, parent: &impl IsA<gtk::Widget>) {
+        match parent.root() {
+            Some(root) => self.upcast_ref::<adw::Dialog>().present(Some(root.upcast_ref::<gtk::Widget>())),
+            None => self.open(),
+        }
+    }
+}
+
+/// The `content` that [`modal`] put under the header of `dialog`.
+pub fn dialog_content(dialog: &adw::Dialog) -> Option<gtk::Widget> {
+    dialog.child()?.downcast::<adw::ToolbarView>().ok()?.content()
+}
+
+/// A content dialog: `content` under a header bar that carries `title`, `w` px wide and `h` px tall (`h` below 1 follows
+/// the content). Escape and the header's close button close it. Open it with [`DialogOpen::open`].
+pub fn modal(title: &gtk::Widget, content: &impl IsA<gtk::Widget>, w: i32, h: i32) -> adw::Dialog {
+    let header = adw::HeaderBar::new();
     header.set_title_widget(Some(title));
-    let win = gtk::Window::builder()
-        .transient_for(&window())
-        .modal(true)
-        .default_width(w)
-        .default_height(h)
-        .titlebar(&header)
-        .child(content)
-        .build();
-    // the 1px outline of `style.css`, so the dialog's edge shows over a dark window behind it
-    win.add_css_class("kb-dialog");
-    win
+    let toolbar = adw::ToolbarView::new();
+    toolbar.add_top_bar(&header);
+    toolbar.set_content(Some(content));
+    let dialog = adw::Dialog::builder().content_width(w).child(&toolbar).build();
+    if h > 0 {
+        dialog.set_content_height(h);
+    }
+    dialog
 }
 
 pub fn show_sheet(sheet: &Sheet) {
@@ -1176,7 +1116,7 @@ pub fn show_sheet(sheet: &Sheet) {
     } else {
         Label::builder().label(crate::spec::shown(&sheet.title)).css_classes(["title"]).build().upcast()
     };
-    modal(&title, &stack, 520, 620).present();
+    modal(&title, &stack, 520, 620).open();
 }
 
 pub fn show_dialog(d: &Dialog) {
@@ -1221,26 +1161,26 @@ impl DialogButton {
     }
 }
 
-/// The one dialog of the app: a title bar, `body` with the standard margins (it scrolls once it is taller than the
-/// screen allows), and the buttons in a row at the bottom right. The window is as tall as its content, the main button
+/// The one content dialog of the app (`adw::Dialog`): a header bar, `body` with the standard margins (it scrolls once it is taller than the
+/// screen allows), and the buttons in a row at the bottom right. The dialog is as tall as its content, the main button
 /// is the default (Enter), and Escape closes it. Every dialog is built here, so they all look and behave the same.
-pub fn dialog(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>) -> gtk::Window {
+pub fn dialog(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>) -> adw::Dialog {
     dialog_or_dismiss(title, body, width, buttons, || {})
 }
 
 /// [`dialog`] that runs `on_dismiss` once when it closes any way other than through a button that is not a Cancel
 /// button: Escape, the close button or Cancel.
-pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> gtk::Window {
+pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> adw::Dialog {
     let answered = Rc::new(std::cell::Cell::new(false));
-    let col = GBox::new(O::Vertical, 12);
+    let col = GBox::new(O::Vertical, SPACE_M);
     margins(&col, 18);
     col.append(body);
-    let row = GBox::new(O::Horizontal, 6);
+    let row = GBox::new(O::Horizontal, SPACE_S);
     row.set_halign(Align::End);
-    row.set_margin_top(6);
+    row.set_margin_top(SPACE_S);
     col.append(&row);
     let win = modal(&Label::builder().label(title).css_classes(["title"]).build().upcast(), &scrolled_max(&col, 560), width, -1);
-    win.set_resizable(false);
+    win.set_title(title);
     for b in buttons {
         let button = Button::with_label(&b.label);
         match b.role {
@@ -1260,16 +1200,49 @@ pub fn dialog_or_dismiss(title: &str, body: &impl IsA<gtk::Widget>, width: i32, 
         });
         row.append(&button);
     }
-    let escape = gtk::ShortcutController::new();
-    escape.add_shortcut(gtk::Shortcut::new(gtk::ShortcutTrigger::parse_string("Escape"), Some(gtk::NamedAction::new("window.close"))));
-    win.add_controller(escape);
-    win.connect_close_request(move |_| {
+    win.connect_closed(move |_| {
         if !answered.get() {
             on_dismiss();
         }
-        glib::Propagation::Proceed
     });
     win
+}
+
+/// A confirm dialog of text (`adw::AlertDialog`): `heading`, one paragraph and one response per button, in the order
+/// given. The main button (`Suggested` or `Destructive`) is the default, Escape counts as the Cancel button, and
+/// `on_dismiss` runs once when it closes any way other than through a button that is not a Cancel button. A button's
+/// `run` result is ignored: an alert always closes (use [`dialog`] for a button that keeps its dialog open).
+pub fn alert(heading: &str, text: &str, buttons: Vec<DialogButton>, on_dismiss: impl Fn() + 'static) -> adw::AlertDialog {
+    let dialog = adw::AlertDialog::builder().heading(heading).body(text).build();
+    let mut actions = Vec::new();
+    for (i, b) in buttons.into_iter().enumerate() {
+        let id = i.to_string();
+        dialog.add_response(&id, &b.label);
+        match b.role {
+            Role::Normal => {}
+            Role::Suggested => {
+                dialog.set_response_appearance(&id, adw::ResponseAppearance::Suggested);
+                dialog.set_default_response(Some(&id));
+            }
+            Role::Destructive => {
+                dialog.set_response_appearance(&id, adw::ResponseAppearance::Destructive);
+                dialog.set_default_response(Some(&id));
+            }
+        }
+        if b.dismisses {
+            dialog.set_close_response(&id);
+        }
+        actions.push((b.run, b.dismisses));
+    }
+    dialog.connect_response(None, move |_, id| {
+        match id.parse::<usize>().ok().and_then(|i| actions.get(i)) {
+            Some((run, false)) => {
+                run();
+            }
+            _ => on_dismiss(),
+        }
+    });
+    dialog
 }
 
 /// A dialog of text: [`dialog`] with one wrapped paragraph as its body.
@@ -1279,7 +1252,7 @@ pub fn message(text: &str) -> Label {
 
 /// Shows a spec dialog. Its last button runs `on_ok` and then closes the dialog; the other buttons only close it.
 pub fn show_dialog_then(d: &Dialog, on_ok: impl Fn() + 'static) {
-    let body = GBox::new(O::Vertical, 12);
+    let body = GBox::new(O::Vertical, SPACE_M);
     if let Some(t) = &d.text {
         body.append(&message(&crate::spec::shown(t)));
     }
@@ -1300,7 +1273,7 @@ pub fn show_dialog_then(d: &Dialog, on_ok: impl Fn() + 'static) {
             DialogButton::new(&crate::spec::shown(l), role, move || on_ok())
         })
         .collect();
-    dialog(&crate::spec::shown(&d.title), &body, 420, buttons).present();
+    dialog(&crate::spec::shown(&d.title), &body, 420, buttons).open();
 }
 
 fn norm(s: &str) -> String {
@@ -1393,7 +1366,7 @@ pub fn generic(s: &Screen) -> GBox {
     let content: gtk::Widget = if s.groups.is_empty() {
         let b = GBox::new(O::Vertical, 0);
         b.append(&col);
-        b.append(&status("dialog-information-symbolic", &crate::spec::shown(s.empty.as_deref().unwrap_or(&s.title))));
+        b.append(&crate::widgets::status::empty("dialog-information-symbolic", &crate::spec::shown(s.empty.as_deref().unwrap_or(&s.title)), None));
         b.upcast()
     } else {
         scrolled(&col).upcast()
@@ -1410,7 +1383,7 @@ mod tests {
     #[test]
     fn the_search_leads_the_row_in_the_phone_layout_and_is_first_of_the_actions_otherwise() {
         crate::testing::with_display(|| {
-            let (lead, end) = (GBox::new(O::Horizontal, 4), GBox::new(O::Horizontal, 4));
+            let (lead, end) = (GBox::new(O::Horizontal, SPACE_XS), GBox::new(O::Horizontal, SPACE_XS));
             let (toggle, refresh) = (gtk::ToggleButton::builder().visible(true).build(), Button::builder().visible(true).build());
             end.append(&refresh);
             // a pushed page's ⋮ menu, hidden in a wide window: it leaves the lead box with nothing showing
@@ -1452,19 +1425,16 @@ mod tests {
     #[test]
     fn over_root_replaces_the_pages_with_one_push_or_pops_when_nothing_is_pushed() {
         crate::testing::with_display(|| {
-            let (stack, _) = crate::testing::nav();
-            if stack.first_child().is_none() {
-                stack.add_child(&gtk::Label::new(Some("root")));
-            }
-            pop_to_root();
+            let _ = crate::testing::nav();
+            push(&gtk::Label::new(Some("root")));
             let (a, b) = (gtk::Label::new(Some("a")), gtk::Label::new(Some("b")));
             push(&a);
             over_root(|| {
                 pop_to_root();
                 push(&b);
             });
-            assert_eq!(stack.visible_child().as_ref(), Some(b.upcast_ref::<gtk::Widget>()), "straight to the new page");
-            assert_eq!(stack.transition_type(), crate::shell::transitions::spec(crate::shell::transitions::Direction::Push, crate::shell::transitions::animations_enabled()).kind);
+            assert_eq!(visible_child().as_ref(), Some(b.upcast_ref::<gtk::Widget>()), "straight to the new page");
+            assert_eq!(page_stack().0.len(), 2, "the root and the new page: the page between went");
             over_root(|| {});
             assert_eq!(page_stack().1, 0, "nothing pushed: back at the root");
         });
@@ -1492,6 +1462,14 @@ mod tests {
     }
 
     /// Every widget at or below `root`.
+    /// Lets the main loop run, so a closing dialog finishes its animation and reports `closed`.
+    fn pump_until_closed() {
+        let until = std::time::Instant::now() + std::time::Duration::from_millis(600);
+        while std::time::Instant::now() < until {
+            glib::MainContext::default().iteration(false);
+        }
+    }
+
     fn all(root: &gtk::Widget, out: &mut Vec<gtk::Widget>) {
         out.push(root.clone());
         let mut child = root.first_child();
@@ -1517,16 +1495,15 @@ mod tests {
                 let buttons = vec![DialogButton::cancel("Cancel"), DialogButton::new("Add", Role::Suggested, move || ran.set(ran.get() + 1))];
                 dialog_or_dismiss("Add category", &message("Body"), 380, buttons, move || dismissed.set(dismissed.get() + 1))
             };
-            let buttons_of = |win: &gtk::Window| {
+            let buttons_of = |win: &adw::Dialog| {
                 let mut found = Vec::new();
-                all(win.upcast_ref(), &mut found);
+                all(&dialog_content(win).expect("content"), &mut found);
                 found.into_iter().filter_map(|w| w.downcast::<Button>().ok()).filter(|b| b.label().is_some()).collect::<Vec<_>>()
             };
 
-            // a window that was never shown has nothing to close, so each one is presented like the app does
+            // a dialog that was never shown has nothing to close, so each one is opened like the app does
             let win = open();
-            win.present();
-            assert!(!win.is_resizable() && win.is_modal());
+            win.open();
             let buttons = buttons_of(&win);
             assert_eq!(buttons.iter().map(|b| b.label().unwrap().to_string()).collect::<Vec<_>>(), ["Cancel", "Add"]);
             assert!(buttons[1].has_css_class("suggested-action"));
@@ -1535,13 +1512,15 @@ mod tests {
             assert_eq!((ran.get(), dismissed.get()), (1, 0), "the answer runs and is not a dismiss");
 
             let win = open();
-            win.present();
+            win.open();
             buttons_of(&win)[0].emit_clicked();
+            pump_until_closed();
             assert_eq!((ran.get(), dismissed.get()), (1, 1), "Cancel dismisses");
 
             let win = open();
-            win.present();
+            win.open();
             win.close();
+            pump_until_closed();
             assert_eq!((ran.get(), dismissed.get()), (1, 2), "the close button dismisses");
         });
     }
@@ -1550,7 +1529,7 @@ mod tests {
     fn a_sidebar_page_has_no_title_and_a_pushed_page_has_its_title_and_back() {
         crate::testing::with_display(|| {
             let root = page("Updates", &GBox::new(O::Vertical, 0), vec![], false);
-            let header = root.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row");
+            let header = root.first_child().and_downcast::<adw::HeaderBar>().expect("the header row");
             assert!(!labels(header.upcast_ref()).iter().any(|l| l == "Updates"), "the sidebar names the tab");
             assert!(header.title_widget().is_some(), "an empty title widget keeps GTK from showing the window title");
             let pushed = page("Appearance", &GBox::new(O::Vertical, 0), vec![], true);
@@ -1568,7 +1547,7 @@ mod tests {
             let search = gtk::SearchEntry::new();
             let refresh = icon_button("view-refresh-symbolic", "Refresh");
             let p = page("Updates", &GBox::new(O::Vertical, 0), vec![search.clone().upcast(), refresh.upcast()], false);
-            let header = p.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row");
+            let header = p.first_child().and_downcast::<adw::HeaderBar>().expect("the header row");
             let bar = header.next_sibling().and_downcast::<gtk::SearchBar>().expect("the bar sits under the header");
             assert!(search.is_ancestor(&bar) && !search.is_ancestor(&header), "the entry is in the bar, not the header");
             let mut w = Vec::new();

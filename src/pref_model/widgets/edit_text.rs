@@ -11,8 +11,9 @@ use kuro_prefs::pref::Pref;
 use super::super::bind::{self, Outcome, Veto, WriteGate};
 use super::super::model::{format_subtitle, ItemCommon};
 use super::dialog::{self, Dialog};
-use super::row::{self, set_subtitle, PrefRow, RowSpec};
+use crate::widgets::row::{self, set_subtitle, RowSpec};
 use super::super::strings;
+use crate::theme::tokens::{SPACE_S};
 
 /// Blank means empty after trimming whitespace (E-03).
 pub fn is_blank(text: &str) -> bool {
@@ -43,7 +44,7 @@ pub fn row(
     validate: Rc<dyn Fn(&str) -> bool>,
     error_message: Option<Rc<dyn Fn(&str) -> String>>,
     veto: Veto<String>,
-) -> PrefRow {
+) -> adw::ActionRow {
     let stored = Rc::new(RefCell::new(pref.get()));
     let built = row::build(RowSpec {
         title: &common.title,
@@ -52,11 +53,11 @@ pub fn row(
         trailing: None,
         on_click: None,
     });
-    built.row.set_sensitive(common.enabled);
-    built.row.set_activatable(common.enabled);
+    built.set_sensitive(common.enabled);
+    built.set_activatable(common.enabled);
 
     let refresh: Rc<dyn Fn(&str)> = {
-        let (subtitle, template) = (built.subtitle.clone(), common.subtitle.clone());
+        let (subtitle, template) = (built.clone(), common.subtitle.clone());
         Rc::new(move |value: &str| {
             let text = template.as_deref().and_then(|t| format_subtitle(t, value));
             set_subtitle(&subtitle, text.as_deref());
@@ -64,7 +65,7 @@ pub fn row(
     };
     let gate = Rc::new(WriteGate::default());
     let title = common.title.clone();
-    crate::widgets::row_activate::on_activate(&built.row, {
+    crate::widgets::row_activate::on_activate(&built, {
         let (stored, refresh, pref, veto, gate) = (stored.clone(), refresh.clone(), pref.clone(), veto.clone(), gate.clone());
         move |row| {
             let Some(parent) = row.root().and_downcast::<gtk::Window>() else {
@@ -96,7 +97,7 @@ pub fn row(
         }
     });
 
-    let weak = built.row.downgrade();
+    let weak = built.downgrade();
     bind::follow(&pref, move || weak.upgrade().is_some(), move |value: String| {
         *stored.borrow_mut() = value.clone();
         refresh(&value);
@@ -115,7 +116,7 @@ struct EditSpec {
 }
 
 fn open(parent: &gtk::Window, spec: EditSpec, on_ok: impl Fn(String, Dialog) + 'static) {
-    let body = GBox::new(Orientation::Vertical, 8);
+    let body = GBox::new(Orientation::Vertical, SPACE_S);
     if let Some(sub) = &spec.dialog_subtitle {
         let label = Label::new(Some(sub));
         label.set_wrap(true);

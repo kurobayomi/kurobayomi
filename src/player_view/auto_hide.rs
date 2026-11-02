@@ -27,7 +27,7 @@ pub struct AutoHide {
 
 impl AutoHide {
     /// Lays out `header` and `bar` on `page` and `overlay` (which holds `area`, the video) and follows the input.
-    pub fn attach(enabled: bool, page: &gtk::Box, overlay: &gtk::Overlay, header: &gtk::HeaderBar, bar: &gtk::Box, area: &gtk::GLArea) -> Rc<Self> {
+    pub fn attach(enabled: bool, page: &gtk::Box, overlay: &gtk::Overlay, header: &adw::HeaderBar, bar: &gtk::Box, area: &gtk::GLArea) -> Rc<Self> {
         let reveal = |child: &gtk::Widget, transition, align| {
             let revealer = gtk::Revealer::builder().transition_type(transition).transition_duration(200).reveal_child(true).valign(align).build();
             revealer.set_child(Some(child));

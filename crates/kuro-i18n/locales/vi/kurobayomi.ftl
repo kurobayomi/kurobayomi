@@ -332,8 +332,6 @@ pref_anime_library_update_categories_details = Anime thuộc danh mục bị lo�
 
 unofficial_extension_message_aniyomi = Tiện ích mở rộng này không có trong danh sách chính thức.
 
-unofficial_anime_extension_message = Tiện ích mở rộng này không có trong danh sách chính thức.
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = Các thể loại bị loại trừ

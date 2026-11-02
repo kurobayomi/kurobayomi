@@ -6,6 +6,7 @@
 //! [`open_sheet`] before the page is pushed, and the search page reads the same entry and the tracker its Search button
 //! named. A bind, an edit or a stop tells the details page, so its Tracking button follows.
 
+use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -34,6 +35,8 @@ use crate::screens::{built, unavailable, Built};
 use crate::settings_ui::tracker_host::{self, now_ms};
 use crate::settings_ui::tracking;
 use crate::ui;
+use crate::theme::tokens::{SPACE_M};
+use crate::theme::tokens::{SPACE_S};
 
 /// The progress spin button writes this long after its last step, so a run of clicks is one write.
 const PROGRESS_SETTLE_MS: u64 = 700;
@@ -210,7 +213,7 @@ fn connect_section(root: &GBox, tracker: TrackerId, waiting: bool) {
 fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
     let Some(entry) = entry() else { return };
     let slot = GBox::new(O::Vertical, 0);
-    slot.append(&ui::dim(&tr(MsgKey::loading)));
+    slot.append(&crate::widgets::status::loading(Some(&tr(MsgKey::loading))));
     root.append(&slot);
     let again = redraw(root);
     let (weak, tracker, id, kind) = (slot.downgrade(), Arc::clone(tracker), entry.id, entry.kind);
@@ -227,7 +230,12 @@ fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
             clear(&slot);
             match result {
                 Ok(bound) => slot.append(&tracker_list(&entry, tracker.as_ref(), bound, again)),
-                Err(err) => slot.append(&ui::dim(&english(&kuro_track::dialog::failure_message(&err)))),
+                Err(err) => {
+                    let retry = Rc::clone(&again);
+                    let page = crate::widgets::status::error(&english(&kuro_track::dialog::failure_message(&err)), None, Some(move || retry()));
+                    page.add_css_class("compact");
+                    slot.append(&page);
+                }
             }
         },
     );
@@ -373,7 +381,7 @@ fn edit_rows(list: &ListBox, entry: &Entry, shown: Shown, bound: Bound, redraw: 
 }
 
 /// "Episodes" or "Chapters": a spin button over `0..=total` (10000 while the total is unknown) and "of N" beside it.
-fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> gtk::ListBoxRow {
+fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> adw::ActionRow {
     let spin = gtk::SpinButton::with_range(0.0, pickers::progress_max(shown.total) as f64, 1.0);
     spin.set_digits(0);
     spin.set_value(shown.progress as f64);
@@ -389,7 +397,7 @@ fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> gtk::List
         });
     });
     let total = if shown.total > 0 { shown.total.to_string() } else { "?".to_owned() };
-    let suffix = GBox::new(O::Horizontal, 6);
+    let suffix = GBox::new(O::Horizontal, SPACE_S);
     suffix.append(&spin);
     suffix.append(&Label::new(Some(&format!("of {total}"))));
     let title = tr(match kind {
@@ -401,7 +409,7 @@ fn progress_row(kind: Kind, shown: &Shown, write: Rc<dyn Fn(Edit)>) -> gtk::List
 
 /// The start or finish date: a button with the day, whose popover holds a calendar, OK and, for a set date, Remove.
 /// A day in the future, a start after the finish or a finish before the start is refused with a toast.
-fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) -> gtk::ListBoxRow {
+fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) -> adw::ActionRow {
     let zone = chrono::Local;
     let text = picker_day(stored, &zone).map_or_else(|| tr(MsgKey::ui_not_set).to_owned(), |day| day.format("%Y-%m-%d").to_string());
     let button = gtk::MenuButton::builder().label(text).build();
@@ -411,7 +419,7 @@ fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) ->
     if let Ok(day) = glib::DateTime::from_local(opened.year(), opened.month() as i32, opened.day() as i32, 0, 0, 0.0) {
         calendar.select_day(&day);
     }
-    let buttons = GBox::new(O::Horizontal, 6);
+    let buttons = GBox::new(O::Horizontal, SPACE_S);
     buttons.set_halign(Align::End);
     if remove_offered(stored) {
         let clear = Button::with_label(&tr(MsgKey::action_remove));
@@ -440,7 +448,7 @@ fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) ->
         }
     });
     buttons.append(&ok);
-    let content = GBox::new(O::Vertical, 6);
+    let content = GBox::new(O::Vertical, SPACE_S);
     ui::margins(&content, 6);
     content.append(&calendar);
     content.append(&buttons);
@@ -460,7 +468,7 @@ fn button_row(label: &str, css: &[&str], run: impl Fn() + 'static) -> gtk::ListB
 /// Stop tracking asks first. The local unlink always runs; for a tracker that can delete, a checkbox (off by default)
 /// also removes the entry from the tracker's site.
 fn confirm_stop(name: &str, bound: &Bound, deletable: bool, redraw: Rc<dyn Fn()>) {
-    let column = GBox::new(O::Vertical, 12);
+    let column = GBox::new(O::Vertical, SPACE_M);
     column.append(&Label::builder().label(tr(MsgKey::track_delete_text)).wrap(true).xalign(0.0).build());
     let also = gtk::CheckButton::builder().label(trf(MsgKey::track_delete_remote_text, &[("arg1", Arg::Str(name))])).active(remove::CHECKBOX_DEFAULT).build();
     also.set_visible(remove::checkbox_shown(deletable));
@@ -476,7 +484,7 @@ fn confirm_stop(name: &str, bound: &Bound, deletable: bool, redraw: Rc<dyn Fn()>
             }
         }),
     ];
-    ui::dialog(&trf(MsgKey::track_delete_title, &[("arg1", Arg::Str(name))]), &column, 400, buttons).present();
+    ui::dialog(&trf(MsgKey::track_delete_title, &[("arg1", Arg::Str(name))]), &column, 400, buttons).open();
 }
 
 /// Writes one edit to `tracker` at once. A success tells the details page and redraws the rows; a failure is a toast.
@@ -553,8 +561,10 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
     }
     let token = generation.get() + 1;
     generation.set(token);
-    say(status, "Searching…");
-    let (kind, latest, shown_status, shown_results, entry) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone());
+    say(status, "");
+    clear(results);
+    results.append(&crate::widgets::status::loading(Some("Searching…")));
+    let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), query.clone(), Rc::clone(generation)));
     crate::source_bridge::call_on_main(
         async move { search_hits(tracker.as_ref(), kind, &query).await },
         move |result| {
@@ -563,12 +573,16 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
             }
             clear(&shown_results);
             match result {
-                Ok(found) if found.is_empty() => say(&shown_status, &kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found)),
-                Ok(found) => {
-                    say(&shown_status, "");
-                    shown_results.append(&hits_list(&entry, found));
+                Ok(found) if found.is_empty() => shown_results.append(&crate::widgets::status::empty("system-search-symbolic", &kuro_i18n::tr(kuro_i18n::MsgKey::no_results_found), None)),
+                Ok(found) => shown_results.append(&hits_list(&entry, found)),
+                Err(err) => {
+                    let (shown, status, results) = (again.clone(), shown_status.clone(), shown_results.clone());
+                    shown_results.append(&crate::widgets::status::error(
+                        &english(&kuro_track::dialog::failure_message(&err)),
+                        None,
+                        Some(move || run_search(&shown.0, shown.1.clone(), &status, &results, &shown.2)),
+                    ));
                 }
-                Err(err) => say(&shown_status, &english(&kuro_track::dialog::failure_message(&err))),
             }
         },
     );

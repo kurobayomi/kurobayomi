@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
 use gtk::{Align, Justification, Orientation as O, gio, glib, pango};
+use crate::theme::tokens::{SPACE_M, SPACE_XL};
 
 const APP_ID: &str = crate::channel::APP_ID;
 const REPORTER_ID: &str = "io.github.anas1412.Kurobayomi.CrashReporter";
@@ -52,10 +53,10 @@ fn build(app: &gtk::Application, path: &Path, text: Option<&str>) {
     attrs.insert(pango::AttrFontDesc::new(&pango::FontDescription::from_string("monospace")));
     let details = gtk::Label::builder().label(text.unwrap_or(&no_details())).selectable(true).xalign(0.0).yalign(0.0).build();
     details.set_attributes(Some(&attrs));
-    details.set_margin_start(12);
-    details.set_margin_end(12);
-    details.set_margin_top(12);
-    details.set_margin_bottom(12);
+    details.set_margin_start(SPACE_M);
+    details.set_margin_end(SPACE_M);
+    details.set_margin_top(SPACE_M);
+    details.set_margin_bottom(SPACE_M);
     let scroll = gtk::ScrolledWindow::builder().child(&details).min_content_height(160).vexpand(true).build();
     let well = gtk::Box::new(O::Vertical, 0);
     well.add_css_class("card");
@@ -86,11 +87,11 @@ fn build(app: &gtk::Application, path: &Path, text: Option<&str>) {
         quit.quit();
     });
 
-    let body = gtk::Box::new(O::Vertical, 12);
-    body.set_margin_start(24);
-    body.set_margin_end(24);
-    body.set_margin_top(24);
-    body.set_margin_bottom(24);
+    let body = gtk::Box::new(O::Vertical, SPACE_M);
+    body.set_margin_start(SPACE_XL);
+    body.set_margin_end(SPACE_XL);
+    body.set_margin_top(SPACE_XL);
+    body.set_margin_bottom(SPACE_XL);
     body.append(&icon);
     body.append(&heading);
     body.append(&subtitle);

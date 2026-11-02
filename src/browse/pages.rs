@@ -22,6 +22,7 @@ use super::filters::SourceFilters;
 use super::grid::list_height;
 use super::header::OverflowItem;
 use super::header_bar::{HeaderDeps, SourceHeader, build as build_header, stub_header};
+use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S};
 #[cfg(test)]
 use super::icons::resolve;
 use super::listing::ListItem;
@@ -78,10 +79,10 @@ pub struct MigrateSourcesNav {
 pub fn migrate_sources(snapshot: &MigrateSourcesSnapshot, nav: MigrateSourcesNav) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     // the prompt and the help button head the list column, as a section heading would
-    let sort = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    sort.set_margin_start(16);
-    sort.set_margin_end(16);
-    sort.set_margin_top(12);
+    let sort = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+    sort.set_margin_start(SPACE_L);
+    sort.set_margin_end(SPACE_L);
+    sort.set_margin_top(SPACE_M);
     sort.append(&gtk::Label::builder().label(tr(MsgKey::migration_selection_prompt)).hexpand(true).xalign(0.0).wrap(true).css_classes(["dim-label"]).build());
     let help = gtk::Button::from_icon_name("help-browser-symbolic");
     help.set_tooltip_text(Some(&tr(MsgKey::label_help)));
@@ -91,11 +92,14 @@ pub fn migrate_sources(snapshot: &MigrateSourcesSnapshot, nav: MigrateSourcesNav
     root.append(&sort);
 
     if let Some(message) = &snapshot.error {
-        root.append(&super::look::error_state(message, Some(Rc::clone(&nav.retry))));
+        root.append(&crate::widgets::status::error(message, None, Some({
+            let retry = Rc::clone(&nav.retry);
+            move || retry()
+        })));
         return root;
     }
     if snapshot.sources.is_empty() {
-        root.append(&super::look::empty_state("view-list-symbolic", &snapshot.empty_text, &[]).0);
+        root.append(&crate::widgets::status::empty("view-list-symbolic", &snapshot.empty_text, None));
         return root;
     }
     let column = crate::ui::column();
@@ -216,7 +220,7 @@ fn stub_page(listing: &ListingDeps, on_back: Rc<dyn Fn()>) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     root.append(&stub_header(&listing.source_name, on_back));
     let label = stub_source_label(&listing.source_name, &listing.source_lang, listing.source_id);
-    root.append(&super::look::empty_state("dialog-warning-symbolic", &trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&label))]), &[]).0);
+    root.append(&crate::widgets::status::empty("dialog-warning-symbolic", &trf(MsgKey::source_not_installed, &[("arg1", Arg::Str(&label))]), None));
     root
 }
 
@@ -304,8 +308,8 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
 
     // the shared top row of a page (`ui::pill_row`), as the library's categories and the download queue's actions
     let chips = crate::ui::pill_row();
-    chips.set_margin_start(16);
-    chips.set_margin_end(16);
+    chips.set_margin_start(SPACE_L);
+    chips.set_margin_end(SPACE_L);
     let mut labels = vec![tr(MsgKey::popular)];
     if supports_latest {
         labels.push(tr(MsgKey::latest));
@@ -621,7 +625,7 @@ pub struct GlobalSearchPage {
 }
 
 pub fn global_search(nav: GlobalSearchNav, ready: watch::Receiver<bool>) -> GlobalSearchPage {
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, SPACE_S);
     let entry = gtk::SearchEntry::new();
     entry.set_placeholder_text(Some(&tr(MsgKey::action_global_search_hint)));
     entry.set_hexpand(true);
@@ -637,9 +641,9 @@ pub fn global_search(nav: GlobalSearchNav, ready: watch::Receiver<bool>) -> Glob
     }
     let progress = gtk::ProgressBar::new();
     progress.set_visible(false);
-    let column = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(12).valign(gtk::Align::Start).build();
-    column.set_margin_start(16);
-    column.set_margin_end(16);
+    let column = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(SPACE_M).valign(gtk::Align::Start).build();
+    column.set_margin_start(SPACE_L);
+    column.set_margin_end(SPACE_L);
     let view = Rc::new(SearchView { column, progress, chips: Cell::new(nav.chips), nav, last: RefCell::new(None), typed: Rc::default() });
     let search = Rc::clone(&view);
     entry.connect_activate(move |entry| (search.nav.search)(entry.text().as_str()));
@@ -739,8 +743,8 @@ fn draw(entry: &gtk::SearchEntry, view: &SearchView, snapshot: &GlobalSearchSnap
 }
 
 fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>) -> gtk::Box {
-    let section = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(6).vexpand(false).valign(gtk::Align::Start).build();
-    let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    let section = gtk::Box::builder().orientation(gtk::Orientation::Vertical).spacing(SPACE_S).vexpand(false).valign(gtk::Align::Start).build();
+    let header = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
     let titles = gtk::Box::new(gtk::Orientation::Vertical, 0);
     titles.set_hexpand(true);
     titles.append(&gtk::Label::builder().label(row_title(row)).xalign(0.0).css_classes(["heading"]).build());
@@ -757,14 +761,14 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
     section.append(&header);
     match &row.state {
         SearchState::Loading => {
-            let spinner = crate::ui::loading(crate::ui::LoadSize::Inline);
+            let spinner = crate::ui::inline_spinner();
             spinner.set_halign(gtk::Align::Center);
-            spinner.set_margin_top(16);
-            spinner.set_margin_bottom(16);
+            spinner.set_margin_top(SPACE_L);
+            spinner.set_margin_bottom(SPACE_L);
             section.append(&spinner);
         }
         SearchState::Error(message) => {
-            let line = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+            let line = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
             line.append(&gtk::Image::from_icon_name("dialog-error-symbolic"));
             line.append(&gtk::Label::builder().label(message).xalign(0.0).wrap(true).css_classes(["error"]).build());
             section.append(&line);
@@ -773,7 +777,7 @@ fn search_row(row: &SearchRow, nav: &GlobalSearchNav, typed: Rc<RefCell<String>>
             section.append(&gtk::Label::builder().label(tr(MsgKey::no_results_found)).xalign(0.0).css_classes(["dim-label"]).build());
         }
         SearchState::Results(items) | SearchState::Refreshing(items) => {
-            let covers = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(8).valign(gtk::Align::Start).vexpand(false).build();
+            let covers = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(SPACE_S).valign(gtk::Align::Start).vexpand(false).build();
             for item in items {
                 let cell = super::view::grid_cell_lines(
                     Some(item),
@@ -820,7 +824,7 @@ pub struct MigrateEntriesNav {
 pub fn migrate_entries(entries: &[MigrateEntry], error: Option<&str>, nav: MigrateEntriesNav) -> gtk::Box {
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     if let Some(message) = error {
-        root.append(&gtk::Label::builder().label(message).margin_top(8).css_classes(["error"]).build());
+        root.append(&gtk::Label::builder().label(message).margin_top(SPACE_S).css_classes(["error"]).build());
     }
     let mut sorted: Vec<&MigrateEntry> = entries.iter().collect();
     sorted.sort_by_key(|e| e.title.to_lowercase());
@@ -828,20 +832,18 @@ pub fn migrate_entries(entries: &[MigrateEntry], error: Option<&str>, nav: Migra
     let list = crate::ui::boxed_list();
     for entry in sorted {
         let item = ListItem { id: entry.id, title: entry.title.clone(), cover: entry.cover.clone(), ..ListItem::default() };
-        let row = super::view::list_cell(Some(&item), &nav.load_cover, &super::view::always());
+        let size = super::look::SMALL;
+        let cover = super::view::cover_widget(&item, size.width, size.height, &nav.load_cover, &super::view::always());
         let (open_search, id) = (Rc::clone(&nav.open_search), entry.id);
         // a click on the row opens the migrate search; a click on the cover opens the entry and claims the click
-        let cell = row.clone();
-        let row = list_row(&cell, move || open_search(id), Vec::new);
-        if let Some(cover) = cell.first_child() {
-            let open_entry = Rc::clone(&nav.open_entry);
-            let click = gtk::GestureClick::new();
-            click.connect_released(move |gesture, _, _, _| {
-                gesture.set_state(gtk::EventSequenceState::Claimed);
-                open_entry(id);
-            });
-            cover.add_controller(click);
-        }
+        let open_entry = Rc::clone(&nav.open_entry);
+        let click = gtk::GestureClick::new();
+        click.connect_released(move |gesture, _, _, _| {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            open_entry(id);
+        });
+        cover.add_controller(click);
+        let row = list_row(&super::look::list_row(Some(cover.upcast()), &item.title, None, None), move || open_search(id), Vec::new);
         list.append(&row);
     }
     // an empty boxed list would still draw its frame
@@ -1078,7 +1080,8 @@ pub(crate) mod tests {
             Some("could not load"),
             MigrateEntriesNav { open_search: Rc::new(|_| {}), open_entry: Rc::new(|_| {}), load_cover: Rc::new(|_, _| {}) },
         );
-        let text = all_labels(&page);
+        // an empty label is a row's blank subtitle
+        let text: Vec<_> = all_labels(&page).into_iter().filter(|t| !t.is_empty()).collect();
         // each cover shows the title's initials until its picture loads
         assert_eq!(text, ["could not load", "A", "Apple", "B", "banana", "Z", "zebra"]);
     }

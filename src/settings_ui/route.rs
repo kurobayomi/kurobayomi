@@ -511,7 +511,7 @@ mod tests {
 
             // the settings search: the field in the bar under the header, a hint before a query, "No results found" after a miss
             let search = crate::screens::build("settings_search");
-            let header = search.first_child().and_downcast::<gtk::HeaderBar>().expect("the header row");
+            let header = search.first_child().and_downcast::<adw::HeaderBar>().expect("the header row");
             let bar = header.next_sibling().expect("the search bar");
             let entry = all_under(&bar, &|w| w.is::<gtk::SearchEntry>());
             assert_eq!(entry.len(), 1, "the search field sits in the bar under the header");
@@ -530,7 +530,7 @@ mod tests {
             // Categories: one header row holding the Anime | Manga switch and Add; with no category the empty state
             let page = crate::screens::build("categories");
             let root = page.upcast_ref::<gtk::Widget>();
-            let headers = all_under(root, &|w| w.is::<gtk::HeaderBar>());
+            let headers = all_under(root, &|w| w.is::<adw::HeaderBar>());
             assert_eq!(headers.len(), 1, "one header row");
             let switches = all_under(root, &|w| w.is::<gtk::StackSwitcher>());
             assert_eq!(switches.len(), 2, "the header's switch and the narrow window's row under it");

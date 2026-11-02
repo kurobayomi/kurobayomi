@@ -31,7 +31,7 @@ pub struct HeaderDeps {
 
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
 pub struct SourceHeader {
-    pub bar: gtk::HeaderBar,
+    pub bar: adw::HeaderBar,
     pub search: gtk::ToggleButton,
     pub display: ViewOptions,
     pub overflow: Option<gtk::MenuButton>,
@@ -88,7 +88,7 @@ pub fn build(deps: HeaderDeps) -> SourceHeader {
 }
 
 /// The header of a page that has nothing but its title and a way back: the missing-source page (T-41a-008).
-pub fn stub_header(title: &str, on_back: Rc<dyn Fn()>) -> gtk::HeaderBar {
+pub fn stub_header(title: &str, on_back: Rc<dyn Fn()>) -> adw::HeaderBar {
     let bar = crate::ui::header_bar();
     crate::ui::window_buttons(&bar);
     bar.set_title_widget(Some(&gtk::Label::builder().label(title).css_classes(["title"]).ellipsize(gtk::pango::EllipsizeMode::End).build()));
@@ -138,7 +138,7 @@ fn overflow_buttons(deps: &HeaderDeps) -> Vec<gtk::Button> {
 }
 
 /// Shows the page actions as buttons in a wide window and as the ⋮ menu in the phone layout.
-fn fold_actions(bar: &gtk::HeaderBar, buttons: Vec<gtk::Button>, menu: Option<gtk::MenuButton>) {
+fn fold_actions(bar: &adw::HeaderBar, buttons: Vec<gtk::Button>, menu: Option<gtk::MenuButton>) {
     let show = move |narrow: bool| {
         for button in &buttons {
             button.set_visible(!narrow);

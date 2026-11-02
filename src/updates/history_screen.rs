@@ -195,7 +195,7 @@ impl HistoryScreen {
         }
     }
 
-    fn row(self: &Rc<Self>, line: &HistoryLine) -> gtk::ListBoxRow {
+    fn row(self: &Rc<Self>, line: &HistoryLine) -> adw::ActionRow {
         let weak = Rc::downgrade(self);
         let act = |f: fn(&Rc<Self>, &HistoryLine)| {
             let (weak, line) = (weak.clone(), line.clone());

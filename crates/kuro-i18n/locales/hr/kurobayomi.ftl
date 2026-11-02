@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Obnovi sva poglavlja za ovaj manga
 
 download_insufficient_space = Neuspjelo preuzimanje zbog nedovoljne memorije
 
-download_queue_size_warning = Upozorenje: velika skupna preuzimanja mogu dovesti do usporavanja izvora i/ili blokiranja Aniyomia. Dodirni za daljnje informacije.
-
 pref_invalidate_download_cache_summary = Prisili aplikaciju da ponovo provjeri preuzeta poglavlja i epizode
 
 label_player_settings = Postavke playera
@@ -729,8 +727,6 @@ pref_manga_library_update_categories_details = Manga u isključenim kategorijama
 pref_anime_library_update_categories_details = Anime u isključenim kategorijama se neće aktualizirati čak i ako se također nalaze u uključenim kategorijama.
 
 unofficial_extension_message_aniyomi = Ovo proširenje nije sa službenog popisa Aniyomi proširenja.
-
-unofficial_anime_extension_message = Ovo proširenje nije službeno Aniyomi proširenje.
 
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }% %
 

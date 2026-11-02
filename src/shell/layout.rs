@@ -1,8 +1,7 @@
-//! Layout chrome: sidebar or bottom bar, from the window width and the immersive rule (T-36a-005, T-36a-031).
-//!
-//! Desktop decides by width only.
+//! Layout chrome: the sidebar gives way to the bottom bar below one width. libadwaita decides it with a breakpoint on the
+//! window; `main.rs` only adds the immersive rule (the reader and the player show neither bar).
 
-use gtk::prelude::*;
+use adw::prelude::*;
 
 /// Width from which the window is wide (table TC-53: 719 is compact, 720 is wide).
 pub const WIDE_MIN_WIDTH_PX: i32 = 720;
@@ -10,40 +9,31 @@ pub const WIDE_MIN_WIDTH_PX: i32 = 720;
 /// The smallest window the app can be shrunk to (table TC-53, the phone size of the layout rules).
 pub const MIN_WINDOW_SIZE: (i32, i32) = (360, 480);
 
-/// Which tab chrome the window shows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Chrome {
-    Sidebar,
-    BottomBar,
-}
-
-/// The chrome for a window `width` pixels wide. `maximized` counts as wide.
-pub fn chrome_for(width: i32, maximized: bool) -> Chrome {
-    if width >= WIDE_MIN_WIDTH_PX || maximized { Chrome::Sidebar } else { Chrome::BottomBar }
-}
-
 /// Sets the smallest size the window can be shrunk to (T-52a-044: 360 x 480).
 pub fn apply_minimum_size(win: &impl IsA<gtk::Widget>) {
     win.set_size_request(MIN_WINDOW_SIZE.0, MIN_WINDOW_SIZE.1);
 }
 
-/// Which chrome elements are on screen.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Visibility {
-    pub sidebar: bool,
-    pub bottom_bar: bool,
+/// The condition of a narrow window: 719 px is compact, 720 px is wide.
+fn narrow_condition() -> adw::BreakpointCondition {
+    adw::BreakpointCondition::new_length(adw::BreakpointConditionLengthType::MaxWidth, f64::from(WIDE_MIN_WIDTH_PX - 1), adw::LengthUnit::Px)
 }
 
-/// Visibility of both chrome elements. The reader and the player are immersive: both hide. Otherwise the bottom bar
-/// stands in for the sidebar, over pushed pages too.
-pub fn visibility(chrome: Chrome, immersive: bool) -> Visibility {
-    if immersive {
-        return Visibility { sidebar: false, bottom_bar: false };
+/// The window's breakpoint for a narrow window (under [`WIDE_MIN_WIDTH_PX`]). While it holds, `wide_only` is hidden,
+/// `narrow_only` is shown and the window has the class `kb-narrow` (`style.css` packs the header buttons tighter).
+/// `wide_only` shows and `narrow_only` hides in the widgets' own state when the window is built.
+pub fn add_narrow_breakpoint(win: &adw::ApplicationWindow, wide_only: &[&gtk::Widget], narrow_only: &[&gtk::Widget]) {
+    let breakpoint = adw::Breakpoint::new(narrow_condition());
+    for (widgets, shown) in [(wide_only, false), (narrow_only, true)] {
+        for widget in widgets {
+            breakpoint.add_setter(*widget, "visible", Some(&shown.to_value()));
+        }
     }
-    match chrome {
-        Chrome::Sidebar => Visibility { sidebar: true, bottom_bar: false },
-        Chrome::BottomBar => Visibility { sidebar: false, bottom_bar: true },
-    }
+    let on = win.clone();
+    breakpoint.connect_apply(move |_| on.add_css_class("kb-narrow"));
+    let off = win.clone();
+    breakpoint.connect_unapply(move |_| off.remove_css_class("kb-narrow"));
+    win.add_breakpoint(breakpoint);
 }
 
 #[cfg(test)]
@@ -53,32 +43,13 @@ mod tests {
     #[test]
     fn the_720_px_breakpoint_decides_the_chrome() {
         // TC-53: 719 px is compact, 720 px is wide
-        assert_eq!(chrome_for(500, false), Chrome::BottomBar);
-        assert_eq!(chrome_for(719, false), Chrome::BottomBar);
-        assert_eq!(chrome_for(720, false), Chrome::Sidebar);
-        assert_eq!(chrome_for(900, false), Chrome::Sidebar);
+        crate::testing::with_display(|| {
+            assert_eq!(narrow_condition().to_str(), "max-width: 719px");
+        });
     }
 
     #[test]
     fn the_minimum_window_is_360_by_480() {
         assert_eq!(MIN_WINDOW_SIZE, (360, 480));
-    }
-
-    #[test]
-    fn a_maximized_window_is_wide() {
-        assert_eq!(chrome_for(500, true), Chrome::Sidebar);
-    }
-
-    #[test]
-    fn immersive_hides_both_chrome_elements() {
-        for chrome in [Chrome::Sidebar, Chrome::BottomBar] {
-            assert_eq!(visibility(chrome, true), Visibility { sidebar: false, bottom_bar: false });
-        }
-    }
-
-    #[test]
-    fn the_bottom_bar_stands_in_for_the_sidebar() {
-        assert_eq!(visibility(Chrome::BottomBar, false), Visibility { sidebar: false, bottom_bar: true });
-        assert_eq!(visibility(Chrome::Sidebar, false), Visibility { sidebar: true, bottom_bar: false });
     }
 }

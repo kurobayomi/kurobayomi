@@ -235,7 +235,7 @@ mod tests {
         crate::testing::with_display(|| {
             for kind in [Kind::Manga, Kind::Anime] {
                 let empty = super::super::sources_page::sources_empty();
-                let action = empty.last_child().and_downcast::<gtk::Button>().expect("the one action");
+                let action = empty.child().and_then(|row| row.first_child()).and_downcast::<gtk::Button>().expect("the one action");
                 assert_eq!(action.label().as_deref(), Some(tr(MsgKey::label_extension_repos).as_str()), "{kind:?}");
             }
         });

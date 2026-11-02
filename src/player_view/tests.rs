@@ -162,8 +162,8 @@ fn pump_for(ms: u64) {
     }
 }
 
-/// Escape, Alt+Left and the mouse back button leave the embedded page through `ui::pop`, which removes it only
-/// 400 ms later. Playback must stop and save at that call, not at the removal. Needs a display and ffmpeg.
+/// Escape, Alt+Left and the mouse back button leave the embedded page through `ui::pop`, which starts the slide
+/// back and drops it after. Playback must stop and save at that call, not at the removal. Needs a display and ffmpeg.
 #[test]
 fn popping_the_embedded_player_stops_playback_at_once() {
     crate::testing::with_display(|| {
@@ -182,7 +182,7 @@ fn popping_the_embedded_player_stops_playback_at_once() {
         assert!(!shared.borrow().closed, "playing");
 
         crate::ui::pop();
-        assert!(shared.borrow().closed, "closed by the pop itself, before the 400 ms removal");
+        assert!(shared.borrow().closed, "closed by the pop itself, before the slide ends");
         assert_eq!(shared.borrow().playback.mpv().get_flag("idle-active"), Some(true), "mpv stopped");
         pump_for(500);
         window.set_visible(was_visible);
@@ -227,16 +227,14 @@ fn fullscreen_and_escape_act_on_the_window_that_holds_the_player() {
         let Some(clip) = make_clip(dir.path()) else {
             return;
         };
-        let (stack, window) = crate::testing::nav();
+        let (_nav, window) = crate::testing::nav();
         let was_visible = window.is_visible();
         window.present();
         // a page under the player, so that popping the player has somewhere to go back to
-        let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        stack.add_child(&root);
-        stack.set_visible_child(&root);
+        crate::ui::push(&gtk::Box::new(gtk::Orientation::Vertical, 0));
         let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("clip", ""), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
         let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
-        let page = stack.visible_child().and_downcast::<gtk::Box>().expect("the page is the visible child");
+        let page = crate::ui::visible_child().and_downcast::<gtk::Box>().expect("the page is the visible child");
 
         // the header is the page's first child: fullscreen hides it, and leaving fullscreen brings it back
         // (inside the revealer that auto-hide slides; the header is its child)
@@ -257,7 +255,6 @@ fn fullscreen_and_escape_act_on_the_window_that_holds_the_player() {
         pump_for(300);
         assert!(shared.borrow().closed);
         pump_for(300);
-        stack.remove(&root);
         window.set_visible(was_visible);
     });
 }

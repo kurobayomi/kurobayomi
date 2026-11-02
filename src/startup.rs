@@ -17,6 +17,7 @@ use kuro_prefs::store::PrefStore;
 
 use crate::data;
 use crate::watch::bind_watch;
+use crate::theme::tokens::{SPACE_M};
 
 /// How long migrations may run before the splash window shows.
 pub const SPLASH_DELAY: Duration = Duration::from_millis(300);
@@ -118,9 +119,9 @@ pub fn clear_chapter_cache_on_launch(enabled: bool, cache_dir: PathBuf) -> Optio
 /// The splash: a small undecorated window with the app name and a spinner. It takes no focus, and the caller
 /// destroys it after presenting the main window.
 pub fn splash_window(app: &gtk::Application) -> gtk::Window {
-    let spinner = crate::ui::loading(crate::ui::LoadSize::Page);
+    let spinner = crate::widgets::status::loading(None);
     let name = gtk::Label::builder().label(crate::channel::APP_NAME).css_classes(["title-2"]).build();
-    let column = gtk::Box::new(gtk::Orientation::Vertical, 12);
+    let column = gtk::Box::new(gtk::Orientation::Vertical, SPACE_M);
     for widget in [name.upcast_ref::<gtk::Widget>(), spinner.upcast_ref()] {
         column.append(widget);
     }

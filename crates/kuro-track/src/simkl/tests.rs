@@ -864,40 +864,15 @@ async fn t_32a_066_a_dropped_caller_does_not_stop_the_second_write() {
 
 // ---- T-32a-049, TST-58: login logs carry no code, token or secret ----
 
-#[derive(Clone, Default)]
-struct Captured(Arc<std::sync::Mutex<Vec<u8>>>);
-
-impl std::io::Write for Captured {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        self.0.lock().unwrap().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
-    type Writer = Captured;
-    fn make_writer(&'a self) -> Captured {
-        self.clone()
-    }
-}
-
 #[tokio::test]
 async fn t_32a_049_a_login_writes_no_code_token_or_secret_to_the_log() {
     let server = MockServer::start().await;
     healthy_login(&server).await;
     let (t, _) = tracker(&server);
-    let captured = Captured::default();
-    let subscriber = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_writer(captured.clone())
-        .finish();
-    let _guard = tracing::subscriber::set_default(subscriber);
+    let (captured, _guard) = crate::fakes::capture_logs(tracing::Level::TRACE);
     t.login("", "C1").await.unwrap();
     t.refresh(&show(5, WATCHING, 1.0, 12, 0.0)).await.ok();
-    let logged = String::from_utf8(captured.0.lock().unwrap().clone()).unwrap();
+    let logged = captured.text();
     for secret in ["C1", "AT", api::CLIENT_SECRET] {
         assert!(!logged.contains(secret), "log leaked {secret}: {logged}");
     }

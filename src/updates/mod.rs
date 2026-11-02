@@ -49,14 +49,3 @@ pub mod updates_dialog;
 pub mod updates_page;
 pub mod updates_screen;
 pub mod upcoming;
-
-/// The text column of a `look::list_row` that leads with a cover: the row's line holds the cover, then the texts (title
-/// first). For the rows of this folder that add a line under the title.
-pub(crate) fn row_texts(row: &gtk::ListBoxRow) -> gtk::Box {
-    use gtk::prelude::*;
-    row.child()
-        .and_then(|line| line.first_child())
-        .and_then(|lead| lead.next_sibling())
-        .and_downcast::<gtk::Box>()
-        .expect("a list row with a cover has its text column after it")
-}

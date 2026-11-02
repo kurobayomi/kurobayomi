@@ -44,8 +44,6 @@ dialog_with_checkbox_reset = Tetapkan semula semua bab untuk komik ini
 
 download_insufficient_space = Tidak dapat memuat turun kerana ruang storan yang rendah
 
-download_queue_size_warning = Amaran: muat turun pukal yang besar boleh menyebabkan sumber menjadi lebih perlahan dan/atau menyekat Aniyomi. Ketik untuk mengetahui lebih lanjut.
-
 pref_invalidate_download_cache_summary = Paksa apl menyemak semula bab dan episod yang dimuat turun
 
 pref_general_summary = Bahasa apl, pemberitahuan

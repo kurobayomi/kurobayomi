@@ -64,8 +64,6 @@ dialog_with_checkbox_reset = Nollaa kaikki luvut tälle mangalle
 
 download_insufficient_space = Lataaminen epäonnistui tallennustilan puutteen vuoksi
 
-download_queue_size_warning = Varoitus: Suuret joukkolataukset voivat hidastaa lähteitä ja/tai estää Aniyomin toiminnan. Napauta saadaksesi lisätietoja.
-
 pref_invalidate_download_cache_summary = Pakota sovellus tarkistamaan ladatut luvut ja jaksot uudelleen
 
 label_player_settings = Soittimen asetukset

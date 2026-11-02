@@ -1,24 +1,27 @@
-//! Slider row (Kotlin `BaseSliderItem` on the preference path): label left, value pill right, full-width
-//! scale below. The caller owns the value; a write goes through the veto, and the pill follows only accepted values.
+//! Slider row (Kotlin `BaseSliderItem` on the preference path): the label with the value under it, the scale at the end.
+//! The caller owns the value; a write goes through the veto, and the value follows only accepted values.
 
 use std::cell::Cell;
 use std::ops::RangeInclusive;
 use std::rc::Rc;
 
 use gtk::prelude::*;
-use gtk::{glib, Align, Box as GBox, Label, ListBoxRow, Orientation, Scale};
+use gtk::{glib, Orientation, Scale};
 
 use super::super::bind::{self, Veto, WriteGate};
 use super::super::model::ItemCommon;
-use super::{PREF_HORIZONTAL_PADDING, SLIDER_ROW_PADDING};
+use crate::widgets::row::{self, RowSpec};
+
+/// The scale's width at the end of the row.
+const SCALE_WIDTH: i32 = 200;
 
 /// The value clamped into `range` (E-38). Applied before display and before the write.
 pub fn clamp_to_range(value: i32, range: &RangeInclusive<i32>) -> i32 {
     value.clamp(*range.start(), *range.end())
 }
 
-/// Pill text: the subtitle when it is not empty, otherwise the number (E-40).
-pub fn pill_text(subtitle: Option<&str>, value: i32) -> String {
+/// Value text: the subtitle when it is not empty, otherwise the number (E-40).
+pub fn value_text(subtitle: Option<&str>, value: i32) -> String {
     match subtitle {
         Some(text) if !text.is_empty() => text.to_owned(),
         _ => value.to_string(),
@@ -43,44 +46,32 @@ pub fn is_change(current: i32, next: i32) -> bool {
     current != next
 }
 
-pub fn row(common: &ItemCommon, value: i32, range: RangeInclusive<i32>, steps: u32, on_change: Veto<i32>) -> ListBoxRow {
+/// The value row: title on the left, the value as the subtitle, the scale at the end. The caller owns the value; a write
+/// goes through the veto, and the subtitle follows only accepted values.
+pub fn row(common: &ItemCommon, value: i32, range: RangeInclusive<i32>, steps: u32, on_change: Veto<i32>) -> adw::ActionRow {
     let start = clamp_to_range(value, &range);
     let current = Rc::new(Cell::new(start));
     let suppress = Rc::new(Cell::new(false));
     let gate = Rc::new(WriteGate::default());
 
-    let outer = GBox::new(Orientation::Vertical, 2);
-    outer.set_margin_start(SLIDER_ROW_PADDING);
-    outer.set_margin_end(SLIDER_ROW_PADDING);
-    outer.set_margin_top(SLIDER_ROW_PADDING);
-    outer.set_margin_bottom(SLIDER_ROW_PADDING);
-    let header = GBox::new(Orientation::Horizontal, 8);
-    let label = Label::new(Some(&common.title));
-    label.set_xalign(0.0);
-    label.set_hexpand(true);
-    label.set_halign(Align::Start);
-    label.add_css_class("pref-title");
-    header.append(&label);
-    let pill = Label::new(Some(&pill_text(common.subtitle.as_deref(), start)));
-    pill.add_css_class("pref-slider-pill");
-    pill.add_css_class("dim-label");
-    header.append(&pill);
-    outer.append(&header);
-
     let step = step_size(&range, steps);
     let scale = Scale::with_range(Orientation::Horizontal, f64::from(*range.start()), f64::from(*range.end()), step);
     scale.set_draw_value(false);
     scale.set_round_digits(0);
-    scale.set_hexpand(true);
+    scale.set_size_request(SCALE_WIDTH, -1);
     scale.set_value(f64::from(start));
     scale.set_sensitive(common.enabled);
-    scale.set_margin_start(0);
-    scale.set_margin_end(PREF_HORIZONTAL_PADDING - SLIDER_ROW_PADDING);
-    outer.append(&scale);
+    let built = row::build(RowSpec {
+        title: &common.title,
+        subtitle: Some(&value_text(common.subtitle.as_deref(), start)),
+        icon: None,
+        trailing: Some(scale.upcast_ref()),
+        on_click: None,
+    });
 
     let subtitle = common.subtitle.clone();
     scale.connect_value_changed({
-        let (current, suppress, gate, pill) = (current.clone(), suppress.clone(), gate.clone(), pill.clone());
+        let (current, suppress, gate, built) = (current.clone(), suppress.clone(), gate.clone(), built.clone());
         move |scale| {
             if suppress.get() {
                 return;
@@ -90,10 +81,10 @@ pub fn row(common: &ItemCommon, value: i32, range: RangeInclusive<i32>, steps: u
                 return;
             }
             let ticket = gate.begin();
-            let (current, gate, pill, subtitle, scale, suppress, on_change) = (
+            let (current, gate, built, subtitle, scale, suppress, on_change) = (
                 current.clone(),
                 gate.clone(),
-                pill.clone(),
+                built.clone(),
                 subtitle.clone(),
                 scale.clone(),
                 suppress.clone(),
@@ -104,7 +95,7 @@ pub fn row(common: &ItemCommon, value: i32, range: RangeInclusive<i32>, steps: u
                 match decision {
                     Ok(true) => {
                         current.set(next);
-                        pill.set_text(&pill_text(subtitle.as_deref(), next));
+                        row::set_subtitle(&built, Some(&value_text(subtitle.as_deref(), next)));
                     }
                     Ok(false) | Err(_) => {
                         suppress.set(true);
@@ -115,12 +106,7 @@ pub fn row(common: &ItemCommon, value: i32, range: RangeInclusive<i32>, steps: u
             });
         }
     });
-
-    let row = ListBoxRow::new();
-    row.set_selectable(false);
-    row.set_activatable(false);
-    row.set_child(Some(&outer));
-    row
+    built
 }
 
 #[cfg(test)]
@@ -134,10 +120,10 @@ mod tests {
     }
 
     #[test]
-    fn pill_falls_back_to_the_number_when_the_subtitle_is_empty() {
-        assert_eq!(pill_text(Some(""), 7), "7");
-        assert_eq!(pill_text(None, 7), "7");
-        assert_eq!(pill_text(Some("ms"), 7), "ms");
+    fn value_falls_back_to_the_number_when_the_subtitle_is_empty() {
+        assert_eq!(value_text(Some(""), 7), "7");
+        assert_eq!(value_text(None, 7), "7");
+        assert_eq!(value_text(Some("ms"), 7), "ms");
     }
 
     // T-47ba-052: the model's `steps` set the stops of the scale; the default is every whole number.

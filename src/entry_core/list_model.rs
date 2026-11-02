@@ -8,28 +8,21 @@ use kuro_i18n::MsgKey;
 use kuro_platform::kind::Kind;
 
 
-/// The alpha of the text of a read or seen row: the disabled alpha of the theme (`ReadItemAlpha`, 0.38).
-pub const READ_ALPHA: f64 = 0.38;
 /// The side of the unread dot.
 pub const DOT_SIZE: i32 = 8;
-
-/// The opacity of a row's text: read rows are dimmed.
-pub fn row_alpha(read: bool) -> f64 {
-    if read { READ_ALPHA } else { 1.0 }
-}
 
 /// One row of the list, a chapter or an episode, built from the models with its download state and its selection.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RowItem {
     pub id: i64,
     pub title: String,
-    /// The dim second line: date, progress and scanlator (`subtitle`).
+    /// The dim second line: date, scanlator and progress (`subtitle`).
     pub subtitle: String,
     /// An episode summary under the second line, when the entry shows summaries.
     pub summary: Option<String>,
     /// The summary shows all its lines rather than three.
     pub summary_expanded: bool,
-    /// Read or seen: the text is dimmed and the unread dot is off.
+    /// Read or seen: the title takes the `dim-label` look and the unread dot is off.
     pub read: bool,
     pub bookmark: bool,
     /// An episode marked filler.
@@ -84,15 +77,15 @@ fn date_text(date_upload_ms: i64) -> Option<String> {
     Some(date.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string())
 }
 
-/// The dim second line of a chapter or an episode: the upload date, the progress and the scanlator or language, joined
-/// by a bullet. A missing part leaves no bullet behind, and an unknown scanlator is never shown.
-pub fn subtitle(date_upload_ms: i64, progress: Option<String>, scanlator: Option<&str>) -> String {
-    [date_text(date_upload_ms), progress, crate::entry_core::text::shown_scanlator(scanlator).map(str::to_owned)]
+/// The dim second line of a chapter or an episode: the upload date, the scanlator or language and the progress of a
+/// partly read item, joined by a middle dot. A missing part leaves no dot behind, and an unknown scanlator is never shown.
+pub fn subtitle(date_upload_ms: i64, scanlator: Option<&str>, progress: Option<String>) -> String {
+    [date_text(date_upload_ms), crate::entry_core::text::shown_scanlator(scanlator).map(str::to_owned), progress]
         .into_iter()
         .flatten()
         .filter(|s| !s.trim().is_empty())
         .collect::<Vec<_>>()
-        .join(" \u{2022} ")
+        .join(" \u{b7} ")
 }
 
 /// The higher chapter id of a marker id `"{lower|null}-{higher}"`. Each chapter is the higher side of at most one
@@ -188,16 +181,10 @@ mod tests {
     #[test]
     fn the_second_line_joins_only_present_parts() {
         assert_eq!(subtitle(0, None, None), "");
-        assert_eq!(subtitle(0, Some("12:30 left".into()), Some("grp")), "12:30 left \u{2022} grp");
-        assert_eq!(subtitle(-5, None, Some(" ")), "", "an unknown date and a blank scanlator leave nothing");
-        assert!(subtitle(86_400_000, None, None).starts_with("1970-01-0"), "the date comes first");
-    }
-
-    #[test]
-    fn row_style_follows_the_upstream_values() {
-        assert_eq!(row_alpha(true), 0.38);
-        assert_eq!(row_alpha(false), 1.0);
-        assert_eq!(DOT_SIZE, 8);
+        assert_eq!(subtitle(0, Some("grp"), Some("14:20 left".into())), "grp \u{b7} 14:20 left", "the progress comes last");
+        assert_eq!(subtitle(-5, Some(" "), None), "", "an unknown date and a blank scanlator leave nothing");
+        let full = subtitle(86_400_000, Some("grp"), Some("Page: 5".into()));
+        assert!(full.starts_with("1970-01-0") && full.ends_with("grp \u{b7} Page: 5"), "date, scanlator, progress: {full}");
     }
 
     #[test]

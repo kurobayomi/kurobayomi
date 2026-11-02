@@ -290,8 +290,6 @@ pref_anime_library_update_categories_details = 同時出現在包含的/被排�
 
 unofficial_extension_message_aniyomi = 此擴充功能不是來自官方列表。
 
-unofficial_anime_extension_message = 此擴充套件不屬於官方清單內。
-
 episode_download_progress = { NUMBER($arg1, useGrouping: "false") }%
 
 pref_remove_exclude_categories_manga = 排除的類別

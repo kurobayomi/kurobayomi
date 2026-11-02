@@ -144,9 +144,9 @@ fn i2_error_state_buttons_in_order() {
 
     use super::primitives::{EmptyAction, error_actions};
     let actions = error_actions(false);
-    let page = super::view::empty_state("failed", &actions, |_: EmptyAction| {});
+    let page = super::view::error_state("failed", &actions, |_: EmptyAction| {});
     let mut tips = Vec::new();
-    let mut stack = vec![page.upcast::<gtk::Widget>()];
+    let mut stack = vec![page.child().expect("the row of buttons")];
     while let Some(w) = stack.pop() {
         if let Some(button) = w.downcast_ref::<gtk::Button>() {
             tips.push(button.tooltip_text().map(|t| t.to_string()).unwrap_or_default());
