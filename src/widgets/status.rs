@@ -15,6 +15,30 @@ const SPINNER_PX: i32 = 48;
 /// How long a page's state switcher fades between loading, content, empty and error.
 pub const SWITCH_FADE_MS: u32 = 150;
 
+/// Fades the page a tab switch shows in over [`SWITCH_FADE_MS`], as [`switcher`] does for a page's states: libadwaita's
+/// view stack has no transition of its own before 1.7. A switch during a fade ends that fade first, so no page is left
+/// half faded. libadwaita skips the fade when the desktop turns animations off. On libadwaita 1.7 or newer, delete this
+/// and turn on the stack's own `enable_transitions` instead (it is off by default, so the two never both run; see
+/// docs/UPGRADING-GTK.md).
+pub fn fade_tab_switches(tabs: &adw::ViewStack) {
+    let running: std::cell::RefCell<Option<adw::TimedAnimation>> = std::cell::RefCell::default();
+    tabs.connect_visible_child_notify(move |tabs| {
+        if let Some(fade) = running.take() {
+            fade.skip();
+        }
+        let Some(page) = tabs.visible_child() else { return };
+        let fade = adw::TimedAnimation::builder()
+            .widget(&page)
+            .target(&adw::PropertyAnimationTarget::new(&page, "opacity"))
+            .value_from(0.0)
+            .value_to(1.0)
+            .duration(SWITCH_FADE_MS)
+            .build();
+        fade.play();
+        running.replace(Some(fade));
+    });
+}
+
 /// The switcher between a page's states (loading, content, empty, error): one crossfade of [`SWITCH_FADE_MS`] for every
 /// page, so content never pops in. GTK drops the fade when the desktop turns animations off.
 pub fn switcher() -> gtk::Stack {
@@ -145,6 +169,22 @@ mod tests {
             assert!(found[0].has_css_class("pill") && found[0].has_css_class("suggested-action"));
             found[0].emit_clicked();
             assert_eq!(retried.get(), 1);
+        });
+    }
+
+    #[test]
+    fn tab_switches_leave_no_page_half_faded() {
+        crate::testing::with_display(|| {
+            let tabs = adw::ViewStack::new();
+            let (a, b) = (gtk::Label::new(Some("a")), gtk::Label::new(Some("b")));
+            tabs.add_named(&a, Some("a"));
+            tabs.add_named(&b, Some("b"));
+            fade_tab_switches(&tabs);
+            tabs.set_visible_child_name("b");
+            tabs.set_visible_child_name("a");
+            tabs.set_visible_child_name("b");
+            // off screen libadwaita ends a fade at once; on screen the next switch ends it (`skip`)
+            assert_eq!((a.opacity(), b.opacity()), (1.0, 1.0));
         });
     }
 }

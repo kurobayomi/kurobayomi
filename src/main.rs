@@ -488,5 +488,6 @@ fn tabs() -> adw::ViewStack {
         let page: gtk::Widget = if own_header { b.content } else { ui::page(&spec::shown(&ui::screen(&n.id).title), &b.content, b.end, false).upcast() };
         tabs.add_titled_with_icon(&page, Some(&n.id), &spec::shown(&n.title), &n.icon);
     }
+    crate::widgets::status::fade_tab_switches(&tabs);
     tabs
 }
