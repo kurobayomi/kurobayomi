@@ -87,7 +87,10 @@ pub(crate) mod capture {
             .with_ansi(false)
             .with_env_filter(tracing_subscriber::EnvFilter::new("kuro_net::http=debug"))
             .finish();
-        tracing::subscriber::set_default(subscriber)
+        let guard = tracing::subscriber::set_default(subscriber);
+        // parallel tests can cache a log statement as unwatched before this thread's subscriber arrives: rebuild the cache
+        tracing::callsite::rebuild_interest_cache();
+        guard
     }
 }
 

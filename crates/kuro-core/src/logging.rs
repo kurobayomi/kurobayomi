@@ -265,6 +265,7 @@ mod tests {
         let file = Capture::default();
         let (subscriber, _filter) = build_subscriber(false, io::sink, file.clone());
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             tracing::error!("error-msg");
             tracing::warn!("warn-msg");
             tracing::info!("info-msg");
@@ -279,6 +280,7 @@ mod tests {
         let file = Capture::default();
         let (subscriber, filter) = build_subscriber(false, io::sink, file.clone());
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             tracing::info!("before-reload");
             filter.reload(env_filter(true)).unwrap();
             tracing::info!("after-reload");
@@ -293,6 +295,7 @@ mod tests {
         let file = Capture::default();
         let (subscriber, _filter) = build_subscriber(true, io::sink, file.clone());
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             tracing::trace!(target: "kurobayomi::app", "app-line");
             tracing::trace!(target: "cranelift_codegen::egraph", "compiler-line");
         });
@@ -305,7 +308,10 @@ mod tests {
     fn line_has_timestamp_level_token_target_and_message() {
         let file = Capture::default();
         let (subscriber, _filter) = build_subscriber(false, io::sink, file.clone());
-        tracing::subscriber::with_default(subscriber, || tracing::error!(target: "crash", "boom"));
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
+            tracing::error!(target: "crash", "boom");
+        });
         let text = file.text();
         let line = text.lines().find(|l| l.contains("boom")).expect("line");
         let ts = line.split(' ').next().unwrap();
@@ -339,7 +345,10 @@ mod tests {
         let file = Capture::default();
         let (subscriber, _filter) = build_subscriber(false, io::sink, file.clone());
         let err = Outer(io::Error::other("inner cause"));
-        tracing::subscriber::with_default(subscriber, || log(LogPriority::Error, "split failed", Some(&err)));
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
+            log(LogPriority::Error, "split failed", Some(&err));
+        });
         let text = file.text();
         assert!(text.contains("split failed"), "{text}");
         assert!(text.contains("error=outer failure"), "{text}");
@@ -351,6 +360,7 @@ mod tests {
         let file = Capture::default();
         let (subscriber, _filter) = build_subscriber(false, io::sink, file.clone());
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             log(LogPriority::Warn, "plain-warn", None);
             log(LogPriority::Verbose, "hidden-trace", None);
         });

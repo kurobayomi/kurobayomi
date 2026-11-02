@@ -467,7 +467,11 @@ mod tests {
             .without_time()
             .with_max_level(tracing::Level::DEBUG)
             .finish();
-        let value = tracing::subscriber::with_default(subscriber, f);
+        let value = tracing::subscriber::with_default(subscriber, || {
+            // parallel tests can cache a log statement as unwatched before this thread's subscriber arrives: rebuild the cache
+            tracing::callsite::rebuild_interest_cache();
+            f()
+        });
         let text = String::from_utf8(logs.0.lock().unwrap().clone()).unwrap();
         (value, text)
     }

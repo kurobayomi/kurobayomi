@@ -165,6 +165,7 @@ mod tests {
             .with_max_level(tracing::Level::WARN)
             .finish();
         tracing::subscriber::with_default(subscriber, || {
+            tracing::callsite::rebuild_interest_cache();
             runtime().block_on(interactor.await_all(&entry(Kind::Manga, 3, 99), &items(Kind::Manga, &[1])));
         });
         assert!(downloads.calls.lock().unwrap().is_empty(), "EC-27");
