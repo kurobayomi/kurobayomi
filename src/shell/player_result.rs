@@ -26,16 +26,12 @@ pub fn handle_exit(success: bool, saved: Option<ExternalPlayback>, on_progress: 
 
 /// Waits for `child` on a worker thread and runs [`handle_exit`] on the GTK thread when it ends.
 pub fn watch(mut child: Child, saved: ExternalPlayback, on_progress: impl FnOnce(ExternalPlayback) + 'static) {
-    let (tx, rx) = async_channel::bounded::<bool>(1);
-    std::thread::spawn(move || {
-        let success = child.wait().is_ok_and(|status| status.success());
-        let _ = tx.send_blocking(success);
-    });
-    gtk::glib::spawn_future_local(async move {
-        if let Ok(success) = rx.recv().await {
+    crate::background::run(
+        move || child.wait().is_ok_and(|status| status.success()),
+        move |success| {
             handle_exit(success, Some(saved), on_progress);
-        }
-    });
+        },
+    );
 }
 
 #[cfg(test)]

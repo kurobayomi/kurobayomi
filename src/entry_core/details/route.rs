@@ -1637,17 +1637,16 @@ impl View {
             // the server start waits up to eleven seconds, so it runs off the GTK thread; the episode opens when it
             // answers, times out or fails (the failure is a toast and playback goes on), T-39b-052
             self.env.backend.start_torrent_server();
-            let (tx, rx) = async_channel::bounded(1);
-            std::thread::spawn(move || {
-                let _ = tx.send_blocking(torrent_server::start_blocking(true, true));
-            });
             let (backend, title, name) = (Arc::clone(&self.env.backend), title.to_owned(), name.to_owned());
-            glib::spawn_future_local(async move {
-                if let Ok(torrent_server::Outcome::Toast(text)) = rx.recv().await {
-                    crate::toast::notify(text);
-                }
-                Self::open_player(&backend, plan, entry_id, episode_id, &title, &name);
-            });
+            crate::background::run(
+                || torrent_server::start_blocking(true, true),
+                move |outcome| {
+                    if let torrent_server::Outcome::Toast(text) = outcome {
+                        crate::toast::notify(text);
+                    }
+                    Self::open_player(&backend, plan, entry_id, episode_id, &title, &name);
+                },
+            );
             return;
         }
         Self::open_player(&self.env.backend, plan, entry_id, episode_id, title, name);

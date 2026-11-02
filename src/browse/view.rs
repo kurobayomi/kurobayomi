@@ -57,7 +57,7 @@ pub fn icon_image_sized(icon: SourceIcon, file: Option<&str>, px: i32) -> Image 
             let (weak, source) = (image.downgrade(), file.to_owned());
             gtk::glib::spawn_future_local(async move {
                 let url = matches!(icon_ref(&source), IconRef::Url(_));
-                let decoded = gtk::gio::spawn_blocking(move || match icon_ref(&source) {
+                let decoded = crate::background::blocking(move || match icon_ref(&source) {
                     IconRef::Url(url) => fetch_icon(icon_cache_root().as_deref(), url, http_get),
                     IconRef::File(file) => load_icon(std::path::Path::new(file)),
                 })

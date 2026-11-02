@@ -5,7 +5,6 @@
 
 use std::time::Duration;
 
-use gtk::glib;
 use kuro_domain::release::check::{Outcome, check_for_update};
 use kuro_domain::release::github::{GithubReleases, ReleaseHttp};
 use kuro_domain::release::{ReleaseError, ReleaseService};
@@ -72,19 +71,15 @@ pub fn check(
 
 /// Runs [`check`] over the real transport on a worker thread and hands the result to `deliver` on the main loop.
 fn spawn_check(force: bool, deliver: impl FnOnce(Result<Outcome, ReleaseError>) + 'static) {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let result = Http::new().map_err(ReleaseError::Transport).and_then(|http| {
-            let service = GithubReleases::new(http, std::env::consts::ARCH);
-            check(&service, UPDATE_REPOSITORY, env!("CARGO_PKG_VERSION"), chrono::Utc::now().timestamp_millis(), force)
-        });
-        let _ = tx.send_blocking(result);
-    });
-    glib::spawn_future_local(async move {
-        if let Ok(result) = rx.recv().await {
-            deliver(result);
-        }
-    });
+    crate::background::run(
+        move || {
+            Http::new().map_err(ReleaseError::Transport).and_then(|http| {
+                let service = GithubReleases::new(http, std::env::consts::ARCH);
+                check(&service, UPDATE_REPOSITORY, env!("CARGO_PKG_VERSION"), chrono::Utc::now().timestamp_millis(), force)
+            })
+        },
+        deliver,
+    );
 }
 
 /// The startup check: only when the build has the check and the user opted in. It is throttled, and any failure is

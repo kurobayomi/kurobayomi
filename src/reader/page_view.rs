@@ -884,7 +884,7 @@ impl PageView {
         let crop = imp.crop_borders.get();
         let weak = self.downgrade();
         glib::spawn_future_local(async move {
-            let decoded = gio::spawn_blocking(move || decode_animation(&bytes, width, intent, crop)).await;
+            let decoded = crate::background::blocking(move || decode_animation(&bytes, width, intent, crop)).await;
             imp::on_page(&weak, |p| p.finish_load(ticket, decoded, key));
         });
     }

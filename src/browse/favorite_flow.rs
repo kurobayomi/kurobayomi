@@ -51,7 +51,7 @@ pub struct FavoriteFlow {
 /// Runs `work` on a worker thread and `then` with its result on the main loop.
 fn blocking<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, then: impl FnOnce(T) + 'static) {
     glib::spawn_future_local(async move {
-        if let Ok(value) = gtk::gio::spawn_blocking(work).await {
+        if let Ok(value) = crate::background::blocking(work).await {
             then(value);
         }
     });

@@ -228,18 +228,11 @@ fn short(commit: &str) -> &str {
 
 /// Runs `work` off the GTK thread and `done` with its result on it; a failure is a toast.
 fn fetch<T: Send + 'static>(work: impl FnOnce() -> Result<T, String> + Send + 'static, done: impl FnOnce(T) + 'static) {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let _ = tx.send_blocking(work());
-    });
-    glib::spawn_future_local(async move {
-        match rx.recv().await {
-            Ok(Ok(value)) => done(value),
-            Ok(Err(error)) => {
-                tracing::debug!(%error, "What's new could not be loaded");
-                crate::toast::notify(&tr(MsgKey::ui_could_not_load_whats_new));
-            }
-            Err(_) => {}
+    crate::background::run(work, move |result| match result {
+        Ok(value) => done(value),
+        Err(error) => {
+            tracing::debug!(%error, "What's new could not be loaded");
+            crate::toast::notify(&tr(MsgKey::ui_could_not_load_whats_new));
         }
     });
 }

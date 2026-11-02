@@ -36,7 +36,7 @@ fn refresh_repositories(button: &gtk::Button) {
     crate::ui::set_refreshing(button, true);
     let button = button.clone();
     gtk::glib::spawn_future_local(async move {
-        let _ = gtk::gio::spawn_blocking(move || ops.refresh()).await;
+        let _ = crate::background::blocking(move || ops.refresh()).await;
         crate::ui::set_refreshing(&button, false);
     });
 }

@@ -4,7 +4,6 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::future::Future;
 use std::path::Path;
 
 use gtk::prelude::*;
@@ -24,20 +23,6 @@ thread_local! {
 /// The blurred picture of a cover already made, if any.
 fn cached(key: &str) -> Option<gdk::Texture> {
     CACHE.with(|c| c.borrow().get(key).cloned())
-}
-
-/// Runs `work` on the blocking pool of `handle` and yields its result on the GTK thread's receiver.
-fn offload<T, F>(handle: &tokio::runtime::Handle, work: impl FnOnce() -> F + Send + 'static) -> async_channel::Receiver<T>
-where
-    T: Send + 'static,
-    F: Future<Output = T>,
-{
-    let (tx, rx) = async_channel::bounded(1);
-    let driver = handle.clone();
-    handle.spawn_blocking(move || {
-        let _ = tx.send_blocking(driver.block_on(work()));
-    });
-    rx
 }
 
 /// The bytes of the cover: the custom file when there is one, else what the image service fetches (its disk cache
@@ -74,20 +59,22 @@ fn load(art: ArtRef, picture: &gtk::Picture) {
         picture.set_paintable(Some(&texture));
         return;
     }
-    let (Some(service), Ok(runtime)) = (cover_view::service(), tokio::runtime::Handle::try_current()) else { return };
+    let Some(service) = cover_view::service() else { return };
     let custom = kuro_platform::system_paths::SystemPaths::system().ok().map(|paths| kuro_images::cover_paths::custom_file_for(&paths, &art)).unwrap_or_default();
-    let rx = offload(&runtime, move || async move {
-        let bytes = cover_bytes(&service, &art, &custom).await?;
-        prepare(&bytes)
-    });
     let picture = picture.downgrade();
-    glib::spawn_future_local(async move {
-        let Ok(Some((w, h, rgba))) = rx.recv().await else { return };
+    crate::background::run_local_async(
+        move || async move {
+            let bytes = cover_bytes(&service, &art, &custom).await?;
+            prepare(&bytes)
+        },
+        move |prepared| {
+        let Some((w, h, rgba)) = prepared else { return };
         let bytes = glib::Bytes::from_owned(rgba);
         let texture: gdk::Texture = gdk::MemoryTexture::new(w as i32, h as i32, gdk::MemoryFormat::R8g8b8a8, &bytes, (w * 4) as usize).upcast();
         CACHE.with(|c| c.borrow_mut().insert(key, texture.clone()));
         if let Some(picture) = picture.upgrade() {
             picture.set_paintable(Some(&texture));
         }
-    });
+        },
+    );
 }

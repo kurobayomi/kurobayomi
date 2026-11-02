@@ -12,7 +12,6 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
-use gtk::glib;
 use gtk::prelude::*;
 use kuro_data::entry::EntryRepo;
 use kuro_data::item::ItemRepo;
@@ -396,19 +395,21 @@ fn load(source: Arc<dyn AnimeSource>, episode: SEpisode, done: impl FnOnce(Resul
         done(Err(tr(MsgKey::player_hoster_failed)));
         return;
     };
-    let (tx, rx) = async_channel::bounded(1);
-    handle.spawn(async move {
-        // the spinner of the menu never stays: after 30 seconds the toast says the source is not answering
-        let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), all_states(source.as_ref(), &episode)).await;
-        let _ = tx.send(answer).await;
-    });
-    glib::spawn_future_local(async move {
-        match rx.recv().await {
-            Ok(answer) => done(answer),
-            // a closed channel means the source task panicked
-            Err(_) => done(Err(tr(MsgKey::no_hosters))),
-        }
-    });
+    crate::background::run_async_on(
+        &handle,
+        async move {
+            // the spinner of the menu never stays: after 30 seconds the toast says the source is not answering
+            let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), all_states(source.as_ref(), &episode)).await;
+            answer
+        },
+        move |answer| {
+            match answer {
+                Some(answer) => done(answer),
+                // a closed channel means the source task panicked
+                None => done(Err(tr(MsgKey::no_hosters))),
+            }
+        },
+    );
 }
 
 async fn all_states(source: &dyn AnimeSource, episode: &SEpisode) -> Result<Vec<HosterState>, String> {
@@ -440,31 +441,33 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
         crate::toast::notify(tr(MsgKey::player_hoster_failed));
         return;
     };
-    let (tx, rx) = async_channel::bounded(1);
-    handle.spawn(async move {
-        let answer = match crate::browse::errors::plain(source.name(), resolve_once(source.as_ref(), video)).await {
-            // the chosen stream's links are checked like the first one's (`source::allowed`)
-            Ok(Some(resolved)) => super::super::source::allowed(source.id(), resolved).await.map(Some),
-            other => other,
-        };
-        let _ = tx.send(answer).await;
-    });
     let shared = Rc::clone(shared);
-    glib::spawn_future_local(async move {
-        // a closed channel means the source task panicked
-        let answer = rx.recv().await.unwrap_or_else(|_| Err(tr(MsgKey::video_list_empty_error)));
-        shared.borrow_mut().resolving = false;
-        match answer {
-            Ok(Some(resolved)) => {
-                set_last(Some(pick));
-                let preferred = stored_text("pref_subtitle_lang");
-                let preferred_audio = stored_text("pref_audio_lang");
-                reload(&shared, source::media_of(resolved, title, &preferred, &preferred_audio));
+    crate::background::run_async_on(
+        &handle,
+        async move {
+            let answer = match crate::browse::errors::plain(source.name(), resolve_once(source.as_ref(), video)).await {
+                // the chosen stream's links are checked like the first one's (`source::allowed`)
+                Ok(Some(resolved)) => super::super::source::allowed(source.id(), resolved).await.map(Some),
+                other => other,
+            };
+            answer
+        },
+        move |answer| {
+            // a closed channel means the source task panicked
+            let answer = answer.unwrap_or_else(|| Err(tr(MsgKey::video_list_empty_error)));
+            shared.borrow_mut().resolving = false;
+            match answer {
+                Ok(Some(resolved)) => {
+                    set_last(Some(pick));
+                    let preferred = stored_text("pref_subtitle_lang");
+                    let preferred_audio = stored_text("pref_audio_lang");
+                    reload(&shared, source::media_of(resolved, title, &preferred, &preferred_audio));
+                }
+                Ok(None) => crate::toast::notify(tr(MsgKey::video_list_empty_error)),
+                Err(text) => crate::toast::notify(text),
             }
-            Ok(None) => crate::toast::notify(tr(MsgKey::video_list_empty_error)),
-            Err(text) => crate::toast::notify(text),
-        }
-    });
+        },
+    );
 }
 
 /// Loads `media` at the playing position and keeps the pause state. Its side tracks are added when mpv has loaded it.

@@ -1,6 +1,17 @@
-//! Source calls from the GTK thread (T-15a-050). A source call runs on the tokio runtime that `main` enters while the
-//! app runs. Its value comes back on the GTK main context, where widgets may be touched. The GTK thread never awaits
-//! a source, and no widget is touched from a tokio task: `deliver` is not `Send`, so it cannot be moved there.
+//! Work off the GTK thread with its result back on it: the one way the app does it (no screen hand-rolls a thread, a
+//! channel and a local future of its own).
+//!
+//! - [`run`]: blocking work (files, a database read, a blocking network call). It runs on the app's runtime's blocking
+//!   pool, so tokio calls work inside it, or on GLib's worker pool where no runtime is entered (unit tests).
+//!   [`blocking`] is the same for code on the GTK main context that awaits the value and goes on.
+//! - [`run_async`] and [`run_async_cancellable`]: a `Send` future on the tokio runtime that `main` enters while the
+//!   app runs (source calls, network). The GTK thread never awaits it. [`run_async_on`] runs on a given runtime and
+//!   tells `done` when the task died instead of leaving it waiting.
+//! - [`run_local_async`]: a future that is not `Send` (the image service's), driven to its end on a blocking-pool thread.
+//!
+//! `done` always runs on the GTK main context, and only when the work finished: no widget is touched from a worker, as
+//! `done` is not `Send`. A long-lived worker (a writer thread, a proxy, the library worker) is a thread of its own, not a
+//! job here.
 
 use std::future::Future;
 
@@ -9,19 +20,17 @@ use gtk::glib;
 use tokio_util::sync::CancellationToken;
 
 /// Runs `call` on the runtime and passes its value to `deliver` on the GTK main context.
-// No call site until the source screens land (T-01a-037 wiring).
-pub fn call_on_main<T, Call, Deliver>(call: Call, deliver: Deliver)
+pub fn run_async<T, Call, Deliver>(call: Call, deliver: Deliver)
 where
     T: Send + 'static,
     Call: Future<Output = T> + Send + 'static,
     Deliver: FnOnce(T) + 'static,
 {
-    call_cancellable(CancellationToken::new(), call, deliver);
+    run_async_cancellable(CancellationToken::new(), call, deliver);
 }
 
-/// As [`call_on_main`], but the call is dropped when `cancel` fires, and then `deliver` never runs.
-// No call site until the source screens land (T-01a-037 wiring).
-pub fn call_cancellable<T, Call, Deliver>(cancel: CancellationToken, call: Call, deliver: Deliver)
+/// As [`run_async`], but the call is dropped when `cancel` fires, and then `deliver` never runs.
+pub fn run_async_cancellable<T, Call, Deliver>(cancel: CancellationToken, call: Call, deliver: Deliver)
 where
     T: Send + 'static,
     Call: Future<Output = T> + Send + 'static,
@@ -36,10 +45,79 @@ where
         };
         let _ = sender.send(value).await;
     });
-    // The thread-default context: the GTK main context in the app, and a private one in the tests.
+    deliver_on_main(receiver, deliver);
+}
+
+/// Runs `call` on the runtime `on` (a source's own runtime) and passes its value to `done` on the GTK main context, or
+/// `None` when the task ended without one (it panicked), so a spinner or a busy notice is never left waiting.
+pub fn run_async_on<T, Call, Deliver>(on: &tokio::runtime::Handle, call: Call, done: Deliver)
+where
+    T: Send + 'static,
+    Call: Future<Output = T> + Send + 'static,
+    Deliver: FnOnce(Option<T>) + 'static,
+{
+    let (sender, receiver) = bounded::<T>(1);
+    on.spawn(async move {
+        let _ = sender.send(call.await).await;
+    });
+    glib::MainContext::ref_thread_default().spawn_local(async move {
+        done(receiver.recv().await.ok());
+    });
+}
+
+/// Runs blocking `work` off the GTK thread and passes its value to `done` on the GTK main context.
+pub fn run<T, Work, Done>(work: Work, done: Done)
+where
+    T: Send + 'static,
+    Work: FnOnce() -> T + Send + 'static,
+    Done: FnOnce(T) + 'static,
+{
+    glib::MainContext::ref_thread_default().spawn_local(async move {
+        if let Ok(value) = blocking(work).await {
+            done(value);
+        }
+    });
+}
+
+/// Blocking `work` off the GTK thread, for code on the GTK main context that goes on after it (`blocking(..).await`).
+/// The work runs on the runtime's blocking pool, so tokio calls work inside it, or on GLib's worker pool where no
+/// runtime is entered. `Err` when the work panicked.
+pub async fn blocking<T, Work>(work: Work) -> Result<T, Box<dyn std::any::Any + Send + 'static>>
+where
+    T: Send + 'static,
+    Work: FnOnce() -> T + Send + 'static,
+{
+    match tokio::runtime::Handle::try_current() {
+        Ok(runtime) => runtime.spawn_blocking(work).await.map_err(|e| Box::new(e.to_string()) as Box<dyn std::any::Any + Send>),
+        Err(_) => gtk::gio::spawn_blocking(work).await,
+    }
+}
+
+/// Runs the future `work` makes, which need not be `Send`, to its end on a blocking-pool thread of the runtime, and
+/// passes its value to `done` on the GTK main context. Without an entered runtime nothing runs.
+pub fn run_local_async<T, Fut, Work, Done>(work: Work, done: Done)
+where
+    T: Send + 'static,
+    Fut: Future<Output = T>,
+    Work: FnOnce() -> Fut + Send + 'static,
+    Done: FnOnce(T) + 'static,
+{
+    let Ok(runtime) = tokio::runtime::Handle::try_current() else { return };
+    let (sender, receiver) = bounded::<T>(1);
+    let driver = runtime.clone();
+    runtime.spawn_blocking(move || {
+        let _ = sender.send_blocking(driver.block_on(work()));
+    });
+    deliver_on_main(receiver, done);
+}
+
+/// Waits on the GTK main context for the one value of `receiver` and passes it to `done`; a dropped sender passes
+/// nothing.
+fn deliver_on_main<T: 'static>(receiver: async_channel::Receiver<T>, done: impl FnOnce(T) + 'static) {
+    // the thread-default context: the GTK main context in the app, and a private one in the tests
     glib::MainContext::ref_thread_default().spawn_local(async move {
         if let Ok(value) = receiver.recv().await {
-            deliver(value);
+            done(value);
         }
     });
 }
@@ -93,7 +171,7 @@ mod tests {
         context
             .with_thread_default(|| {
                 let (done_tx, done_rx) = mpsc::channel::<u32>();
-                call_on_main(
+                run_async(
                     async {
                         tokio::time::sleep(Duration::from_secs(2)).await;
                         42_u32
@@ -123,7 +201,7 @@ mod tests {
             .with_thread_default(|| {
                 let (done_tx, done_rx) = mpsc::channel::<u32>();
                 let token = CancellationToken::new();
-                call_cancellable(
+                run_async_cancellable(
                     token.clone(),
                     async {
                         tokio::time::sleep(Duration::from_secs(5)).await;
@@ -138,5 +216,37 @@ mod tests {
                 assert!(done_rx.try_recv().is_err());
             })
             .expect("the test thread takes its own main context");
+    }
+    /// The guard of this module: no code outside it hands off background work its own way. A one-shot hand-off (a
+    /// spawned thread or task whose single value is awaited on the GTK side) and a direct GLib worker-pool call are
+    /// this module's job; a stream of progress (a `while` loop over a channel) and a long-lived worker are not. Reads the
+    /// source files, so it needs no display.
+    #[test]
+    fn background_work_goes_through_this_module() {
+        fn rust_files(dir: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(dir).expect("a source directory") {
+                let path = entry.expect("a directory entry").path();
+                if path.is_dir() {
+                    rust_files(&path, found);
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    found.push(path);
+                }
+            }
+        }
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        rust_files(&src, &mut files);
+        let mut offenders = Vec::new();
+        for file in files.into_iter().filter(|f| !f.ends_with("background.rs")) {
+            let text = std::fs::read_to_string(&file).expect("a readable source file");
+            // the production part: a test module may wire its own threads
+            let code = text.split("#[cfg(test)]\nmod tests").next().unwrap_or_default();
+            let spawns = ["thread::spawn", "thread::Builder::new", "spawn_blocking(", ".spawn(async move"].iter().any(|s| code.contains(s));
+            let one_shot = code.lines().any(|line| line.contains(".recv().await") && !line.contains("while "));
+            if code.contains("gio::spawn_blocking") || (spawns && one_shot) {
+                offenders.push(file.strip_prefix(&src).unwrap_or(&file).display().to_string());
+            }
+        }
+        assert!(offenders.is_empty(), "hand background work to crate::background (run, run_async, run_async_on, blocking): {offenders:?}");
     }
 }

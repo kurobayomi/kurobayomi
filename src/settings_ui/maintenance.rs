@@ -139,7 +139,7 @@ fn share_crash_logs(row: &adw::ActionRow) {
     let row = row.clone();
     gtk::glib::spawn_future_local(async move {
         let done = match dirs {
-            Ok((cache, logs)) => gtk::gio::spawn_blocking(move || write_crash_dump(&cache, &logs, &debug, &manga, &anime)).await.map_err(|_| "the dump task panicked".to_owned()).and_then(|r| r.map_err(|e| e.to_string())),
+            Ok((cache, logs)) => crate::background::blocking(move || write_crash_dump(&cache, &logs, &debug, &manga, &anime)).await.map_err(|_| "the dump task panicked".to_owned()).and_then(|r| r.map_err(|e| e.to_string())),
             Err(err) => Err(err.to_string()),
         };
         let (text, shown) = match done {

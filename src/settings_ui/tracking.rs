@@ -92,7 +92,7 @@ fn open_login_dialog(tracker: Arc<dyn Tracker>, changed: Rc<dyn Fn()>) {
                 button.set_label(busy.button_label());
             }
             let (tracker, changed) = (Arc::clone(&tracker), Rc::clone(&changed));
-            crate::source_bridge::call_on_main(
+            crate::background::run_async(
                 {
                     let tracker = Arc::clone(&tracker);
                     async move { run_login(tracker.as_ref(), &username, &password).await }

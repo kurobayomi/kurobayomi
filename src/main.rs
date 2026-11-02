@@ -40,7 +40,7 @@ mod screens;
 mod selection;
 mod settings;
 mod settings_ui;
-mod source_bridge;
+mod background;
 mod source_gate;
 mod source_switch;
 mod toast;

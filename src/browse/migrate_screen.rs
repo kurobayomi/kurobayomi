@@ -141,7 +141,7 @@ pub fn load(view: &Rc<MigrateEntriesView>, read: Arc<dyn Fn() -> Result<Vec<Migr
     }));
     let view = Rc::clone(view);
     gtk::glib::spawn_future_local(async move {
-        let result = gtk::gio::spawn_blocking(move || read()).await.unwrap_or_else(|_| Err("the favourites read was cancelled".to_owned()));
+        let result = crate::background::blocking(move || read()).await.unwrap_or_else(|_| Err("the favourites read was cancelled".to_owned()));
         if let Err(error) = &result {
             tracing::error!(%error, "the favourites to migrate could not be read");
         }

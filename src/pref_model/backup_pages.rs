@@ -301,7 +301,7 @@ pub fn restore_page() -> Option<Built> {
             let (screen, alive, refresh) = (screen.clone(), alive.clone(), refresh.clone());
             glib::spawn_future_local(async move {
                 let checked = file.clone();
-                let result = gio::spawn_blocking(move || check_file(&checked, &crate::library_update::live::LiveRegistry, &NothingInstalled)).await;
+                let result = crate::background::blocking(move || check_file(&checked, &crate::library_update::live::LiveRegistry, &NothingInstalled)).await;
                 // a page that was closed meanwhile drops the answer without a toast
                 if !alive.get() {
                     return;

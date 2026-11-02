@@ -1157,7 +1157,7 @@ fn ready_source(screen: &Screen, page: &Rc<ReaderPage>) -> Option<crate::reader:
 fn copy_page(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
     let Some(source) = ready_source(screen, page) else { return };
     let toaster = screen.toaster.clone();
-    page_save::in_background(move || page_save::read_bytes(&source), move |result| {
+    crate::background::run(move || page_save::read_bytes(&source), move |result| {
         let texture = result.ok().and_then(|bytes| gtk::gdk::Texture::from_bytes(&gtk::glib::Bytes::from_owned(bytes)).ok());
         match (texture, gtk::gdk::Display::default()) {
             (Some(texture), Some(display)) => display.clipboard().set_texture(&texture),
@@ -1193,7 +1193,7 @@ fn share_page(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
     let Ok(paths) = kuro_platform::system_paths::SystemPaths::system() else { return warn_unknown(screen) };
     let staging = kuro_images::share::staging_dir(&paths);
     let toaster = screen.toaster.clone();
-    page_save::in_background(move || page_save::stage_for_share(&source, &base, &staging), move |result| {
+    crate::background::run(move || page_save::stage_for_share(&source, &base, &staging), move |result| {
         // the file opens with the default handler; the notice carries the share message and offers the file manager
         let opened = result.and_then(|path| {
             saved_notice::open_with_default(&path).map_err(|e| e.to_string())?;
@@ -1223,7 +1223,7 @@ fn set_cover(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
         let weak = Rc::downgrade(&s);
         if let Some(folder) = s.core.local_folder() {
             // a local manga's cover is an image in its folder, and the library shows the manga's thumbnail
-            page_save::in_background(move || page_save::write_local_cover(&source, &folder), move |written| {
+            crate::background::run(move || page_save::write_local_cover(&source, &folder), move |written| {
                 let Some(s) = weak.upgrade() else { return };
                 let message = s.core.local_cover_result(written);
                 s.toaster.show(message, ToastLength::Short);
@@ -1232,7 +1232,7 @@ fn set_cover(screen: &Rc<Screen>, page: &Rc<ReaderPage>) {
         }
         let Ok(paths) = kuro_platform::system_paths::SystemPaths::system() else { return warn_unknown(&s) };
         let cover = kuro_images::cover_paths::custom_file(&paths, kuro_images::cover_paths::Family::MangaCover, s.core.deps.manga_id);
-        page_save::in_background(move || page_save::write_cover_file(&source, &cover), move |written| {
+        crate::background::run(move || page_save::write_cover_file(&source, &cover), move |written| {
             let Some(s) = weak.upgrade() else { return };
             let message = s.core.cover_result(written);
             s.toaster.show(message, ToastLength::Short);

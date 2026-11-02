@@ -86,7 +86,7 @@ async fn blocking<T: Send + 'static>(work: impl FnOnce(&Passphrase<'_>) -> T + S
     }
     #[cfg(not(test))]
     {
-        gtk::gio::spawn_blocking(run).await.expect("the unlock task panicked")
+        crate::background::blocking(run).await.expect("the unlock task panicked")
     }
 }
 

@@ -6,7 +6,6 @@
 use kuro_i18n::{Arg, MsgKey, tr, trf, tr_plural};
 
 use gtk::gio;
-use gtk::glib;
 use gtk::prelude::*;
 use kuro_platform::kind::Kind;
 
@@ -38,19 +37,17 @@ pub fn link_folder(kind: Kind) {
         let Some(folder) = picked.ok().and_then(|file| file.path()) else { return };
         let db = crate::data::app().db.clone();
         let prefs = crate::data::app().base.store().clone();
-        let (sender, receiver) = async_channel::bounded(1);
-        std::thread::spawn(move || {
-            let _ = sender.send_blocking(titles::link(&db, &prefs, kind, &folder, chrono::Utc::now().timestamp_millis()).map_err(|e| e.to_string()));
-        });
-        glib::spawn_future_local(async move {
-            let Ok(result) = receiver.recv().await else { return };
+        crate::background::run(
+            move || titles::link(&db, &prefs, kind, &folder, chrono::Utc::now().timestamp_millis()).map_err(|e| e.to_string()),
+            move |result| {
             crate::toast::notify(message(&result));
             if result.is_ok_and(|report| !report.added.is_empty()) {
                 crate::library::mount::refresh(kind);
                 // the local source reads the new titles' chapters or episodes in the library update
                 crate::updates::library_trigger::start(kind);
             }
-        });
+            },
+        );
     });
 }
 

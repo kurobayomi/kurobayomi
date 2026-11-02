@@ -260,16 +260,7 @@ pub fn going_to_downloaded_off_thread(
     lookup: Arc<dyn Fn(&Item) -> bool + Send + Sync>,
     done: impl FnOnce(bool) + 'static,
 ) {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let found = going_to_downloaded(manga_is_local, to.as_ref(), |c| lookup(c));
-        let _ = tx.send_blocking(found);
-    });
-    glib::spawn_future_local(async move {
-        if let Ok(found) = rx.recv().await {
-            done(found);
-        }
-    });
+    crate::background::run(move || going_to_downloaded(manga_is_local, to.as_ref(), |c| lookup(c)), done);
 }
 
 /// The line under a destination card for its state: a spinner with the loading text, or the error with a Retry

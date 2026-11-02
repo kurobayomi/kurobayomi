@@ -266,24 +266,20 @@ impl ReleaseHttp for Http {
 
 /// The forced check, off the UI thread: `done` runs on the main context with the result.
 fn run_check(done: impl FnOnce(Result<Outcome, ReleaseError>) + 'static) {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let result = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .map(Http)
-            .map_err(|e| ReleaseError::Transport(e.to_string()))
-            .and_then(|http| {
-                let service = GithubReleases::new(http, std::env::consts::ARCH);
-                app_update::check(&service, app_update::UPDATE_REPOSITORY, env!("CARGO_PKG_VERSION"), chrono::Utc::now().timestamp_millis(), true)
-            });
-        let _ = tx.send_blocking(result);
-    });
-    gtk::glib::spawn_future_local(async move {
-        if let Ok(result) = rx.recv().await {
-            done(result);
-        }
-    });
+    crate::background::run(
+        || {
+            reqwest::blocking::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()
+                .map(Http)
+                .map_err(|e| ReleaseError::Transport(e.to_string()))
+                .and_then(|http| {
+                    let service = GithubReleases::new(http, std::env::consts::ARCH);
+                    app_update::check(&service, app_update::UPDATE_REPOSITORY, env!("CARGO_PKG_VERSION"), chrono::Utc::now().timestamp_millis(), true)
+                })
+        },
+        done,
+    );
 }
 
 /// A release-notes dialog (the update page, T-47ba-030, ui-parity 3.5, and What's new): a 48 px icon, the heading, the

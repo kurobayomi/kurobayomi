@@ -268,7 +268,7 @@ pub fn turn_on_then(key: String, done: impl Fn(bool) + 'static) {
     let prefs = live();
     gtk::glib::spawn_future_local(async move {
         let worked = match prefs {
-            Some(prefs) => matches!(gtk::gio::spawn_blocking(move || turn_on(&prefs, &key)).await, Ok(Ok(()))),
+            Some(prefs) => matches!(crate::background::blocking(move || turn_on(&prefs, &key)).await, Ok(Ok(()))),
             None => false,
         };
         if !worked {
@@ -466,7 +466,7 @@ pub fn announce_new(link: String, repo: String, count: usize) {
 pub fn check_now(kind: Kind, source_id: i64, name: String) {
     crate::toast::notify(trf(MsgKey::source_switch_checking, &[("source", Arg::Str(&name))]));
     gtk::glib::spawn_future_local(async move {
-        let result = gtk::gio::spawn_blocking(move || crate::recipe_sources::check(kind, source_id)).await;
+        let result = crate::background::blocking(move || crate::recipe_sources::check(kind, source_id)).await;
         let message = match result {
             Ok(Some(Status::Active)) => MsgKey::source_switch_check_works,
             Ok(Some(Status::Blocked)) => MsgKey::source_switch_check_blocked,

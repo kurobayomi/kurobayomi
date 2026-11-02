@@ -131,31 +131,29 @@ impl Inner {
         let Some(art) = this.wanted.borrow_mut().take() else { return };
         *this.shown.borrow_mut() = Some(art.clone());
         let (generation, cancel) = this.binding.borrow_mut().bind();
-        let (Some(service), Ok(runtime)) = (SERVICE.get().cloned(), tokio::runtime::Handle::try_current()) else { return };
+        let Some(service) = SERVICE.get().cloned() else { return };
         let options = LoadOptions { priority: this.priority.get(), ..LoadOptions::default() };
-        let (done, loaded) = async_channel::bounded(1);
-        // the service's future is not `Send`, so it runs to the end on a blocking-pool thread
-        let driver = runtime.clone();
-        runtime.spawn_blocking(move || {
-            let url = art.url.clone();
-            let result = driver.block_on(service.load(&LoadRequest { art, options, cancel }));
-            // a cover that cannot be shown says why once, in the log; a cancelled load (the cover left the screen) is not
-            // a failure
-            if let Err(error) = &result
-                && !matches!(error, ImageError::Cancelled)
-            {
-                tracing::warn!(url = url.as_deref().unwrap_or("none"), %error, "a cover could not be loaded");
-            }
-            let _ = done.send_blocking(result);
-        });
         let this = Rc::clone(this);
-        glib::spawn_future_local(async move {
-            if let Ok(result) = loaded.recv().await
-                && this.binding.borrow_mut().finish(generation, result)
-            {
-                this.show();
-            }
-        });
+        // the service's future is not `Send`
+        crate::background::run_local_async(
+            move || async move {
+                let url = art.url.clone();
+                let result = service.load(&LoadRequest { art, options, cancel }).await;
+                // a cover that cannot be shown says why once, in the log; a cancelled load (the cover left the screen)
+                // is not a failure
+                if let Err(error) = &result
+                    && !matches!(error, ImageError::Cancelled)
+                {
+                    tracing::warn!(url = url.as_deref().unwrap_or("none"), %error, "a cover could not be loaded");
+                }
+                result
+            },
+            move |result| {
+                if this.binding.borrow_mut().finish(generation, result) {
+                    this.show();
+                }
+            },
+        );
     }
 
     /// The frame was hidden: a load still running stops, and the image is asked for again when the frame shows. An

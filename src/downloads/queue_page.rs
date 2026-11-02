@@ -259,7 +259,7 @@ fn unit_line(kind: Kind, entry_id: Option<i64>, unit: on_disk::Unit) -> adw::Act
 fn show_size(heading: &adw::ActionRow, count: String, folder: PathBuf) {
     let heading = heading.downgrade();
     glib::spawn_future_local(async move {
-        let Ok(bytes) = gtk::gio::spawn_blocking(move || kuro_core::storage::dir_size(&folder).unwrap_or(0)).await else { return };
+        let Ok(bytes) = crate::background::blocking(move || kuro_core::storage::dir_size(&folder).unwrap_or(0)).await else { return };
         if let Some(heading) = heading.upgrade() {
             row::set_subtitle(&heading, Some(&format!("{count} · {}", glib::format_size(bytes))));
         }

@@ -56,7 +56,7 @@ pub fn save_in_background(
     done: impl FnOnce(Result<PathBuf, String>, Option<Vec<u8>>) + 'static,
 ) {
     let (title, file_base) = (title.to_owned(), file_base.to_owned());
-    in_background(
+    crate::background::run(
         move || {
             let saved = save_now(&source, &title, &file_base, folder_per_manga, &pictures_dir());
             let thumbnail = saved.as_ref().ok().and_then(|path| super::saved_notice::thumbnail_png(path));
@@ -79,27 +79,13 @@ pub fn save_now(source: &ByteSource, title: &str, file_base: &str, folder_per_ma
     Ok(target)
 }
 
-/// Runs `work` on a worker thread and calls `done` on the GTK thread with its result. The GTK side never waits on
-/// the file system.
-pub fn in_background<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static, done: impl FnOnce(T) + 'static) {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let _ = tx.send_blocking(work());
-    });
-    gtk::glib::spawn_future_local(async move {
-        if let Ok(value) = rx.recv().await {
-            done(value);
-        }
-    });
-}
-
-/// The bytes of a page, read where they are. Blocking: call it through [`in_background`].
+/// The bytes of a page, read where they are. Blocking: call it through `background::run`.
 pub fn read_bytes(source: &ByteSource) -> Result<Vec<u8>, String> {
     read(source).map_err(|e| e.to_string())
 }
 
 /// Writes a page's bytes as the manga's cover file (T-43a-058). The file is replaced atomically, so a failure leaves
-/// the old cover in place. Blocking: call it through [`in_background`].
+/// the old cover in place. Blocking: call it through `background::run`.
 pub fn write_cover_file(source: &ByteSource, cover_file: &Path) -> Result<(), String> {
     let bytes = read(source).map_err(|e| e.to_string())?;
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e| e.to_string())?;
@@ -107,7 +93,7 @@ pub fn write_cover_file(source: &ByteSource, cover_file: &Path) -> Result<(), St
 }
 
 /// Writes a local manga's cover into its folder, over the folder's `cover` image (Kotlin `LocalMangaCoverManager`). The
-/// result carries the thumbnail url and the cover time that the manga row takes. Blocking: call it through [`in_background`].
+/// result carries the thumbnail url and the cover time that the manga row takes. Blocking: call it through `background::run`.
 pub fn write_local_cover(source: &ByteSource, folder: &Path) -> Result<kuro_local::images::CoverWrite, String> {
     let bytes = read(source).map_err(|e| e.to_string())?;
     kuro_local::images::set_cover(folder, &bytes).map_err(|e| e.to_string())

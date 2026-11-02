@@ -7,7 +7,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use kuro_platform::kind::Kind;
 
-use gtk::gio;
 use gtk::glib;
 use adw::prelude::*;
 use kuro_i18n::{Arg, MsgKey, tr, trf};
@@ -409,7 +408,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
                 let busy = ops.busy_text().map(|text| crate::toast::busy(&text));
                 glib::spawn_future_local(async move {
                     let (adding, added) = (ops.clone(), url.clone());
-                    let outcome = gio::spawn_blocking(move || adding.add(&url)).await;
+                    let outcome = crate::background::blocking(move || adding.add(&url)).await;
                     drop(busy);
                     let Some(page) = weak.upgrade() else { return };
                     match outcome {
@@ -441,7 +440,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
             Effect::Delete(key) => {
                 let ops = self.ops.clone();
                 glib::spawn_future_local(async move {
-                    if gio::spawn_blocking(move || ops.remove(&key)).await.is_ok() {
+                    if crate::background::blocking(move || ops.remove(&key)).await.is_ok() {
                         reload_extensions();
                     }
                 });
@@ -450,7 +449,7 @@ impl<T: Keyed + Send + 'static> Inner<T> {
                 let (weak, ops) = (Rc::downgrade(self), self.ops.clone());
                 glib::spawn_future_local(async move {
                     // a panic on the worker still ends the spinner
-                    let _ = gio::spawn_blocking(move || ops.refresh()).await;
+                    let _ = crate::background::blocking(move || ops.refresh()).await;
                     reload_extensions();
                     if let Some(page) = weak.upgrade() {
                         page.dispatch(Event::RefreshDone);

@@ -301,7 +301,12 @@ fn fill_data_storage(holder: &gtk::Box) {
         tree.insert(0, rows::item(banner));
     }
     let body = page::body(&tree);
-    usage::replace_usage_row(&body.widget, &usage::live_rows());
+    // the disk sizes are asked off the GTK thread (a slow or sleeping disk can take seconds); the row fills in when
+    // they arrive
+    let page = body.widget.clone();
+    crate::background::run(usage::live_rows, move |rows| {
+        usage::replace_usage_row(&page, &rows);
+    });
     holder.append(&body.widget);
 }
 

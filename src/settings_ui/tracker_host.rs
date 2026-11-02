@@ -164,7 +164,7 @@ pub fn ensure() {
     });
     gtk::glib::spawn_future_local(async move {
         let built = match inputs {
-            Some(inputs) => gtk::gio::spawn_blocking(move || {
+            Some(inputs) => crate::background::blocking(move || {
                 let (secrets, config_dir) = open_store()?;
                 build(inputs, secrets, &config_dir)
             })
@@ -299,7 +299,7 @@ pub fn start_mal_login(host: &Rc<Host>, changed: Rc<dyn Fn()>) {
     }
     let mal = Arc::clone(&host.mal);
     let host = Rc::clone(host);
-    crate::source_bridge::call_on_main(
+    crate::background::run_async(
         {
             let mal = Arc::clone(&mal);
             async move { LoginDialog::open(&mal, DEFAULT_PORT).await }
@@ -316,7 +316,7 @@ pub fn start_mal_login(host: &Rc<Host>, changed: Rc<dyn Fn()>) {
             host.begin_waiting(TrackerId::MYANIMELIST, now_ms());
             crate::ui::open_link(login.authorize_url(), None);
             changed();
-            crate::source_bridge::call_on_main(
+            crate::background::run_async(
                 async move { login.wait_redirect(&mal).await.unwrap_or(Err(MalError::LoginTimedOut)) },
                 move |result| {
                     host.stop_waiting(TrackerId::MYANIMELIST);
@@ -354,7 +354,7 @@ pub fn on_redirect(uri: &str) -> bool {
             let Some(tracker) = host.manager.get(id) else { return false };
             let host_for_task = Rc::clone(&host);
             let value = credential.value;
-            crate::source_bridge::call_on_main(
+            crate::background::run_async(
                 {
                     let tracker = Arc::clone(&tracker);
                     async move { tracker.login("", &value).await }

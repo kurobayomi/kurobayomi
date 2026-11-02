@@ -7,7 +7,6 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use gtk::glib;
 use kuro_data::entry::{EntryRepo, EntryUpdate};
 use kuro_data::item::{Item, ItemRepo};
 use kuro_db::handle::Db;
@@ -45,16 +44,17 @@ pub fn ensure(db: Arc<Db>, anime_id: i64, done: impl FnOnce() + 'static) {
     // one cover at a time, so a library of uncovered series never runs a crowd of video decoders at once
     // ponytail: one thread per waiting entry; a single queue thread if libraries get huge
     static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let _turn = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = tx.send_blocking(store_cover(&db, anime_id));
-    });
-    glib::spawn_future_local(async move {
-        if rx.recv().await == Ok(true) {
-            done();
-        }
-    });
+    crate::background::run(
+        move || {
+            let _turn = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+            store_cover(&db, anime_id)
+        },
+        move |stored| {
+            if stored {
+                done();
+            }
+        },
+    );
 }
 
 fn store_cover(db: &Arc<Db>, anime_id: i64) -> bool {

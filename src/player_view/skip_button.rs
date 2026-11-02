@@ -7,7 +7,6 @@
 
 use std::rc::Rc;
 
-use gtk::glib;
 use gtk::prelude::*;
 use kuro_data::entry::EntryRepo;
 use kuro_data::item::ItemRepo;
@@ -222,34 +221,36 @@ fn start_aniskip(shared: &Shared, request: Request) {
         return;
     };
     let (episode_id, load, duration) = (request.episode_id, request.load, request.duration_s);
-    let (tx, rx) = async_channel::bounded(1);
-    handle.spawn(async move {
-        let mut tracks = request.tracks;
-        if aniskip::needs_title_lookup(&tracks) {
-            if let Some(mal) = match &request.title {
-                Some(title) => aniskip::mal_id_by_title(&client, request.anime_id, title).await,
-                None => None,
-            } {
-                tracks = vec![TrackerRef::MyAnimeList(mal)];
-            }
-        }
-        let stamps = aniskip::lookup(&client, &tracks, request.episode_number, Some(request.duration_s)).await;
-        let _ = tx.send((episode_id, load, duration, stamps)).await;
-    });
     let shared = Rc::clone(shared);
-    glib::spawn_future_local(async move {
-        let Ok((episode_id, load, duration, Some(stamps))) = rx.recv().await else {
-            return;
-        };
-        let mut player = shared.borrow_mut();
-        if player.closed || player.episode_id != episode_id || player.skip.load != load {
-            return;
-        }
-        let merged = chapters::with_timestamps(&player.skip.chapters, &stamps, Some(duration as i32));
-        if let Some(merged) = merged {
-            player.skip.chapters = merged;
-        }
-    });
+    crate::background::run_async_on(
+        &handle,
+        async move {
+            let mut tracks = request.tracks;
+            if aniskip::needs_title_lookup(&tracks) {
+                if let Some(mal) = match &request.title {
+                    Some(title) => aniskip::mal_id_by_title(&client, request.anime_id, title).await,
+                    None => None,
+                } {
+                    tracks = vec![TrackerRef::MyAnimeList(mal)];
+                }
+            }
+            let stamps = aniskip::lookup(&client, &tracks, request.episode_number, Some(request.duration_s)).await;
+            (episode_id, load, duration, stamps)
+        },
+        move |answer| {
+            let Some((episode_id, load, duration, Some(stamps))) = answer else {
+                return;
+            };
+            let mut player = shared.borrow_mut();
+            if player.closed || player.episode_id != episode_id || player.skip.load != load {
+                return;
+            }
+            let merged = chapters::with_timestamps(&player.skip.chapters, &stamps, Some(duration as i32));
+            if let Some(merged) = merged {
+                player.skip.chapters = merged;
+            }
+        },
+    );
 }
 
 /// mpv's chapters of the playing file. Each takes the kind its title names.

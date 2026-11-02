@@ -55,10 +55,6 @@ pub fn run_with_splash<T, S>(
     T: Send + 'static,
     S: 'static,
 {
-    let (tx, rx) = async_channel::bounded(1);
-    std::thread::spawn(move || {
-        let _ = tx.send_blocking(work());
-    });
     let splash: Rc<RefCell<Option<S>>> = Rc::default();
     let done = Rc::new(Cell::new(false));
     {
@@ -71,7 +67,7 @@ pub fn run_with_splash<T, S>(
         });
     }
     glib::spawn_future_local(async move {
-        let result = rx.recv().await.expect("the startup worker panicked");
+        let result = crate::background::blocking(work).await.expect("the startup worker panicked");
         done.set(true);
         let splash = splash.borrow_mut().take();
         finish(result, splash);

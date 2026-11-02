@@ -354,7 +354,7 @@ impl Image {
         let (weak_view, weak_me) = (self.view.downgrade(), self.me.clone());
         glib::spawn_future_local(async move {
             let read_from = source.clone();
-            let bytes = gtk::gio::spawn_blocking(move || page_bytes::read(&read_from)).await;
+            let bytes = crate::background::blocking(move || page_bytes::read(&read_from)).await;
             let (Some(view), Some(me)) = (weak_view.upgrade(), weak_me.upgrade()) else { return };
             match bytes {
                 Ok(Ok(bytes)) => {

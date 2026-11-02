@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use gtk::glib;
 use kuro_data::entry::EntryRepo;
 use kuro_data::item::{Item, ItemRepo};
 use kuro_domain::source::remote_update::to_s_episode;
@@ -96,23 +95,25 @@ pub fn resolve_episode(found: SourceEpisode, done: impl FnOnce(Result<Media, Str
     let preferred_audio = super::stored_text("pref_audio_lang");
     // read here: the app data lives on the GTK thread, the stream is chosen on the source's runtime
     let quality = super::default_quality();
-    let (tx, rx) = async_channel::bounded(1);
-    handle.spawn(async move {
-        // the "Loading…" card never stays: after 30 seconds the toast says the source is not answering
-        let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), best_stream(source.as_ref(), &s_episode, quality)).await;
-        let answer = match answer {
-            Ok(video) => allowed(source.id(), video).await,
-            Err(text) => Err(text),
-        };
-        let _ = tx.send(answer).await;
-    });
     let busy = crate::toast::busy(&tr(MsgKey::loading));
-    glib::spawn_future_local(async move {
-        // a closed channel means the source task panicked
-        let answer = rx.recv().await.unwrap_or_else(|_| Err(tr(MsgKey::video_list_empty_error)));
-        drop(busy);
-        done(answer.map(|video| media_of(video, title, &preferred, &preferred_audio)));
-    });
+    crate::background::run_async_on(
+        &handle,
+        async move {
+            // the "Loading…" card never stays: after 30 seconds the toast says the source is not answering
+            let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), best_stream(source.as_ref(), &s_episode, quality)).await;
+            let answer = match answer {
+                Ok(video) => allowed(source.id(), video).await,
+                Err(text) => Err(text),
+            };
+            answer
+        },
+        move |answer| {
+            // a closed channel means the source task panicked
+            let answer = answer.unwrap_or_else(|| Err(tr(MsgKey::video_list_empty_error)));
+            drop(busy);
+            done(answer.map(|video| media_of(video, title, &preferred, &preferred_audio)));
+        },
+    );
     true
 }
 

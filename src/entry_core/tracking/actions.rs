@@ -50,7 +50,7 @@ pub fn episode_seen(anime_id: i64, episode: f64) -> Option<Outcomes> {
 pub fn pull_progress(kind: kuro_platform::kind::Kind, entry_id: i64) {
     use kuro_platform::kind::Kind;
     let Some(ctx) = tracker_host::ctx() else { return };
-    crate::source_bridge::call_on_main(
+    crate::background::run_async(
         async move {
             let refreshed = match kind {
                 Kind::Anime => kuro_track::sync::refresh_anime(&ctx, entry_id).await,

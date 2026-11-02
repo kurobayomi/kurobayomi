@@ -22,7 +22,7 @@ use super::listing::{LinkFuture, ListItem, PageLoader};
 use super::pages::{GlobalSearchSnapshot, SourceFilter};
 use super::primitives::stub_source_label;
 use super::tasks::{PageTasks, Tagged};
-use crate::source_bridge::call_cancellable;
+use crate::background::run_async_cancellable;
 use tokio_util::sync::CancellationToken;
 
 /// The loader of a source's listings by id, `None` when the source is not installed.
@@ -135,7 +135,7 @@ impl SearchRunner {
         let token = CancellationToken::new();
         *self.link_lookup.borrow_mut() = token.clone();
         let weak = Rc::downgrade(self);
-        call_cancellable(token, lookup, move |item| {
+        run_async_cancellable(token, lookup, move |item| {
             let Some(runner) = weak.upgrade() else { return };
             match item {
                 Some(item) => {

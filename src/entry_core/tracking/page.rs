@@ -229,7 +229,7 @@ fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
     let again = redraw(root);
     let (weak, tracker, id, kind) = (slot.downgrade(), Arc::clone(tracker), entry.id, entry.kind);
     let tracker_id = tracker.id();
-    crate::source_bridge::call_on_main(
+    crate::background::run_async(
         async move {
             match kind {
                 Kind::Anime => ctx.anime_binding(id, tracker_id).await.map(|found| found.map(Bound::Anime)),
@@ -544,7 +544,7 @@ fn finish<T: Send + 'static, E: Send + 'static>(job: Option<JoinHandle<Result<T,
         crate::toast::notify(tracking::not_ready());
         return;
     };
-    crate::source_bridge::call_on_main(async move { job.await }, move |result| match result {
+    crate::background::run_async(async move { job.await }, move |result| match result {
         Ok(Ok(_)) => {
             changed();
             redraw();
@@ -588,7 +588,7 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
     clear(results);
     results.append(&crate::widgets::status::loading(Some("Searching…")));
     let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), query.clone(), Rc::clone(generation)));
-    crate::source_bridge::call_on_main(
+    crate::background::run_async(
         async move { search_hits(tracker.as_ref(), kind, &query).await },
         move |result| {
             if latest.get() != token {
@@ -646,7 +646,7 @@ fn bind(entry: Entry, hit: Found) {
         return;
     };
     let (tracker, private) = (search_tracker(), SEARCH_PRIVATE.with(Cell::get));
-    crate::source_bridge::call_on_main(
+    crate::background::run_async(
         async move { bind_hit(&ctx, tracker, &entry, hit, private).await },
         |result| match result {
             Ok(()) => {
