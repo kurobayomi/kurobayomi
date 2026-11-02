@@ -109,7 +109,7 @@ pub struct ReaderSession {
     chapters: Vec<Rc<ReaderChapter>>,
     current: Option<usize>,
     viewer_flags: i64,
-    incognito: bool,
+    incognito: crate::incognito::Check,
     preserve_position: bool,
     store: Rc<dyn ReaderStore>,
     events: Sender<ReaderEvent>,
@@ -148,13 +148,13 @@ struct DeleteAfterRead {
 }
 
 impl ReaderSession {
-    /// `incognito` is read once, when the session starts (E-INC-2 closes the reader when it changes).
+    /// `incognito` is asked at every write, so switching it on stops the history and progress writes at once.
     pub fn new(
         manga_id: i64,
         viewer_flags: i64,
         chapters: Vec<Rc<ReaderChapter>>,
         current: usize,
-        incognito: bool,
+        incognito: crate::incognito::Check,
         preserve_position: bool,
         store: Rc<dyn ReaderStore>,
         events: Sender<ReaderEvent>,
@@ -228,7 +228,7 @@ impl ReaderSession {
     /// (`SessionTimer::flush`: the session is clamped to 12 h and the start is cleared on every path).
     pub fn flush_history(&mut self, now: i64) {
         let item_id = self.current_chapter().map(|c| c.chapter.id);
-        let update = self.history.flush(now, Kind::Manga, item_id.unwrap_or(-1), self.incognito);
+        let update = self.history.flush(now, Kind::Manga, item_id.unwrap_or(-1), (self.incognito)());
         self.history_running = false;
         if let (Some(_), Some(update)) = (item_id, update) {
             self.store.upsert_history(update.item_id, update.at, update.session_ms);
@@ -318,7 +318,7 @@ impl ReaderSession {
         let index = i64::from(page.index);
         self.current_page = page.number();
         chapter.requested_page.set(index);
-        if !self.incognito && page.status.get() != PageStatus::Error {
+        if !(self.incognito)() && page.status.get() != PageStatus::Error {
             chapter.last_page_read.set(index);
             if index == pages_len - 1 {
                 // landing on the last page completes the chapter; repeating it is harmless (E-PROG-2)
@@ -598,7 +598,7 @@ mod tests {
 
     fn session(store: Rc<Recorder>, chapters: Vec<Rc<ReaderChapter>>, current: usize, incognito: bool) -> (ReaderSession, mpsc::Receiver<ReaderEvent>) {
         let (tx, rx) = mpsc::channel();
-        (ReaderSession::new(7, 0x2, chapters, current, incognito, false, store, tx), rx)
+        (ReaderSession::new(7, 0x2, chapters, current, Rc::new(move || incognito), false, store, tx), rx)
     }
 
     fn never_built(_: &Rc<ReaderChapter>) -> Result<Loader, LoadError> {

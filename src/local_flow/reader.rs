@@ -53,7 +53,7 @@ pub fn open_local_chapter(manga_id: i64, chapter_id: i64) -> gtk::Box {
         build: Rc::new(build_loader),
         is_downloaded: Rc::new(|_| false),
         downloaded_only: app.base.downloaded_only.get(),
-        incognito: app.base.incognito_mode.get(),
+        incognito: crate::incognito::live(),
         prefs_store: store,
     };
     open(deps, &open_gate(), toaster(), crate::ui::pop).root

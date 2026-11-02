@@ -2,8 +2,13 @@
 //! check item of the app menu. The preference is the one source of truth; every change goes through [`set`], which
 //! updates the notification and the check item (the panel's title icon follows the item) so nothing needs a restart.
 //! The window banner is `shell::banners`.
+//!
+//! [`is_on`] is the one check every writer asks (history, reading progress, trackers, auto-track binds) at the moment
+//! it would write, from any thread, so the switch applies at once: no refresh, no page change, no reopened reader.
 
 use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::OnceLock;
 
 use gtk::prelude::*;
 use kuro_platform::incognito as platform;
@@ -33,8 +38,25 @@ thread_local! {
 }
 
 /// Registers `app.incognito-off` and `app.incognito` and applies the stored value (notification and check item).
+/// The stored flag, readable from any thread (the store is shared and locked).
+static LIVE: OnceLock<Pref<bool>> = OnceLock::new();
+
+/// Whether Incognito is on now. Safe on any thread; `false` before the app attached it (unit tests).
+pub fn is_on() -> bool {
+    LIVE.get().is_some_and(Pref::get)
+}
+
+/// A live Incognito check for a screen to keep: it asks [`is_on`] each time, so it is never a stale copy.
+pub type Check = Rc<dyn Fn() -> bool>;
+
+/// The app's live check, for a screen that takes a [`Check`].
+pub fn live() -> Check {
+    Rc::new(is_on)
+}
+
 /// Call once from the GTK main thread.
 pub fn attach(app: &gtk::Application, incognito: Pref<bool>) {
+    let _ = LIVE.set(incognito.clone());
     let off = gtk::gio::SimpleAction::new("incognito-off", None);
     off.connect_activate(|_, _| set(false));
     app.add_action(&off);

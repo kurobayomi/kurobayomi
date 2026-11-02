@@ -43,9 +43,9 @@ fn current() -> Option<Arc<TrackCtx>> {
 /// Incognito is on: it promises that nothing reaches the trackers, and binding puts the title on the tracker's list.
 pub fn binder(kind: Kind) -> TrackerBinder {
     let runtime = crate::shell::host::Shell::get().map(|shell| shell.runtime().clone()).or_else(|| tokio::runtime::Handle::try_current().ok());
-    let incognito = crate::data::is_installed().then(|| crate::data::app().base.incognito_mode.clone());
     Arc::new(move |id, title, source| {
-        if incognito.as_ref().is_some_and(|on| on.get()) {
+        // asked at the moment of the bind, from whatever thread the add ran on
+        if crate::incognito::is_on() {
             return;
         }
         let Some(runtime) = runtime.clone() else { return };

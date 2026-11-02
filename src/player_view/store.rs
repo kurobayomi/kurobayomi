@@ -60,7 +60,7 @@ pub struct Tracker {
     episode_id: i64,
     stored: Item,
     /// Read at every save, so the switch takes effect in the middle of an episode.
-    incognito: std::rc::Rc<dyn Fn() -> bool>,
+    incognito: crate::incognito::Check,
     throttle: WriteThrottle,
     /// When the watched time was last added to the history, while the episode plays. A pause, a stop or a switch of
     /// episode (a forced save) clears it, so the time spent paused is never counted.
@@ -78,10 +78,10 @@ impl Tracker {
 
     /// [`open`](Self::open) for the app: the incognito switch is read at every save.
     pub fn open_live(db: Arc<Db>, episode_id: i64) -> Option<Self> {
-        Self::open_following(db, episode_id, std::rc::Rc::new(|| crate::data::is_installed() && crate::data::app().base.incognito_mode.get()))
+        Self::open_following(db, episode_id, crate::incognito::live())
     }
 
-    fn open_following(db: Arc<Db>, episode_id: i64, incognito: std::rc::Rc<dyn Fn() -> bool>) -> Option<Self> {
+    fn open_following(db: Arc<Db>, episode_id: i64, incognito: crate::incognito::Check) -> Option<Self> {
         let episodes = ItemRepo::new(Arc::clone(&db));
         let stored = match episodes.by_id(episode_id) {
             Ok(Some(row)) => row,

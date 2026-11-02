@@ -1042,7 +1042,7 @@ impl View {
         let model = self.model.borrow();
         let Some(m) = model.as_ref() else { return };
         let numbers: Vec<f64> = m.episodes.iter().filter(|e| ids.contains(&e.id)).map(|e| e.number).collect();
-        crate::entry_core::tracking::progress::marked(self.env.kind, m.entry.id, true, &numbers, crate::data::app().base.incognito_mode.get());
+        crate::entry_core::tracking::progress::marked(self.env.kind, m.entry.id, true, &numbers, crate::incognito::is_on());
     }
 
     /// Whether the entry's source is a torrent source and the torrent server is on (17.4, 17.5).

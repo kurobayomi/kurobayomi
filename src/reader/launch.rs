@@ -195,7 +195,6 @@ pub fn open_chapter(manga_id: i64, chapter_id: i64) -> gtk::Box {
     let gate = retry_gate.as_ref().map_or_else(open_gate, |fetch| fetch());
     let in_reader = Arc::clone(&lookup);
     let (neighbours_db, on_disk) = (Arc::clone(&db), Arc::clone(&lookup));
-    let incognito = app.base.incognito_mode.get();
     let deps = ReaderDeps {
         db: Arc::clone(&db),
         manga_id,
@@ -211,7 +210,7 @@ pub fn open_chapter(manga_id: i64, chapter_id: i64) -> gtk::Box {
         }),
         is_downloaded: Rc::new(move |chapter| in_reader(chapter)),
         downloaded_only: app.base.downloaded_only.get(),
-        incognito,
+        incognito: crate::incognito::live(),
         prefs_store: store.clone(),
     };
     let extras = ReaderExtras {
@@ -223,7 +222,7 @@ pub fn open_chapter(manga_id: i64, chapter_id: i64) -> gtk::Box {
         downloads: DownloadCheck::new(manga_is_local, lookup),
         // the app starts no download manager yet, so the download-ahead hook has nothing to call
         track_update: Some(Rc::new(move |manga_id, number| {
-            crate::entry_core::tracking::progress::item_finished(Kind::Manga, manga_id, number, incognito);
+            crate::entry_core::tracking::progress::item_finished(Kind::Manga, manga_id, number, crate::incognito::is_on());
         })),
         // the next chapter is queued through the one download host, past a quarter of a downloaded one
         download_ahead: Some(Rc::new(|manga_id, chapter_ids| {

@@ -75,7 +75,8 @@ pub struct ReaderDeps {
     pub build: BuildLoader,
     pub is_downloaded: Rc<dyn Fn(&Item) -> bool>,
     pub downloaded_only: bool,
-    pub incognito: bool,
+    /// The live Incognito check (`incognito::live`), asked at every write.
+    pub incognito: crate::incognito::Check,
     /// The store behind `prefs`. Its change feed applies live settings to the open reader.
     pub prefs_store: kuro_prefs::store::PrefStore,
 }
@@ -266,7 +267,7 @@ impl ReaderCore {
             opened.manga.viewer_flags,
             opened.chapters,
             opened.index,
-            self.deps.incognito,
+            Rc::clone(&self.deps.incognito),
             preserve,
             Rc::clone(&self.deps.store),
             tx,
@@ -278,9 +279,9 @@ impl ReaderCore {
             session.set_delete_after_read(i64::from(slots), Rc::clone(&sink.defer));
         }
         if let Some(sink) = &self.extras.track_update {
-            let (sink, prefs, incognito) = (Rc::clone(sink), TrackPrefs::new(self.deps.prefs_store.clone()), self.deps.incognito);
+            let (sink, prefs, incognito) = (Rc::clone(sink), TrackPrefs::new(self.deps.prefs_store.clone()), Rc::clone(&self.deps.incognito));
             session.set_track_update(Rc::new(move |manga_id, number| {
-                if auto_update_allowed(&prefs, incognito) {
+                if auto_update_allowed(&prefs, incognito()) {
                     sink(manga_id, number);
                 }
             }));
@@ -1783,7 +1784,7 @@ mod tests {
             build,
             is_downloaded: Rc::new(|_| false),
             downloaded_only: false,
-            incognito: false,
+            incognito: Rc::new(|| false),
             prefs_store: PrefStore::in_memory(),
         })
     }
@@ -1799,7 +1800,7 @@ mod tests {
                 build,
                 is_downloaded: Rc::new(|_| false),
                 downloaded_only: false,
-                incognito: false,
+                incognito: Rc::new(|| false),
                 prefs_store,
             },
             extras,
@@ -2139,7 +2140,7 @@ mod tests {
                 build: http_build("header"),
                 is_downloaded: Rc::new(|_| false),
                 downloaded_only: false,
-                incognito: false,
+                incognito: Rc::new(|| false),
                 prefs_store: PrefStore::in_memory(),
             };
             let (toaster, _feed) = kuro_platform::toast::toast_channel();
@@ -2183,7 +2184,7 @@ mod tests {
                 build,
                 is_downloaded: Rc::new(|_| false),
                 downloaded_only: false,
-                incognito: false,
+                incognito: Rc::new(|| false),
                 prefs_store: PrefStore::in_memory(),
             };
             let (toaster, _feed) = kuro_platform::toast::toast_channel();
@@ -2232,7 +2233,7 @@ mod tests {
                 build,
                 is_downloaded: Rc::new(|_| false),
                 downloaded_only: false,
-                incognito: false,
+                incognito: Rc::new(|| false),
                 prefs_store: PrefStore::in_memory(),
             };
             let (toaster, _feed) = kuro_platform::toast::toast_channel();
@@ -2284,7 +2285,7 @@ mod tests {
                 build: http_build("menu-toggle"),
                 is_downloaded: Rc::new(|_| false),
                 downloaded_only: false,
-                incognito: false,
+                incognito: Rc::new(|| false),
                 prefs_store: PrefStore::in_memory(),
             };
             let (toaster, _feed) = kuro_platform::toast::toast_channel();
