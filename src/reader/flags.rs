@@ -7,9 +7,15 @@
 use kuro_prefs::flags::{Flag, with_flag};
 use kuro_prefs::reader::{READING_MODE_MASK, ReadingMode};
 
-/// Default reading mode when the preference is unset: left to right (the user's decision, 2026-10-11). Right to left is
-/// picked per manga. The stored default of `pref_default_reading_mode_key` must say the same (`kuro-prefs`).
-pub const DEFAULT_READING_MODE_PREF: i32 = 1;
+/// The stored default reading mode that means Adaptive: the title's tags pick the strip or pages, and pages turn in the
+/// adaptive direction (`pref_adaptive_direction`). It is the unset default (user, 2026-11-02); the stored default of
+/// `pref_default_reading_mode_key` must say the same (`kuro-prefs`). A value that is no mode reads as Adaptive too.
+pub const DEFAULT_READING_MODE_PREF: i32 = 0;
+
+/// The pages mode of the adaptive direction: left to right for 1, else right to left (the default, 2).
+pub fn adaptive_pages(direction: i32) -> ReadingMode {
+    if direction == 1 { ReadingMode::LeftToRight } else { ReadingMode::RightToLeft }
+}
 
 /// The reading mode a manga's viewer flags select. Only the mode bits are read.
 pub fn reading_mode_of(viewer_flags: i64) -> ReadingMode {
@@ -25,15 +31,15 @@ pub fn content_mode(genres: &[String]) -> Option<ReadingMode> {
     genres.iter().any(|g| VERTICAL_TAGS.contains(&g.trim().to_lowercase().as_str())).then_some(ReadingMode::Webtoon)
 }
 
-/// `getMangaReadingMode(resolveDefault = true)`: the manga's own mode, else the mode its tags call for (`content`), else
-/// the preference. A corrupt global preference that is itself DEFAULT falls back to [`DEFAULT_READING_MODE_PREF`], so
-/// this never returns [`ReadingMode::Default`].
-pub fn resolve_reading_mode(viewer_flags: i64, content: Option<ReadingMode>, default_pref: i32) -> ReadingMode {
+/// `getMangaReadingMode(resolveDefault = true)`: the manga's own mode, else the default reading mode. A fixed default
+/// is used as it is; the Adaptive one (or a value that is no mode) takes the mode the title's tags call for (`content`),
+/// else pages in `direction` (`adaptive_pages`). Never returns [`ReadingMode::Default`].
+pub fn resolve_reading_mode(viewer_flags: i64, content: Option<ReadingMode>, default_pref: i32, direction: i32) -> ReadingMode {
     match reading_mode_of(viewer_flags) {
-        ReadingMode::Default => content.unwrap_or_else(|| match ReadingMode::from_preference(default_pref) {
-            ReadingMode::Default => ReadingMode::from_preference(DEFAULT_READING_MODE_PREF),
+        ReadingMode::Default => match ReadingMode::from_preference(default_pref) {
+            ReadingMode::Default => content.unwrap_or_else(|| adaptive_pages(direction)),
             mode => mode,
-        }),
+        },
         mode => mode,
     }
 }
@@ -102,17 +108,17 @@ mod tests {
 
     #[test]
     fn manga_mode_zero_resolves_to_preference_and_raw_is_kept_otherwise() {
-        assert_eq!(resolve_reading_mode(0, None, DEFAULT_READING_MODE_PREF), ReadingMode::LeftToRight);
-        assert_eq!(resolve_reading_mode(0, None, 2), ReadingMode::RightToLeft, "a preference of right to left is still honoured");
-        assert_eq!(resolve_reading_mode(0x3, None, DEFAULT_READING_MODE_PREF), ReadingMode::Vertical);
+        assert_eq!(resolve_reading_mode(0, None, DEFAULT_READING_MODE_PREF, 2), ReadingMode::RightToLeft, "adaptive, right to left");
+        assert_eq!(resolve_reading_mode(0, None, 1, 2), ReadingMode::LeftToRight, "a fixed default is used as it is");
+        assert_eq!(resolve_reading_mode(0x3, None, DEFAULT_READING_MODE_PREF, 2), ReadingMode::Vertical);
     }
 
     #[test]
     fn e21_resolve_never_returns_default_even_with_a_corrupt_global() {
-        assert_eq!(resolve_reading_mode(0, None, 1), ReadingMode::LeftToRight);
-        assert_eq!(resolve_reading_mode(0, None, 0), ReadingMode::LeftToRight, "corrupt global falls back to LTR");
-        assert_eq!(resolve_reading_mode(0, None, 9), ReadingMode::LeftToRight);
-        assert_ne!(resolve_reading_mode(0, None, 0), ReadingMode::Default);
+        assert_eq!(resolve_reading_mode(0, None, 0, 1), ReadingMode::LeftToRight, "adaptive, left to right");
+        assert_eq!(resolve_reading_mode(0, None, 9, 2), ReadingMode::RightToLeft, "no mode reads as adaptive");
+        assert_eq!(resolve_reading_mode(0, None, 0, 7), ReadingMode::RightToLeft, "an unknown direction is right to left");
+        assert_ne!(resolve_reading_mode(0, None, 0, 2), ReadingMode::Default);
     }
 
     #[test]
@@ -137,8 +143,9 @@ mod tests {
         assert_eq!(content_mode(&tags(&["Long Strip"])), Some(ReadingMode::Webtoon), "case and spaces do not matter");
         assert_eq!(content_mode(&tags(&["Action", "Shounen"])), None, "other manga keeps the default");
         let webtoon = content_mode(&tags(&["Webtoon"]));
-        assert_eq!(resolve_reading_mode(0, webtoon, DEFAULT_READING_MODE_PREF), ReadingMode::Webtoon);
-        assert_eq!(resolve_reading_mode(0x2, webtoon, DEFAULT_READING_MODE_PREF), ReadingMode::RightToLeft, "the title's own mode wins");
-        assert_eq!(resolve_reading_mode(0, None, 2), ReadingMode::RightToLeft, "no tag: the preference");
+        assert_eq!(resolve_reading_mode(0, webtoon, DEFAULT_READING_MODE_PREF, 2), ReadingMode::Webtoon, "adaptive follows the tags");
+        assert_eq!(resolve_reading_mode(0x1, webtoon, DEFAULT_READING_MODE_PREF, 2), ReadingMode::LeftToRight, "the title's own mode wins");
+        assert_eq!(resolve_reading_mode(0, webtoon, 2, 1), ReadingMode::RightToLeft, "a fixed default ignores the tags");
+        assert_eq!(resolve_reading_mode(0, None, DEFAULT_READING_MODE_PREF, 1), ReadingMode::LeftToRight, "no tag: pages in the adaptive direction");
     }
 }

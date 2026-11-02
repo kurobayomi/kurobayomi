@@ -580,9 +580,10 @@ impl ReaderCore {
     }
 
     fn mode(&self) -> kuro_prefs::reader::ReadingMode {
-        // the manga's own mode, else the one its tags call for, else the default of the Settings page
+        // the manga's own mode, else the default of the Settings page (Adaptive: the tags, else pages in its direction)
         let viewer_flags = self.session.borrow().as_ref().map_or(0, |s| s.viewer_flags());
-        flags::resolve_reading_mode(viewer_flags, self.content_mode.get(), self.deps.prefs.default_reading_mode.get())
+        let prefs = &self.deps.prefs;
+        flags::resolve_reading_mode(viewer_flags, self.content_mode.get(), prefs.default_reading_mode.get(), prefs.adaptive_direction.get())
     }
 }
 
@@ -1986,8 +1987,8 @@ mod tests {
         let f = fixture(1);
         let core = core(&f, 0, http_build("crop"));
         core.initial_load().unwrap();
-        // the default mode preference is left to right, a pager mode
-        assert_eq!(core.mode(), ReadingMode::LeftToRight);
+        // the default is Adaptive, and an untagged title reads right to left, a pager mode
+        assert_eq!(core.mode(), ReadingMode::RightToLeft);
         assert!(!core.crop_on());
         let on = core.toggle_crop();
         assert_eq!(on, CropView { value: true, icon: CROP_ICON_ON, toast: "On".to_string() });

@@ -147,7 +147,9 @@ define_prefs! {
     /// `[reader]` section: the reader keys the settings diet kept (Reader page: reading mode, background, scale type,
     /// zoom start, crop borders and split wide pages).
     pub struct ReaderPrefs in "reader" {
-        default_reading_mode: i32 = "pref_default_reading_mode_key" => 1;
+        /// 0 is Adaptive (user, 2026-11-02): the title's tags pick the strip or pages, pages turning in
+        /// `adaptive_direction`; 1 to 5 are the fixed modes. Left to right (1) was the default from 2026-10-11.
+        default_reading_mode: i32 = "pref_default_reading_mode_key" => 0;
         image_scale_type: i32 = "pref_image_scale_type_key" => 1;
         zoom_start: i32 = "pref_zoom_start_key" => 1;
         reader_theme: i32 = "pref_reader_theme_key" => 1;
@@ -155,6 +157,8 @@ define_prefs! {
         dual_page_split_paged: bool = "pref_dual_page_split" => false;
         /// Two pages side by side in the page-by-page modes: 0 when the window is wider than tall, 1 always, 2 never.
         two_pages: i32 = "pref_two_pages" => 0;
+        /// The direction Adaptive turns pages: 2 right to left (manga), 1 left to right.
+        adaptive_direction: i32 = "pref_adaptive_direction" => 2;
     }
 }
 
@@ -244,7 +248,7 @@ mod tests {
 
     #[test]
     fn the_section_holds_every_reader_row() {
-        assert_eq!(ReaderPrefs::FIELDS.len(), 7);
+        assert_eq!(ReaderPrefs::FIELDS.len(), 8);
         let reader = ReaderPrefs::new(PrefStore::in_memory());
         assert_section_registered(ReaderPrefs::TABLE, ReaderPrefs::FIELDS, &reader.defaults());
     }

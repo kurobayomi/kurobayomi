@@ -2580,6 +2580,8 @@ pref_show_navigation_mode_summary = Briefly show when reader is opened
 # source: i18n
 pref_dual_page_split = Split wide pages
 pref_two_pages = Page layout
+reading_mode_adaptive = Adaptive
+pref_adaptive_direction = Adaptive page direction
 two_pages_automatic = Two pages when wide
 two_pages_always = Two pages
 two_pages_never = One page

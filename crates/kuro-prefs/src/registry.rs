@@ -265,7 +265,7 @@ define_prefs! {
     "pref_torrserver_tackers", Normal, Str, TORRSERVER_TRACKERS, "torrent", "torr_server_trackers";
     "pref_torrserver_proxymode", Normal, Str, "None", "torrent", "torr_server_proxy_mode";
     "pref_torrserver_proxyurl", Normal, Str, "", "torrent", "torr_server_proxy_url";
-    "pref_default_reading_mode_key", Normal, Int, 1, "reader", "default_reading_mode";
+    "pref_default_reading_mode_key", Normal, Int, 0, "reader", "default_reading_mode";
     "pref_image_scale_type_key", Normal, Int, 1, "reader", "image_scale_type";
     "pref_zoom_start_key", Normal, Int, 1, "reader", "zoom_start";
     "pref_reader_theme_key", Normal, Int, 1, "reader", "reader_theme";
@@ -293,6 +293,7 @@ define_prefs! {
     "manga_dual_page_split_{id}", Normal, Bool, false, "reader.manga_dual_page_split", "";
     "pref_two_pages", Normal, Int, 0, "reader", "two_pages";
     "manga_two_pages_{id}", Normal, Int, 0, "reader.manga_two_pages", "";
+    "pref_adaptive_direction", Normal, Int, 2, "reader", "adaptive_direction";
 }
 
 /// Keys of features this desktop app does not have, and of settings the settings diet cut (docs/design/settings-diet.md).
@@ -609,10 +610,10 @@ mod tests {
                     .replace("${tracker.id}", "{id}")
                     .replace("${id}", "{id}");
                 // T-19a-064: the anime update badge count is derived in memory, never registered
-                // the default reading mode is left to right (1) by the user's decision of 2026-10-11, not the plan's 2
+                // the default reading mode is Adaptive (0) by the user's decision of 2026-11-02, not the plan's 2
                 // adult titles are hidden by default by the user's decision of 2026-10-19, not the plan's true
                 let default = match key.as_str() {
-                    "pref_default_reading_mode_key" => "1",
+                    "pref_default_reading_mode_key" => "0",
                     "show_nsfw_source" => "false",
                     _ => cells[6],
                 };
@@ -696,7 +697,7 @@ mod tests {
         // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
         // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
         // (`MangaReaderPrefs`), then two pages side by side (`pref_two_pages`) and its value for one manga
-        assert_eq!(REGISTRY.len(), rows.len() + 18);
+        assert_eq!(REGISTRY.len(), rows.len() + 19);
         assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
         assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
         assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");
@@ -712,6 +713,7 @@ mod tests {
         assert_eq!(REGISTRY[rows.len() + 15].key, "manga_dual_page_split_{id}");
         assert_eq!(REGISTRY[rows.len() + 16].key, "pref_two_pages");
         assert_eq!(REGISTRY[rows.len() + 17].key, "manga_two_pages_{id}");
+        assert_eq!(REGISTRY[rows.len() + 18].key, "pref_adaptive_direction");
         let mut pinned = 0;
         for (meta, (key, store, kind, default)) in REGISTRY.iter().zip(&rows) {
             assert_eq!(meta.key, key);

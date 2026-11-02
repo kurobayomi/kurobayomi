@@ -76,10 +76,10 @@ are built once, on the shared pieces.
 
 ### Phase 3: reading features
 
-- **Reading mode from the content** (done): a title with no mode of its own whose tags say Webtoon, Manhwa, Manhua or
-  Long Strip opens as the vertical strip. Everything else keeps the user's default (left to right, their decision of
-  2026-10-11; right to left stays a per-title choice), so Japanese manga is not switched by guess. A choice the user
-  made for a title always wins.
+- **Reading mode from the content** (done): the default reading mode Adaptive (the default since 2026-11-02) opens a
+  title whose tags say Webtoon, Manhwa, Manhua or Long Strip as the vertical strip, and everything else as pages in the
+  "Adaptive page direction" (right to left by default, as in Mihon; left to right on request). A fixed default mode
+  ignores the tags. A choice the user made for a title always wins.
 - **Two pages side by side** (done) in the left-to-right and right-to-left modes when the window is wider than tall:
   pages pair in reading order from each chapter's start, a wide page (an existing spread) and the first page stand
   alone, and the pair follows the reading direction with both halves meeting in the middle. The setting "Page layout"
@@ -106,5 +106,6 @@ moves.
 ## Decisions (2026-11-02)
 
 - Two pages side by side: Automatic by window shape is the default, with Always and Never as the other choices.
-- Reading mode from the content: on for everyone, no setting, vertical strip only (tags); a mode the user picked for a
-  title always wins, and the left-to-right default of 2026-10-11 stays for everything else.
+- Reading mode from the content: the Adaptive default reading mode (2026-11-02), vertical strip only (tags), pages in
+  the adaptive direction (right to left, the common manga default and Mihon's) otherwise; a mode the user picked for a
+  title always wins, and a fixed default mode is used as it is.
