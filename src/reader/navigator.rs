@@ -1,7 +1,7 @@
-//! The chapter navigator (T-043a-041): one floating capsule, the same as the player's control bar
-//! (`widgets::osd::bar`): the previous and next chapter buttons around the page numbers and the slider, centred at the
-//! bottom and at most [`MAX_WIDTH`] wide (libadwaita's clamp). The decisions (slider range, labels, RTL mirror) are pure
-//! functions; [`Navigator`] only applies them.
+//! The chapter navigator (T-043a-041): one floating capsule across the bottom, the same as the player's control bar
+//! (`widgets::osd::bar`): the previous and next chapter buttons around the page numbers and the slider. It hides while
+//! the user reads, so it spans the width as the player's does. The decisions (slider range, labels, RTL mirror) are
+//! pure functions; [`Navigator`] only applies them.
 
 use kuro_i18n::{MsgKey, tr};
 use std::cell::{Cell, RefCell};
@@ -18,9 +18,6 @@ pub const ICON_NEXT: &str = "media-skip-forward-symbolic";
 pub fn slider_value(current_page: i32, total: i32) -> f64 {
     f64::from(current_page.clamp(1, total.max(1)))
 }
-
-/// The widest the navigator gets, in px: a floating bar under the page, not a strip across a wide window.
-pub const MAX_WIDTH: i32 = 600;
 
 /// The current page number label: `3`, or `2-3` with page 2 shown `beside` it. A dash before the first page event
 /// (`ReaderViewModel.kt:962`).
@@ -60,17 +57,15 @@ pub struct ButtonPlan {
     pub icon: &'static str,
 }
 
-/// Left and right buttons. In LTR the left one is previous; in RTL the positions swap, and each icon follows its
-/// action so the glyph matches what the button does (PROPOSAL, `p1-ui-parity.md` section 3.1.1).
+/// Left and right buttons. In LTR the left one is previous; in RTL the actions swap, as the pages run leftwards. The
+/// icons stay by position: the left arrow points left, toward where its chapter is on the slider, the right one right
+/// (user, 2026-11-02: an arrow pointing away from its chapter read as switched).
 pub fn button_plan(rtl: bool, previous_enabled: bool, next_enabled: bool) -> [ButtonPlan; 2] {
-    let previous = ButtonPlan {
-        step: Step::Previous,
-        enabled: previous_enabled,
-        description: tr(MsgKey::action_previous_chapter),
-        icon: ICON_PREVIOUS,
-    };
+    let previous = ButtonPlan { step: Step::Previous, enabled: previous_enabled, description: tr(MsgKey::action_previous_chapter), icon: ICON_PREVIOUS };
     let next = ButtonPlan { step: Step::Next, enabled: next_enabled, description: tr(MsgKey::action_next_chapter), icon: ICON_NEXT };
-    if rtl { [next, previous] } else { [previous, next] }
+    let [mut left, mut right] = if rtl { [next, previous] } else { [previous, next] };
+    (left.icon, right.icon) = (ICON_PREVIOUS, ICON_NEXT);
+    [left, right]
 }
 
 /// What the navigator shows.
@@ -89,7 +84,7 @@ pub struct NavigatorState {
 
 /// The navigator widgets. `on_step` runs a chapter button, `on_page` moves the viewer to a 0-based index.
 pub struct Navigator {
-    pub root: adw::Clamp,
+    pub root: gtk::Box,
     /// The left and right buttons by position; what each runs follows the RTL plan in `update`.
     left: gtk::Button,
     right: gtk::Button,
@@ -135,7 +130,7 @@ impl Navigator {
         bar.append(&left);
         bar.append(&pill);
         bar.append(&right);
-        let root = adw::Clamp::builder().maximum_size(MAX_WIDTH).tightening_threshold(MAX_WIDTH).child(&bar).build();
+        let root = bar;
         root.set_widget_name("navigator");
 
         let navigator = Rc::new(Self {
@@ -252,14 +247,14 @@ mod tests {
     }
 
     #[test]
-    fn rtl_swaps_the_buttons_and_their_actions_and_icons() {
+    fn rtl_swaps_the_actions_and_the_arrows_stay_by_position() {
         let ltr = button_plan(false, true, false);
         assert_eq!(ltr[0].step, Step::Previous);
         assert!(ltr[0].enabled && !ltr[1].enabled);
         let rtl = button_plan(true, true, false);
         assert_eq!(rtl[0].step, Step::Next);
         assert!(!rtl[0].enabled, "the left button follows enabledNext in RTL");
-        assert_eq!(rtl[0].icon, ICON_NEXT);
+        assert_eq!((rtl[0].icon, rtl[1].icon), (ICON_PREVIOUS, ICON_NEXT), "the arrows point toward their chapter on the slider");
         assert_eq!(rtl[1].description, "Previous chapter");
     }
 }
