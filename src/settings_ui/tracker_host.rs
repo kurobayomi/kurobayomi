@@ -104,6 +104,16 @@ enum State {
 thread_local! {
     static STATE: RefCell<State> = const { RefCell::new(State::Idle) };
     static REFRESH: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+    static WAITING: RefCell<Vec<Box<dyn FnOnce()>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Runs `then` once the services are built: at once when they already are. Dropped when building fails.
+pub fn when_ready(then: impl FnOnce() + 'static) {
+    if host().is_some() {
+        return then();
+    }
+    WAITING.with(|waiting| waiting.borrow_mut().push(Box::new(then)));
+    ensure();
 }
 
 /// The services, once they are built.
@@ -162,6 +172,10 @@ pub fn ensure() {
                 }
             }
         });
+        let waiting = WAITING.with(|waiting| std::mem::take(&mut *waiting.borrow_mut()));
+        if host().is_some() {
+            waiting.into_iter().for_each(|then| then());
+        }
         refresh();
     });
 }

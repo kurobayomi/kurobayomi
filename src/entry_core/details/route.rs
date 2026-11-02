@@ -775,9 +775,21 @@ impl View {
                 if let Some(m) = &loaded {
                     let large = self.two_pane.get().unwrap_or(false);
                     self.expansion.set(Expansion::new(large, m.from_source));
-                    // progress made in another app reaches the trackers first: pull it once per open of a library entry
-                    if first && m.entry.favorite {
-                        crate::entry_core::tracking::actions::pull_progress(self.env.kind, m.entry.id);
+                    // the first open after launch loads before the tracker services are up (none published, count 0):
+                    // once they are, count the bound trackers again for the tracking button, and pull the progress made
+                    // in another app once per open of a library entry
+                    if first {
+                        let runner = Rc::downgrade(&self.runner);
+                        let (kind, entry_id, source_id, favorite) = (self.env.kind, m.entry.id, m.entry.source, m.entry.favorite);
+                        crate::settings_ui::tracker_host::when_ready(move || {
+                            crate::entry_core::tracking::session::refresh_from_host();
+                            if favorite {
+                                crate::entry_core::tracking::actions::pull_progress(kind, entry_id);
+                            }
+                            if let Some(runner) = runner.upgrade() {
+                                runner.send(EntryCmd::ReadTracking { entry_id, source_id });
+                            }
+                        });
                     }
                 }
                 *self.model.borrow_mut() = loaded.map(|b| *b);
