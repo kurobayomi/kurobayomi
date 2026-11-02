@@ -1,9 +1,9 @@
 //! Work off the GTK thread with its result back on it: the one way the app does it (no screen hand-rolls a thread, a
 //! channel and a local future of its own).
 //!
-//! - [`run`]: blocking work (files, a database read, a blocking network call). It runs on the app's runtime's blocking
-//!   pool, so tokio calls work inside it, or on GLib's worker pool where no runtime is entered (unit tests).
-//!   [`blocking`] is the same for code on the GTK main context that awaits the value and goes on.
+//! - [`run`]: blocking work (a blocking network call, a child process to wait for) on a detached thread of its own, so
+//!   it never holds a pool or delays the exit. [`blocking`] is short blocking work on GLib's worker pool for code on the
+//!   GTK main context that awaits the value and goes on.
 //! - [`run_async`] and [`run_async_cancellable`]: a `Send` future on the tokio runtime that `main` enters while the
 //!   app runs (source calls, network). The GTK thread never awaits it. [`run_async_on`] runs on a given runtime and
 //!   tells `done` when the task died instead of leaving it waiting.
@@ -65,32 +65,29 @@ where
     });
 }
 
-/// Runs blocking `work` off the GTK thread and passes its value to `done` on the GTK main context.
+/// Runs blocking `work` on a thread of its own and passes its value to `done` on the GTK main context. The thread is
+/// detached: a long wait (an external player that runs for an hour) holds no pool and never delays the app's exit.
 pub fn run<T, Work, Done>(work: Work, done: Done)
 where
     T: Send + 'static,
     Work: FnOnce() -> T + Send + 'static,
     Done: FnOnce(T) + 'static,
 {
-    glib::MainContext::ref_thread_default().spawn_local(async move {
-        if let Ok(value) = blocking(work).await {
-            done(value);
-        }
+    let (sender, receiver) = bounded::<T>(1);
+    std::thread::spawn(move || {
+        let _ = sender.send_blocking(work());
     });
+    deliver_on_main(receiver, done);
 }
 
-/// Blocking `work` off the GTK thread, for code on the GTK main context that goes on after it (`blocking(..).await`).
-/// The work runs on the runtime's blocking pool, so tokio calls work inside it, or on GLib's worker pool where no
-/// runtime is entered. `Err` when the work panicked.
+/// Blocking `work` on GLib's worker pool, for code on the GTK main context that goes on after it (`blocking(..).await`).
+/// For short work (a file, a database read); a long wait goes through [`run`]. `Err` when the work panicked.
 pub async fn blocking<T, Work>(work: Work) -> Result<T, Box<dyn std::any::Any + Send + 'static>>
 where
     T: Send + 'static,
     Work: FnOnce() -> T + Send + 'static,
 {
-    match tokio::runtime::Handle::try_current() {
-        Ok(runtime) => runtime.spawn_blocking(work).await.map_err(|e| Box::new(e.to_string()) as Box<dyn std::any::Any + Send>),
-        Err(_) => gtk::gio::spawn_blocking(work).await,
-    }
+    gtk::gio::spawn_blocking(work).await
 }
 
 /// Runs the future `work` makes, which need not be `Send`, to its end on a blocking-pool thread of the runtime, and
