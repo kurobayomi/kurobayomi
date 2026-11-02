@@ -31,7 +31,7 @@ both never run together.
 |---|---|---|
 | libadwaita 1.6 | `gtk::Spinner` in `widgets::status::spinner` | `adw::Spinner` |
 | libadwaita 1.6 | No system accent colour | `adw::StyleManager` accent colour |
-| libadwaita 1.7 | `widgets::status::fade_tab_switches` (a 150 ms fade on tab switches) | `adw::ViewStack::set_enable_transitions(true)` in `main.rs` `tabs()` |
+| libadwaita 1.7 | `widgets::status::crossfade_tabs` (a 150 ms crossfade on tab switches, an overlay around the tabs) | `adw::ViewStack::set_enable_transitions(true)` in `main.rs` `tabs()`, pushed without the overlay (and `ui.rs` finds the stack directly again) |
 
 Also check the newer widgets the migration had to skip (`plans/LIBADWAITA-MIGRATION.md`, Constraints): `AdwBottomSheet`
 and `AdwButtonRow` (1.6), `AdwToggleGroup` and `AdwWrapBox` (1.7).

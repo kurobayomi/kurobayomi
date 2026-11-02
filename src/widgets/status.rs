@@ -15,28 +15,43 @@ const SPINNER_PX: i32 = 48;
 /// How long a page's state switcher fades between loading, content, empty and error.
 pub const SWITCH_FADE_MS: u32 = 150;
 
-/// Fades the page a tab switch shows in over [`SWITCH_FADE_MS`], as [`switcher`] does for a page's states: libadwaita's
-/// view stack has no transition of its own before 1.7. A switch during a fade ends that fade first, so no page is left
-/// half faded. libadwaita skips the fade when the desktop turns animations off. On libadwaita 1.7 or newer, delete this
-/// and turn on the stack's own `enable_transitions` instead (it is off by default, so the two never both run; see
-/// docs/UPGRADING-GTK.md).
-pub fn fade_tab_switches(tabs: &adw::ViewStack) {
+/// `tabs` with its switches crossfaded over [`SWITCH_FADE_MS`], as [`switcher`] does for a page's states: libadwaita's
+/// view stack has no transition of its own before 1.7, and it hides the page being left at once. So the last picture of
+/// that page, taken as the switch happens (a frame later it is blank), lies over the new page and fades out. A switch
+/// during a fade ends that fade first. libadwaita skips the fade when the desktop turns animations off. On libadwaita
+/// 1.7 or newer, delete this and turn on the stack's own `enable_transitions` instead (it is off by default, so the two
+/// never both run; see docs/UPGRADING-GTK.md).
+pub fn crossfade_tabs(tabs: &adw::ViewStack) -> gtk::Overlay {
+    let overlay = gtk::Overlay::builder().child(tabs).build();
+    let leaving = gtk::Picture::builder().can_target(false).can_shrink(true).content_fit(gtk::ContentFit::Fill).visible(false).build();
+    overlay.add_overlay(&leaving);
+    let shown = std::cell::RefCell::new(tabs.visible_child().map(|page| gtk::WidgetPaintable::new(Some(&page))));
     let running: std::cell::RefCell<Option<adw::TimedAnimation>> = std::cell::RefCell::default();
     tabs.connect_visible_child_notify(move |tabs| {
         if let Some(fade) = running.take() {
             fade.skip();
         }
-        let Some(page) = tabs.visible_child() else { return };
+        let last = shown.replace(tabs.visible_child().map(|page| gtk::WidgetPaintable::new(Some(&page)))).map(|left| left.current_image());
+        let Some(last) = last else { return };
+        leaving.set_paintable(Some(&last));
+        leaving.set_opacity(1.0);
+        leaving.set_visible(true);
         let fade = adw::TimedAnimation::builder()
-            .widget(&page)
-            .target(&adw::PropertyAnimationTarget::new(&page, "opacity"))
-            .value_from(0.0)
-            .value_to(1.0)
+            .widget(&leaving)
+            .target(&adw::PropertyAnimationTarget::new(&leaving, "opacity"))
+            .value_from(1.0)
+            .value_to(0.0)
             .duration(SWITCH_FADE_MS)
             .build();
+        let picture = leaving.clone();
+        fade.connect_done(move |_| {
+            picture.set_visible(false);
+            picture.set_paintable(None::<&gtk::gdk::Paintable>);
+        });
         fade.play();
         running.replace(Some(fade));
     });
+    overlay
 }
 
 /// The switcher between a page's states (loading, content, empty, error): one crossfade of [`SWITCH_FADE_MS`] for every
@@ -173,18 +188,20 @@ mod tests {
     }
 
     #[test]
-    fn tab_switches_leave_no_page_half_faded() {
+    fn a_tab_switch_leaves_no_picture_of_the_old_page_behind() {
         crate::testing::with_display(|| {
             let tabs = adw::ViewStack::new();
             let (a, b) = (gtk::Label::new(Some("a")), gtk::Label::new(Some("b")));
             tabs.add_named(&a, Some("a"));
             tabs.add_named(&b, Some("b"));
-            fade_tab_switches(&tabs);
-            tabs.set_visible_child_name("b");
-            tabs.set_visible_child_name("a");
-            tabs.set_visible_child_name("b");
+            let overlay = crossfade_tabs(&tabs);
+            for name in ["b", "a", "b"] {
+                tabs.set_visible_child_name(name);
+            }
             // off screen libadwaita ends a fade at once; on screen the next switch ends it (`skip`)
-            assert_eq!((a.opacity(), b.opacity()), (1.0, 1.0));
+            let picture = overlay.last_child().and_downcast::<gtk::Picture>().expect("the fading picture lies over the tabs");
+            assert!(!picture.is_visible() && picture.paintable().is_none());
+            assert_eq!(overlay.child().as_ref(), Some(tabs.upcast_ref()));
         });
     }
 }

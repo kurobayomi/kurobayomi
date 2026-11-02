@@ -481,7 +481,10 @@ pub fn open(id: &str) {
         // sidebar destinations switch tabs instead of stacking a second copy; a hidden page (Downloads with an empty
         // queue) shows while it is open
         pop_to_root();
-        if let Some(tabs) = pages(&nav().0).first().and_then(|p| p.child()).and_downcast::<adw::ViewStack>() {
+        // the root page is the tab stack inside its crossfade overlay (`widgets::status::crossfade_tabs`)
+        let root = pages(&nav().0).first().and_then(|p| p.child());
+        let tabs = root.and_then(|w| w.downcast::<gtk::Overlay>().ok()).and_then(|o| o.child()).and_downcast::<adw::ViewStack>();
+        if let Some(tabs) = tabs {
             if let Some(page) = tabs.child_by_name(id) {
                 page.set_visible(true);
             }

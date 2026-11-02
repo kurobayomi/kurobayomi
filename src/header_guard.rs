@@ -22,7 +22,7 @@ mod tests {
         ("browse/glue.rs", "&page"),                           // the categories page from screens::build
         ("settings_ui/route.rs", "&page"),                     // the categories page from screens::build
         ("settings_ui/licenses.rs", "&detail_page(&library)"), // ui::page
-        ("main.rs", "&tabs"),                                  // the root page: each tab brings its own header
+        ("main.rs", "&widgets::status::crossfade_tabs(&tabs)"), // the root page: each tab brings its own header
     ];
 
     fn assert_has_header(what: &str, page: &gtk::Widget) {
