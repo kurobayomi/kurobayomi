@@ -15,12 +15,17 @@ const SPINNER_PX: i32 = 48;
 /// How long a page's state switcher fades between loading, content, empty and error.
 pub const SWITCH_FADE_MS: u32 = 150;
 
-/// `tabs` with its switches crossfaded over [`SWITCH_FADE_MS`], as [`switcher`] does for a page's states: libadwaita's
-/// view stack has no transition of its own before 1.7, and it hides the page being left at once. So the last picture of
-/// that page, taken as the switch happens (a frame later it is blank), lies over the new page and fades out. A switch
-/// during a fade ends that fade first. libadwaita skips the fade when the desktop turns animations off. On libadwaita
-/// 1.7 or newer, delete this and turn on the stack's own `enable_transitions` instead (it is off by default, so the two
-/// never both run; see docs/UPGRADING-GTK.md).
+/// How long a tab switch crossfades: what GTK's own stack crossfade takes by default, as the Anime and Manga switch of a
+/// page does, so both switches feel the same.
+pub const TAB_FADE_MS: u32 = 200;
+
+/// `tabs` with its switches crossfaded as GTK's stack crossfade does (the Anime and Manga switch): over
+/// [`TAB_FADE_MS`] the page being left fades out while the new one fades in. libadwaita's view stack has no transition
+/// of its own before 1.7 and hides the page being left at once, so the last picture of that page, taken as the switch
+/// happens (a frame later it is blank), lies over the new page and fades out. A switch during a fade ends that fade
+/// first. libadwaita skips the fade when the desktop turns animations off. On libadwaita 1.7 or newer, delete this and
+/// turn on the stack's own `enable_transitions` instead (it is off by default, so the two never both run; see
+/// docs/UPGRADING-GTK.md).
 pub fn crossfade_tabs(tabs: &adw::ViewStack) -> gtk::Overlay {
     let overlay = gtk::Overlay::builder().child(tabs).build();
     let leaving = gtk::Picture::builder().can_target(false).can_shrink(true).content_fit(gtk::ContentFit::Fill).visible(false).build();
@@ -31,20 +36,31 @@ pub fn crossfade_tabs(tabs: &adw::ViewStack) -> gtk::Overlay {
         if let Some(fade) = running.take() {
             fade.skip();
         }
-        let last = shown.replace(tabs.visible_child().map(|page| gtk::WidgetPaintable::new(Some(&page)))).map(|left| left.current_image());
-        let Some(last) = last else { return };
+        let page = tabs.visible_child();
+        let last = shown.replace(page.as_ref().map(|page| gtk::WidgetPaintable::new(Some(page)))).map(|left| left.current_image());
+        let (Some(last), Some(page)) = (last, page) else { return };
         leaving.set_paintable(Some(&last));
-        leaving.set_opacity(1.0);
         leaving.set_visible(true);
+        // one value drives both: the old picture at 1 - v over the new page at v
+        let step = {
+            let (leaving, page) = (leaving.clone(), page.clone());
+            move |v: f64| {
+                leaving.set_opacity(1.0 - v);
+                page.set_opacity(v);
+            }
+        };
+        step(0.0);
         let fade = adw::TimedAnimation::builder()
             .widget(&leaving)
-            .target(&adw::PropertyAnimationTarget::new(&leaving, "opacity"))
-            .value_from(1.0)
-            .value_to(0.0)
-            .duration(SWITCH_FADE_MS)
+            .target(&adw::CallbackAnimationTarget::new(step.clone()))
+            .value_from(0.0)
+            .value_to(1.0)
+            .duration(TAB_FADE_MS)
+            .easing(adw::Easing::Linear)
             .build();
         let picture = leaving.clone();
         fade.connect_done(move |_| {
+            step(1.0);
             picture.set_visible(false);
             picture.set_paintable(None::<&gtk::gdk::Paintable>);
         });
@@ -201,7 +217,44 @@ mod tests {
             // off screen libadwaita ends a fade at once; on screen the next switch ends it (`skip`)
             let picture = overlay.last_child().and_downcast::<gtk::Picture>().expect("the fading picture lies over the tabs");
             assert!(!picture.is_visible() && picture.paintable().is_none());
+            assert_eq!((a.opacity(), b.opacity()), (1.0, 1.0), "no page is left half faded");
             assert_eq!(overlay.child().as_ref(), Some(tabs.upcast_ref()));
+        });
+    }
+
+    #[test]
+    fn on_screen_the_old_page_fades_out_while_the_new_one_fades_in() {
+        crate::testing::with_display(|| {
+            if !gtk::Settings::default().is_some_and(|s| s.is_gtk_enable_animations()) {
+                return;
+            }
+            let tabs = adw::ViewStack::new();
+            let (a, b) = (gtk::Label::new(Some("first page")), gtk::Label::new(Some("second page")));
+            tabs.add_named(&a, Some("a"));
+            tabs.add_named(&b, Some("b"));
+            let overlay = crossfade_tabs(&tabs);
+            let window = gtk::Window::new();
+            window.set_default_size(300, 200);
+            window.set_child(Some(&overlay));
+            window.present();
+            let pump = |ms: u64| {
+                let (ctx, end) = (gtk::glib::MainContext::default(), std::time::Instant::now() + std::time::Duration::from_millis(ms));
+                while std::time::Instant::now() < end {
+                    while ctx.iteration(false) {}
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+            };
+            pump(300);
+            tabs.set_visible_child_name("b");
+            pump(80);
+            let picture = overlay.last_child().and_downcast::<gtk::Picture>().unwrap();
+            assert!(picture.is_visible(), "the old page's picture lies over the new one");
+            assert!(picture.paintable().is_some_and(|p| p.intrinsic_width() > 0), "the picture holds the old page, not a blank");
+            let (old, new) = (picture.opacity(), b.opacity());
+            assert!(old > 0.0 && old < 1.0 && new > 0.0 && new < 1.0 && (old + new - 1.0).abs() < 1e-6, "mid-fade: {old} and {new}");
+            pump(300);
+            assert!(!picture.is_visible() && b.opacity() == 1.0, "the fade ends on the new page");
+            window.destroy();
         });
     }
 }
