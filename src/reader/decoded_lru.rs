@@ -6,8 +6,16 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-/// The default budget: 512 MiB of decoded pixels (RD §5.6).
-pub const DEFAULT_BUDGET_BYTES: usize = 512 * 1024 * 1024;
+/// The most a reader keeps decoded: 512 MiB of pixels (RD §5.6).
+pub const MAX_BUDGET_BYTES: usize = 512 * 1024 * 1024;
+/// The least it keeps, enough for a few full spreads on a small machine.
+pub const MIN_BUDGET_BYTES: usize = 128 * 1024 * 1024;
+
+/// The decoded-page budget for a machine with `total` bytes of memory: a sixteenth of it, between
+/// [`MIN_BUDGET_BYTES`] and [`MAX_BUDGET_BYTES`]; the maximum when the total is unknown.
+pub fn budget_for(total: Option<u64>) -> usize {
+    total.map_or(MAX_BUDGET_BYTES, |bytes| usize::try_from(bytes / 16).unwrap_or(usize::MAX).clamp(MIN_BUDGET_BYTES, MAX_BUDGET_BYTES))
+}
 
 struct Entry<V> {
     value: V,
@@ -88,6 +96,15 @@ impl<K: Hash + Eq + Clone, V: Clone> ByteLru<K, V> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_budget_is_a_sixteenth_of_the_memory_within_its_bounds() {
+        const GIB: u64 = 1024 * 1024 * 1024;
+        assert_eq!(budget_for(Some(16 * GIB)), MAX_BUDGET_BYTES, "a big machine keeps the most");
+        assert_eq!(budget_for(Some(4 * GIB)), 256 * 1024 * 1024);
+        assert_eq!(budget_for(Some(GIB)), MIN_BUDGET_BYTES, "a small machine keeps the least");
+        assert_eq!(budget_for(None), MAX_BUDGET_BYTES);
+    }
+
     use super::*;
     use std::rc::Rc;
 

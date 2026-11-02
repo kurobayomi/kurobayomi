@@ -22,7 +22,7 @@ use gtk::{gdk, glib, graphene};
 
 use crate::reader::decode_guard::{self, Ticket};
 use kuro_core::image::background::Background;
-use crate::reader::decoded_lru::{ByteLru, DEFAULT_BUDGET_BYTES};
+use crate::reader::decoded_lru::{ByteLru, budget_for};
 use crate::reader::long_press::{DEFAULT_DOUBLE_CLICK_MS, DEFAULT_LONG_PRESS_MS, LongPressAction, LongPressTracker, SLOP_PX};
 use crate::reader::page_decode::{self, DecodeError, LoadState, MIN_DELAY_MS};
 use crate::reader::page_transform::{self, DecodeIntent};
@@ -95,7 +95,7 @@ struct Cached {
 
 thread_local! {
     /// The decoded pages kept by byte budget. A page that leaves the realised window drops its widget but not its pixels.
-    static DECODED: RefCell<ByteLru<DecodeKey, Cached>> = RefCell::new(ByteLru::new(DEFAULT_BUDGET_BYTES));
+    static DECODED: RefCell<ByteLru<DecodeKey, Cached>> = RefCell::new(ByteLru::new(budget_for(kuro_platform::device::total_memory_bytes())));
 }
 
 fn cache_get(key: &DecodeKey) -> Option<Cached> {

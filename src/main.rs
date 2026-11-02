@@ -328,7 +328,7 @@ fn build_window(app: &gtk::Application) {
     startup::publish_launcher_badge(&app.application_id().unwrap_or_default());
     // background work that waits for the window: the chapter cache clear and the opt-in release check
     if let Ok(paths) = kuro_platform::system_paths::SystemPaths::system() {
-        startup::clear_chapter_cache_on_launch(crate::misc::diet_defaults::LIBRARY_AUTO_CLEAR_CHAPTER_CACHE, kuro_images::platform::chapter_cache_dir(&paths));
+        startup::clear_chapter_cache_on_launch(crate::misc::diet_defaults::LIBRARY_AUTO_CLEAR_CHAPTER_CACHE, kuro_platform::paths::Paths::chapter_cache_dir(&paths));
         cache_limit::start(&kuro_prefs::backup::StoragePrefs::new(data::app().base.store().clone()), cache_limit::dirs(&paths));
     }
     app_update::startup();

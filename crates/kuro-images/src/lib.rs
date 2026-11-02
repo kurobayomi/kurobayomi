@@ -2,7 +2,6 @@
 
 pub mod art;
 pub mod buffered;
-pub mod chapter_cache;
 pub mod cover_file;
 pub mod cover_image;
 pub mod cover_paths;
@@ -16,7 +15,6 @@ pub mod http;
 pub mod icc;
 pub mod invalidate;
 pub mod keys;
-pub mod loader;
 pub mod memory_cache;
 pub mod menu;
 pub mod messages;

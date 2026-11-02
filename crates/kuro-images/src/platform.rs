@@ -13,11 +13,6 @@ pub fn image_cache_dir(paths: &dyn Paths) -> PathBuf {
     paths.image_cache_dir()
 }
 
-/// `<cache>/chapter_disk_cache`, the page-list and page-image cache (behavior section 20.1).
-pub fn chapter_cache_dir(paths: &dyn Paths) -> PathBuf {
-    paths.chapter_cache_dir()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -30,10 +25,6 @@ mod tests {
         assert_eq!(
             image_cache_dir(&paths),
             Path::new("/root/cache/image_cache")
-        );
-        assert_eq!(
-            chapter_cache_dir(&paths),
-            Path::new("/root/cache/chapter_disk_cache")
         );
     }
 

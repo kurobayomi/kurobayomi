@@ -49,14 +49,19 @@ pub fn is_low_ram_from(meminfo: Option<&str>) -> bool {
     meminfo.and_then(mem_total_bytes).is_some_and(|bytes| bytes < LOW_RAM_BYTES)
 }
 
-/// True when `MemTotal` is below 3 GiB. Read once per process; a missing or unparsable `/proc/meminfo` is false. On
-/// Windows the total comes from `windows::device`.
+/// The machine's total memory in bytes, read once per process: `MemTotal` of `/proc/meminfo`, or on Windows
+/// `windows::device`. `None` when it cannot be read.
 #[allow(unreachable_code)]
-pub fn is_low_ram() -> bool {
-    static LOW_RAM: OnceLock<bool> = OnceLock::new();
+pub fn total_memory_bytes() -> Option<u64> {
+    static TOTAL: OnceLock<Option<u64>> = OnceLock::new();
     #[cfg(all(target_os = "windows", feature = "platform-windows"))]
-    return *LOW_RAM.get_or_init(|| crate::windows::device::total_memory().is_some_and(|bytes| bytes < LOW_RAM_BYTES));
-    *LOW_RAM.get_or_init(|| is_low_ram_from(std::fs::read_to_string("/proc/meminfo").ok().as_deref()))
+    return *TOTAL.get_or_init(crate::windows::device::total_memory);
+    *TOTAL.get_or_init(|| std::fs::read_to_string("/proc/meminfo").ok().as_deref().and_then(mem_total_bytes))
+}
+
+/// True when the total memory is below 3 GiB. A total that cannot be read is not low RAM.
+pub fn is_low_ram() -> bool {
+    total_memory_bytes().is_some_and(|bytes| bytes < LOW_RAM_BYTES)
 }
 
 /// The `GL_MAX_TEXTURE_SIZE` the app probed at startup, or 0 when no probe succeeded. The probe itself needs a

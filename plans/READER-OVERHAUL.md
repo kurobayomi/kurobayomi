@@ -64,16 +64,16 @@ are built once, on the shared pieces.
 - Rewrite the stale notes in the module overview to say what is connected now.
 - Decide the ICC code: enable the `icc` feature with its setting, or delete it. Recommended: delete (the setting was cut).
 
-### Phase 2: one image pipeline
+### Phase 2: one image pipeline (done 2026-11-02)
 
-- Decode pages with `kuro_images::decode` (gains JPEG XL, HEIF, AVIF; animation stays), and crop borders with
-  `kuro_images::decode::borders`. Delete `page_decode`'s decoder and `crop_borders.rs`; keep the tiling, which is the
-  reader's own job.
-- Use `kuro_images::chapter_cache` for page lists and page images; delete `src/reader/cache.rs`.
-- One decoded-image cache: the reader's pages go into the image service's memory cache under their own budget share,
-  and the budget is sized from the machine's memory (`kuro_platform::device` already reads it), not a fixed 512 MiB.
-- Page fetches go through the image service: the page on screen in the priority lane, preloads in the normal one, two
-  to three at a time instead of one. The reader's queue keeps its ordering and cancels pages that left the screen.
+- Pages decode with `kuro_images::decode` (gains JPEG XL, HEIF, AVIF and the EXIF orientation; animation stays) and
+  borders are cropped by it; `page_decode`'s own decoder and `crop_borders.rs` are gone. The tiling stays the reader's.
+- One chapter cache: the reader's `DiskCache` (synchronous, on the app's cache-size setting, also used by Updates)
+  stays, and the unused async copy in `kuro-images` (`chapter_cache`, with the unused `loader::start`) is deleted.
+- The decoded-page budget is a sixteenth of the machine's memory, between 128 and 512 MiB, instead of a fixed 512 MiB.
+  It stays a cache of its own: it holds tile pyramids and frames, the image service holds covers.
+- Page fetches stay one at a time in the reader's priority queue. Mihon's loader is sequential too, and sources are
+  written for it (their own rate limits); parallel downloads would risk being throttled or banned for little gain.
 
 ### Phase 3: reading features
 
