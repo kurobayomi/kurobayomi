@@ -259,6 +259,8 @@ pub struct ItemList {
     selection: Rc<SelectionMirror>,
     leading: RefCell<Vec<gtk::Widget>>,
     shown: RefCell<Vec<RowItem>>,
+    /// Rows that wait for the page's slide to end (`sync`).
+    pending: RefCell<Option<Vec<RowItem>>>,
     /// The page's row press: a drag selects through it with Ctrl held, as a Ctrl+click does.
     on_row: Rc<dyn Fn(i64, Press)>,
 }
@@ -387,6 +389,7 @@ impl ItemList {
             selection: SelectionMirror::new(&selection),
             leading: RefCell::new(Vec::new()),
             shown: RefCell::new(Vec::new()),
+            pending: RefCell::default(),
             on_row: Rc::clone(&callbacks.on_row),
         });
         *list.borrow_mut() = Rc::downgrade(&this);
@@ -428,9 +431,26 @@ impl ItemList {
         self.selection.apply(chosen);
     }
 
-    /// Shows `rows`: see `sync_store`. The shown rows are swapped in before the store changes, so a handler that the
+    /// Shows `rows`. GTK builds a widget for every row near the ones in view (up to 200 of them) at once, which takes
+    /// longer than a frame, so while the page slides in the rows wait for the end of the slide (`ui::after_slide`).
+    /// Later rows replace waiting ones.
+    pub fn sync(self: &Rc<Self>, rows: Vec<RowItem>) {
+        if self.pending.replace(Some(rows)).is_some() {
+            return;
+        }
+        let list = Rc::downgrade(self);
+        crate::ui::after_slide(&self.widget, move || {
+            if let Some(list) = list.upgrade()
+                && let Some(rows) = list.pending.take()
+            {
+                list.sync_now(rows);
+            }
+        });
+    }
+
+    /// Shows `rows` now: see `sync_store`. The shown rows are swapped in before the store changes, so a handler that the
     /// change runs (a rebind, a focus move) finds no borrow of them held.
-    pub fn sync(&self, rows: Vec<RowItem>) {
+    fn sync_now(&self, rows: Vec<RowItem>) {
         let offset = self.leading.borrow().len() as u32;
         let old = self.shown.replace(rows.clone());
         // a row is replaced by a fresh object; when that row holds keyboard focus (it was just clicked, as in a

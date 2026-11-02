@@ -11,6 +11,8 @@ use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_S, SPACE_XL, SPACE_XS};
 thread_local! {
     pub static SPEC: Spec = Spec::load();
     static NAV: OnceCell<(adw::NavigationView, gtk::ApplicationWindow)> = const { OnceCell::new() };
+    /// The pushed pages still sliding in (`after_slide`).
+    static SLIDING: std::cell::RefCell<Vec<glib::WeakRef<adw::NavigationPage>>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
 pub fn with_spec<R>(f: impl FnOnce(&Spec) -> R) -> R {
@@ -74,7 +76,35 @@ fn pages(nav: &adw::NavigationView) -> Vec<adw::NavigationPage> {
 /// ([`set_page_title`]).
 fn wrap(page: &impl IsA<gtk::Widget>) -> adw::NavigationPage {
     let title = header_title(page.upcast_ref()).unwrap_or_else(|| tr(MsgKey::home_title).to_string());
-    adw::NavigationPage::builder().child(page).title(title).build()
+    let page = adw::NavigationPage::builder().child(page).title(title).build();
+    // the page slides in until libadwaita says it is shown (at once without animations)
+    SLIDING.with(|sliding| sliding.borrow_mut().push(page.downgrade()));
+    page.connect_shown(|shown| SLIDING.with(|sliding| sliding.borrow_mut().retain(|page| page.upgrade().is_some_and(|page| &page != shown))));
+    page
+}
+
+/// Runs `f` once the page that holds `widget` has finished sliding in, or now when it is not sliding. Building many
+/// widgets at once (the rows of a long list) takes longer than a frame and stalls the slide, so work like that waits
+/// for its end. A page left before its slide ends never runs `f`.
+pub fn after_slide(widget: &impl IsA<gtk::Widget>, f: impl FnOnce() + 'static) {
+    let page = widget.ancestor(adw::NavigationPage::static_type()).and_downcast::<adw::NavigationPage>();
+    let Some(page) = page.filter(|page| SLIDING.with(|sliding| sliding.borrow().iter().any(|p| p.upgrade().as_ref() == Some(page)))) else {
+        return f();
+    };
+    let f = std::cell::Cell::new(Some(f));
+    let handler: Rc<std::cell::Cell<Option<glib::SignalHandlerId>>> = Rc::default();
+    let id = page.connect_shown({
+        let handler = Rc::clone(&handler);
+        move |page| {
+            if let Some(id) = handler.take() {
+                page.disconnect(id);
+            }
+            if let Some(f) = f.take() {
+                f();
+            }
+        }
+    });
+    handler.set(Some(id));
 }
 
 /// The title the first header bar inside `widget` shows, if it shows one.
