@@ -66,6 +66,8 @@ pub enum CoverState {
 pub struct CoverBinding {
     generation: u64,
     cancel: Option<CancellationToken>,
+    /// A load was started and has not finished.
+    loading: bool,
     state: CoverState,
 }
 
@@ -74,6 +76,7 @@ impl Default for CoverBinding {
         Self {
             generation: 0,
             cancel: None,
+            loading: false,
             state: CoverState::Placeholder,
         }
     }
@@ -90,6 +93,7 @@ impl CoverBinding {
         self.unbind();
         let token = CancellationToken::new();
         self.cancel = Some(token.clone());
+        self.loading = true;
         (self.generation, token)
     }
 
@@ -99,12 +103,13 @@ impl CoverBinding {
             token.cancel();
         }
         self.generation += 1;
+        self.loading = false;
         self.state = CoverState::Placeholder;
     }
 
     /// Whether a load was started and has not finished yet.
     pub fn in_flight(&self) -> bool {
-        self.cancel.is_some()
+        self.loading
     }
 
     /// Applies the result of the load started with `generation`. A result of an older load is dropped, and so is
@@ -114,7 +119,7 @@ impl CoverBinding {
             return false;
         }
         if !matches!(result, Err(ImageError::Cancelled)) {
-            self.cancel = None;
+            self.loading = false;
         }
         self.state = match result {
             Ok(loaded) => CoverState::Loaded(loaded.image),
