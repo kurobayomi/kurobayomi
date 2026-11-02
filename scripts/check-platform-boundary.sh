@@ -19,6 +19,7 @@ matches=$(rg --line-number --no-heading --color never --hidden \
     --glob '!Cargo.lock' \
     --glob '!scripts/check-platform-boundary.sh' \
     --glob '!scripts/build-appimage.sh' \
+    --glob '!scripts/isolated-gui.sh' \
     --glob '!CONTRIBUTING.md' \
     -e "$pattern" .) || status=$?
 

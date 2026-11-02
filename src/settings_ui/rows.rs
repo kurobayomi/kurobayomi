@@ -120,6 +120,7 @@ pub fn edit_text(
     }
 }
 
+#[cfg(test)]
 /// The write of a text row: a blank text that is not allowed is not applied (`Ok(false)`), an invalid one is an error.
 pub(crate) fn text_veto(pref: &Pref<String>, can_be_blank: bool, validate: fn(&str) -> Result<(), String>) -> Veto<String> {
     let pref = pref.clone();

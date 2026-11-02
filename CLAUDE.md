@@ -19,6 +19,7 @@ This file is for Claude working on this repo. The speed-ups below cut a GUI wave
 - `~/kurobayomi-notes/watcher.py` is armed with the Monitor tool (30 minute timeout, re-arm each time). It reports idle capacity, memory stalls and prune results.
 - systemd-oomd kills the biggest swap user when swap passes 90%. It killed Claude Desktop once. Mark the live Claude cgroups with `setfattr -n user.oomd_avoid -v 1` (resets when the app restarts).
 - Never `pkill -f` a pattern that also appears in your own command line.
+- Run a test copy of the app or any GUI run that may touch the desktop through `scripts/isolated-gui.sh <command>`: its own session bus, stubbed browser and file openers, and it stops the portal and password-store processes the bus started (left running, 530 of them once held 4.7 GB of swap).
 
 ## RAM watching and limits (the user's standing rule: never let the machine run out of memory)
 

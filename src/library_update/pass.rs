@@ -314,11 +314,12 @@ where
 
     /// The manual "start now": returns `false` without starting when a pass of the kind is running, otherwise runs
     /// the pass on a spawned task and returns `true`.
+    #[cfg(test)]
     pub fn start_now(self: &Arc<Self>, settings: PassSettings) -> bool {
         self.start_after(settings, std::future::ready(()))
     }
 
-    /// [`Self::start_now`], with the pass waiting for `before` first. The lock is taken at once, so the pass counts as
+    /// The manual start, with the pass waiting for `before` first. The lock is taken at once, so the pass counts as
     /// running (and a second start is refused) while it waits.
     pub fn start_after(self: &Arc<Self>, settings: PassSettings, before: impl Future<Output = ()> + Send + 'static) -> bool {
         let Ok(guard) = PassLocks::acquire(&self.locks, settings.kind, Trigger::Manual) else {
