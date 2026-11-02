@@ -165,7 +165,7 @@ fn t_31a_006_auth_url_has_the_source_parameter_order_and_no_scope() {
     .unwrap();
     assert_eq!(
         t.auth_url().unwrap(),
-        "https://shikimori.one/oauth/authorize?client_id=cid&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code"
+        "https://shikimori.io/oauth/authorize?client_id=cid&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code"
     );
 }
 
@@ -886,7 +886,7 @@ async fn ts_s_18_two_parallel_upserts_both_post_and_return_the_row_id() {
 
 #[test]
 fn t_31a_017_a_manga_without_chapters_is_skipped_and_an_anime_without_episodes_counts_zero() {
-    let base = "https://shikimori.one";
+    let base = "https://shikimori.io";
     let manga: SmEntry = serde_json::from_value(catalogue(json!(null))).unwrap();
     assert!(search::to_manga_search(base, &manga).is_none());
     let mut anime_json = catalogue(json!(20));

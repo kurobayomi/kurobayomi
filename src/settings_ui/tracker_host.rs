@@ -313,10 +313,15 @@ pub fn start_mal_login(host: &Rc<Host>, changed: Rc<dyn Fn()>) {
     );
 }
 
-/// A login link arrived (`kurobayomi://anilist-auth#access_token=...` and the like). Routes it to the pending attempt and
-/// finishes the AniList login on the runtime; the toast and the redraw follow on the main context. False when the link is
-/// not for an AniList login in this run (the services are not built, or no attempt is waiting), so the caller can treat
-/// the link as not its own. The token is stored by the AniList login itself, through the secret store.
+/// The trackers whose browser login [`on_redirect`] finishes: the link's credential (AniList's token, Shikimori's code)
+/// is the password of `Tracker::login`.
+const REDIRECT_LOGINS: [TrackerId; 2] = [TrackerId::ANILIST, TrackerId::SHIKIMORI];
+
+/// A login link arrived (`kurobayomi://anilist-auth#access_token=...`, `kurobayomi://shikimori-auth?code=...`). Routes it
+/// to the pending attempt and finishes that tracker's login on the runtime; the toast and the redraw follow on the main
+/// context. False when the link is not for such a login in this run (the services are not built, or no attempt is
+/// waiting), so the caller can treat the link as not its own. The tracker's login stores the token itself, through the
+/// secret store.
 pub fn on_redirect(uri: &str) -> bool {
     let Some(host) = host() else { return false };
     let handled = handle_redirect(&mut host.pending.borrow_mut(), &host.manager, uri, now_ms());
@@ -329,15 +334,19 @@ pub fn on_redirect(uri: &str) -> bool {
             crate::toast::notify(english(&key));
             refresh();
         }
-        Handled::Exchange(credential) if credential.tracker == TrackerId::ANILIST => {
-            let Some(anilist) = host.manager.get(TrackerId::ANILIST) else { return false };
+        Handled::Exchange(credential) if REDIRECT_LOGINS.contains(&credential.tracker) => {
+            let id = credential.tracker;
+            let Some(tracker) = host.manager.get(id) else { return false };
             let host_for_task = Rc::clone(&host);
-            let token = credential.value;
+            let value = credential.value;
             crate::source_bridge::call_on_main(
-                async move { anilist.login("", &token).await },
+                {
+                    let tracker = Arc::clone(&tracker);
+                    async move { tracker.login("", &value).await }
+                },
                 move |result| {
-                    host_for_task.stop_waiting(TrackerId::ANILIST);
-                    crate::toast::notify(finished("AniList", result));
+                    host_for_task.stop_waiting(id);
+                    crate::toast::notify(finished(tracker.name(), result));
                     refresh();
                 },
             );

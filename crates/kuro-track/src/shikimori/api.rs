@@ -42,14 +42,14 @@ pub(crate) fn http_client() -> Result<reqwest::Client, reqwest::Error> {
 /// Where the calls go. Tests point this at a local server.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Endpoints {
-    /// `https://shikimori.one` in production.
+    /// `https://shikimori.io` in production. The old `shikimori.one` redirects there, and a redirect drops the bearer.
     pub base: String,
 }
 
 impl Endpoints {
     pub fn production() -> Self {
         Self {
-            base: "https://shikimori.one".to_owned(),
+            base: "https://shikimori.io".to_owned(),
         }
     }
 }

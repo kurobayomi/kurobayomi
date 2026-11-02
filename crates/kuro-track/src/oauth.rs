@@ -586,7 +586,7 @@ mod tests {
         let url = pending
             .begin_with_url(
                 TrackerId::SHIKIMORI,
-                "https://shikimori.one/oauth/authorize?client_id=c&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code",
+                "https://shikimori.io/oauth/authorize?client_id=c&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code",
                 0,
             )
             .unwrap();
@@ -594,7 +594,7 @@ mod tests {
         assert_eq!(
             url,
             format!(
-                "https://shikimori.one/oauth/authorize?client_id=c&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code&state={state}"
+                "https://shikimori.io/oauth/authorize?client_id=c&redirect_uri=kurobayomi%3A%2F%2Fshikimori-auth&response_type=code&state={state}"
             )
         );
         assert!(

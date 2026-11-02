@@ -6,7 +6,7 @@ use super::dto::SmEntry;
 use crate::model::TrackerId;
 use crate::model::search::{AnimeTrackSearch, MangaTrackSearch};
 
-/// The manga search result of a record. `base` is the site root, e.g. `https://shikimori.one`. `None` when the record
+/// The manga search result of a record. `base` is the site root, e.g. `https://shikimori.io`. `None` when the record
 /// has no chapter count.
 pub fn to_manga_search(base: &str, e: &SmEntry) -> Option<MangaTrackSearch> {
     let Some(chapters) = e.chapters else {
