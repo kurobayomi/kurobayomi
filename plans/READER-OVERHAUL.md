@@ -82,8 +82,9 @@ are built once, on the shared pieces.
   made for a title always wins.
 - **Two pages side by side** (done) in the left-to-right and right-to-left modes when the window is wider than tall:
   pages pair in reading order from each chapter's start, a wide page (an existing spread) and the first page stand
-  alone, and the pair follows the reading direction with both halves meeting in the middle. The setting "Two pages side
-  by side" (When the window is wide, the default; Always; Never) is per title like the other Paged settings. While pairs
+  alone, and the pair follows the reading direction with both halves meeting in the middle. The setting "Page layout"
+  (Two pages when wide, the default; Two pages; One page) is per title like the other Paged settings, and sits in the
+  reader's menu under Reading mode (greyed out in the scrolling modes). While pairs
   show, wide pages are not split, and each half zooms on its own.
 - **Drag to scroll a webtoon with the mouse** at any zoom, with the same momentum the page modes have.
 - **Page errors say why**: no connection, the site refused the image (with the HTTP status), or the image could not be

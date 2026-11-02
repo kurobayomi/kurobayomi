@@ -9,7 +9,7 @@ use std::rc::Rc;
 use gtk::prelude::*;
 use kuro_prefs::reader::ReadingMode;
 
-use super::chrome::{MODES, MenuHandlers, TopBar, TopBarActions, build_top_bar, menu_actions, mode_label, overflow_menu, sync_menu_state};
+use super::chrome::{MODES, MenuHandlers, MenuState, PAGE_LAYOUTS, TopBar, TopBarActions, build_top_bar, menu_actions, mode_label, overflow_menu, page_layout_label, sync_menu_state};
 use super::navigator::{Navigator, NavigatorState};
 
 /// Every button under `root`, in tree order.
@@ -145,7 +145,7 @@ fn item(label: &str, action: &str) -> (String, Option<String>, Option<String>) {
 #[test]
 fn the_menu_model_has_five_radio_modes_then_crop_and_settings_then_the_source_entries() {
     let web = sections_of(true);
-    assert_eq!(web.len(), 3);
+    assert_eq!(web.len(), 4);
     assert_eq!(web[0].0.as_deref(), Some(tr(MsgKey::pref_category_reading_mode)).as_deref());
     let modes: Vec<_> = MODES
         .iter()
@@ -154,26 +154,32 @@ fn the_menu_model_has_five_radio_modes_then_crop_and_settings_then_the_source_en
     assert_eq!(web[0].1, modes, "five radio items on one action, each with its mode as the target");
     assert_eq!(modes.len(), 5);
     assert_eq!(modes[0].0, "Left to right");
-    assert_eq!(web[1].1, [item(&tr(MsgKey::pref_crop_borders), "reader.crop"), item(&tr(MsgKey::reader_menu_reader_settings), "reader.settings")]);
-    assert_eq!(web[2].1, [item(&tr(MsgKey::action_open_in_browser), "reader.open-browser"), item(&tr(MsgKey::action_share), "reader.share")]);
-    assert_eq!(sections_of(false)[2].1, [item(&tr(MsgKey::set_as_cover), "reader.set-cover")], "a local manga sets the cover instead");
+    assert_eq!(web[1].0.as_deref(), Some("Page layout"));
+    let layouts: Vec<_> = PAGE_LAYOUTS.iter().map(|(target, code)| (page_layout_label(*code), Some("reader.pages".to_owned()), Some((*target).to_owned()))).collect();
+    assert_eq!(web[1].1, layouts);
+    assert_eq!(layouts.iter().map(|l| l.0.as_str()).collect::<Vec<_>>(), ["Two pages when wide", "Two pages", "One page"]);
+    assert_eq!(web[2].1, [item(&tr(MsgKey::pref_crop_borders), "reader.crop"), item(&tr(MsgKey::reader_menu_reader_settings), "reader.settings")]);
+    assert_eq!(web[3].1, [item(&tr(MsgKey::action_open_in_browser), "reader.open-browser"), item(&tr(MsgKey::action_share), "reader.share")]);
+    assert_eq!(sections_of(false)[3].1, [item(&tr(MsgKey::set_as_cover), "reader.set-cover")], "a local manga sets the cover instead");
 }
 
 #[test]
 fn choosing_a_radio_mode_applies_it_and_the_state_is_the_current_mode() {
     let chosen: Rc<RefCell<Vec<ReadingMode>>> = Rc::default();
     let crops = Rc::new(std::cell::Cell::new(0));
-    let (sink, crop_sink) = (Rc::clone(&chosen), Rc::clone(&crops));
+    let layouts: Rc<RefCell<Vec<i32>>> = Rc::default();
+    let (sink, crop_sink, layout_sink) = (Rc::clone(&chosen), Rc::clone(&crops), Rc::clone(&layouts));
     let noop: Rc<dyn Fn()> = Rc::new(|| {});
     let handlers = MenuHandlers {
         on_mode: Rc::new(move |mode| sink.borrow_mut().push(mode)),
         on_crop: Rc::new(move || crop_sink.set(crop_sink.get() + 1)),
+        on_pages: Rc::new(move |code| layout_sink.borrow_mut().push(code)),
         on_settings: Rc::clone(&noop),
         on_open_browser: Rc::clone(&noop),
         on_share: Rc::clone(&noop),
         on_set_cover: noop,
     };
-    let group = menu_actions(ReadingMode::RightToLeft, true, handlers);
+    let group = menu_actions(MenuState { mode: ReadingMode::RightToLeft, crop: true, pages: 0 }, handlers);
     let state = |name: &str| group.action_state(name).expect("a stateful action");
     assert_eq!(state("mode").str(), Some("rtl"), "the state is the current mode");
     assert_eq!(state("crop").get::<bool>(), Some(true));
@@ -187,9 +193,16 @@ fn choosing_a_radio_mode_applies_it_and_the_state_is_the_current_mode() {
     group.change_action_state("crop", &false.to_variant());
     assert_eq!((crops.get(), state("crop").get::<bool>()), (1, Some(false)));
 
-    sync_menu_state(&group, ReadingMode::LeftToRight, true);
-    assert_eq!((state("mode").str(), state("crop").get::<bool>()), (Some("ltr"), Some(true)));
-    assert_eq!((chosen.borrow().len(), crops.get()), (1, 1), "syncing the states runs no handler");
+    assert_eq!(state("pages").str(), Some("auto"));
+    assert!(group.is_action_enabled("pages"), "right to left can show two pages");
+    group.change_action_state("pages", &"one".to_variant());
+    assert_eq!(*layouts.borrow(), [2], "One page stores its code");
+
+    sync_menu_state(&group, MenuState { mode: ReadingMode::LeftToRight, crop: true, pages: 1 });
+    assert_eq!((state("mode").str(), state("crop").get::<bool>(), state("pages").str()), (Some("ltr"), Some(true), Some("two")));
+    assert_eq!((chosen.borrow().len(), crops.get(), layouts.borrow().len()), (1, 1, 1), "syncing the states runs no handler");
+    sync_menu_state(&group, MenuState { mode: ReadingMode::Webtoon, crop: true, pages: 1 });
+    assert!(!group.is_action_enabled("pages"), "the page layout is greyed out in a scrolling mode");
 }
 
 #[test]

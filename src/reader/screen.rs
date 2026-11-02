@@ -478,6 +478,18 @@ impl ReaderCore {
         self.reader_prefs().crop_borders().get()
     }
 
+    /// What the top bar's menu shows: the mode, crop and page layout of the open manga.
+    pub fn menu_state(&self) -> chrome::MenuState {
+        chrome::MenuState { mode: self.reading_mode(), crop: self.crop_on(), pages: self.reader_prefs().two_pages().get() }
+    }
+
+    /// Stores the page layout of the open manga (`pref_two_pages`); the viewer follows the stored value at once.
+    pub fn set_page_layout(&self, code: i32) {
+        if let Err(e) = self.reader_prefs().two_pages().set(code) {
+            tracing::warn!(error = %e, "the page layout could not be saved");
+        }
+    }
+
     /// Flips the crop setting of the open manga and stores it (T-43a-037). One switch serves every mode, the long strip
     /// follows it.
     pub fn toggle_crop(&self) -> CropView {
@@ -849,7 +861,7 @@ pub fn open_with(
         auto_hide,
         navigator: Rc::clone(&navigator),
         keep_menu_until: Cell::new(None),
-        menu_actions: chrome::menu_actions(core.reading_mode(), core.crop_on(), menu_handlers(me)),
+        menu_actions: chrome::menu_actions(core.menu_state(), menu_handlers(me)),
         position: RefCell::new(None),
         sheet: Rc::clone(&sheet),
         ui: RefCell::new(UiState::default()),
@@ -1019,7 +1031,7 @@ fn refresh(screen: &Screen) {
     screen.navigator.update(&state, size_of(screen));
     let ui = *screen.ui.borrow();
     update_position(screen);
-    chrome::sync_menu_state(&screen.menu_actions, screen.core.reading_mode(), screen.core.crop_on());
+    chrome::sync_menu_state(&screen.menu_actions, screen.core.menu_state());
     apply_fullscreen(screen, ui.menu_visible);
 }
 
@@ -1587,6 +1599,14 @@ fn menu_handlers(me: &Weak<Screen>) -> MenuHandlers {
             refresh(&s);
         }),
         on_crop: run(me, |s| toggle_crop(s)),
+        on_pages: {
+            let me = me.clone();
+            Rc::new(move |code| {
+                if let Some(s) = me.upgrade() {
+                    s.core.set_page_layout(code);
+                }
+            })
+        },
         on_settings: run(me, open_settings),
         on_open_browser: run(me, open_in_browser),
         on_share: run(me, share_chapter),

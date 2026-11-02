@@ -35,9 +35,9 @@ pub fn scale_types() -> [(i32, String); 6] {
         (6, tr(MsgKey::scale_type_smart_fit)),
     ]
 }
-/// Two-page codes (`pref_two_pages`).
+/// Page layout codes (`pref_two_pages`), worded as the reader's menu words them.
 pub fn two_pages_choices() -> [(i32, String); 3] {
-    [(0, tr(MsgKey::two_pages_automatic)), (1, tr(MsgKey::two_pages_always)), (2, tr(MsgKey::two_pages_never))]
+    crate::reader::chrome::PAGE_LAYOUTS.map(|(_, code)| (code, crate::reader::chrome::page_layout_label(code)))
 }
 /// Zoom start codes (`pref_zoom_start_key`).
 pub fn zoom_starts() -> [(i32, String); 4] {
@@ -135,7 +135,7 @@ mod tests {
         let tree = rows_all(&prefs);
         let Preference::Group(paged) = &tree[3] else { panic!("the Paged group") };
         let titles: Vec<&str> = paged.items.iter().map(|i| i.title()).collect();
-        assert_eq!(titles, ["Scale type", "Zoom start position", "Crop borders", "Split wide pages", "Two pages side by side"]);
+        assert_eq!(titles, ["Scale type", "Zoom start position", "Crop borders", "Split wide pages", "Page layout"]);
     }
 
     #[test]
