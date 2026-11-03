@@ -1,6 +1,6 @@
 //! Message types of the `.tachibk` format (area 21, T-21a-002..006, T-21a-009).
 //!
-//! Field numbers, wire types and defaults follow `plans/21-backup-format-and-create/p1-data-and-config.md`.
+//! Field numbers, wire types and defaults follow Aniyomi's backup protobuf.
 //! Entry messages are plain structs; the SQL-side conversion lives in `creator`.
 
 use kuro_db::codecs::UpdateStrategy;

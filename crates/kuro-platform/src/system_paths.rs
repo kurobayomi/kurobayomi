@@ -7,8 +7,7 @@ use directories::{ProjectDirs, UserDirs};
 
 use crate::paths::Paths;
 
-/// The app's folder name under each base directory (`~/.config/kurobayomi` and so on), lowercase as
-/// plans/ARCHITECTURE.md says.
+/// The app's folder name under each base directory (`~/.config/kurobayomi` and so on), lowercase.
 const APP_DIR: &str = if crate::channel::NIGHTLY { "kurobayomi-nightly" } else { "kurobayomi" };
 
 /// Base directories that [`SystemPaths`] derives every other path from.

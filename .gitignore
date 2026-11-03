@@ -10,7 +10,7 @@
 /.make-*.py
 /.m02-chunks.json
 /.p0-queue.json
-/plans/_tools/snap/
+
 
 # logs and OS files
 *.log

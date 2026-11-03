@@ -1,4 +1,4 @@
-//! MangaUpdates behind the tracker traits (`plans/32-tracker-mangaupdates-simkl`, T-32a-001 to T-32a-026 except the
+//! MangaUpdates behind the tracker traits (T-32a-001 to T-32a-026 except the
 //! logo asset, T-32a-025). The registry and the GUI hold it as `Arc<dyn Tracker>`.
 //!
 //! Credentials follow the shared layout of [`BaseTracker`]: the username is the account uid as a decimal string and

@@ -20,7 +20,7 @@ Decisions recorded for area 54. Each item names the task, what was dropped, and 
 The extension API keep list (the source-api consumer rule file and lines 25 to 31 of the app rule file) existed so the
 Android shrinker would not remove classes that extension APKs load by name. Extensions in Kurobayomi are not loaded
 by class name (area 20, extension strategy redesign), and there is no shrinker. The list is obsolete. This note is the
-record for it, because the area 20 decision log sits in the read-only plans.
+record for it.
 
 ## Home-screen widget
 
@@ -572,8 +572,8 @@ its look is remembered for every source, apart from the Library's, as in Aniyomi
 
 ## Backup timer units removed (2026-11-02)
 
-The systemd user units of T-21a-041 (`data/systemd/kurobayomi-backup.service` and `.timer`, plan section 5 of
-`plans/21-backup-format-and-create/p1-topic-autobackup-scheduling.md`) are removed. No package installed them and the
+The systemd user units of T-21a-041 (`data/systemd/kurobayomi-backup.service` and `.timer`) are
+removed. No package installed them and the
 app never wrote or enabled them, and they worked on Linux only. Automatic backups run in the app's own loop while it is
 open (`src/backup_schedule.rs`). The `--run-backup` entry point stays: it is the same on every system.
 

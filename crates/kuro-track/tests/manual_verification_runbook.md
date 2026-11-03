@@ -1,8 +1,7 @@
 # Manual verification runbook: enhanced trackers
 
 These four checks need live servers, so they cannot run in CI. Run them before a release and write the result in
-the last column. The source is `plans/33-tracker-enhanced-kavita-komga-suwayomi-jellyfin/p1-edge-cases-and-tests.md`
-section 11.
+the last column.
 
 | # | Server | Steps | Expected | Result |
 |---|--------|-------|----------|--------|

@@ -1,4 +1,4 @@
-//! Shikimori errors (`plans/31-tracker-shikimori-bangumi/p1-rust-design.md` section 10). The display texts are for
+//! Shikimori errors. The display texts are for
 //! logs; the user sees the message keys they convert to (T-31a-041).
 
 use kuro_platform::secrets::SecretError;

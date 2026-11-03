@@ -1,6 +1,5 @@
 //! Kitsu bind, update and refresh rules (T-30a-019, T-30a-020, T-30a-021), as pure functions over the personal fields of
 //! one library entry. The tracker adapts them to anime and manga tracks, so both kinds share one rule set.
-//! Behaviour sections 7, 8 and 9 of `plans/30-tracker-kitsu/p1-behavior.md`.
 
 use super::api::{EntryFields, EntryMatch};
 use super::error::KitsuError;

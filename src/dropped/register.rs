@@ -2,8 +2,8 @@
 //! carry over, each with the task that decided it and the reason the import report shows.
 //!
 //! One table feeds both the normaliser (which skips these keys) and the import report (which lists them), so the two
-//! cannot drift. The tests compare the table with the key list of `plans/11-app-migrations/p1-data-and-config.md`
-//! section 2: every legacy key the plan calls "ignored" is here, and no converted or typed key is.
+//! cannot drift. The tests check that every legacy key marked "ignored" is here,
+//! and no converted or typed key is.
 
 #[cfg(test)]
 /// What kind of leftover an entry names.

@@ -1,5 +1,5 @@
-//! Bangumi integration tests TS-B-01 to TS-B-14 (`plans/31-tracker-shikimori-bangumi/p1-edge-cases-and-tests.md`
-//! section 6.2). Wiremock only; the bodies are the fixtures under `tests/fixtures/bangumi/`.
+//! Bangumi integration tests TS-B-01 to TS-B-14.
+//! Wiremock only; the bodies are the fixtures under `tests/fixtures/bangumi/`.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

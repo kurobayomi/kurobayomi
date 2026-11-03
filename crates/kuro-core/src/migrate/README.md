@@ -2,7 +2,7 @@
 
 A migration is a step in `list.rs` that runs once when the stored version code is lower than the running one, or
 on every start when its version is `Version::Always`. The framework is in `mod.rs`; the three registered steps
-are in `steps.rs`. These seven rules come from `plans/11-app-migrations/p1-rust-design.md` section 2. The
+are in `steps.rs`. The
 idempotency harness in `idempotency.rs` enforces the fifth.
 
 1. The version of a step is the `VERSION_CODE` of the release that introduces it. Bump `VERSION_CODE` in the same

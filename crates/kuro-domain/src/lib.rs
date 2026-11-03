@@ -1,7 +1,7 @@
 //! Domain logic for entries and items: flag words, number recognition, sorting, fetch intervals and the
 //! read-side facades over `kuro-data` repositories. No GTK, no OS code.
 //!
-//! Layout follows `plans/CRATE-MAP.md` (crate `kuro-domain`). The models are defined in `kuro-data`;
+//! The models are defined in `kuro-data`;
 //! their behaviour is added here as extension traits, because inherent impls must live in the crate
 //! that defines the type.
 

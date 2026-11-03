@@ -1,5 +1,5 @@
 //! Kitsu tracker: identity, capability flags, status tables (T-30a-001, T-30a-002), the REST client, the Algolia
-//! search and the tracker traits in [`tracker::KitsuTracker`] (`plans/30-tracker-kitsu/p1-tasks.md`).
+//! search and the tracker traits in [`tracker::KitsuTracker`].
 
 pub mod api;
 pub mod auth;

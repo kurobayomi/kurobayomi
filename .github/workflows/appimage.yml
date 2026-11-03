@@ -279,8 +279,8 @@ jobs:
         run: |
           # Once main has a newer commit that changed a workflow file, this token may make the tag only on main's newest
           # commit, so tagging this one would fail, and only after the old tag was deleted, leaving the release a draft the
-          # app cannot see. Skip then: a newer run updates the nightly. A newer commit without a workflow change (docs,
-          # plans) starts no CI and so no nightly of its own; this run still publishes then.
+          # app cannot see. Skip then: a newer run updates the nightly. A newer commit without a workflow change (docs)
+          # starts no CI and so no nightly of its own; this run still publishes then.
           git fetch -q --depth=1 origin main
           if [ "$(git rev-parse FETCH_HEAD)" != "$SHA" ] && ! git diff --quiet "$SHA" FETCH_HEAD -- .github/workflows; then
             echo "main has moved past $SHA with a workflow change; a newer run updates the nightly"

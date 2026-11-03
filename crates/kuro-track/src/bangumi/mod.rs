@@ -1,5 +1,5 @@
-//! Bangumi tracker (`Bangumi.kt`): identity, login by OAuth code, the collection rules and the tracker traits
-//! (`plans/31-tracker-shikimori-bangumi/p1-behavior.md` section 3). The network and token state are in [`api`].
+//! Bangumi tracker (`Bangumi.kt`): identity, login by OAuth code, the collection rules and the tracker traits.
+//! The network and token state are in [`api`].
 
 pub mod api;
 pub mod auth;

@@ -1,6 +1,6 @@
 # MANUAL-48 checklist (player settings and scripts)
 
-Run before a release, on a desktop session with libmpv installed. Source: `plans/48-settings-player-and-scripts/p1-edge-cases-and-tests.md`, section 4, items 15 to 22 (items 1 to 14 are `cargo test`).
+Run before a release, on a desktop session with libmpv installed. These are items 15 to 22; items 1 to 14 are `cargo test`.
 
 - [ ] MANUAL-48-15 Play a video: the default `+85 s` button is visible; a click seeks; a long press opens the number picker; change it to 30 s and the button title updates.
 - [ ] MANUAL-48-16 Create a custom button whose Lua has an error; play; the other buttons still work and the error appears in the log.

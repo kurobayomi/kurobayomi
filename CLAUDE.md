@@ -45,24 +45,15 @@ The machine has 15 GB RAM plus a 15 GB zram swap that sits at 8 to 15 GB used, s
 - **Run both scripts before reporting a lane done:** `bash scripts/check-path-literals.sh && bash scripts/check-platform-boundary.sh .` They take about a second. A failure here turns the GitHub CI red even when every test passes.
 - **GUI tests** that create GTK objects must run through `crate::testing::with_display(...)` (one GTK thread), otherwise the test binary crashes at random.
 
-## Never hand out the same task twice (user, 2026-10-10: "pls no repeated work")
-
-- Every new wave script must pick its tasks with `~/kurobayomi-notes/pick.py` (`from pick import pick`), which skips everything in `~/kurobayomi-notes/ledger.py`: every task of every earlier wave script, the M02 chunks, and all of milestones M00 and M01 (done before the waves). Do not write ad-hoc picking code.
-- **Before every Workflow launch run `python3 ~/kurobayomi-notes/check-wave.py <script.js>`.** If it prints `CHECK-WAVE FAILED`, fix the script. The only exception is an intentional re-run of partial work: mark that group `"rerun": true` in `GROUPS`.
-- Never generate a wave script over an existing wave file (it removes its tasks from the "already handed out" set).
-- What went wrong before: the old picker skipped only tasks it could parse, so about 217 finished M00 and M01 tasks and about 18 others (ids like `T-req-platform-006` and two-letter suffixes like `T-49ba-003`) were handed out again, about 6% of the plan.
+## Agents and commits
 
 - **Waiting for a long test:** agents must wait with ONE command (`timeout 590 bash -c 'until grep -q EXIT= LOG; do sleep 10; done'`) and read the log. Calling the Monitor tool repeatedly in a loop creates a new background task every few seconds (86 identical ones on 2026-10-10, from one wave 53 agent) and burns tokens.
-
-## Wave bookkeeping
-
-- Task source: `plans/TASKS.csv`. Pick by plan area, skip ids already present in any wave script's `GROUPS`. Never regenerate over a wave script that has already run: its ids would drop out of the "taken" set and be handed out twice.
 - Resume a stopped wave with `Workflow({scriptPath, resumeFromRunId})`. A "weekly limit" error from agents can be transient: resume and check whether agents write.
 - Commit messages carry no Claude or Anthropic attribution (global rule).
 
-## Later: small improvements to review (the user asked to look at these after the main waves)
+## Later: small improvements to review
 
-Do not start these before the plan waves, the P0 audit and the first push of a green `main` are done. Pick them up in a cleanup wave.
+Pick these up in a cleanup pass.
 
 - **Crash window Restart button** (`src/reporter.rs`): after the binary is replaced Linux reports the exe path with " (deleted)", and the relaunch silently fails. Add `kuro_platform::process::current_exe()` that strips the suffix, log the failure, add a test. Details in `~/kurobayomi-notes/FINDINGS.md`.
 - **Header buttons that look pressed after a click**: `ui::no_sticky_focus` is in place; confirm it by eye on the real window with the user's Tokyonight theme.
@@ -70,7 +61,6 @@ Do not start these before the plan waves, the P0 audit and the first push of a g
 - **Local folders** with the same title are resolved by id now; check the manga and anime library menus for a clear Rescan control.
 - **Open gaps from the early waves:** one-time "secrets file fallback" notice has no app caller; `InMemorySettings` in production paths; startup migration wiring; `apply_theme` caller.
 - **183 open review findings** in `~/kurobayomi-notes/FINDINGS.md`: re-review the crates that were never re-reviewed, then close or fix.
-- **Skipped plan tasks** that describe an SQLite key-value preference store (areas 43b, 47a, 48a): settings live in `config.toml` via `kuro-prefs`, so decide whether any of them is still needed.
 - **Fixer leftovers:** performance and stability test loops written by a fixer (for example `perf_2000_*` in `src/updates`); keep only what is cheap and `#[ignore]` the rest.
 - **Warnings:** about 19 unused-`Result` warnings in `kuro-domain` tests and a few dead-code warnings in the GUI.
 - **CI:** the GitHub Actions run on the real runner has never been checked; add a headless-display job (xvfb) so the GTK tests run in CI instead of skipping.
@@ -129,7 +119,7 @@ How the nightly works:
 - The build gets `KB_CHANNEL=nightly` and `KB_COMMIT=<sha>`. `channel::NIGHTLY` (GTK crate) and `kuro_platform::channel::NIGHTLY` read them. A nightly build is its own app: id `io.github.anas1412.Kurobayomi.Nightly`, name "Kurobayomi Nightly", gold-frame logo, data in `kurobayomi-nightly` and `~/Kurobayomi-Nightly`. Its icons are `src/shell/data/icons-nightly`, and `build.rs` recolours the in-app logos.
 - It updates itself: at start it reads the `nightly` release and, if the commit differs, replaces its own AppImage file (size, sha256 and ELF checks first). Only when `APPIMAGE` is set and the build has a commit.
 - Shelly cannot read embedded update info, so it needs a one-time `shelly sync appimage Kurobayomi <download url> StaticUrl`; the URL is `https://github.com/kurobayomi/kurobayomi/releases/download/nightly/Kurobayomi-nightly-x86_64.AppImage`.
-- GTK stays at 4.14 (`v4_14`), with libadwaita 1.5 (`v1_5`, the Ubuntu 24.04 version; the migration was merged into main on 2026-11-02, see plans/LIBADWAITA-MIGRATION.md). Lowering it to 4.6 gave 86 compile errors (file dialogs, launchers, accessibility API, picture content fit); older distros are a job for a Flatpak. How and when to move to newer versions: docs/UPGRADING-GTK.md.
+- GTK stays at 4.14 (`v4_14`), with libadwaita 1.5 (`v1_5`, the Ubuntu 24.04 version; the migration was merged into main on 2026-11-02). Lowering it to 4.6 gave 86 compile errors (file dialogs, launchers, accessibility API, picture content fit); older distros are a job for a Flatpak. How and when to move to newer versions: docs/UPGRADING-GTK.md.
 - `scripts/build-appimage.sh` cannot run on Arch (linuxdeploy's GTK plugin expects the Ubuntu folder layout); test it in an Ubuntu 24.04 container.
 
 - **Windows ships one way: the Inno Setup installer** (`dist/windows/kurobayomi.iss`, built by `scripts/bundle-windows.sh` and `scripts/build-windows-installer.sh` on an MSYS2 UCRT64 runner). Files: `Kurobayomi-Setup-x86_64.exe` (stable, in `SHA256SUMS`) and `Kurobayomi-Nightly-Setup-x86_64.exe` (nightly); never rename them, the Windows self-updater looks for them. Only the stable installer registers `kurobayomi://` and `.tachibk`. Both workflows publish from a final `publish` job that waits for the AppImage and the installer, files first and notes last, so neither self-updater sees a commit whose file is not up yet.

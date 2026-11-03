@@ -92,9 +92,8 @@ notification delivery are injected by the GUI crate.
   the engine returned `Ok`.
 - **Drag across sections (T-25a-028, E-34).** Decision: refused, as in Kotlin. `AnimeDownloadAdapter.shouldMove`
   returns true only when both rows have the same header, so a cross-section drop never reaches `onItemReleased`.
-  The plan bullet ("cross-section drops are allowed") and E-34 assumed the opposite; the Kotlin behaviour wins by the
-  port rule. The plans are read-only
-  here, so the bullet is not amended in place.
+  E-34 assumed the opposite ("cross-section drops are allowed"); the Kotlin behaviour wins by the
+  port rule.
 - **Hidden notification content (T-23a-043, T-24a-028).** `NotifierSink` passes each notice through as built. The text
   rules (`effect_for`, `progress_notice`) already hide names under `hide_notification_content` ("Downloading (x/y)" or
   "Downloading…", empty body), so the platform's blanket replacement is not used on download notices.

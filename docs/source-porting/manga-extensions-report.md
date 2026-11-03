@@ -203,7 +203,7 @@ Checked against the real files, not the plan text: `crates/kuro-source-wasm/wit/
 
 **What the real WIT is.** Package `kuro:source@1.4.0`. A guest imports four host functions: `http(request-json)`, `pref-get(key)`, `pref-set(key, value-json)` and `log(level, message)`. It exports one function: `invoke(op, input-json)`, with ops `info`, `create-sources`, `popular`, `latest`, `search`, `details`, `chapters`, `pages`. The host links only that `host` interface (`source.rs`, `Guest::new`), so a guest that imports anything else (for example WASI clocks) should fail to start (not tested).
 
-**Doc drift to know about.** `plans/20-extension-strategy-redesign/p1-topic-wasm-component-design.md` describes a different design: package `kurobayomi:source@1.0.0`, typed records, `http.fetch`, `settings.get/set`, a `clock.now-ms` import, and a `manifest.toml` folder. The code is a `.kuroext` zip with `manifest.json` and `source.wasm`, and has no clock. Also `manifest.rs` accepts ABI "1.4" and "1.5" while the WIT file says 1.4.0.
+**Package format.** A source is a `.kuroext` zip with `manifest.json` and `source.wasm`, and has no clock. `manifest.rs` accepts ABI "1.4" and "1.5" while the WIT file says 1.4.0.
 
 Counts below are over `src/` and `lib-multisrc/` (extension and theme) with `rg -l`, so a theme's feature counts once for the theme and once more if an extension repeats it. "ext" means extension folders, "files" means source files.
 
@@ -255,9 +255,9 @@ Counts below are over `src/` and `lib-multisrc/` (extension and theme) with `rg 
 
 The 1,431 `index.json` entries match the 1,431 extension folders. The content-warning counts match the build files (579, 468, 384). The fingerprint in `repo.json` equals `signingKey` in `index.json`.
 
-**Comparison with our plan** (`plans/20-extension-strategy-redesign/p1-data-and-config.md` section D4, and `plans/18-extensions-manga/p1-data-and-config.md` section 7.5):
+**Comparison with the original design:**
 
-| Topic | Our plan assumes | keiyoushi actually publishes | Flag |
+| Topic | The original design assumed | keiyoushi actually publishes | Flag |
 |---|---|---|---|
 | File | `index.min.json` | `index.pb` and `index.json`. `index.min.json` is a stub that tells old apps to update. | Different |
 | Top level | JSON array | object: `name`, `badgeLabel`, `signingKey`, `contact`, and `extensionList.extensions[]` (the schema also allows `extensionListUrl`, a pointer to a list stored elsewhere) | Different |

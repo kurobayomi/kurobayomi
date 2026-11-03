@@ -1,4 +1,4 @@
-//! Kitsu errors (`plans/30-tracker-kitsu/p1-rust-design.md` section 3). The display texts are the texts the user sees.
+//! Kitsu errors. The display texts are the texts the user sees.
 
 use kuro_platform::secrets::SecretError;
 

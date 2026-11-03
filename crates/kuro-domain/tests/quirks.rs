@@ -1,4 +1,4 @@
-//! One named test per upstream quirk of `plans/07-domain-entries-items/p1-topic-quirks-and-decisions.md` (Q1 to Q22). Each
+//! One named test per upstream quirk (Q1 to Q22). Each
 //! test asserts the policy the table chose: a preserved quirk keeps the upstream result, a fixed one gives the corrected
 //! result.
 

@@ -24,7 +24,7 @@ the website live. Deploy keys were allowed on the `tsuikabako` organization for 
 - `scripts/set-identity.py --owner X [--repo Y] [--app-id Z]` rewrites every tracked file that names the old values
   (code, packaging, workflows, docs; `owner/repo`, the AppImage update info, the app ID dotted, as a path and
   regex-escaped), renames the 27 files whose names hold the app ID with `git mv`, then writes `identity.toml`. History
-  (`plans/`, `docs/audit/`, this file) is left alone.
+  (`docs/audit/`, this file) is left alone.
 - `--check` runs in the `Identity` workflow on every push (docs included) and fails when a file names another owner or
   app ID.
 - The stable build reads its update address from `${{ github.repository }}`, so it follows any move by itself.

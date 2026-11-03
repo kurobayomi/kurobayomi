@@ -6,7 +6,7 @@
 //!
 //! # Android to Linux API map
 //!
-//! Every row of `plans/52-util-app/p1-rust-design.md` section 6 appears once. The owner is the
+//! Every Android API the app used appears once. The owner is the
 //! module that holds the replacement, `dropped` (with the reason), or the crate or layer that
 //! owns the non-platform row. "not implemented yet" marks a planned module with no code yet.
 //!

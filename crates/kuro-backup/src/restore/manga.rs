@@ -1,6 +1,5 @@
 //! Manga entry restore (area 22, T-22a-011 to T-22a-021). The backup row becomes a shared [`Incoming`] entry and
-//! `write::restore_entry` writes it. Rules follow `plans/22-backup-restore/p1-behavior.md` section 4.3 with the fixes
-//! named in the task blocks.
+//! `write::restore_entry` writes it.
 
 use std::collections::{HashMap, HashSet};
 

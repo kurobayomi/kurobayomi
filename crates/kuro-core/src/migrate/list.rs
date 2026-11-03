@@ -8,8 +8,7 @@
 //! preferences file, deletes an Android directory, cancels an Android job or logs a tracker out, and a Kurobayomi
 //! profile starts without any of that. Where the conversion still matters for an imported Aniyomi backup it lives in
 //! `kuro_prefs::legacy` (NORM); the rest is dropped (DROP). A key of a removed desktop feature (`kuro_prefs::registry::DROPPED_KEYS`)
-//! is ignored by the import, so its steps are DROP too. The disposition of every row, in run order
-//! (`plans/11-app-migrations/p1-topic-migration-catalogue.md` section 1):
+//! is ignored by the import, so its steps are DROP too. The disposition of every row, in run order:
 //!
 //! ```text
 //!  #  class                                version  disposition  reason

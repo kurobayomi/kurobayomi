@@ -1,4 +1,4 @@
-"""Generates the decoder fixtures of area:34 (plans/34-images-covers-cache/p1-edge-cases-and-tests.md section 7).
+"""Generates the image decoder fixtures.
 
 Run from anywhere: python3 generate.py. Needs Pillow. The AVIF and JPEG XL stills are not generated here: they were
 were produced once and are checked in. F-10 (HEIF) has no encoder in this build

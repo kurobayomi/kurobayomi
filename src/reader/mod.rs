@@ -18,7 +18,7 @@
 //! -> `glib::timeout_add_local_once` (`page_view`); ViewConfiguration -> the constants of `long_press`; MaterialButton ->
 //! `gtk::Button`; Canvas.drawRect -> `gtk::Snapshot` (`blend_box`); FLAG_KEEP_SCREEN_ON -> the platform idle inhibitor (`keep_awake`).
 //!
-//! Gap list G-01 to G-35 (`plans/43-reader-core/p1-ui-parity.md` section 12), the ones that were open at the review (T-43a-078):
+//! Gap list G-01 to G-35, the ones that were open at the review (T-43a-078):
 //! - G-27 navigation overlay labels with fade: done in `nav_overlay` (zones, colours, labels, 1000 ms fades, shown by the
 //!   on-start and new-user preferences and by a changed tap-zone layout). The tap zones themselves are area 44 (`viewers::nav`).
 //! - G-34 the "Continuous vertical" label: `tr(MsgKey::vertical_plus_viewer)`.
@@ -30,7 +30,7 @@
 //! - T-43a-030 and T-43a-034 are connected: `launch` gives the session the tracker progress sink, the download-ahead sink
 //!   and the delete-after-read sink (`ReaderExtras`).
 //! - Online chapters read through the source registry (`source_pages`); a source that is not reachable is
-//!   "Source not found" until phase 3 of `plans/READER-OVERHAUL.md` names it.
+//!   "Source not found" (the message does not name the source yet).
 //!
 //! Decisions recorded here so they are not mistaken for gaps:
 //! - Volume keys (T-43a-071 against T-44a-015): the paging stays, as the opt-in of T-44a-015. `reader_volume_keys` is off by
@@ -39,8 +39,8 @@
 //! - The reader settings live in the top bar's menu (`chrome::overflow_menu`), the open manga's own values, written at
 //!   once so the reader follows them live; Settings > Reader holds the defaults. There is no reader settings window.
 //! - The reader's top bar is the shared header of `widgets::page_header`, the same design as the player's. Pages open at the
-//!   left-to-right default; right to left is a per-manga choice that the reader remembers (a mode picked from the content
-//!   is phase 3 of `plans/READER-OVERHAUL.md`). The page slider sits at the bottom.
+//!   left-to-right default; right to left is a per-manga choice that the reader remembers (picking the mode from the content
+//!   is not done yet). The page slider sits at the bottom.
 //! - A chapter whose page list is still being fetched shows the spinner and is asked for again (`source_pages::is_pending`);
 //!   it is not an error any more.
 

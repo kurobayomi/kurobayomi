@@ -136,7 +136,7 @@ fn main() -> glib::ExitCode {
 
     // a second launch is forwarded to the running instance by GApplication; dev variables run a window of their own
     let unique = kuro_platform::single_instance::is_unique(|v| std::env::var(v).is_ok());
-    // libadwaita draws the widgets and owns light/dark (plans/LIBADWAITA-MIGRATION.md)
+    // libadwaita draws the widgets and owns light/dark
     let app = adw::Application::builder().application_id(channel::APP_ID).flags(shell::launch::app_flags(unique)).build();
     shell::launch::connect(app.upcast_ref());
     // the preferences get up to 2 s to reach the disk when the application shuts down (T-02a-038)

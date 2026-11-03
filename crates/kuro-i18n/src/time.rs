@@ -1,6 +1,5 @@
-//! Relative dates and times and the short duration (plan
-//! 51-i18n T-51a-016, T-51a-025). Thresholds follow `plans/51-i18n/p1-behavior.md`
-//! section 6. Every function takes `now` or `today` as an argument, so tests use a fixed clock.
+//! Relative dates and times and the short duration (T-51a-016,
+//! T-51a-025). Every function takes `now` or `today` as an argument, so tests use a fixed clock.
 
 use chrono::{DateTime, Local, NaiveDate, NaiveDateTime};
 

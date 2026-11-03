@@ -22,5 +22,4 @@ Aniyomi backup supplied by the user, on the Android app's own screens:
 4. History ordering: the History tab lists one row per entry, newest first, with the same date headers.
 5. Updates: the Updates tab shows the same chapters for the same window, newest fetch first.
 
-Record the outcome and the backup version in the release notes. Any mismatch is a bug against the matching
-task in `plans/08-domain-library-category-history-updates/p1-tasks.md`.
+Record the outcome and the backup version in the release notes. Any mismatch is a bug.

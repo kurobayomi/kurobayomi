@@ -1,6 +1,6 @@
 //! Kurobayomi backup: `.tachibk` create and restore, restore planner, dialog model.
 //!
-//! Modules are added by the backup areas (21 and 22). Dependencies per `plans/CRATE-MAP.md` section 2.1.
+//! Modules are added by the backup areas (21 and 22).
 //! GTK-free: notices and dialogs are data here, shown by the binary crate.
 
 pub mod auto;

@@ -1,34 +1,34 @@
 # Key registry: every preference declared in scope (generated from the Kotlin sources, then reviewed)
 
-Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Preferences` classes of area:02-preferences-system part 1 (327 rows + `extension_installer`, the hand-written preference in `app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt`, = 328 keys; the per-tracker and per-source families expand at runtime). Columns: **Key** is the literal string stored (after the `__APP_STATE_` / `__PRIVATE_` prefix, shown in Store). **Kotlin type** is the SharedPreferences primitive actually written. **Default** is the value used when the key is absent. **Rust field** is `Settings.<section>.<field>` for normal keys, `State.<section>.<field>` for app-state keys, `Secrets` for private keys. **Dec** = KEEP / KEEP-CHANGED / REPLACE / DROP. **Pri** is the implementation priority of the field. Task ids are in section 3 of p1-tasks.md (the task covering a class is given in the class heading).
+Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Preferences` classes (327 rows + `extension_installer`, the hand-written preference in `app/src/main/java/eu/kanade/domain/base/ExtensionInstallerPreference.kt`, = 328 keys; the per-tracker and per-source families expand at runtime). Columns: **Key** is the literal string stored (after the `__APP_STATE_` / `__PRIVATE_` prefix, shown in Store). **Kotlin type** is the SharedPreferences primitive actually written. **Default** is the value used when the key is absent. **Rust field** is `Settings.<section>.<field>` for normal keys, `State.<section>.<field>` for app-state keys, `Secrets` for private keys. **Dec** = KEEP / KEEP-CHANGED / REPLACE / DROP. **Pri** is the implementation priority of the field.
 
 
-## BasePreferences (`app/src/main/java/eu/kanade/domain/base/BasePreferences.kt`), 7 keys, Rust section `base`, consumers area:36-ui-shell-navigation-security-webview, tasks T-02a-023
+## BasePreferences (`app/src/main/java/eu/kanade/domain/base/BasePreferences.kt`), 7 keys, Rust section `base`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `extensionInstaller()` | `extension_installer` | normal | Enum ExtensionInstaller (name string) | PACKAGEINSTALLER (LEGACY on MIUI) | `Settings.base.extension_installer` | DROP | P3 | APK installers (LEGACY, PACKAGEINSTALLER, SHIZUKU, PRIVATE) do not exist on Linux; replaced by the extension strategy of area:20-extension-strategy-redesign. Value kept only so backups round-trip. |
+| 1 | `extensionInstaller()` | `extension_installer` | normal | Enum ExtensionInstaller (name string) | PACKAGEINSTALLER (LEGACY on MIUI) | `Settings.base.extension_installer` | DROP | P3 | APK installers (LEGACY, PACKAGEINSTALLER, SHIZUKU, PRIVATE) do not exist on Linux; replaced by the extension strategy. Value kept only so backups round-trip. |
 | 2 | `downloadedOnly()` | `__APP_STATE_pref_downloaded_only` | app-state | Boolean | false | `State.base.downloaded_only` | KEEP | P0 | App-state, not backed up. |
 | 3 | `incognitoMode()` | `__APP_STATE_incognito_mode` | app-state | Boolean | false | `State.base.incognito_mode` | KEEP | P0 | App-state, not backed up. |
 | 4 | `shownOnboardingFlow()` | `__APP_STATE_onboarding_complete` | app-state | Boolean | false | `State.base.shown_onboarding_flow` | KEEP | P2 | App-state; first-run flag. |
 | 5 | `displayProfile()` | `pref_display_profile_key` | normal | String | "" | `Settings.base.display_profile` | DROP | P3 | Android ICC display-profile path for the reader; GTK/GdkPixbuf has no equivalent switch. Loss: no custom colour profile for pages. |
 | 6 | `hardwareBitmapThreshold()` | `pref_hardware_bitmap_threshold` | normal | Int | 2048 | `Settings.base.hardware_bitmap_threshold` | DROP | P3 | Android GPU texture limit for hardware bitmaps; GTK textures have no such user knob. |
-| 7 | `alwaysDecodeLongStripWithSSIV()` | `pref_always_decode_long_strip_with_ssiv` | normal | Boolean | false | `Settings.base.always_decode_long_strip_with_ssiv` | DROP | P3 | Android SubsamplingScaleImageView workaround; Rust reader tiles tall strips itself (area:44-reader-viewers). |
+| 7 | `alwaysDecodeLongStripWithSSIV()` | `pref_always_decode_long_strip_with_ssiv` | normal | Boolean | false | `Settings.base.always_decode_long_strip_with_ssiv` | DROP | P3 | Android SubsamplingScaleImageView workaround; Rust reader tiles tall strips itself. |
 
-## UiPreferences (`app/src/main/java/eu/kanade/domain/ui/UiPreferences.kt`), 8 keys, Rust section `ui`, consumers area:36-ui-shell-navigation-security-webview/49, tasks T-02a-023
+## UiPreferences (`app/src/main/java/eu/kanade/domain/ui/UiPreferences.kt`), 8 keys, Rust section `ui`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `themeMode()` | `pref_theme_mode_key` | normal | Enum ThemeMode (name string) | SYSTEM | `Settings.ui.theme_mode` | KEEP-CHANGED | P0 | LIGHT/DARK drive gtk-application-prefer-dark-theme; SYSTEM follows the desktop setting. |
-| 2 | `appTheme()` | `pref_app_theme` | normal | Enum AppTheme (name string) | MONET if dynamic colour available else DEFAULT | `Settings.ui.app_theme` | KEEP-CHANGED | P1 | All enum names kept for backup round-trip; MONET maps to the desktop accent where available else DEFAULT; default on Linux is DEFAULT (no dynamic colour). Rendering owned by area:49-theme-and-design-system. |
+| 2 | `appTheme()` | `pref_app_theme` | normal | Enum AppTheme (name string) | MONET if dynamic colour available else DEFAULT | `Settings.ui.app_theme` | KEEP-CHANGED | P1 | All enum names kept for backup round-trip; MONET maps to the desktop accent where available else DEFAULT; default on Linux is DEFAULT (no dynamic colour). Rendering owned. |
 | 3 | `themeDarkAmoled()` | `pref_theme_dark_amoled_key` | normal | Boolean | false | `Settings.ui.theme_dark_amoled` | KEEP | P2 | Pure-black dark variant. |
 | 4 | `relativeTime()` | `relative_time_v2` | normal | Boolean | true | `Settings.ui.relative_time` | KEEP | P1 |  |
 | 5 | `dateFormat()` | `app_date_format` | normal | String | "" | `Settings.ui.date_format` | KEEP | P0 | Empty = locale SHORT date; else strftime-compatible pattern translated from java DateTimeFormatter pattern (see behavior). Empty string = locale SHORT date style. |
-| 6 | `tabletUiMode()` | `tablet_ui_mode` | normal | Enum TabletUiMode (name string) | AUTOMATIC | `Settings.ui.tablet_ui_mode` | DROP | P3 | Android tablet/phone layout switch; desktop layout is responsive (area:36-ui-shell-navigation-security-webview). Stored/restored but unused. |
+| 6 | `tabletUiMode()` | `tablet_ui_mode` | normal | Enum TabletUiMode (name string) | AUTOMATIC | `Settings.ui.tablet_ui_mode` | DROP | P3 | Android tablet/phone layout switch; desktop layout is responsive. Stored/restored but unused. |
 | 7 | `startScreen()` | `start_screen` | normal | Enum StartScreen (name string) | ANIME | `Settings.ui.start_screen` | KEEP | P1 |  |
 | 8 | `navStyle()` | `bottom_rail_nav_style` | normal | Enum NavStyle (name string) | MOVE_HISTORY_TO_MORE | `Settings.ui.nav_style` | KEEP-CHANGED | P2 | Controls which tab moves into "More" on narrow windows; wide windows use the sidebar and ignore it. |
 
-## SourcePreferences (`app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt`), 34 keys, Rust section `sources`, consumers area:17-source-app-layer, tasks T-02a-019
+## SourcePreferences (`app/src/main/java/eu/kanade/domain/source/service/SourcePreferences.kt`), 34 keys, Rust section `sources`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -39,7 +39,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 5 | `migrationSortingDirection()` | `pref_migration_direction` | normal | Enum MigrateSortDirection (name string) | ASCENDING | `Settings.sources.migration_sorting_direction` | KEEP | P1 |  |
 | 6 | `animeExtensionRepos()` | `anime_extension_repos` | normal | Set<String> | {} | `Settings.sources.anime_extension_repos` | KEEP | P1 | Legacy: Aniyomi migrates to DB tables; Kurobayomi reads it only on backup import. |
 | 7 | `mangaExtensionRepos()` | `extension_repos` | normal | Set<String> | {} | `Settings.sources.manga_extension_repos` | KEEP | P1 | Legacy: same. |
-| 8 | `trustedExtensions()` | `__APP_STATE_trusted_extensions` | app-state | Set<String> | {} | `State.sources.trusted_extensions` | KEEP-CHANGED | P1 | Set of signing fingerprints on Android; extension strategy (area:20-extension-strategy-redesign) decides the Linux trust unit. |
+| 8 | `trustedExtensions()` | `__APP_STATE_trusted_extensions` | app-state | Set<String> | {} | `State.sources.trusted_extensions` | KEEP-CHANGED | P1 | Set of signing fingerprints on Android; extension strategy decides the Linux trust unit. |
 | 9 | `globalSearchFilterState()` | `__APP_STATE_has_filters_toggle_state` | app-state | Boolean | false | `State.sources.global_search_filter_state` | KEEP | P1 |  |
 | 10 | `disabledAnimeSources()` | `hidden_anime_catalogues` | normal | Set<String> | {} | `Settings.sources.disabled_anime_sources` | KEEP | P1 |  |
 | 11 | `disabledMangaSources()` | `hidden_catalogues` | normal | Set<String> | {} | `Settings.sources.disabled_manga_sources` | KEEP | P1 |  |
@@ -67,7 +67,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 33 | `dataSaverExcludedSources()` | `data_saver_excluded` | normal | Set<String> | {} | `Settings.sources.data_saver_excluded_sources` | KEEP | P1 |  |
 | 34 | `dataSaverDownloader()` | `data_saver_downloader` | normal | Boolean | true | `Settings.sources.data_saver_downloader` | KEEP | P1 |  |
 
-## TrackPreferences (`app/src/main/java/eu/kanade/domain/track/service/TrackPreferences.kt`), 9 keys, Rust section `tracking`, consumers area:27-tracking-core, tasks T-02a-018
+## TrackPreferences (`app/src/main/java/eu/kanade/domain/track/service/TrackPreferences.kt`), 9 keys, Rust section `tracking`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -81,7 +81,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 8 | `showNextEpisodeAiringTime()` | `show_next_episode_airing_time` | normal | Boolean | true | `Settings.tracking.show_next_episode_airing_time` | KEEP | P1 |  |
 | 9 | `autoUpdateTrackOnMarkRead()` | `pref_auto_update_manga_on_mark_read` | normal | Enum AutoTrackState (name string) | ALWAYS | `Settings.tracking.auto_update_track_on_mark_read` | KEEP | P1 |  |
 
-## LibraryPreferences (`domain/src/main/java/tachiyomi/domain/library/service/LibraryPreferences.kt`), 87 keys, Rust section `library`, consumers area:37-ui-library, tasks T-02a-008, T-02a-009, T-02a-010, T-02a-011
+## LibraryPreferences (`domain/src/main/java/tachiyomi/domain/library/service/LibraryPreferences.kt`), 87 keys, Rust section `library`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -173,12 +173,12 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 86 | `markDuplicateReadChapterAsRead()` | `mark_duplicate_read_chapter_read` | normal | Set<String> | {} | `Settings.library.mark_duplicate_read_chapter_as_read` | KEEP | P2 |  |
 | 87 | `markDuplicateSeenEpisodeAsSeen()` | `mark_duplicate_seen_episode_seen` | normal | Set<String> | {} | `Settings.library.mark_duplicate_seen_episode_as_seen` | KEEP | P2 |  |
 
-## DownloadPreferences (`domain/src/main/java/tachiyomi/domain/download/service/DownloadPreferences.kt`), 23 keys, Rust section `downloads`, consumers area:25-downloads-shared, tasks T-02a-017
+## DownloadPreferences (`domain/src/main/java/tachiyomi/domain/download/service/DownloadPreferences.kt`), 23 keys, Rust section `downloads`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `downloadOnlyOverWifi()` | `pref_download_only_over_wifi_key` | normal | Boolean | true | `Settings.downloads.download_only_over_wifi` | KEEP-CHANGED | P1 | "Wi-Fi" becomes "not a metered connection" via NetworkManager/GIO NetworkMonitor. |
-| 2 | `useExternalDownloader()` | `use_external_downloader` | normal | Boolean | false | `Settings.downloads.use_external_downloader` | REPLACE | P3 | Android external downloader apps (ADM, 1DM) replaced by an optional command line (e.g. aria2c) in area:25-downloads-shared; key kept. |
+| 2 | `useExternalDownloader()` | `use_external_downloader` | normal | Boolean | false | `Settings.downloads.use_external_downloader` | REPLACE | P3 | Android external downloader apps (ADM, 1DM) replaced by an optional command line (e.g. aria2c); key kept. |
 | 3 | `externalDownloaderSelection()` | `external_downloader_selection` | normal | String | "" | `Settings.downloads.external_downloader_selection` | REPLACE | P3 | Package name on Android; command string on Linux. |
 | 4 | `saveChaptersAsCBZ()` | `save_chapter_as_cbz` | normal | Boolean | true | `Settings.downloads.save_chapters_as_cbz` | KEEP | P1 |  |
 | 5 | `splitTallImages()` | `split_tall_images` | normal | Boolean | true | `Settings.downloads.split_tall_images` | KEEP | P1 |  |
@@ -201,7 +201,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 22 | `downloadNewUnreadChaptersOnly()` | `download_new_unread_chapters_only` | normal | Boolean | false | `Settings.downloads.download_new_unread_chapters_only` | KEEP | P1 |  |
 | 23 | `downloadNewUnseenEpisodesOnly()` | `download_new_unread_episodes_only` | normal | Boolean | false | `Settings.downloads.download_new_unseen_episodes_only` | KEEP | P1 |  |
 
-## BackupPreferences (`domain/src/main/java/tachiyomi/domain/backup/service/BackupPreferences.kt`), 3 keys, Rust section `backup`, consumers area:21-backup-format-and-create, tasks T-02a-024
+## BackupPreferences (`domain/src/main/java/tachiyomi/domain/backup/service/BackupPreferences.kt`), 3 keys, Rust section `backup`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -209,42 +209,42 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 2 | `lastAutoBackupTimestamp()` | `__APP_STATE_last_auto_backup_timestamp` | app-state | Long | 0L | `State.backup.last_auto_backup_timestamp` | KEEP | P1 |  |
 | 3 | `backupFlags()` | `backup_flags` | normal | Set<String> | {"1","2","4","8"} (FLAG_CATEGORIES, FLAG_CHAPTERS, FLAG_HISTORY, FLAG_TRACK) | `Settings.backup.backup_flags` | DROP | P3 | Never read in Aniyomi (dead); backup options use BackupOptions instead. |
 
-## StoragePreferences (`domain/src/main/java/tachiyomi/domain/storage/service/StoragePreferences.kt`), 1 keys, Rust section `storage`, consumers area:13-core-util-storage-archive-torrent, tasks T-02a-024
+## StoragePreferences (`domain/src/main/java/tachiyomi/domain/storage/service/StoragePreferences.kt`), 1 keys, Rust section `storage`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `baseStorageDirectory()` | `__APP_STATE_storage_dir` | app-state | String | file URI of <external storage>/Aniyomi (Android) | `State.storage.base_storage_directory` | KEEP-CHANGED | P0 | App-state. Linux default is $XDG_DATA_HOME/kurobayomi (Paths trait), stored as a plain path not a content URI. |
+| 1 | `baseStorageDirectory()` | `__APP_STATE_storage_dir` | app-state | String | file URI of <external storage>/Aniyomi (Android) | `State.storage.base_storage_directory` | KEEP-CHANGED | P0 | App-state. Linux default is the platform data directory (Paths trait), stored as a plain path not a content URI. |
 
-## SecurityPreferences (`core/common/src/main/java/eu/kanade/tachiyomi/core/security/SecurityPreferences.kt`), 5 keys, Rust section `security`, consumers area:36-ui-shell-navigation-security-webview, tasks T-02a-022
+## SecurityPreferences (`core/common/src/main/java/eu/kanade/tachiyomi/core/security/SecurityPreferences.kt`), 5 keys, Rust section `security`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `useAuthenticator()` | `use_biometric_lock` | normal | Boolean | false | `Settings.security.use_authenticator` | REPLACE | P2 | Android biometric prompt replaced by an app-lock passphrase dialog (area:36-ui-shell-navigation-security-webview); key kept. |
+| 1 | `useAuthenticator()` | `use_biometric_lock` | normal | Boolean | false | `Settings.security.use_authenticator` | REPLACE | P2 | Android biometric prompt replaced by an app-lock passphrase dialog; key kept. |
 | 2 | `lockAppAfter()` | `lock_app_after` | normal | Int | 0 | `Settings.security.lock_app_after` | KEEP | P2 | Minutes: 0 always, 1, 2, 5, 10, -1 never. Minutes. 0 always, 1, 2, 5, 10, -1 never. |
 | 3 | `secureScreen()` | `secure_screen_v2` | normal | Enum SecureScreenMode (name string) | INCOGNITO | `Settings.security.secure_screen` | DROP | P3 | FLAG_SECURE has no Wayland/X11 equivalent for GTK apps. Loss: screenshots of the app are not blocked. |
 | 4 | `hideNotificationContent()` | `hide_notification_content` | normal | Boolean | false | `Settings.security.hide_notification_content` | KEEP-CHANGED | P2 | Applies to desktop notifications via Notifier trait. |
 | 5 | `lastAppClosed()` | `__APP_STATE_last_app_closed` | app-state | Long | 0 | `State.security.last_app_closed` | KEEP | P2 | App-state. |
 
-## NetworkPreferences (`core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkPreferences.kt`), 3 keys, Rust section `network`, consumers area:12-network-stack, tasks T-02a-020
+## NetworkPreferences (`core/common/src/main/java/eu/kanade/tachiyomi/network/NetworkPreferences.kt`), 3 keys, Rust section `network`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `verboseLogging()` | `verbose_logging` | normal | Boolean | false (constructor arg; true only in debug builds) | `Settings.network.verbose_logging` | KEEP-CHANGED | P2 | Maps to tracing level debug/trace for HTTP. |
 | 2 | `dohProvider()` | `doh_provider` | normal | Int | -1 | `Settings.network.doh_provider` | KEEP | P2 | Values -1 none, 1..13 providers (see data-and-config). -1 off; 1 Cloudflare,2 Google,3 AdGuard,4 Quad9,5 AliDNS,6 DNSPod,7 360,8 Quad101,9 Mullvad,10 ControlD,11 Njalla,12 Shecan,13 LibreDNS. |
-| 3 | `defaultUserAgent()` | `default_user_agent` | normal | String | "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0" | `Settings.network.default_user_agent` | KEEP | P0 | Sent by the shared HTTP client (area:12-network-stack). |
+| 3 | `defaultUserAgent()` | `default_user_agent` | normal | String | "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0" | `Settings.network.default_user_agent` | KEEP | P0 | Sent by the shared HTTP client. |
 
-## TorrentPreferences (`core/common/src/main/java/aniyomi/core/common/torrent/TorrentPreferences.kt`), 6 keys, Rust section `torrent`, consumers area:13-core-util-storage-archive-torrent, tasks T-02a-021
+## TorrentPreferences (`core/common/src/main/java/aniyomi/core/common/torrent/TorrentPreferences.kt`), 6 keys, Rust section `torrent`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `torrServerEnable()` | `pref_torrserver_enable` | normal | Boolean | false | `Settings.torrent.torr_server_enable` | KEEP-CHANGED | P2 | TorrServer runs as a spawned child process (area:13-core-util-storage-archive-torrent). |
+| 1 | `torrServerEnable()` | `pref_torrserver_enable` | normal | Boolean | false | `Settings.torrent.torr_server_enable` | KEEP-CHANGED | P2 | TorrServer runs as a spawned child process. |
 | 2 | `torrServerShownNotice()` | `pref_torrserver_shownotice` | normal | Boolean | false | `Settings.torrent.torr_server_shown_notice` | KEEP | P2 |  |
 | 3 | `torrServerPort()` | `pref_torrserver_port` | normal | String | "8090" | `Settings.torrent.torr_server_port` | KEEP | P2 | String, default "8090". |
-| 4 | `torrServerTrackers()` | `pref_torrserver_tackers` | normal | String | 26 tracker URLs joined by "\n" (spaces removed); see p1-data-and-config.md section 6 | `Settings.torrent.torr_server_trackers` | KEEP | P2 | Newline-separated announce URLs. |
+| 4 | `torrServerTrackers()` | `pref_torrserver_tackers` | normal | String | 26 tracker URLs joined by "\n" (spaces removed) | `Settings.torrent.torr_server_trackers` | KEEP | P2 | Newline-separated announce URLs. |
 | 5 | `torrServerProxyMode()` | `pref_torrserver_proxymode` | normal | Enum ProxyMode (name string) | None | `Settings.torrent.torr_server_proxy_mode` | KEEP | P2 | QUIRK: ProxyMode.None.value == "tracker" (same as Tracker). |
 | 6 | `torrServerProxyUrl()` | `pref_torrserver_proxyurl` | normal | String | "" | `Settings.torrent.torr_server_proxy_url` | KEEP | P2 |  |
 
-## ReaderPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/reader/setting/ReaderPreferences.kt`), 54 keys, Rust section `reader`, consumers area:43-reader-core/44, tasks T-02a-012
+## ReaderPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/reader/setting/ReaderPreferences.kt`), 54 keys, Rust section `reader`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -294,7 +294,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 44 | `grayscale()` | `pref_grayscale` | normal | Boolean | false | `Settings.reader.grayscale` | KEEP | P1 |  |
 | 45 | `invertedColors()` | `pref_inverted_colors` | normal | Boolean | false | `Settings.reader.inverted_colors` | KEEP | P1 |  |
 | 46 | `readWithLongTap()` | `reader_long_tap` | normal | Boolean | true | `Settings.reader.read_with_long_tap` | KEEP-CHANGED | P2 | Right-click / long press opens page actions. |
-| 47 | `readWithVolumeKeys()` | `reader_volume_keys` | normal | Boolean | false | `Settings.reader.read_with_volume_keys` | DROP | P3 | Hardware volume keys; keyboard/mouse bindings replace them (area:43-reader-core). |
+| 47 | `readWithVolumeKeys()` | `reader_volume_keys` | normal | Boolean | false | `Settings.reader.read_with_volume_keys` | DROP | P3 | Hardware volume keys; keyboard/mouse bindings replace them. |
 | 48 | `readWithVolumeKeysInverted()` | `reader_volume_keys_inverted` | normal | Boolean | false | `Settings.reader.read_with_volume_keys_inverted` | DROP | P3 | Same. |
 | 49 | `navigationModePager()` | `reader_navigation_mode_pager` | normal | Int | 0 | `Settings.reader.navigation_mode_pager` | KEEP | P0 | Index of TapZones: 0 default,1 L,2 kindlish,3 edge,4 right-and-left,5 disabled. |
 | 50 | `navigationModeWebtoon()` | `reader_navigation_mode_webtoon` | normal | Int | 0 | `Settings.reader.navigation_mode_webtoon` | KEEP | P0 | Same index list as pager. |
@@ -303,7 +303,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 53 | `showNavigationOverlayNewUser()` | `reader_navigation_overlay_new_user` | normal | Boolean | true | `Settings.reader.show_navigation_overlay_new_user` | KEEP | P2 | App-style first-run hint. |
 | 54 | `showNavigationOverlayOnStart()` | `reader_navigation_overlay_on_start` | normal | Boolean | false | `Settings.reader.show_navigation_overlay_on_start` | KEEP | P0 |  |
 
-## PlayerPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/PlayerPreferences.kt`), 36 keys, Rust section `player`, consumers area:45-player-core/46, tasks T-02a-014
+## PlayerPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/PlayerPreferences.kt`), 36 keys, Rust section `player`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -332,7 +332,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 23 | `waitingTimeIntroSkip()` | `pref_waiting_time_aniskip` | normal | Int | 5 | `Settings.player.waiting_time_intro_skip` | KEEP | P2 |  |
 | 24 | `aniSkipEnabled()` | `pref_enable_ani_skip` | normal | Boolean | false | `Settings.player.ani_skip_enabled` | KEEP | P0 |  |
 | 25 | `disableAniSkipOnChapters()` | `pref_disabled_ani_skip_chapters` | normal | Boolean | true | `Settings.player.disable_ani_skip_on_chapters` | KEEP | P0 |  |
-| 26 | `enablePip()` | `pref_enable_pip` | normal | Boolean | true | `Settings.player.enable_pip` | REPLACE | P3 | Android PiP; replaced by always-on-top mini player (area:46-player-controls-ui) or dropped; key kept. |
+| 26 | `enablePip()` | `pref_enable_pip` | normal | Boolean | true | `Settings.player.enable_pip` | REPLACE | P3 | Android PiP; replaced by always-on-top mini player or dropped; key kept. |
 | 27 | `pipEpisodeToasts()` | `pref_pip_episode_toasts` | normal | Boolean | true | `Settings.player.pip_episode_toasts` | DROP | P3 | PiP only. |
 | 28 | `pipOnExit()` | `pref_pip_on_exit` | normal | Boolean | false | `Settings.player.pip_on_exit` | DROP | P3 | PiP only. |
 | 29 | `pipReplaceWithPrevious()` | `pip_replace_with_previous` | normal | Boolean | false | `Settings.player.pip_replace_with_previous` | DROP | P3 | PiP only. |
@@ -344,7 +344,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 35 | `aspectState()` | `pref_player_aspect_state` | normal | Enum VideoAspect (name string) | Fit | `Settings.player.aspect_state` | KEEP | P0 |  |
 | 36 | `autoplayEnabled()` | `pref_auto_play_enabled` | normal | Boolean | false | `Settings.player.autoplay_enabled` | KEEP | P1 | "Old" key still present; autoplay next episode. |
 
-## GesturePreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/GesturePreferences.kt`), 13 keys, Rust section `player.gestures`, consumers area:46-player-controls-ui, tasks T-02a-014
+## GesturePreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/GesturePreferences.kt`), 13 keys, Rust section `player.gestures`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -362,7 +362,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 12 | `mediaPlayPauseGesture()` | `pref_media_playpause` | normal | Enum SingleActionGesture (name string) | PlayPause | `Settings.player.gestures.media_play_pause_gesture` | KEEP | P1 |  |
 | 13 | `mediaNextGesture()` | `pref_media_next` | normal | Enum SingleActionGesture (name string) | Switch | `Settings.player.gestures.media_next_gesture` | KEEP | P1 |  |
 
-## DecoderPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/DecoderPreferences.kt`), 9 keys, Rust section `player.decoder`, consumers area:45-player-core, tasks T-02a-014
+## DecoderPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/DecoderPreferences.kt`), 9 keys, Rust section `player.decoder`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -376,7 +376,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 8 | `gammaFilter()` | `pref_player_filter_gamma` | normal | Int | 0 | `Settings.player.decoder.gamma_filter` | KEEP | P0 |  |
 | 9 | `hueFilter()` | `pref_player_filter_hue` | normal | Int | 0 | `Settings.player.decoder.hue_filter` | KEEP | P0 |  |
 
-## AudioPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/AudioPreferences.kt`), 5 keys, Rust section `player.audio`, consumers area:45-player-core, tasks T-02a-015
+## AudioPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/AudioPreferences.kt`), 5 keys, Rust section `player.audio`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -386,7 +386,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 4 | `volumeBoostCap()` | `pref_audio_volume_boost_cap` | normal | Int | 30 | `Settings.player.audio.volume_boost_cap` | KEEP | P1 | mpv volume-max = 100 + value. |
 | 5 | `audioDelay()` | `pref_audio_delay` | normal | Int | 0 | `Settings.player.audio.audio_delay` | KEEP | P1 |  |
 
-## SubtitlePreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/SubtitlePreferences.kt`), 21 keys, Rust section `player.subtitles`, consumers area:46-player-controls-ui, tasks T-02a-015
+## SubtitlePreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/SubtitlePreferences.kt`), 21 keys, Rust section `player.subtitles`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|
@@ -412,7 +412,7 @@ Source of rows: every `preferenceStore.get*(...)` declaration in the 18 `*Prefer
 | 20 | `subtitlesSpeed()` | `pref_subtitles_speed` | normal | Float | 1.0 | `Settings.player.subtitles.subtitles_speed` | KEEP | P1 |  |
 | 21 | `subtitlesSecondaryDelay()` | `pref_subtitles_secondary_delay` | normal | Int | 0 | `Settings.player.subtitles.subtitles_secondary_delay` | KEEP | P1 |  |
 
-## AdvancedPlayerPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/AdvancedPlayerPreferences.kt`), 4 keys, Rust section `player.advanced`, consumers area:48-settings-player-and-scripts, tasks T-02a-016
+## AdvancedPlayerPreferences (`app/src/main/java/eu/kanade/tachiyomi/ui/player/settings/AdvancedPlayerPreferences.kt`), 4 keys, Rust section `player.advanced`
 
 | # | Kotlin fn | Key | Store | Kotlin type | Default | Rust field | Dec | Pri | Notes |
 |---|---|---|---|---|---|---|---|---|---|

@@ -1,7 +1,6 @@
 //! Anime entry restore (area 22, T-22a-022 to T-22a-025). Seasons are restored under their parent (D7 and D18 fixed):
 //! `plan_anime` splits the sorted list into top-level rows and seasons, and each season takes the database id of its
-//! parent. The backup row becomes a shared [`Incoming`] entry and `write::restore_entry` writes it. Rules follow
-//! `plans/22-backup-restore/p1-behavior.md` section 4.4 with the task-block fixes.
+//! parent. The backup row becomes a shared [`Incoming`] entry and `write::restore_entry` writes it.
 
 use std::collections::{HashMap, HashSet};
 

@@ -1,6 +1,6 @@
 # MANUAL-49 checklist (theme and design system)
 
-Run before a release, on a Plasma 6 session unless noted. Source: `plans/49-theme-and-design-system/p1-edge-cases-and-tests.md`.
+Run before a release, on a Plasma 6 session unless noted.
 
 - [ ] MANUAL-49-01 Light/dark follows the system: toggle in KDE System Settings, the app updates without a restart.
 - [ ] MANUAL-49-02 Choose each of the 19 schemes and the System option. Each applies live. Text stays readable (check Matrix, Nord, Yin & Yang by eye).

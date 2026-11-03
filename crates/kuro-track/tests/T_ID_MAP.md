@@ -2,7 +2,7 @@
 
 The unit tests were written under `tr_27*` names, so this mapping is by topic, not by ID.
 
-Source: `plans/27-tracking-core/p2-edge-cases-and-tests.md` section 6. Names are Rust test function names. `tr_27*`
+Names are Rust test function names. `tr_27*`
 tests are unit tests in `src/`, `tests/*.rs` are integration tests. Run one with `cargo test -p kuro-track <name>`.
 
 | ID | Test names | Status |
@@ -35,7 +35,7 @@ tests are unit tests in `src/`, `tests/*.rs` are integration tests. Run one with
 
 # Kitsu: KT-01..KT-99 mapped to test names (T-30a-033)
 
-Source: `plans/30-tracker-kitsu/p1-edge-cases-and-tests.md`. Tests are in `src/kitsu/`: `api.rs`, `auth.rs`, `dates.rs`, `dto.rs`,
+Tests are in `src/kitsu/`: `api.rs`, `auth.rs`, `dates.rs`, `dto.rs`,
 `mod.rs`, `rules.rs`, `score.rs`, `search.rs`, `status.rs` (unit tests), `wire_tests.rs` and `fixture_tests.rs` (wiremock).
 Fixtures are in `tests/fixtures/kitsu/` (all 18 of section 4). Ids the plan lists as numbered gaps (KT-16..19, 34..39, 67..69,
 81..84, 89, 94) do not exist in the plan. Run one with `cargo test -p kuro-track <name>`.

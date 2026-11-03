@@ -1,7 +1,6 @@
 # Player controls: manual device checks
 
 Run on the target machine, on Wayland (KDE) and on X11. Mark each line pass or fail with the date.
-Source: `plans/46-player-controls-ui/p1-ui-parity.md` section 19 (T-46a-056).
 
 1. [ ] Single tap toggles chrome; the chrome hides 4 s after the last control click while playing; stays visible while paused.
 2. [ ] Locking hides chrome; tapping reveals the unlock button; unlock restores chrome.

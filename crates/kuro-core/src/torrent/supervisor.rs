@@ -1,5 +1,5 @@
 //! TorrServer process supervisor: starts a TorrServer-compatible binary as a child, waits for `/echo`, and
-//! stops it. It replaces the Android library and foreground service (see `plans/13-*/p1-topic-torrserver-lifecycle.md`).
+//! stops it. It replaces the Android library and foreground service.
 //!
 //! `ensure_running` is single-flight: the whole start runs under one async mutex, so a concurrent caller waits
 //! for it and then sees `Running`. The configuration is read from a provider at each start, so edited

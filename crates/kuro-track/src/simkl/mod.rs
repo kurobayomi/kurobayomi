@@ -1,4 +1,4 @@
-//! Simkl behind the tracker traits (`plans/32-tracker-mangaupdates-simkl`, T-32a-030 to T-32a-046). The identity, the
+//! Simkl behind the tracker traits (T-32a-030 to T-32a-046). The identity, the
 //! status table, the browser login, the token store, logout and the anime operations (search, bind, update, refresh).
 //!
 //! Credentials follow the shared layout of [`BaseTracker`]: the username is the user id as a decimal string, the

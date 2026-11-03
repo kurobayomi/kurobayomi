@@ -1,4 +1,4 @@
-//! Kitsu JSON:API wire shapes (T-30a-014, `plans/30-tracker-kitsu/p1-data-and-config.md` section 2). Unknown keys are
+//! Kitsu JSON:API wire shapes (T-30a-014). Unknown keys are
 //! ignored. Ids accept a JSON number or a numeric string.
 
 use serde::{Deserialize, Deserializer};

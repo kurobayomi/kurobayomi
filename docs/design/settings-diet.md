@@ -60,7 +60,7 @@ Pages removed: Security and privacy, Advanced, Data Saver, Player > Internal pla
 - Add the key to `DROPPED_KEYS` in `registry.rs`. That list is the existing mechanism: restore skips those keys, so an Aniyomi backup or an old `config.toml` still loads. Every CUT row below that says "keep accepting on import" needs exactly that one line.
 - Tracker secret families (`__PRIVATE_*_{id}`) are kept by KEEP-LATER; their keyring storage is separate from these registry names.
 - `pref_mpv_conf` and `pref_mpv_input` are CUT as keys; on import, write their text to the real `mpv.conf` / `input.conf` in the mpv-config folder only if that file is missing.
-- Two pinning tests will need a new count: `registry_has_the_309_plan_rows_in_order` in `registry.rs` (it reads `plans/02-preferences-system/p1-topic-key-registry.md`) and the per-section `FIELDS.len()` asserts such as the one in `source.rs`. The download keys exist twice (`crates/kuro-domain/src/download/prefs.rs` and `crates/kuro-downloads/src/download_prefs.rs`); cut both.
+- Two pinning tests will need a new count: `registry_has_the_59_fixture_rows_in_order` in `registry.rs` (it reads `crates/kuro-prefs/tests/fixtures/key-registry.md`) and the per-section `FIELDS.len()` asserts such as the one in `source.rs`. The download keys exist twice (`crates/kuro-domain/src/download/prefs.rs` and `crates/kuro-downloads/src/download_prefs.rs`); cut both.
 
 ## 5. Decisions that need you (features, not micro-options) and what to restore first
 

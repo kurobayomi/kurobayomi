@@ -1,5 +1,5 @@
 {
-  "_comment": "The worked example of plans/10-app-domain-layer/p1-topic-chapter-episode-sync.md section 3. The values are copied from that section, not from running the code.",
+  "_comment": "A worked example of chapter and episode sync. The values are written by hand, not taken from running the code.",
   "manga_title": "Foo",
   "now_ms": 1000000,
   "stored": [

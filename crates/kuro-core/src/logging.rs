@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn active_file_is_kurobayomi_log_in_the_log_directory() {
-        // plans/ARCHITECTURE.md section 11 and T-01a-005 name this file.
+        // T-01a-005 names this file.
         assert_eq!(LOG_FILE_NAME, "kurobayomi.log");
         let dir = tempfile::tempdir().unwrap();
         let _writer = DailyFile::open(dir.path()).unwrap();

@@ -2,10 +2,10 @@
 # checks text out with CRLF unless told otherwise.
 * text=auto eol=lf
 
-# stored with CRLF on purpose (raw HTTP answers, a CRLF changelog fixture, the task table): never converted
+# stored with CRLF on purpose (raw HTTP answers, a CRLF changelog fixture): never converted
 *.http -text
 tests/fixtures/update/changelog_05.md -text
-plans/TASKS.csv -text
+
 
 # binary: Git's guess is wrong for some small files
 *.png binary

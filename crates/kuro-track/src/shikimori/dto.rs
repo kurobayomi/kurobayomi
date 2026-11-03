@@ -1,4 +1,4 @@
-//! Shikimori wire shapes (T-31a-004, `plans/31-tracker-shikimori-bangumi/p1-rust-design.md` section 4.1). Unknown keys
+//! Shikimori wire shapes (T-31a-004). Unknown keys
 //! are ignored. Nullable fields are `Option` and default to `None` when absent.
 
 use serde::{Deserialize, Serialize};

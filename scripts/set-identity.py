@@ -19,8 +19,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 IDENTITY = ROOT / "identity.toml"
-# history and plans, which name earlier identities on purpose, and this script, whose usage names examples
-SKIP = ("plans/", "docs/audit/", "docs/ORG-MIGRATION.md", "identity.toml", "scripts/set-identity.py")
+# history, which names earlier identities on purpose, and this script, whose usage names examples
+SKIP = ("docs/audit/", "docs/ORG-MIGRATION.md", "identity.toml", "scripts/set-identity.py")
 
 
 def tracked() -> list[str]:

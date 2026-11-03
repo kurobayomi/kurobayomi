@@ -2,7 +2,7 @@
 //! that runs at start when the stored version code is lower than the running one. [`select`] picks a [`Strategy`]
 //! from the stored and the running code, [`plan`] lists the steps it runs, and [`run`] runs them in order.
 //!
-//! Rules of the port, from `plans/11-app-migrations`:
+//! Rules of the port:
 //! * `old == 0` runs only the `Always` steps; `old >= new` runs nothing; otherwise the `Always` steps and the steps
 //!   whose version is in `old + 1 ..= new` run.
 //! * Steps run one after the other, `Always` first, equal versions in list order. Every step runs even when an

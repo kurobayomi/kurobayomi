@@ -1,6 +1,6 @@
 name: CI
 
-# Runs only when something that is compiled or checked changes; README, docs, plans and other text do not start a run.
+# Runs only when something that is compiled or checked changes; README, docs and other text do not start a run.
 on:
   push:
     paths:
@@ -84,7 +84,7 @@ jobs:
         if: always()
         run: df -h / | cat
 
-  # The Windows port (plans/addenda/requirements-cross-platform.md, rule 7): the whole app built and tested on Windows
+  # The Windows port: the whole app built and tested on Windows
   # with the MSYS2 UCRT64 toolchain whose GTK, mpv, dav1d and libarchive the installer bundles. Tests that need a Unix
   # shell, Unix file modes or Linux desktop tools are #[cfg(unix)].
   windows:

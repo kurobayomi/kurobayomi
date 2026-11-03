@@ -8,4 +8,4 @@
 - Weblate handoff: Weblate reads and writes the Fluent `.ftl` files in this folder (one `<tag>/kurobayomi.ftl` per locale), never Android XML. After a Weblate export, run the `check` command above by hand. It is not in the CI workflow yet. CI runs only `cargo test --workspace`.
 - Overlap names (defined in both the core and Aniyomi XML) take the Aniyomi English text, and each is defined once in `en/kurobayomi.ftl` (test `overlap_precedence`).
 
-Not ported: the Gradle, moko and Android manifest plumbing. See `plans/51-i18n/p1-data-and-config.md` section 2.
+Not ported: the Gradle, moko and Android manifest plumbing.

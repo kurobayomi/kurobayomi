@@ -1,8 +1,7 @@
 //! Converts the moko (Android-format) base XML into the English Fluent catalogue.
 //!
-//! Plan 51-i18n: key normalisation (T-51a-002), placeholders (T-51a-003), plurals (T-51a-004),
-//! escapes (T-51a-005), and the English generator (T-51a-001). Behaviour is fixed by
-//! `plans/51-i18n/p1-topic-xml-to-fluent.md`.
+//! Key normalisation (T-51a-002), placeholders (T-51a-003), plurals (T-51a-004),
+//! escapes (T-51a-005), and the English generator (T-51a-001).
 
 use std::collections::BTreeSet;
 use std::fmt;

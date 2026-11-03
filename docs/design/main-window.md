@@ -1,6 +1,6 @@
 # Main window
 
-The window shell (sidebar, page header) and the Library page. GTK 4 with libadwaita (since 2026-11-01, plans/LIBADWAITA-MIGRATION.md); before that plain GTK 4, no libadwaita: every colour comes from
+The window shell (sidebar, page header) and the Library page. GTK 4 with libadwaita (since 2026-11-01); before that plain GTK 4, no libadwaita: every colour comes from
 the user's GTK theme (named colours `@theme_*` only, in `src/theme/style.css`), every widget is a stock GTK widget.
 
 ## Audit of the old window

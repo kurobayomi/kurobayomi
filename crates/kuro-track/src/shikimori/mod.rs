@@ -1,5 +1,5 @@
-//! Shikimori tracker (`Shikimori.kt`): identity, login by OAuth code, the library rules and the tracker traits
-//! (`plans/31-tracker-shikimori-bangumi/p1-behavior.md` section 2). The network and token state are in [`api`].
+//! Shikimori tracker (`Shikimori.kt`): identity, login by OAuth code, the library rules and the tracker traits.
+//! The network and token state are in [`api`].
 
 pub mod api;
 pub mod auth;

@@ -1,4 +1,4 @@
-//! MyAnimeList tracker (`plans/29-tracker-myanimelist/p1-rust-design.md` section 1). No GTK type and no
+//! MyAnimeList tracker. No GTK type and no
 //! OS-specific code here: token storage and the config directory are injected.
 
 pub mod api;

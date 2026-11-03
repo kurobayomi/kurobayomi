@@ -1,5 +1,5 @@
-//! Shikimori integration tests TS-S-01 to TS-S-19 (`plans/31-tracker-shikimori-bangumi/p1-edge-cases-and-tests.md`
-//! section 6.1). Wiremock only; the bodies are the fixtures under `tests/fixtures/shikimori/`.
+//! Shikimori integration tests TS-S-01 to TS-S-19.
+//! Wiremock only; the bodies are the fixtures under `tests/fixtures/shikimori/`.
 
 use kuro_platform::kind::Kind;
 use std::collections::BTreeMap;

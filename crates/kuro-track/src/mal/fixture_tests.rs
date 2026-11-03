@@ -1,5 +1,5 @@
 //! DTO tests on the fixtures in `tests/fixtures/mal/` (T-29a-036, T-29a-041). The fixtures are synthetic, written
-//! from the DTO shapes in `plans/29-tracker-myanimelist/p1-data-and-config.md` section 3. They are not recorded
+//! from the DTO shapes. They are not recorded
 //! responses: the recording from a test account is still open (T-29a-041, T-29a-058). Replace each file with a
 //! recorded response that keeps the same shape, and the tests below stay as they are.
 

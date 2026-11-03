@@ -1,6 +1,6 @@
 //! The preference key registry: one row per preference declared by the Kotlin preference classes.
 //!
-//! Rows follow `plans/02-preferences-system/p1-topic-key-registry.md` in order; a test checks each
+//! Rows follow `tests/fixtures/key-registry.md` in order; a test checks each
 //! row. A key containing `{id}` is a family (per tracker or per source); the id replaces `{id}`.
 //! `table` is the dotted TOML table and `field` the TOML key inside it. Family rows keep the id as
 //! the TOML key, so `field` is empty. Private keys with a string value never reach a file.
@@ -183,8 +183,8 @@ pub fn find_path(path: &str) -> Option<&'static PrefMeta> {
     REGISTRY.iter().find(|m| m.table == table && m.field == field)
 }
 
-/// Plan `pref_torrserver_tackers` default: 26 announce URLs, spaces removed, newline-joined,
-/// no trailing newline (p1-data-and-config.md section 6.1).
+/// The `pref_torrserver_tackers` default: 26 announce URLs, spaces removed, newline-joined,
+/// no trailing newline.
 pub const TORRSERVER_TRACKERS: &str = concat!(
     "http://nyaa.tracker.wf:7777/announce\n",
     "http://anidex.moe:6969/announce\n",
@@ -600,10 +600,10 @@ mod tests {
     use super::*;
 
     const MARKDOWN: &str =
-        include_str!("../../../plans/02-preferences-system/p1-topic-key-registry.md");
+        include_str!("../tests/fixtures/key-registry.md");
 
-    /// Rows of the plan's registry tables as (key, store, kind, default).
-    fn plan_rows() -> Vec<(String, String, String, String)> {
+    /// Rows of the fixture's registry tables as (key, store, kind, default).
+    fn fixture_rows() -> Vec<(String, String, String, String)> {
         MARKDOWN
             .lines()
             .filter_map(|line| {
@@ -616,8 +616,8 @@ mod tests {
                     .replace("${tracker.id}", "{id}")
                     .replace("${id}", "{id}");
                 // T-19a-064: the anime update badge count is derived in memory, never registered
-                // the default reading mode is Adaptive (0) by the user's decision of 2026-11-02, not the plan's 2
-                // adult titles are hidden by default by the user's decision of 2026-10-19, not the plan's true
+                // the default reading mode is Adaptive (0) by the user's decision of 2026-11-02, not the fixture's 2
+                // adult titles are hidden by default by the user's decision of 2026-10-19, not the fixture's true
                 let default = match key.as_str() {
                     "pref_default_reading_mode_key" => "0",
                     "show_nsfw_source" => "false",
@@ -633,47 +633,47 @@ mod tests {
             .collect()
     }
 
-    fn kind_matches(kind: Kind, plan_kind: &str) -> bool {
+    fn kind_matches(kind: Kind, fixture_kind: &str) -> bool {
         match kind {
-            Kind::Bool => plan_kind == "Boolean",
-            Kind::Int => plan_kind == "Int",
-            Kind::Long => plan_kind == "Long",
-            Kind::Float => plan_kind == "Float",
-            Kind::Set => plan_kind == "Set<String>",
+            Kind::Bool => fixture_kind == "Boolean",
+            Kind::Int => fixture_kind == "Int",
+            Kind::Long => fixture_kind == "Long",
+            Kind::Float => fixture_kind == "Float",
+            Kind::Set => fixture_kind == "Set<String>",
             Kind::Str => {
-                plan_kind == "String"
-                    || plan_kind.starts_with("Enum ")
-                    || plan_kind.starts_with("Object ")
+                fixture_kind == "String"
+                    || fixture_kind.starts_with("Enum ")
+                    || fixture_kind.starts_with("Object ")
             }
         }
     }
 
-    /// `Some(matches)` when the plan's default is a literal; `None` for prose (checked by hand).
-    fn default_matches(lit: Lit, plan: &str) -> Option<bool> {
-        if let Some(quoted) = plan.strip_prefix('"') {
+    /// `Some(matches)` when the fixture's default is a literal; `None` for prose (checked by hand).
+    fn default_matches(lit: Lit, fixture: &str) -> Option<bool> {
+        if let Some(quoted) = fixture.strip_prefix('"') {
             let Lit::Str(s) = lit else { return Some(false) };
             return Some(quoted.strip_suffix('"')? == s);
         }
-        if plan.starts_with('{') {
+        if fixture.starts_with('{') {
             let Lit::Set(items) = lit else {
                 return Some(false);
             };
-            if plan.contains('<') {
+            if fixture.contains('<') {
                 return None;
             }
-            let body = plan.split('}').next()?.trim_start_matches('{');
-            let mut plan_items: Vec<&str> = body
+            let body = fixture.split('}').next()?.trim_start_matches('{');
+            let mut fixture_items: Vec<&str> = body
                 .split(',')
                 .map(|s| s.trim().trim_matches('"'))
                 .filter(|s| !s.is_empty())
                 .collect();
             let mut want: Vec<&str> = items.to_vec();
-            plan_items.sort_unstable();
+            fixture_items.sort_unstable();
             want.sort_unstable();
-            return Some(plan_items == want);
+            return Some(fixture_items == want);
         }
-        let first = plan.split_whitespace().next()?;
-        let rest = &plan[first.len()..];
+        let first = fixture.split_whitespace().next()?;
+        let rest = &fixture[first.len()..];
         match lit {
             Lit::Bool(b) => Some(first == b.to_string()),
             Lit::Int(i) => Some(first.parse::<i64>().ok() == Some(i64::from(i))),
@@ -684,7 +684,7 @@ mod tests {
         }
     }
 
-    /// Defaults the plan gives as prose, pinned to the value the registry must hold on Linux.
+    /// Defaults the fixture gives as prose, pinned to the value the registry must hold on Linux.
     const PROSE_DEFAULTS: [(&str, Lit); 3] = [
         ("source_languages", Lit::Set(&["all", "en"])),
         ("__APP_STATE_storage_dir", Lit::Str("")),
@@ -692,10 +692,10 @@ mod tests {
     ];
 
     #[test]
-    fn registry_has_the_59_plan_rows_in_order() {
-        let rows = plan_rows();
-        assert_eq!(rows.len(), 59, "the plan's rows minus the derived animeext_updates_count and the dropped (cut) plan rows");
-        // four Kurobayomi rows after the plan's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
+    fn registry_has_the_59_fixture_rows_in_order() {
+        let rows = fixture_rows();
+        assert_eq!(rows.len(), 59, "the fixture's rows minus the derived animeext_updates_count and the dropped (cut) fixture rows");
+        // four Kurobayomi rows after the fixture's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
         // (T-req-platform-004), `check_app_updates` (the update toggle, back from the settings diet, on by default) and
         // `last_kind` (the Anime | Manga choice every page shares), `appimage_menu_removed` (the user took the AppImage
         // out of the applications menu), `auto_hide_bars` (the reader's and the player's bars hide by themselves) and

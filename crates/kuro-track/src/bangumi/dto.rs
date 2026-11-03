@@ -1,5 +1,5 @@
-//! Bangumi wire shapes (T-31a-023, T-31a-024, T-31a-025, `plans/31-tracker-shikimori-bangumi/p1-data-and-config.md`
-//! section 1.2). Unknown keys are ignored. Nullable fields are `Option` and default to `None` when absent.
+//! Bangumi wire shapes (T-31a-023, T-31a-024, T-31a-025).
+//! Unknown keys are ignored. Nullable fields are `Option` and default to `None` when absent.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

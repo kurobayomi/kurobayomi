@@ -1,5 +1,5 @@
-//! Kitsu login and logout dialog texts and rules (T-30a-008). The GUI reads these; the texts are the literal strings
-//! of `plans/30-tracker-kitsu/p1-data-and-config.md` section 6.2.
+//! Kitsu login and logout dialog texts and rules (T-30a-008). The GUI shows these
+//! texts as they are.
 
 pub const LOGIN_TITLE: &str = "Log in to Kitsu";
 pub const USERNAME_LABEL: &str = "Email address";

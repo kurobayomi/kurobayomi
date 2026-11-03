@@ -1,5 +1,5 @@
-; The Windows installer (Inno Setup 6), the one way Kurobayomi ships on Windows (plans/addenda/requirements-cross-platform.md,
-; packaging). One script for both channels:
+; The Windows installer (Inno Setup 6), the one way Kurobayomi ships on Windows.
+; One script for both channels:
 ;   ISCC /DChannel=stable|nightly /DVersion=X.Y.Z /DBundle=<folder of scripts/bundle-windows.sh> /DIcon=<kurobayomi.ico>
 ;        /DOutput=<folder> dist\windows\kurobayomi.iss
 ; It installs for the current user only (no administrator prompt) into %LOCALAPPDATA%\Programs. Stable and nightly have

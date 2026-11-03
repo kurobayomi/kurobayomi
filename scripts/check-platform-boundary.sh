@@ -13,7 +13,7 @@ matches=$(rg --line-number --no-heading --color never --hidden \
     --glob '!.git/**' \
     --glob '!crates/kuro-platform/**' \
     --glob '!target/**' \
-    --glob '!plans/**' \
+
     --glob '!docs/audit/**' \
     --glob '!shots/**' \
     --glob '!Cargo.lock' \

@@ -1,4 +1,4 @@
-//! The numbered tests T1-T79 of `plans/45-player-core/p2-edge-cases-and-tests.md` section 4 that need
+//! The numbered player tests T1-T79 that need
 //! the committed fixtures, plus the check that every number has a test (T-45b-062). The other
 //! numbered tests sit next to their module as `#[cfg(test)]` tests named `tN_...`.
 
