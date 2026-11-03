@@ -6,7 +6,6 @@
 *.http -text
 tests/fixtures/update/changelog_05.md -text
 
-
 # binary: Git's guess is wrong for some small files
 *.png binary
 *.jpg binary
