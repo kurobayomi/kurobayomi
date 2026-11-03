@@ -80,6 +80,8 @@ fn clear_db(id: &str) -> Option<Built> {
                 let check = gtk::CheckButton::new();
                 let r = row(&name, Some(&kuro_i18n::trf(kuro_i18n::MsgKey::clear_database_source_item_count, &[("arg1", kuro_i18n::Arg::Int(count))])), Some(check.clone().upcast()));
                 r.add_prefix(&gtk::Image::from_icon_name("application-x-addon-symbolic"));
+                // a plain row is not activatable on its own; the list's activation below flips the check
+                r.set_activatable(true);
                 l.append(&r);
                 (source, check, r)
             })

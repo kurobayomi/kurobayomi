@@ -193,8 +193,8 @@ pub fn search() -> Option<Built> {
 
     let generation = Rc::new(Cell::new(0_u64));
     let (typed, shown_status, shown_results, typed_generation) = (entry.clone(), status.clone(), results.clone(), Rc::clone(&generation));
-    field.connect_activate(move |entry_field| run_search(&typed, entry_field.text().to_string(), &shown_status, &shown_results, &typed_generation));
-    run_search(&entry, entry.title.clone(), &status, &results, &generation);
+    field.connect_activate(move |entry_field| run_search(&typed, vec![entry_field.text().to_string()], &shown_status, &shown_results, &typed_generation));
+    run_search(&entry, title_queries(&entry.title), &status, &results, &generation);
     built(ui::scrolled(&column), vec![])
 }
 
@@ -609,14 +609,16 @@ fn summary(tracker: &dyn Tracker, bound: &Bound) -> String {
     [status.map(|key| status_text(Some(key))), Some(progress), score].into_iter().flatten().collect::<Vec<_>>().join(" · ")
 }
 
-/// Runs the search page's tracker search for `query` and shows its results. Only the latest search may show anything.
-fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, generation: &Rc<Cell<u64>>) {
+/// Runs the search page's tracker search and shows its results: `queries` in order, until one finds something. Only the
+/// latest search may show anything.
+fn run_search(entry: &Entry, queries: Vec<String>, status: &Label, results: &GBox, generation: &Rc<Cell<u64>>) {
     let Some(host) = tracker_host::host() else {
         say(status, &tracking::not_ready());
         return;
     };
     let Some(tracker) = host.manager.get(search_tracker()) else { return };
-    if query.trim().is_empty() {
+    let queries: Vec<String> = queries.into_iter().filter(|query| !query.trim().is_empty()).collect();
+    if queries.is_empty() {
         say(status, "");
         return;
     }
@@ -625,9 +627,9 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
     say(status, "");
     clear(results);
     results.append(&crate::widgets::status::loading(Some("Searching…")));
-    let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), query.clone(), Rc::clone(generation)));
+    let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), queries.clone(), Rc::clone(generation)));
     crate::background::run_async(
-        async move { search_hits(tracker.as_ref(), kind, &query).await },
+        async move { search_first(tracker.as_ref(), kind, &queries).await },
         move |result| {
             if latest.get() != token {
                 return;
@@ -649,6 +651,33 @@ fn run_search(entry: &Entry, query: String, status: &Label, results: &GBox, gene
     );
 }
 
+/// The queries the first search of an entry tries, in order: its title as the source names it, the part before a
+/// subtitle (`: `, ` - `, ` – `), and its first three words. Sources often carry a long romaji title that the tracker
+/// lists under a shorter name. Repeats are dropped.
+fn title_queries(title: &str) -> Vec<String> {
+    let title = title.trim();
+    let main = [": ", " - ", " – "].iter().filter_map(|cut| title.split_once(cut).map(|(head, _)| head.trim())).min_by_key(|head| head.len()).unwrap_or(title);
+    let words = main.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+    let mut queries: Vec<String> = Vec::new();
+    for query in [title, main, words.as_str()] {
+        if !query.is_empty() && !queries.iter().any(|known| known == query) {
+            queries.push(query.to_owned());
+        }
+    }
+    queries
+}
+
+/// The hits of the first of `queries` that finds any. A failed search stops there: the error is shown with its Retry.
+async fn search_first(tracker: &dyn Tracker, kind: Kind, queries: &[String]) -> Result<Vec<Found>, TrackError> {
+    for query in queries {
+        let hits = search_hits(tracker, kind, query).await?;
+        if !hits.is_empty() {
+            return Ok(hits);
+        }
+    }
+    Ok(Vec::new())
+}
+
 async fn search_hits(tracker: &dyn Tracker, kind: Kind, query: &str) -> Result<Vec<Found>, TrackError> {
     Ok(match kind {
         Kind::Anime => match tracker.as_anime() {
@@ -666,7 +695,10 @@ async fn search_hits(tracker: &dyn Tracker, kind: Kind, query: &str) -> Result<V
 fn hits_list(entry: &Entry, found: Vec<Found>) -> ListBox {
     let list = ui::boxed_list();
     for hit in &found {
-        list.append(&ui::row(hit.title(), None, None));
+        // a plain row is not activatable on its own, and the list's activation below is what binds
+        let row = ui::row(hit.title(), None, None);
+        row.set_activatable(true);
+        list.append(&row);
     }
     let entry = entry.clone();
     list.connect_row_activated(move |_, row| {
@@ -729,6 +761,28 @@ mod tests {
         assert_eq!(status_text(Some("plan_to_read")), "Plan to read");
         assert_eq!(status_text(Some("no_such_key_here")), "no_such_key_here", "an unknown key shows as it is");
         assert_eq!(status_text(None), "");
+    }
+
+    #[test]
+    fn the_first_search_falls_back_to_the_main_title_and_its_first_words() {
+        assert_eq!(
+            title_queries("Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin"),
+            ["Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin", "Kyouran Reijou Nia Liston", "Kyouran Reijou Nia"]
+        );
+        assert_eq!(title_queries("Bungou Stray Dogs 5th Season"), ["Bungou Stray Dogs 5th Season", "Bungou Stray Dogs"]);
+        assert_eq!(title_queries("  Frieren  "), ["Frieren"], "a short title is tried once");
+        assert!(title_queries("   ").is_empty());
+    }
+
+    #[test]
+    fn search_results_can_be_tapped() {
+        crate::testing::with_display(|| {
+            let entry = Entry { kind: Kind::Anime, id: 1, title: "Frieren".into() };
+            let found = vec![Found::Anime(AnimeTrackSearch::new(TrackerId::ANILIST, 1, "Frieren", ""))];
+            let list = hits_list(&entry, found);
+            let row = list.row_at_index(0).expect("one row per result");
+            assert!(row.is_activatable(), "a tap on a result binds it");
+        });
     }
 
     #[test]
