@@ -246,6 +246,6 @@ mod tests {
 
     #[test]
     fn the_desktop_file_is_the_application_id() {
-        assert_eq!(desktop_file_name("io.github.anas1412.Kurobayomi"), "io.github.anas1412.Kurobayomi.desktop");
+        assert_eq!(desktop_file_name("io.github.kurobayomi.Kurobayomi"), "io.github.kurobayomi.Kurobayomi.desktop");
     }
 }

@@ -3,4 +3,7 @@
 # when a file names another owner or app ID.
 owner = "kurobayomi"
 repo = "kurobayomi"
-app_id = "io.github.anas1412.Kurobayomi"
+app_id = "io.github.kurobayomi.Kurobayomi"
+# Earlier app IDs, newest last. Only this file names them: the build hands them to the AppImage, which takes the menu
+# entry and icons it installed under an old ID away again.
+old_app_ids = ["io.github.anas1412.Kurobayomi"]

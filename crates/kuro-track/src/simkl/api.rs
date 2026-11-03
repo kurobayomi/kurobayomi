@@ -29,7 +29,7 @@ const JSON_MIME: &str = "application/json; charset=utf-8";
 pub const USER_AGENT: &str = concat!(
     "Kurobayomi v",
     env!("CARGO_PKG_VERSION"),
-    " (io.github.anas1412.Kurobayomi)"
+    " (io.github.kurobayomi.Kurobayomi)"
 );
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const CALL_TIMEOUT: Duration = Duration::from_secs(120);

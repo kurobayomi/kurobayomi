@@ -1,11 +1,11 @@
 //! Compiles the bundled icon theme (`src/theme/icons`) into a GResource under
-//! `/io/github/anas1412/Kurobayomi/icons`; `theme::icons::register` loads it at startup.
+//! `/io/github/kurobayomi/Kurobayomi/icons`; `theme::icons::register` loads it at startup.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const PREFIX: &str = "/io/github/anas1412/Kurobayomi/icons";
+const PREFIX: &str = "/io/github/kurobayomi/Kurobayomi/icons";
 
 fn files(dir: &Path, root: &Path, out: &mut Vec<String>) {
     let mut entries: Vec<PathBuf> = std::fs::read_dir(dir).expect("read icon dir").map(|e| e.expect("dir entry").path()).collect();
@@ -30,13 +30,13 @@ fn nightly_icons(from: &Path, to: &Path) {
         let target = to.join(path.file_name().expect("file name"));
         if path.is_dir() {
             nightly_icons(&path, &target);
-        } else if path.file_name().is_some_and(|n| n == "kb-logo-shadow.svg" || n == "io.github.anas1412.Kurobayomi.svg") {
+        } else if path.file_name().is_some_and(|n| n == "kb-logo-shadow.svg" || n == "io.github.kurobayomi.Kurobayomi.svg") {
             // the app icon also takes the nightly app id as its name (`channel::APP_ID`)
-            let target = if path.file_name().is_some_and(|n| n == "io.github.anas1412.Kurobayomi.svg") { to.join("io.github.anas1412.Kurobayomi.Nightly.svg") } else { target };
+            let target = if path.file_name().is_some_and(|n| n == "io.github.kurobayomi.Kurobayomi.svg") { to.join("io.github.kurobayomi.Kurobayomi.Nightly.svg") } else { target };
             let svg = std::fs::read_to_string(&path).expect("read logo");
             std::fs::write(&target, svg.replace("stroke=\"#ffffff\" stroke-width=", "stroke=\"#f2b01e\" stroke-width=")).expect("write logo");
-        } else if path.file_name().is_some_and(|n| n == "io.github.anas1412.Kurobayomi-symbolic.svg") {
-            std::fs::copy(&path, to.join("io.github.anas1412.Kurobayomi.Nightly-symbolic.svg")).expect("copy icon");
+        } else if path.file_name().is_some_and(|n| n == "io.github.kurobayomi.Kurobayomi-symbolic.svg") {
+            std::fs::copy(&path, to.join("io.github.kurobayomi.Kurobayomi.Nightly-symbolic.svg")).expect("copy icon");
         } else {
             std::fs::copy(&path, &target).expect("copy icon");
         }
@@ -47,9 +47,9 @@ fn nightly_icons(from: &Path, to: &Path) {
 /// since Vista. Six directory entries, then the images.
 fn windows_icon(nightly: bool, to: &Path) {
     let (dir, name) = if nightly {
-        ("src/shell/data/icons-nightly", "io.github.anas1412.Kurobayomi.Nightly")
+        ("src/shell/data/icons-nightly", "io.github.kurobayomi.Kurobayomi.Nightly")
     } else {
-        ("src/shell/data/icons", "io.github.anas1412.Kurobayomi")
+        ("src/shell/data/icons", "io.github.kurobayomi.Kurobayomi")
     };
     let sizes = [16u32, 24, 32, 48, 128, 256];
     let images: Vec<Vec<u8>> = sizes
@@ -81,11 +81,21 @@ fn windows_icon(nightly: bool, to: &Path) {
     std::fs::write(to, ico).expect("write app icon");
 }
 
+/// The app's earlier ids (`old_app_ids` of `identity.toml`), comma-separated. Only `identity.toml` names them, so
+/// `set-identity.py --check` stays green; the AppImage takes the menu files it installed under them away.
+fn old_app_ids() -> String {
+    let identity = std::fs::read_to_string("identity.toml").expect("read identity.toml");
+    let Some(list) = identity.lines().find_map(|line| line.strip_prefix("old_app_ids = [")) else { return String::new() };
+    list.trim_end_matches(']').split(',').map(|id| id.trim().trim_matches('"')).filter(|id| !id.is_empty()).collect::<Vec<_>>().join(",")
+}
+
 fn main() {
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
     let source = PathBuf::from("src/theme/icons");
     println!("cargo:rerun-if-changed=src/theme/icons");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=identity.toml");
+    println!("cargo:rustc-env=KB_OLD_APP_IDS={}", old_app_ids());
     println!("cargo:rerun-if-env-changed=KB_CHANNEL");
     let nightly = std::env::var("KB_CHANNEL").is_ok_and(|channel| channel == "nightly");
     // Windows takes a program's icon (taskbar, Explorer, title bar) from the exe; without one GTK shows its own logo

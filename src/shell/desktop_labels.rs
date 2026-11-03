@@ -125,7 +125,7 @@ mod tests {
 
     use super::*;
 
-    const BASE: &str = include_str!("data/io.github.anas1412.Kurobayomi.desktop");
+    const BASE: &str = include_str!("data/io.github.kurobayomi.Kurobayomi.desktop");
 
     fn fake(table: &'static [(&'static str, &'static str, &'static str)]) -> impl Fn(&str, &str) -> Option<String> {
         let map: HashMap<(&str, &str), &str> = table.iter().map(|(t, k, v)| ((*t, *k), *v)).collect();
@@ -200,7 +200,7 @@ mod tests {
         assert!(entry.contains("Name[de]=Neues"), "German Updates label from the real file");
         assert!(entry.lines().filter(|l| l.starts_with("Name[")).count() > 100);
         let out = tempfile::tempdir().unwrap();
-        let file = out.path().join("io.github.anas1412.Kurobayomi.desktop");
+        let file = out.path().join("io.github.kurobayomi.Kurobayomi.desktop");
         std::fs::write(&file, &entry).unwrap();
         let status = Command::new("desktop-file-validate").arg(&file).output().expect("desktop-file-validate is required for this test");
         assert!(status.status.success(), "{}", String::from_utf8_lossy(&status.stderr));

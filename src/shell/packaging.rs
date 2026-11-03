@@ -9,8 +9,8 @@ mod tests {
 
     use crate::shell::argv;
 
-    const DESKTOP: &str = include_str!("data/io.github.anas1412.Kurobayomi.desktop");
-    const MIME: &str = include_str!("data/io.github.anas1412.Kurobayomi.xml");
+    const DESKTOP: &str = include_str!("data/io.github.kurobayomi.Kurobayomi.desktop");
+    const MIME: &str = include_str!("data/io.github.kurobayomi.Kurobayomi.xml");
     const POST_INSTALL: &str = include_str!("data/post-install.sh");
 
     /// The golden copy of section 2.6, TC-53-36.
@@ -20,12 +20,12 @@ Name=Kurobayomi
 GenericName=Manga and anime reader
 Comment=Read manga and watch anime
 Exec=kurobayomi %U
-Icon=io.github.anas1412.Kurobayomi
+Icon=io.github.kurobayomi.Kurobayomi
 Terminal=false
 Categories=AudioVideo;Video;Player;
 StartupNotify=true
 DBusActivatable=true
-StartupWMClass=io.github.anas1412.Kurobayomi
+StartupWMClass=io.github.kurobayomi.Kurobayomi
 MimeType=application/x-tachibk;x-scheme-handler/kurobayomi;
 Actions=show-library;show-animelib;show-updates;show-history;show-browse;
 
@@ -84,7 +84,7 @@ Exec=kurobayomi --action=show-browse
     #[test]
     fn tc_53_36_the_desktop_entry_is_the_golden_copy_and_has_the_launch_keys() {
         assert_eq!(DESKTOP, DESKTOP_GOLDEN);
-        for key in ["Exec=kurobayomi %U", "Icon=io.github.anas1412.Kurobayomi", "StartupWMClass=io.github.anas1412.Kurobayomi", "DBusActivatable=true", "StartupNotify=true"] {
+        for key in ["Exec=kurobayomi %U", "Icon=io.github.kurobayomi.Kurobayomi", "StartupWMClass=io.github.kurobayomi.Kurobayomi", "DBusActivatable=true", "StartupNotify=true"] {
             assert!(DESKTOP.lines().any(|l| l == key), "{key}");
         }
     }
@@ -92,7 +92,7 @@ Exec=kurobayomi --action=show-browse
     #[cfg(unix)]
     #[test]
     fn desktop_file_validate_exits_zero() {
-        assert!(run("desktop-file-validate", &[&data("io.github.anas1412.Kurobayomi.desktop")]));
+        assert!(run("desktop-file-validate", &[&data("io.github.kurobayomi.Kurobayomi.desktop")]));
     }
 
     #[test]
@@ -118,7 +118,7 @@ Exec=kurobayomi --action=show-browse
     fn tc_53_37_the_mime_file_declares_the_backup_type_and_the_entry_lists_it() {
         assert_eq!(MIME, MIME_GOLDEN);
         if xmllint_available() {
-            assert!(run("xmllint", &["--noout", &data("io.github.anas1412.Kurobayomi.xml")]));
+            assert!(run("xmllint", &["--noout", &data("io.github.kurobayomi.Kurobayomi.xml")]));
         }
         let mime_types = DESKTOP.lines().find_map(|l| l.strip_prefix("MimeType=")).unwrap_or_default();
         for t in ["application/x-tachibk", "x-scheme-handler/kurobayomi"] {
@@ -133,14 +133,14 @@ Exec=kurobayomi --action=show-browse
     #[test]
     fn the_icon_resolves_in_hicolor_at_48_128_and_256_pixels() {
         for size in [48u32, 128, 256] {
-            let path = data(&format!("icons/hicolor/{size}x{size}/apps/io.github.anas1412.Kurobayomi.png"));
+            let path = data(&format!("icons/hicolor/{size}x{size}/apps/io.github.kurobayomi.Kurobayomi.png"));
             let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{path}: {e}"));
             assert_eq!(&bytes[1..4], b"PNG");
             // the PNG header stores the width and height at bytes 16 to 24
             assert_eq!(u32::from_be_bytes(bytes[16..20].try_into().unwrap()), size);
             assert_eq!(u32::from_be_bytes(bytes[20..24].try_into().unwrap()), size);
         }
-        assert!(Path::new(&data("icons/hicolor/scalable/apps/io.github.anas1412.Kurobayomi.svg")).exists());
+        assert!(Path::new(&data("icons/hicolor/scalable/apps/io.github.kurobayomi.Kurobayomi.svg")).exists());
     }
 
     #[test]
@@ -153,7 +153,7 @@ Exec=kurobayomi --action=show-browse
     #[test]
     fn the_search_provider_file_is_what_the_provider_serves() {
         // the file packaging installs under the shell's search-providers folder, next to the desktop entry
-        let shipped = include_str!("data/io.github.anas1412.Kurobayomi.search-provider.ini");
+        let shipped = include_str!("data/io.github.kurobayomi.Kurobayomi.search-provider.ini");
         assert_eq!(shipped, crate::shell::search_provider::ini());
     }
 }

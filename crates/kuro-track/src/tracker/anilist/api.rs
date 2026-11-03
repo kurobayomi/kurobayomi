@@ -27,7 +27,7 @@ pub const RATE_PERMITS: usize = 85;
 /// Length of the rolling window (`API:42`).
 pub const RATE_PERIOD: Duration = Duration::from_secs(60);
 /// Sent in the `User-Agent` header with the crate version.
-pub const APP_ID: &str = "io.github.anas1412.Kurobayomi";
+pub const APP_ID: &str = "io.github.kurobayomi.Kurobayomi";
 
 /// Sliding-window log: at most `permits` requests in any `period`. One instance is shared by all calls.
 pub struct RateLimiter {
@@ -453,7 +453,7 @@ mod tests {
         assert_eq!(fake.bearers(), vec![Some("tok-123".to_owned())]);
         assert_eq!(fake.bodies()[0]["variables"]["a"], json!(1));
         assert!(user_agent().starts_with("Kurobayomi v"));
-        assert!(user_agent().ends_with("(io.github.anas1412.Kurobayomi)"));
+        assert!(user_agent().ends_with("(io.github.kurobayomi.Kurobayomi)"));
         Ok(())
     }
 

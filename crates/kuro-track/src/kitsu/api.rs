@@ -35,7 +35,7 @@ pub const VND_API_JSON: &str = "application/vnd.api+json";
 const USER_AGENT_VALUE: &str = concat!(
     "Kurobayomi v",
     env!("CARGO_PKG_VERSION"),
-    " (io.github.anas1412.Kurobayomi)"
+    " (io.github.kurobayomi.Kurobayomi)"
 );
 pub(super) const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 pub(super) const READ_TIMEOUT: Duration = Duration::from_secs(30);

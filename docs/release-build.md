@@ -30,8 +30,8 @@ and rejects anything else:
 
 ## Icons
 
-The application icon is `dist/icons/hicolor/scalable/apps/io.github.anas1412.Kurobayomi.svg` plus a 512x512 PNG.
-The dev build (`io.github.anas1412.Kurobayomi.Devel`) has its own icon in the red and grey palette
-(`#C92824`, `#455A64`, `#607D8B`) and the desktop entry `dist/io.github.anas1412.Kurobayomi.Devel.desktop`, named
+The application icon is `dist/icons/hicolor/scalable/apps/io.github.kurobayomi.Kurobayomi.svg` plus a 512x512 PNG.
+The dev build (`io.github.kurobayomi.Kurobayomi.Devel`) has its own icon in the red and grey palette
+(`#C92824`, `#455A64`, `#607D8B`) and the desktop entry `dist/io.github.kurobayomi.Kurobayomi.Devel.desktop`, named
 "Kurobayomi (dev)". The packaging step installs the `hicolor` tree under the platform icon directory.
 `scripts/check-dist-assets.sh` checks both.

@@ -14,7 +14,7 @@ use kuro_i18n::{MsgKey, tr};
 pub const APP_ID: &str = crate::channel::APP_ID;
 
 /// The bundled icon theme root: `scalable/actions/`, `scalable/apps/` and `symbolic/apps/` below it.
-pub const ICON_RESOURCE_PATH: &str = "/io/github/anas1412/Kurobayomi/icons";
+pub const ICON_RESOURCE_PATH: &str = "/io/github/kurobayomi/Kurobayomi/icons";
 
 #[allow(dead_code)] // kept for the shape of the type; not built or read yet
 /// One icon the app shows. `name()` is the icon-theme name looked up at run time.
@@ -185,8 +185,8 @@ impl Icon {
     #[cfg(test)]
     pub const fn bundled_path(self) -> Option<&'static str> {
         Some(match self {
-            Icon::Logo => "scalable/apps/io.github.anas1412.Kurobayomi.svg",
-            Icon::LogoSymbolic => "symbolic/apps/io.github.anas1412.Kurobayomi-symbolic.svg",
+            Icon::Logo => "scalable/apps/io.github.kurobayomi.Kurobayomi.svg",
+            Icon::LogoSymbolic => "symbolic/apps/io.github.kurobayomi.Kurobayomi-symbolic.svg",
             Icon::LogoShadow => "scalable/apps/kb-logo-shadow.svg",
             Icon::AnimeLibraryOutline => "scalable/actions/kb-animelibrary-outline-symbolic.svg",
             Icon::AnimeLibraryFilled => "scalable/actions/kb-animelibrary-filled-symbolic.svg",
@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(Icon::DownloadCircle.name(), "kb-download-circle-symbolic");
         assert_eq!(Icon::ReaderContinuousVertical.name(), "kb-reader-continuous-vertical-symbolic");
         assert_eq!(Icon::Logo.name(), APP_ID);
-        assert_eq!(Icon::LogoSymbolic.name(), "io.github.anas1412.Kurobayomi-symbolic");
+        assert_eq!(Icon::LogoSymbolic.name(), "io.github.kurobayomi.Kurobayomi-symbolic");
     }
 
     #[test]
@@ -514,15 +514,15 @@ mod tests {
         assert_eq!(themed.names()[0].as_str(), "accessories-dictionary-symbolic");
         let logo = notification_icon(Icon::Logo);
         let logo = logo.downcast_ref::<gtk::gio::ThemedIcon>().expect("themed icon");
-        assert_eq!(logo.names()[0].as_str(), "io.github.anas1412.Kurobayomi");
+        assert_eq!(logo.names()[0].as_str(), "io.github.kurobayomi.Kurobayomi");
     }
 
     #[test]
     fn app_icon_is_full_colour_and_symbolic_is_separate() {
-        assert_eq!(Icon::Logo.bundled_path(), Some("scalable/apps/io.github.anas1412.Kurobayomi.svg"));
+        assert_eq!(Icon::Logo.bundled_path(), Some("scalable/apps/io.github.kurobayomi.Kurobayomi.svg"));
         assert_eq!(
             Icon::LogoSymbolic.bundled_path(),
-            Some("symbolic/apps/io.github.anas1412.Kurobayomi-symbolic.svg")
+            Some("symbolic/apps/io.github.kurobayomi.Kurobayomi-symbolic.svg")
         );
     }
 
@@ -569,7 +569,7 @@ mod tests {
     /// T-49ba-017: the full-colour app icon (黒箱 in white on a black box) keeps its colours.
     #[test]
     fn app_icon_keeps_the_launcher_colours() {
-        let text = std::fs::read_to_string(icon_file("scalable/apps/io.github.anas1412.Kurobayomi.svg")).expect("svg");
+        let text = std::fs::read_to_string(icon_file("scalable/apps/io.github.kurobayomi.Kurobayomi.svg")).expect("svg");
         for colour in ["#101012", "#ffffff"] {
             assert!(text.contains(&format!("fill=\"{colour}\"")), "missing {colour}");
         }
@@ -600,7 +600,7 @@ mod brand_tests {
     fn brand_resource_paths_point_into_the_bundle() {
         assert_eq!(
             Brand::Magnet.resource_path(),
-            "/io/github/anas1412/Kurobayomi/icons/brand/magnet.svg"
+            "/io/github/kurobayomi/Kurobayomi/icons/brand/magnet.svg"
         );
     }
 }

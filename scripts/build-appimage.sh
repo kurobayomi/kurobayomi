@@ -16,7 +16,7 @@ bin="$(readlink -f "${1:?usage: build-appimage.sh BINARY OUTPUT.AppImage}")"
 out="$(readlink -m "${2:?usage: build-appimage.sh BINARY OUTPUT.AppImage}")"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 data="$root/src/shell/data"
-id=io.github.anas1412.Kurobayomi
+id=io.github.kurobayomi.Kurobayomi
 icons="$data/icons"
 # what an AppImage updater (Gear Lever, AppImageUpdate, ...) follows: the nightly release, or the newest stable one
 update_info="gh-releases-zsync|kurobayomi|kurobayomi|latest|Kurobayomi-x86_64.AppImage.zsync"
@@ -59,9 +59,9 @@ objcopy --add-gnu-debuglink="$debug" "$appdir/usr/bin/kurobayomi"
 mkdir -p "$appdir/usr/share/icons"
 cp -r "$icons/." "$appdir/usr/share/icons/"
 # no D-Bus activation from inside an AppImage: there is no installed service file for the bus to start
-desktop="$data/io.github.anas1412.Kurobayomi.desktop"
+desktop="$data/io.github.kurobayomi.Kurobayomi.desktop"
 if [ "${CHANNEL:-stable}" = nightly ]; then
-    sed -e "s/io\.github\.anas1412\.Kurobayomi/$id/g" -e 's/^Name=Kurobayomi$/Name=Kurobayomi Nightly/' \
+    sed -e "s/io\.github\.kurobayomi\.Kurobayomi/$id/g" -e 's/^Name=Kurobayomi$/Name=Kurobayomi Nightly/' \
         -e '/^DBusActivatable=/d' -e '/^MimeType=/d' "$desktop" > "$appdir/usr/share/applications/$id.desktop"
 else
     install -m644 "$data/$id.xml" "$appdir/usr/share/mime/packages/$id.xml"

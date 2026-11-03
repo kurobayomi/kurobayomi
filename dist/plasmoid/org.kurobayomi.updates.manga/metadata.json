@@ -3,7 +3,7 @@
         "Id": "org.kurobayomi.updates.manga",
         "Name": "Updates",
         "Description": "See your recently updated library entries",
-        "Icon": "io.github.anas1412.Kurobayomi",
+        "Icon": "io.github.kurobayomi.Kurobayomi",
         "Category": "Utilities"
     },
     "KPackageStructure": "Plasma/Applet",

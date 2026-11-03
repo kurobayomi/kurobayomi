@@ -160,9 +160,9 @@ def main(source_dir, out_dir):
         symbolic_svg(compass, 16, transforms={"ring": COMPASS_RING}),
     )
     logo = vector_root(os.path.join(source_dir, "ic_ani.xml"))
-    write(os.path.join(out_dir, "symbolic", "apps", "io.github.anas1412.Kurobayomi-symbolic.svg"), symbolic_svg(logo, 16))
+    write(os.path.join(out_dir, "symbolic", "apps", "io.github.kurobayomi.Kurobayomi-symbolic.svg"), symbolic_svg(logo, 16))
     launcher = vector_root(os.path.join(source_dir, "ic_launcher_foreground.xml"))
-    write(os.path.join(out_dir, "scalable", "apps", "io.github.anas1412.Kurobayomi.svg"), colour_svg(launcher))
+    write(os.path.join(out_dir, "scalable", "apps", "io.github.kurobayomi.Kurobayomi.svg"), colour_svg(launcher))
     return 0
 
 

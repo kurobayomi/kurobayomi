@@ -1,6 +1,6 @@
 //! Desktop search provider (Kotlin `searchable.xml`, T-53a-066): the GNOME Shell `SearchProvider2` interface.
 //!
-//! GNOME reads `io.github.anas1412.Kurobayomi.search-provider.ini` (installed under the shell's search-providers folder) and
+//! GNOME reads `io.github.kurobayomi.Kurobayomi.search-provider.ini` (installed under the shell's search-providers folder) and
 //! calls the object this module serves on the session bus. A result is a library title; activating it sends the `Search`
 //! route to the running instance. KRunner reaches the same results through its GNOME-provider bridge when it is installed;
 //! no separate runner is written.
@@ -21,9 +21,9 @@ use super::argv::LaunchRequest;
 use kuro_platform::kind::Kind;
 
 #[cfg(test)]
-pub const DESKTOP_ID: &str = "io.github.anas1412.Kurobayomi.desktop";
-pub const BUS_NAME: &str = if crate::channel::NIGHTLY { "io.github.anas1412.Kurobayomi.Nightly.SearchProvider" } else { "io.github.anas1412.Kurobayomi.SearchProvider" };
-pub const OBJECT_PATH: &str = "/io/github/anas1412/Kurobayomi/SearchProvider";
+pub const DESKTOP_ID: &str = "io.github.kurobayomi.Kurobayomi.desktop";
+pub const BUS_NAME: &str = if crate::channel::NIGHTLY { "io.github.kurobayomi.Kurobayomi.Nightly.SearchProvider" } else { "io.github.kurobayomi.Kurobayomi.SearchProvider" };
+pub const OBJECT_PATH: &str = "/io/github/kurobayomi/Kurobayomi/SearchProvider";
 pub const INTERFACE: &str = "org.gnome.Shell.SearchProvider2";
 /// The icon name shown beside each result.
 pub const ICON: &str = crate::channel::APP_ID;
@@ -259,21 +259,21 @@ mod tests {
         for line in [
             "[Shell Search Provider]",
             "Version=2",
-            "DesktopId=io.github.anas1412.Kurobayomi.desktop",
-            "BusName=io.github.anas1412.Kurobayomi.SearchProvider",
-            "ObjectPath=/io/github/anas1412/Kurobayomi/SearchProvider",
+            "DesktopId=io.github.kurobayomi.Kurobayomi.desktop",
+            "BusName=io.github.kurobayomi.Kurobayomi.SearchProvider",
+            "ObjectPath=/io/github/kurobayomi/Kurobayomi/SearchProvider",
         ] {
             assert!(ini.lines().any(|l| l == line), "{line}");
         }
-        assert_eq!(ini, include_str!("data/io.github.anas1412.Kurobayomi.search-provider.ini"));
+        assert_eq!(ini, include_str!("data/io.github.kurobayomi.Kurobayomi.search-provider.ini"));
     }
 
     #[test]
     fn the_desktop_id_names_the_installed_desktop_file() {
-        let desktop = include_str!("data/io.github.anas1412.Kurobayomi.desktop");
-        assert!(desktop.contains("Icon=io.github.anas1412.Kurobayomi"));
-        assert_eq!(DESKTOP_ID, "io.github.anas1412.Kurobayomi.desktop");
-        assert_eq!(ICON, "io.github.anas1412.Kurobayomi");
+        let desktop = include_str!("data/io.github.kurobayomi.Kurobayomi.desktop");
+        assert!(desktop.contains("Icon=io.github.kurobayomi.Kurobayomi"));
+        assert_eq!(DESKTOP_ID, "io.github.kurobayomi.Kurobayomi.desktop");
+        assert_eq!(ICON, "io.github.kurobayomi.Kurobayomi");
     }
 
     #[test]

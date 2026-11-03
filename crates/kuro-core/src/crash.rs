@@ -349,7 +349,7 @@ mod tests {
         let facts = text.find("[facts]\n").expect("facts");
         let bt = text.find("[backtrace]\n").expect("backtrace");
         assert!(facts < bt);
-        assert!(text.contains("app_id: io.github.anas1412.Kurobayomi\n"));
+        assert!(text.contains("app_id: io.github.kurobayomi.Kurobayomi\n"));
         let os = kuro_platform::system::facts().into_iter().find(|(k, _)| *k == "os").expect("os").1;
         assert!(text.contains(&format!("os: {os}\n")), "{text}");
         assert!(text.ends_with("   0: kuro_core::foo::bar\n"));

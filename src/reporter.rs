@@ -10,7 +10,7 @@ use gtk::{Align, Justification, Orientation as O, gio, glib, pango};
 use crate::theme::tokens::{SPACE_M, SPACE_XL};
 
 const APP_ID: &str = crate::channel::APP_ID;
-const REPORTER_ID: &str = "io.github.anas1412.Kurobayomi.CrashReporter";
+const REPORTER_ID: &str = "io.github.kurobayomi.Kurobayomi.CrashReporter";
 fn no_details() -> String {
     tr(MsgKey::crash_no_details)
 }

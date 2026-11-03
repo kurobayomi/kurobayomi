@@ -5,7 +5,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 root="${1:-dist/icons/hicolor}"
-id=io.github.anas1412.Kurobayomi
+id=io.github.kurobayomi.Kurobayomi
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
 for f in "$root/scalable/apps/$id.svg" "$root/512x512/apps/$id.png" "$root/scalable/apps/$id.Devel.svg"; do

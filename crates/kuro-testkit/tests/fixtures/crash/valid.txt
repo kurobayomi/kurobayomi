@@ -4,7 +4,7 @@ thread: kuro-rt
 location: crates/kuro-core/src/foo.rs:42:9
 message: boom
 [facts]
-app_id: io.github.anas1412.Kurobayomi
+app_id: io.github.kurobayomi.Kurobayomi
 app_version: 0.1.0 (abc1234, 1, 2026-10-08T14:00:00Z)
 os: linux x86_64
 [backtrace]

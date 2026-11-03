@@ -86,7 +86,7 @@ mod tests {
 
     #[test]
     fn app_id_and_version_code() {
-        assert_eq!(APP_INFO.app_id, "io.github.anas1412.Kurobayomi");
+        assert_eq!(APP_INFO.app_id, "io.github.kurobayomi.Kurobayomi");
         assert_eq!(APP_INFO.version_code, 1);
     }
 

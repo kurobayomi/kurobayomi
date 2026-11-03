@@ -4,12 +4,12 @@ Name=Kurobayomi
 GenericName=Manga and anime reader
 Comment=Read manga and watch anime
 Exec=kurobayomi %U
-Icon=io.github.anas1412.Kurobayomi
+Icon=io.github.kurobayomi.Kurobayomi
 Terminal=false
 Categories=AudioVideo;Video;Player;
 StartupNotify=true
 DBusActivatable=true
-StartupWMClass=io.github.anas1412.Kurobayomi
+StartupWMClass=io.github.kurobayomi.Kurobayomi
 MimeType=application/x-tachibk;x-scheme-handler/kurobayomi;
 Actions=show-library;show-animelib;show-updates;show-history;show-browse;
 

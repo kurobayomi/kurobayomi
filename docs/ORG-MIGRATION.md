@@ -15,7 +15,7 @@ Names (free on 2026-10-23, confirm when creating):
 Done: both organizations; the transfers; `kurobayomi/kurobayomi` on the new owner (CI green); `tsuikabako/extensions-source`
 public, publishing to `tsuikabako/extensions` (index checked: 12 sources, every checksum matches, the old link serves it);
 the website live. Deploy keys were allowed on the `tsuikabako` organization for the publish key. Open: release 0.1.6
-(it carries the automatic link move); step 6 (app ID) undecided. History was not rewritten: earlier commits in the
+(it carries the automatic link move). Step 6 (app ID) followed on 2026-11-03. History was not rewritten: earlier commits in the
 `tsuikabako` repositories still name anas1412; new ones in the local clones use the author "Tsuikabako".
 
 ## Step 1: one place for the app's identity (done, 2026-10-23)
@@ -129,15 +129,22 @@ A repository `tsuikabako/tsuikabako.github.io`, built with VitePress and publish
   `tachiyomi://` links already do (`src/shell/uri.rs`), plus a test.
 - The extensions READMEs link to the website; the app's README does not (it names no repository).
 
-## Step 6 (decide later): the app ID
+## Step 6 (done 2026-11-03): the app ID
 
-Every Linux app has an ID; ours is `io.github.anas1412.Kurobayomi`, with the personal account name in it. Once the
-`kurobayomi` organization exists it can become `io.github.kurobayomi.Kurobayomi` (and `.Nightly`).
+Every Linux app has an ID. Ours was `io.github.anas1412.Kurobayomi`, with the personal account name in it; it is now
+`io.github.kurobayomi.Kurobayomi` (and `.Nightly`).
 
-- Library, settings and downloads stay: the data folders are named `kurobayomi`, not after the ID.
-- On first start the app removes its old menu entry and icons and installs the new ones.
-- Flathub would then check the `kurobayomi` organization instead of the personal account.
-- With `identity.toml` in place this is one line plus the cleanup of the old menu entry.
+- Library, settings and downloads stay: the data folders are named `kurobayomi`, not after the ID. Tracker logins stay
+  too: the secret store's service is `kurobayomi`, and the `kurobayomi://` login links do not hold the ID.
+- `identity.toml` keeps the old ID in `old_app_ids`; `build.rs` hands it to the app. At every start the AppImage first
+  removes the launcher, icons and file types it installed under an old ID (`appimage_integrate::forget_old_ids`), then
+  installs the new ones. The order matters: the old launcher starts the same AppImage, so it would otherwise pass for
+  another tool's launcher and the app would add none.
+- What users notice: a dock or taskbar pin of the old launcher has to be pinned again, and desktop notification
+  settings start from the defaults (both are kept per app ID). Launchers made by Gear Lever or AppImageLauncher keep
+  the old icon name until those tools integrate the AppImage again.
+- Flathub would check the `kurobayomi` organization instead of the personal account.
+- Windows is not affected: the installer does not use the app ID.
 
 ## Final check
 

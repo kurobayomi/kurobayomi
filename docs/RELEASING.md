@@ -8,7 +8,7 @@ Two channels, both built by GitHub Actions as an AppImage for Linux and an insta
 | Trigger | every push to `main` that passes CI (`appimage.yml`) | a tag `vX.Y.Z` (`release.yml`) |
 | Release | one rolling prerelease, tag `nightly`, replaced in place | one normal release per tag, shown as "Latest" |
 | File | `Kurobayomi-nightly-x86_64.AppImage` (+ `.zsync`), `Kurobayomi-Nightly-Setup-x86_64.exe` | `Kurobayomi-x86_64.AppImage` (+ `.zsync`), `Kurobayomi-Setup-x86_64.exe`, `SHA256SUMS` |
-| App | `io.github.anas1412.Kurobayomi.Nightly`, gold icon, own data folders | `io.github.anas1412.Kurobayomi` |
+| App | `io.github.kurobayomi.Kurobayomi.Nightly`, gold icon, own data folders | `io.github.kurobayomi.Kurobayomi` |
 | Updates | updates itself from the `nightly` release | the AppImage and the installed Windows copy update themselves from the latest release (`SHA256SUMS` when GitHub gives no digest); another build only shows the notice |
 | Windows | installs beside stable, takes no `kurobayomi://` links or `.tachibk` files | registers `kurobayomi://` and `.tachibk` |
 

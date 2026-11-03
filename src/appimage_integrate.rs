@@ -70,8 +70,8 @@ fn write_if_changed(path: &Path, contents: &[u8]) -> std::io::Result<bool> {
     Ok(true)
 }
 
-/// The files of `dir` and below whose name starts with the app id (the app's icons), relative to `dir`.
-fn own_files(dir: &Path) -> Vec<PathBuf> {
+/// The files of `dir` and below whose name `keep` accepts, relative to `dir`.
+fn files_under(dir: &Path, keep: impl Fn(&str) -> bool) -> Vec<PathBuf> {
     let mut found = Vec::new();
     let mut pending = vec![dir.to_path_buf()];
     while let Some(folder) = pending.pop() {
@@ -79,12 +79,50 @@ fn own_files(dir: &Path) -> Vec<PathBuf> {
             let path = entry.path();
             if path.is_dir() {
                 pending.push(path);
-            } else if path.file_name().is_some_and(|n| n.to_string_lossy().starts_with(APP_ID)) {
+            } else if path.file_name().is_some_and(|n| keep(&n.to_string_lossy())) {
                 found.extend(path.strip_prefix(dir).ok().map(Path::to_path_buf));
             }
         }
     }
     found
+}
+
+/// The files of `dir` and below whose name starts with the app id (the app's icons), relative to `dir`.
+fn own_files(dir: &Path) -> Vec<PathBuf> {
+    files_under(dir, |name| name.starts_with(APP_ID))
+}
+
+/// The launcher, file types and icons this channel put in `data_home` under an earlier app id. Only the names of that
+/// one id count (`<id>.png`, `<id>-symbolic.svg`), so the other channel's files stay.
+fn old_id_files(data_home: &Path) -> Vec<PathBuf> {
+    let icons = data_home.join("icons");
+    let mut found = Vec::new();
+    for id in crate::channel::old_app_ids() {
+        found.push(data_home.join(format!("applications/{id}.desktop")));
+        found.push(data_home.join(format!("mime/packages/{id}.xml")));
+        let symbolic = format!("{id}-symbolic");
+        let named = |name: &str| Path::new(name).file_stem().is_some_and(|stem| stem == id.as_str() || stem == symbolic.as_str());
+        found.extend(files_under(&icons, named).into_iter().map(|icon| icons.join(icon)));
+    }
+    found.retain(|file| file.exists());
+    found
+}
+
+/// Takes the files of an earlier app id out of `data_home`. This runs before anything else at start: a launcher left
+/// under an old id starts this same AppImage, so it would pass for another tool's and keep the new one out.
+fn forget_old_ids(data_home: &Path) -> std::io::Result<Changed> {
+    let mut changed = Changed::default();
+    for file in old_id_files(data_home) {
+        std::fs::remove_file(&file)?;
+        if file.starts_with(data_home.join("applications")) {
+            changed.launcher = true;
+        } else if file.starts_with(data_home.join("mime")) {
+            changed.file_types = true;
+        } else {
+            changed.icons = true;
+        }
+    }
+    Ok(changed)
 }
 
 /// What changed, so the menu's, the icons' and the file types' caches are renewed only then.
@@ -122,13 +160,18 @@ fn integrate(appimage: &Path, appdir: &Path, data_home: &Path) -> std::io::Resul
     Ok(changed)
 }
 
-/// Takes the app's launcher, icons and file types out of `data_home`.
+/// Takes the app's launcher, icons and file types out of `data_home`, those of an earlier app id included.
 fn unintegrate(data_home: &Path) -> std::io::Result<Changed> {
+    let old = forget_old_ids(data_home)?;
     let own = data_home.join(format!("applications/{APP_ID}.desktop"));
     let types = data_home.join(format!("mime/packages/{APP_ID}.xml"));
     let icons = data_home.join("icons");
     let own_icons = own_files(&icons);
-    let changed = Changed { launcher: own.exists(), icons: !own_icons.is_empty(), file_types: types.exists() };
+    let changed = Changed {
+        launcher: old.launcher || own.exists(),
+        icons: old.icons || !own_icons.is_empty(),
+        file_types: old.file_types || types.exists(),
+    };
     for file in [own, types] {
         if file.exists() {
             std::fs::remove_file(file)?;
@@ -222,10 +265,22 @@ pub fn set_removed_by_user(removed: bool) {
     }
 }
 
-/// The start of an AppImage: it adds itself to the applications menu, or brings its launcher up to date (a moved
-/// AppImage). Any other build, an AppImage another tool manages, or one the user took out of the menu does nothing.
+/// The start of an AppImage: it first takes away what it installed under an earlier app id, then adds itself to the
+/// applications menu, or brings its launcher up to date (a moved AppImage). Any other build, an AppImage another tool
+/// manages, or one the user took out of the menu adds nothing.
 pub fn startup() {
-    if available() && !managed_elsewhere() && !removed_by_user() {
+    if !available() {
+        return;
+    }
+    let data_home = gtk::glib::user_data_dir();
+    match forget_old_ids(&data_home) {
+        Ok(changed) if changed != Changed::default() => {
+            std::thread::spawn(move || renew_after(&changed, &data_home));
+        }
+        Ok(_) => {}
+        Err(error) => tracing::warn!(%error, "the menu files of an earlier app id could not be removed"),
+    }
+    if !managed_elsewhere() && !removed_by_user() {
         add();
     }
 }
@@ -288,5 +343,34 @@ mod tests {
         assert!(!own.exists() && !data.join("icons").join(&icon).exists(), "taken out of the menu");
         assert!(!data.join(format!("mime/packages/{APP_ID}.xml")).exists());
         assert_eq!(unintegrate(&data).unwrap(), Changed::default(), "nothing left to remove");
+    }
+
+    /// A launcher left under an earlier app id starts the same AppImage, so it passes for another tool's until it goes.
+    /// Only that id's own files go: another app's icon stays.
+    #[cfg(unix)]
+    #[test]
+    fn the_files_of_an_earlier_app_id_go_first_so_the_new_launcher_is_added() {
+        let old = crate::channel::old_app_ids().next().expect("identity.toml names an earlier app id");
+        let dir = tempfile::tempdir().unwrap();
+        let data = dir.path().join("share");
+        let appimage = dir.path().join("Kurobayomi.AppImage");
+        let applications = data.join("applications");
+        std::fs::create_dir_all(&applications).unwrap();
+        std::fs::write(applications.join(format!("{old}.desktop")), format!("[Desktop Entry]\nExec={} %U\n", appimage.display())).unwrap();
+        let apps = data.join("icons/hicolor/scalable/apps");
+        std::fs::create_dir_all(&apps).unwrap();
+        for icon in [format!("{old}.svg"), format!("{old}-symbolic.svg"), "other.svg".to_owned()] {
+            std::fs::write(apps.join(icon), b"svg").unwrap();
+        }
+        std::fs::create_dir_all(data.join("mime/packages")).unwrap();
+        std::fs::write(data.join(format!("mime/packages/{old}.xml")), b"<mime/>").unwrap();
+        let own = applications.join(format!("{APP_ID}.desktop"));
+        assert!(launched_elsewhere(&applications, &own, &appimage), "the old launcher looks like another tool's");
+
+        assert_eq!(forget_old_ids(&data).unwrap(), Changed { launcher: true, icons: true, file_types: true });
+        assert!(!launched_elsewhere(&applications, &own, &appimage));
+        assert!(!apps.join(format!("{old}.svg")).exists() && !apps.join(format!("{old}-symbolic.svg")).exists());
+        assert!(apps.join("other.svg").exists(), "another app's icon stays");
+        assert_eq!(forget_old_ids(&data).unwrap(), Changed::default(), "nothing left to remove");
     }
 }

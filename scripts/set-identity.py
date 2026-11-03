@@ -64,13 +64,20 @@ def apply(old: dict, new: dict) -> None:
             (ROOT / target).parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "mv", path, target], cwd=ROOT, check=True)
             print(f"renamed {path} -> {target}")
-    IDENTITY.write_text(rewrite_identity(IDENTITY.read_text(encoding="utf-8"), new), encoding="utf-8")
+    old_ids = [i for i in old.get("old_app_ids", []) if i != new["app_id"]]
+    if old["app_id"] != new["app_id"] and old["app_id"] not in old_ids:
+        old_ids.append(old["app_id"])
+    IDENTITY.write_text(rewrite_identity(IDENTITY.read_text(encoding="utf-8"), new, old_ids), encoding="utf-8")
 
 
-def rewrite_identity(text: str, new: dict) -> str:
+def rewrite_identity(text: str, new: dict, old_ids: list[str]) -> str:
     for key, value in new.items():
         text = re.sub(rf'^{key} = ".*"$', f'{key} = "{value}"', text, flags=re.M)
-    return text
+    # the AppImage takes the menu files of these IDs away (build.rs hands them over)
+    line = "old_app_ids = [" + ", ".join(f'"{i}"' for i in old_ids) + "]"
+    if re.search(r"^old_app_ids = .*$", text, flags=re.M):
+        return re.sub(r"^old_app_ids = .*$", line, text, flags=re.M)
+    return text.rstrip("\n") + "\n" + line + "\n" if old_ids else text
 
 
 def problems(identity: dict) -> list[str]:
@@ -108,7 +115,7 @@ def main() -> int:
         print("FAILED: run scripts/set-identity.py, or fix the lines above" if found else "OK: every file agrees with identity.toml")
         return 1 if found else 0
     new = {"owner": args.owner or old["owner"], "repo": args.repo or old["repo"], "app_id": args.app_id or old["app_id"]}
-    if new == old:
+    if all(new[key] == old[key] for key in new):
         print("identity.toml already says that")
         return 0
     apply(old, new)

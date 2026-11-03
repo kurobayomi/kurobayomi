@@ -234,5 +234,5 @@ fn a_formatted_sentence_is_caught_and_values_alone_are_not() {
 fn english_words_are_told_from_identifiers_and_urls() {
     assert!(is_english_words("Check for updates") && is_english_words("Delete"));
     assert!(!is_english_words("view-refresh-symbolic") && !is_english_words("https://example.org") && !is_english_words("GTK"));
-    assert!(!is_english_words("kb-status") && !is_english_words("io.github.anas1412.Kurobayomi"));
+    assert!(!is_english_words("kb-status") && !is_english_words("io.github.kurobayomi.Kurobayomi"));
 }
