@@ -147,7 +147,7 @@ mod tests {
         assert_eq!(lookup("track_token"), None);
     }
 
-    /// The plan ignores the un-prefixed legacy copy of this counter (T-11a-023), while the registry keeps the key for the
+    /// The import ignores the un-prefixed legacy copy of this counter (T-11a-023), while the registry keeps the key for the
     /// updates badge, as Aniyomi does. A backup's old count is not imported; the app recounts it.
     const LIVE_AND_IGNORED: [&str; 1] = ["library_unseen_updates_count"];
 

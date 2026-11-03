@@ -2,7 +2,7 @@
 //! `http://localhost:<port>` and this server answers each request through a [`LocalHandler`]. The server cuts a
 //! `Range` request out of the whole resource, so mpv and ffmpeg can seek.
 //!
-//! ponytail: std threads, one per connection, and a blocking handler. The plan's axum server would add a crate and a
+//! ponytail: std threads, one per connection, and a blocking handler. An axum server would add a crate and a
 //! runtime for one localhost socket. Upgrade to an async server if a handler needs to await inside a connection.
 
 use std::collections::HashMap;

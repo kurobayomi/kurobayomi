@@ -49,7 +49,7 @@ notification delivery are injected by the GUI crate.
 | `local` | local manga source counts (directories and archives) and recursive size (T-23a-042) |
 | `redact` | log redaction: URL query, fragment and userinfo removed, header values replaced by `<redacted>` (T-24a-060) |
 | `comicinfo` | `ComicInfo.xml` writer: element order, number and status text, `Web` value (T-23a-021) |
-| `settings` | download preference keys and defaults (`PREFERENCE_KEYS`, data section 3), speed limit KiB/s to bytes/s (T-24a-054, T-25a-002, T-25a-003, T-25a-005) |
+| `settings` | download preference keys and defaults (`PREFERENCE_KEYS`), speed limit KiB/s to bytes/s (T-24a-054, T-25a-002, T-25a-003, T-25a-005) |
 
 ## Decisions
 

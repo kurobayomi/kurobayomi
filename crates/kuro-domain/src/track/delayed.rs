@@ -3,7 +3,7 @@
 //! and entry kind, and the worker replays it once the device is online.
 //!
 //! The replay itself (`TrackChapter` / `TrackEpisode` with `setup_job_on_failure = false`) is behind [`TrackReplay`], so the
-//! worker has no tracker code. Decision: the queue is this JSON file, as the area 10 plan says. `kuro-track` has its own
+//! worker has no tracker code. Decision: the queue is this JSON file. `kuro-track` has its own
 //! `track_retry_queue` table with a different policy (doubling backoff to 5 hours, items kept after the last run); the app
 //! must use one of the two, and this one follows the acceptance text.
 

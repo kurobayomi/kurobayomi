@@ -1,7 +1,7 @@
 //! Serialized `SerializableVideo` and `SerializableHoster` JSON (`model/Video.kt`, `model/Hoster.kt`; T-16a-018).
 //!
 //! Writes every key, nulls included (Kotlin `explicitNulls = true`, `encodeDefaults = true`). Reads ignore unknown keys
-//! (the superset tolerance of data section 5.1). A hoster without `internalData` fails to decode, as in Kotlin.
+//! (superset tolerance). A hoster without `internalData` fails to decode, as in Kotlin.
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -74,7 +74,7 @@ struct WireHoster {
     hoster_url: String,
     #[serde(default)]
     hoster_name: String,
-    /// Nested JSON text of a video list, not an array (data section 5.2).
+    /// Nested JSON text of a video list, not an array.
     video_list: Option<String>,
     /// Required on read: a missing key is a decode error.
     internal_data: String,

@@ -15,7 +15,7 @@ fn t2_search_01_id_form_matches_only_that_id() {
     let f = fields(42, "x", &[]);
     assert!(hit("id:42", &f));
     assert!(!hit("id:42", &fields(43, "x", &[])));
-    // the plan says `ID:42` also matches, but E-01 asks for upstream's results: the prefix is read case-insensitively
+    // `ID:42` does not match, as upstream: the prefix is read case-insensitively
     // and the value is cut at a case-sensitive `id:`, so the upper-case form never parses and matches nothing
     assert!(!hit("ID:42", &f));
 }

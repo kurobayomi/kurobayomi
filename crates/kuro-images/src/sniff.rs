@@ -1,9 +1,9 @@
-//! `ImageFormat`, `sniff` and `is_image` from magic bytes (area:34 behavior section 17).
+//! `ImageFormat`, `sniff` and `is_image` from magic bytes.
 
-/// Only this many leading bytes are inspected (behavior section 17.2).
+/// Only this many leading bytes are inspected.
 const SNIFF_LEN: usize = 32;
 
-/// The seven image types of Kotlin's `ImageType` (data section 6.1). The extension of JPEG is `jpg`.
+/// The seven image types of Kotlin's `ImageType`. The extension of JPEG is `jpg`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImageFormat {
     Avif,
@@ -82,7 +82,7 @@ pub fn sniff(bytes: &[u8]) -> Option<ImageFormat> {
     None
 }
 
-/// Whether a file is an image (behavior section 17.3). A missing name is not an image. Otherwise the
+/// Whether a file is an image. A missing name is not an image. Otherwise the
 /// extension after the last `.` (case-sensitive) decides, and sniffing the bytes is the fallback.
 pub fn is_image(name: Option<&str>, bytes: &[u8]) -> bool {
     let Some(name) = name else {

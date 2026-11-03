@@ -1,4 +1,4 @@
-//! `ComicInfo.xml` writer (T-23a-021; data section 2.4 of area 23, behaviour 10.10 and the status table of Kotlin
+//! `ComicInfo.xml` writer (T-23a-021; the status table of Kotlin
 //! `ComicInfoPublishingStatus`). The file goes into the chapter folder before it is packed as a CBZ.
 //!
 //! Element order is the one of the Kotlin data class. Fields that are null in Kotlin (`Inker`, `Colorist`, `Letterer`,

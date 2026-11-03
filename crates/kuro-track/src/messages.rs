@@ -7,7 +7,7 @@ use crate::mal::messages as mal_text;
 /// The English catalogue. Included so that a missing file fails the build of this crate.
 pub const EN_CATALOGUE: &str = include_str!("../../kuro-i18n/locales/en/kurobayomi.ftl");
 
-/// Fluent ids of the user-visible strings of behaviour section 18, all present in the English catalogue.
+/// Fluent ids of the user-visible tracking strings, all present in the English catalogue.
 pub const SECTION_18_IDS: &[&str] = &[
     "pref_category_tracking",
     "tracking_guide",
@@ -189,7 +189,7 @@ pub enum MsgKey {
     Enhanced { key: &'static str, arg: String },
     /// "HTTP %d, check website in WebView" (`exception_http`), a server answer other than success (T-31a-041).
     HttpStatus(u16),
-    /// `track_error` with a fixed detail key instead of free text (T-31a-041, design section 10).
+    /// `track_error` with a fixed detail key instead of free text (T-31a-041).
     TrackerDetail {
         tracker: String,
         detail: TrackDetail,

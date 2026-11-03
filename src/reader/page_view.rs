@@ -327,7 +327,7 @@ mod imp {
             self.zoom.set(z);
             self.fitted.set(Some(key));
             if (z.scale - before.scale).abs() > 1e-9 {
-                // Every scale change reports, the first fit included (behaviour section 9.1). Deferred, because this
+                // Every scale change reports, the first fit included. Deferred, because this
                 // runs inside a snapshot.
                 let weak = self.obj().downgrade();
                 glib::idle_add_local_once(move || {

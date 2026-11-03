@@ -1,6 +1,6 @@
 //! Per-source preferences (`ConfigurableSource.kt`, T-15a-019). Decision: values live in the app `PrefStore` under
 //! `source_<id>.<key>`, the namespace `kuro-source-wasm` and `kuro-backup` already use, not in a `source_prefs` table
-//! (p1-rust-design section 7, Option A): the table would need a `kuro-db` migration, and the store already gives one
+//! (Option A): the table would need a `kuro-db` migration, and the store already gives one
 //! typed value per key plus change events. Backup reads [`SourcePrefs::entries`]; restore writes
 //! [`SourcePrefs::restore`], which needs no installed source (EC-PR-07).
 

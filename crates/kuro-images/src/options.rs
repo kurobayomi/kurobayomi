@@ -1,6 +1,6 @@
-//! `LoadOptions`, `CachePolicy`, `RequestSize` and `Scale` (area:34 behavior section 3 and data section 7).
+//! `LoadOptions`, `CachePolicy`, `RequestSize` and `Scale`.
 
-/// Whether each cache layer is read and written (behavior section 3.3).
+/// Whether each cache layer is read and written.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CachePolicy {
     #[default]
@@ -25,7 +25,7 @@ impl CachePolicy {
 pub enum RequestSize {
     #[default]
     Original,
-    /// Target pixels. `(0, 0)` is undefined and samples at 1 (behavior section 15.1, edge E-IMG-7).
+    /// Target pixels. `(0, 0)` is undefined and samples at 1 (edge E-IMG-7).
     Pixels { width: u32, height: u32 },
 }
 
@@ -45,7 +45,7 @@ pub enum Priority {
     High,
 }
 
-/// Per-request options (behavior section 3). Defaults are Coil's, plus `use_custom_cover`, the only
+/// Per-request options. Defaults are Coil's, plus `use_custom_cover`, the only
 /// Kotlin extra that defaults to true.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LoadOptions {
@@ -79,8 +79,8 @@ impl Default for LoadOptions {
 }
 
 impl LoadOptions {
-    /// Options of a webtoon reader page: no memory or disk cache, the native decoder, and the crop setting
-    /// (behavior section 3.2). The crossfade length comes from `motion::crossfade`.
+    /// Options of a webtoon reader page: no memory or disk cache, the native decoder, and the crop setting.
+    /// The crossfade length comes from `motion::crossfade`.
     pub fn webtoon_page(crop_borders: bool) -> Self {
         Self {
             crop_borders,

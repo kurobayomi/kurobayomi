@@ -35,7 +35,7 @@
 //! Decisions recorded here so they are not mistaken for gaps:
 //! - Volume keys (T-43a-071 against T-44a-015): the paging stays, as the opt-in of T-44a-015. `reader_volume_keys` is off by
 //!   default, the keys are claimed only while it is on and the menu is hidden (`viewers::keys`), and the preference keys are
-//!   kept. T-43a-071 (P3, drop) is read as "not used by default"; the plan text of T-43a-071 should be amended to say so.
+//!   kept. T-43a-071 (P3, drop) is read as "not used by default".
 //! - The reader settings live in the top bar's menu (`chrome::overflow_menu`), the open manga's own values, written at
 //!   once so the reader follows them live; Settings > Reader holds the defaults. There is no reader settings window.
 //! - The reader's top bar is the shared header of `widgets::page_header`, the same design as the player's. Pages open at the

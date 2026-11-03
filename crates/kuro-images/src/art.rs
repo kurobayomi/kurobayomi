@@ -1,4 +1,4 @@
-//! `ArtRef`, `ArtKind` and `Kind`: one input type for manga and anime covers (area:34 behavior section 4 and 10).
+//! `ArtRef`, `ArtKind` and `Kind`: one input type for manga and anime covers.
 
 use kuro_platform::kind::Kind;
 use crate::cover_paths::Family;
@@ -18,7 +18,7 @@ pub enum ArtKind {
 ///
 /// Library entries, list projections (`MangaCover`, `AnimeCover`) and anime requests with `use_background`
 /// all reduce to this shape. `ArtRef::anime_entry` picks `kind` from `use_background`, so `Background` is only
-/// set for an anime request with `use_background` (behavior section 4.2).
+/// set for an anime request with `use_background`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArtRef {
     pub owner: Kind,
@@ -27,14 +27,14 @@ pub struct ArtRef {
     pub kind: ArtKind,
     /// Thumbnail URL for covers, background URL for backgrounds. `None` when the source gave none.
     pub url: Option<String>,
-    /// `favorite` of the entry. Library entries write and promote cover files (behavior section 6.1).
+    /// `favorite` of the entry. Library entries write and promote cover files.
     pub favorite: bool,
     /// `cover_last_modified` or `background_last_modified`, in epoch milliseconds.
     pub last_modified: i64,
 }
 
 impl ArtRef {
-    /// The image an anime entry shows for one request (behavior section 4.2, `AnimeFactory`). With
+    /// The image an anime entry shows for one request (`AnimeFactory`). With
     /// `use_background` it is the background: its URL, its timestamp and `ArtKind::Background`. Otherwise it is
     /// the thumbnail. `cover` and `background` are `(url, last_modified)` pairs. Cover projections
     /// (`AnimeCover`) build `ArtKind::Cover` directly and ignore the option, as Kotlin's cover-only factory does.

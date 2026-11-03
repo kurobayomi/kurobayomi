@@ -19,9 +19,9 @@ use crate::notify;
 pub const TICK: Duration = Duration::from_secs(600);
 /// Base of the retry backoff and the deferral retry (B-18).
 pub const RETRY_BASE: Duration = Duration::from_secs(600);
-/// The first check after start waits so the library can load (topic section 2.1).
+/// The first check after start waits so the library can load.
 pub const FIRST_TICK_DELAY: Duration = Duration::from_secs(60);
-/// Battery threshold on battery power (topic section 2.2, Proposal).
+/// Battery threshold on battery power (Proposal).
 pub const DEFAULT_MIN_BATTERY_PERCENT: u8 = 15;
 
 const HOUR_MS: i64 = 3_600_000;
@@ -118,7 +118,7 @@ pub fn decide(
 /// What the loop needs from the app. Implemented over the settings, the database and the platform.
 pub trait AutoHost: Send + Sync + 'static {
     fn now_ms(&self) -> i64;
-    /// Re-read on every tick, so a run started elsewhere is seen (topic section 4).
+    /// Re-read on every tick, so a run started elsewhere is seen.
     fn last_auto_ms(&self) -> i64;
     fn restore_running(&self) -> bool;
     fn power(&self) -> PowerState;

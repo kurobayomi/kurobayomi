@@ -18,7 +18,7 @@ pub fn speed_label(speed: f32) -> String {
 pub const SPEED_MIN: f32 = 0.01;
 pub const SPEED_MAX: f32 = 6.0;
 
-/// Keyboard step on the desktop: 0.05, or 0.01 with Shift (p2-ui-parity section 3.2).
+/// Keyboard step on the desktop: 0.05, or 0.01 with Shift.
 pub fn keyboard_step(shift: bool) -> f32 {
     if shift { 0.01 } else { 0.05 }
 }

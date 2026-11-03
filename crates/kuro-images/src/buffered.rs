@@ -1,4 +1,4 @@
-//! In-memory byte source: page data the reader already holds (area:34 behavior section 4.3, T-34a-024).
+//! In-memory byte source: page data the reader already holds (T-34a-024).
 
 use bytes::Bytes;
 

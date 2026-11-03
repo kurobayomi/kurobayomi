@@ -93,7 +93,7 @@ const fn of(parts: &[Tables]) -> Tables {
     Tables(bits)
 }
 
-// Dependency sets of the live queries (plan section 3.4). A query subscribes to the tables it reads.
+// Dependency sets of the live queries. A query subscribes to the tables it reads.
 pub const ENTRY_DEPS: Tables = Tables::ENTRIES;
 pub const LIBRARY_DEPS: Tables =
     of(&[Tables::ENTRIES, Tables::ITEMS, Tables::EXCLUDED_SCANLATORS, Tables::HISTORY, Tables::ENTRY_CATEGORIES]);

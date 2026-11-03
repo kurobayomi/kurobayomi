@@ -54,7 +54,7 @@ All extension code together is 2,608 `.kt` files and 295,855 lines (counted with
 
 Everything else has a default: `getMangaByUrl` (paste a link to open a title), related titles, a lazy per-page image address, filters fetched from the network, settings screens, and so on. The site name, language, address and source id are not written by hand; the build tool generates them from `build.gradle.kts`.
 
-**Two findings that change the plan's wording:**
+**Two findings:**
 - The older class `ParsedHttpSource` (CSS selectors split into small hooks) is gone from `src/` and `lib-multisrc/`: `rg -l ParsedHttpSource` finds 0 files. `CONTRIBUTING.md` calls it deprecated. 45 extensions still use the old `libVersion = "1.4"` API (`HttpSource`); 1,386 use `1.6` (`KeiSource`). So "class A = ParsedHttpSource" cannot be counted. I counted the HTML-parsing calls instead (section 3).
 - The source id is the same MD5-based id as Aniyomi. Our `kuro-source/src/id.rs` uses the same recipe, so a port with the same name, language and version keeps users' library entries. The index ids (for example `6289731484943315811`) are Aniyomi-compatible.
 
@@ -199,7 +199,7 @@ The ten themes cover 526 extensions, 36.8% of the repo. The top 1 covers 18.0%, 
 
 ## 5. What Kotlin extensions rely on, mapped to our contract
 
-Checked against the real files, not the plan text: `crates/kuro-source-wasm/wit/kuro-source.wit`, `crates/kuro-source-wasm/src/{bridge,wire,source,manifest,limits,startup}.rs`, `crates/kuro-source-http/src/{image,html,parsed}.rs` and `crates/kuro-net/src`.
+Checked against the real files: `crates/kuro-source-wasm/wit/kuro-source.wit`, `crates/kuro-source-wasm/src/{bridge,wire,source,manifest,limits,startup}.rs`, `crates/kuro-source-http/src/{image,html,parsed}.rs` and `crates/kuro-net/src`.
 
 **What the real WIT is.** Package `kuro:source@1.4.0`. A guest imports four host functions: `http(request-json)`, `pref-get(key)`, `pref-set(key, value-json)` and `log(level, message)`. It exports one function: `invoke(op, input-json)`, with ops `info`, `create-sources`, `popular`, `latest`, `search`, `details`, `chapters`, `pages`. The host links only that `host` interface (`source.rs`, `Guest::new`), so a guest that imports anything else (for example WASI clocks) should fail to start (not tested).
 
@@ -226,7 +226,7 @@ Counts below are over `src/` and `lib-multisrc/` (extension and theme) with `rg 
 | Page image address found lazily (`getImageUrl`) | 74 files | `Page` holds `url` and `image_url` only. A guest must resolve every image address inside `pages`, costing one request per page. | Missing |
 | Custom image request headers (Referer and so on) | `imageRequest` override in 101 files | `Page` carries no headers (`wire.rs`). | Missing |
 | Image descrambling, decrypting, stitching | 130 ext with image-drawing code; 53 ext rewrite response bodies | The reader fetches images itself. A guest can fetch bytes through `http` but has no way to hand bytes back. Not checked: whether the reader accepts `data:` addresses. | Missing |
-| Current time (relative dates like "2 days ago") | 185 ext folders and 22 themes | No clock in the WIT. The plan lists one, the code does not. | Missing |
+| Current time (relative dates like "2 days ago") | 185 ext folders and 22 themes | No clock in the WIT. | Missing |
 | WebView (login token, challenge page, JS execution) | 54 ext | `kuro-platform` has a `WebViewHost`, but it is not exposed to guests. | Missing |
 | JavaScript engines | QuickJs or Synchrony in 12 ext; unpacker in 11 | The guest can carry its own code (the unpacker is 109 lines). A full engine would need a host function or an embedded interpreter. | Partial |
 | Crypto (AES, HMAC, MD5, XOR) | 135 C ext | Plain code inside the guest (Rust crates). No host function needed. | OK |
@@ -275,7 +275,7 @@ The 1,431 `index.json` entries match the 1,431 extension folders. The content-wa
 
 **What this means.**
 - If we want to read keiyoushi's index (for example to show "this source has a port available" or to match source ids), read `index.json`. Do not read `index.pb` unless we add a protobuf dependency, and do not read `index.min.json` at all.
-- Our own repo format is separate and can keep the plan's shape. Keeping the two index shapes straight in code is the only risk.
+- Our own repo format is separate and can keep its own shape. Keeping the two index shapes straight in code is the only risk.
 - Binaries in release assets exist because of GitHub size limits on APKs. Our `.kuroext` files are small and could live in the branch itself. Not measured.
 - I did not find out what consumes the `jarUrl` files. The build produces a signed JAR per extension (`CreateExtensionJarTask.kt`, `SignExtensionJarTask.kt`) and the index schema labels the field as a divergence from upstream.
 

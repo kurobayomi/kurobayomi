@@ -71,7 +71,7 @@ impl std::fmt::Debug for OAuthClient {
     }
 }
 
-/// One library row for a catalogue record (`ShikiLibEntry`, section 3.4 of the design). `library_id` is the user-rate
+/// One library row for a catalogue record (`ShikiLibEntry`). `library_id` is the user-rate
 /// id. The catalogue id stays the track's `remote_id`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LibEntry {

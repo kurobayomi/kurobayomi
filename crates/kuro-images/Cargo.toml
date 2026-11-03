@@ -13,7 +13,7 @@ default = ["avif", "jxl"]
 avif = ["image/avif-native"]
 # JPEG XL stills through jxl-oxide. Without it a JXL file is `UnsupportedFormat`.
 jxl = ["dep:jxl-oxide"]
-# Display ICC profile through lcms2 (system liblcms2). Off by default (T-34a-031, design section 9).
+# Display ICC profile through lcms2 (system liblcms2). Off by default (T-34a-031).
 icc = ["dep:lcms2"]
 # HEIF and HEIC stills through the system libheif. Off by default: it needs the `libheif` package to
 # build and run. Without the feature a HEIF file is `DecodeInit` ("Failed to initialize decoder").

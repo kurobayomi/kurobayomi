@@ -1,4 +1,4 @@
-//! Decision logic for `prep_update_cover` and `remove_covers` (area:34 behavior section 19) and the
+//! Decision logic for `prep_update_cover` and `remove_covers` and the
 //! timestamp writes that follow them.
 //!
 //! The functions return the entry the caller should store. The write itself goes through `TimestampStore`,
@@ -24,7 +24,7 @@ pub fn now_millis() -> i64 {
         .unwrap_or(0)
 }
 
-/// Applies a fresh thumbnail URL from the source to a cover (behavior section 19.1).
+/// Applies a fresh thumbnail URL from the source to a cover.
 ///
 /// A missing or empty remote URL changes nothing. The same URL changes nothing unless `refresh_same_url`.
 /// A local entry only gets a new timestamp. An entry with a custom cover keeps its timestamp, and only its
@@ -58,7 +58,7 @@ pub fn prep_update_cover(
     }
 }
 
-/// Deletes the thumbnail and custom cover of an entry leaving the library (behavior section 19.2). The
+/// Deletes the thumbnail and custom cover of an entry leaving the library. The
 /// timestamp moves only when at least one file was deleted. Local entries are never touched.
 pub fn remove_covers(paths: &dyn Paths, entry: &ArtRef, now_ms: i64) -> ArtRef {
     if entry.is_local() {
@@ -74,7 +74,7 @@ pub fn remove_covers(paths: &dyn Paths, entry: &ArtRef, now_ms: i64) -> ArtRef {
     }
 }
 
-/// The removal branch of `toggleFavorite` for covers (behavior section 19.4). Deletes the covers, then writes
+/// The removal branch of `toggleFavorite` for covers. Deletes the covers, then writes
 /// the new cover timestamp only when the returned entry differs from the input.
 pub fn remove_from_library(
     paths: &dyn Paths,
@@ -89,14 +89,14 @@ pub fn remove_from_library(
     Ok(removed)
 }
 
-/// Which timestamp column of an entry to write (data section 5).
+/// Which timestamp column of an entry to write.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Column {
     CoverLastModified,
     BackgroundLastModified,
 }
 
-/// Writes one timestamp column of one entry and nothing else (behavior section 19.5). The database layer
+/// Writes one timestamp column of one entry and nothing else. The database layer
 /// implements this over `cover_last_modified` and `background_last_modified`.
 pub trait TimestampStore: Send + Sync {
     fn set_last_modified(
@@ -155,8 +155,8 @@ fn outcome(art: &ArtRef, ok: bool) -> Message {
     }
 }
 
-/// The Edit action: copies the picked file into the custom image, then bumps the timestamp so the keyer changes
-/// (behavior sections 19.3, 24.2). Returns the snackbar message. An entry that is not in the library is refused for
+/// The Edit action: copies the picked file into the custom image, then bumps the timestamp so the keyer changes.
+/// Returns the snackbar message. An entry that is not in the library is refused for
 /// both kinds (edge E-IMG-14, decision 11c; the same rule as `kuro_local::images::art_route`). Local entries are not
 /// handled here: their own folder is written by area:14, so they report a failure rather than writing a stray custom
 /// file.
@@ -176,7 +176,7 @@ pub async fn edit_custom(
     outcome(art, ok)
 }
 
-/// The Delete action: removes the custom file, then always bumps the timestamp (behavior section 24.4), so a
+/// The Delete action: removes the custom file, then always bumps the timestamp, so a
 /// refresh follows even when the file was already gone.
 pub fn delete_custom(
     paths: &dyn Paths,

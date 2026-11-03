@@ -1,4 +1,4 @@
-//! `extension`, `stem` and `is_hidden` for file names (area:14 behavior section 4.1).
+//! `extension`, `stem` and `is_hidden` for file names.
 
 /// Kotlin `UniFile.extension`: `substringAfterLast('.')`. A name without a dot is its own extension.
 /// Not lowercased: callers apply their own case rule.

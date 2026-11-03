@@ -3,7 +3,7 @@
 //! notice then has no image hint.
 //!
 //! Decision: decode, crop, scale, circle mask and PNG encode go through the `image` crate, which the app already uses for
-//! covers (`feed::cover`). The plan names gdk-pixbuf, but this build's cairo has no PNG writer, so a cairo route would
+//! covers (`feed::cover`). gdk-pixbuf would be the usual route, but this build's cairo has no PNG writer, so a cairo route would
 //! need a new feature flag. The result is the same PNG.
 
 

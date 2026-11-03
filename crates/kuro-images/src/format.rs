@@ -1,4 +1,4 @@
-//! Chapter and episode number text (area:34 behavior section 27.1, T-34a-056).
+//! Chapter and episode number text (T-34a-056).
 //!
 //! Java's `DecimalFormat("#.###")` with `.` as the decimal separator: at most three fraction digits, no trailing
 //! zeros, no grouping, rounding HALF_EVEN on the shortest decimal text of the number, ASCII digits.

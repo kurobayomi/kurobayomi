@@ -1,4 +1,4 @@
-//! How a restore run ends (area 22, T-22a-032; behaviour sections 7.3 and 8). A completed run reports its summary. A
+//! How a restore run ends (area 22, T-22a-032). A completed run reports its summary. A
 //! canceled run reports `Canceled` and still writes the error log of the errors collected so far (F-03, D17 fix).
 
 use std::path::{Path, PathBuf};

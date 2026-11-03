@@ -1,4 +1,4 @@
-//! `cache_key` for an `ArtRef` (area:34 behavior section 10) and the MD5 hex used for file names (behavior section 18.2).
+//! `cache_key` for an `ArtRef` and the MD5 hex used for file names.
 
 use kuro_platform::kind::Kind;
 use md5::{Digest, Md5};
@@ -15,7 +15,7 @@ pub fn hash_key(s: &str) -> String {
 }
 
 /// The cache key of one image: `<owner>;<entry id>;<last_modified>` when the entry has a custom file, and
-/// `<owner>;<url or null>;<last_modified>` otherwise (behavior section 10). Changing the timestamp changes
+/// `<owner>;<url or null>;<last_modified>` otherwise. Changing the timestamp changes
 /// the key, so stale entries are never shown after an update.
 ///
 /// `custom_exists` is the result of the custom-file check (`cover_paths::has_custom`), passed in so the

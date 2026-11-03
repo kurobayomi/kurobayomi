@@ -1,8 +1,8 @@
-//! Library cover file cache: writes the source to the cover file and promotes it (area:34 behavior section 8),
-//! and the custom-cover write and delete paths (behavior section 18.6 and 18.7).
+//! Library cover file cache: writes the source to the cover file and promotes it,
+//! and the custom-cover write and delete paths.
 //!
 //! Cover files are plain files under `<data>`, so they survive a cache clear. `write_atomic` is the
-//! `write_source_to_cover_file` of Kotlin with a rename at the end, so a reader never sees a partial file (design section 6.4).
+//! `write_source_to_cover_file` of Kotlin with a rename at the end, so a reader never sees a partial file.
 
 use kuro_platform::kind::Kind;
 use std::io;
@@ -16,7 +16,7 @@ use crate::cover_paths::{self, Family};
 use crate::disk_image_cache::DiskImageCache;
 
 /// Removes a temporary file on drop, unless it was disarmed after the rename. A failed or cancelled write
-/// therefore leaves no `.part` file behind (behavior section 8.3 step 4, section 9.1 step 6).
+/// therefore leaves no `.part` file behind (section 9.1 step 6).
 struct PartFile(Option<PathBuf>);
 
 impl PartFile {
@@ -51,7 +51,7 @@ pub async fn write_atomic(target: &Path, bytes: &[u8]) -> io::Result<()> {
 }
 
 /// Copies a disk-cache snapshot into the library cover file, then removes the disk entry, so a library
-/// entry's image lives in one place (behavior section 6.3).
+/// entry's image lives in one place.
 pub async fn promote_snapshot(
     disk: &DiskImageCache,
     key: &str,
@@ -64,8 +64,8 @@ pub async fn promote_snapshot(
     Ok(())
 }
 
-/// Copies the whole stream into the custom file, truncating an existing one. No validation of the bytes
-/// (behavior section 18.6 and 24.3). Any I/O error is returned and nothing else is changed.
+/// Copies the whole stream into the custom file, truncating an existing one. No validation of the bytes.
+/// Any I/O error is returned and nothing else is changed.
 pub async fn set_custom<R>(
     paths: &dyn Paths,
     family: Family,
@@ -82,8 +82,8 @@ where
     Ok(())
 }
 
-/// Copies a picked local image into the custom file of the entry, replacing the old one (behavior section 24.2).
-/// The bytes are not checked (behavior section 24.3). A missing source is an error and changes nothing.
+/// Copies a picked local image into the custom file of the entry, replacing the old one.
+/// The bytes are not checked. A missing source is an error and changes nothing.
 pub async fn set_custom_from_file(
     paths: &dyn Paths,
     family: Family,
@@ -94,13 +94,13 @@ pub async fn set_custom_from_file(
     set_custom(paths, family, entry_id, file).await
 }
 
-/// Deletes the custom file of an entry. `true` only when the file existed and was removed (behavior section 18.7).
+/// Deletes the custom file of an entry. `true` only when the file existed and was removed.
 pub fn delete_custom_cover(paths: &dyn Paths, family: Family, entry_id: i64) -> bool {
     remove_if_exists(&cover_paths::custom_file(paths, family, entry_id))
 }
 
 /// Deletes the thumbnail or background file of the image and, when asked, its custom file. Returns how many
-/// files were actually deleted, so a thumbnail plus a custom cover counts 2 (behavior section 18.7).
+/// files were actually deleted, so a thumbnail plus a custom cover counts 2.
 pub fn delete_from_cache(paths: &dyn Paths, art: &ArtRef, delete_custom: bool) -> usize {
     let mut deleted = 0;
     if let Some(file) = cover_paths::cover_file_for(paths, art) {
@@ -114,7 +114,7 @@ pub fn delete_from_cache(paths: &dyn Paths, art: &ArtRef, delete_custom: bool) -
     deleted
 }
 
-/// Copies the custom file of `from_id` to `to_id` during a migration (behavior section 24.5, T-34a-051). The manga
+/// Copies the custom file of `from_id` to `to_id` during a migration (T-34a-051). The manga
 /// migration copies its cover. The anime migration calls it for the cover and for the background. A missing source is
 /// not an error. A failed copy is logged, the partial target is removed, and `false` is returned, so the migration
 /// carries on.

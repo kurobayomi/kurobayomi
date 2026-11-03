@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn genres_split_trim_drop_blanks_and_keep_first_seen_order() {
-        assert_eq!(split_genres("A, B, ,A"), ["A", "B", ",A"], "the Kotlin algorithm; the plan's EC-19 example says [A, B]");
+        assert_eq!(split_genres("A, B, ,A"), ["A", "B", ",A"], "the Kotlin algorithm keeps \",A\"");
         assert_eq!(split_genres(""), Vec::<String>::new());
         assert_eq!(split_genres("  Action ,Drama"), ["Action ,Drama"], "only the two-character separator splits");
     }

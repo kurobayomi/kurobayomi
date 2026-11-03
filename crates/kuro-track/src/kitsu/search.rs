@@ -16,7 +16,7 @@ use crate::model::TrackerId;
 /// The Algolia application id (`X-Algolia-Application-Id`).
 pub const APP_ID: &str = "AWQO5J657S";
 
-/// The manga search filter, sent verbatim after `query=...` (`ALGOLIA_FILTER`, behaviour section 11.2).
+/// The manga search filter, sent verbatim after `query=...` (`ALGOLIA_FILTER`).
 pub const FILTER_MANGA: &str = "&facetFilters=%5B%22kind%3Amanga%22%5D&attributesToRetrieve=%5B%22synopsis%22%2C%22averageRating%22%2C%22canonicalTitle%22%2C%22chapterCount%22%2C%22posterImage%22%2C%22startDate%22%2C%22subtype%22%2C%22endDate%22%2C%20%22id%22%5D";
 /// The anime search filter (`ALGOLIA_FILTER_ANIME`).
 pub const FILTER_ANIME: &str = "&facetFilters=%5B%22kind%3Aanime%22%5D&attributesToRetrieve=%5B%22synopsis%22%2C%22averageRating%22%2C%22canonicalTitle%22%2C%22episodeCount%22%2C%22posterImage%22%2C%22startDate%22%2C%22subtype%22%2C%22endDate%22%2C%20%22id%22%5D";
@@ -71,7 +71,7 @@ pub fn decode_hits(hits: Vec<Value>) -> Vec<AlgoliaHit> {
         .collect()
 }
 
-/// The fields that both kinds map the same way (table of behaviour section 12).
+/// The fields that both kinds map the same way.
 struct Common {
     title: String,
     total: i64,

@@ -10,34 +10,34 @@ pub enum ImageError {
     InvalidImage,
     #[error("No cover specified")]
     NoCoverSpecified,
-    /// The message is the HTTP reason phrase, as Kotlin's `IOException(response.message)` (behavior section 7.3).
+    /// The message is the HTTP reason phrase, as Kotlin's `IOException(response.message)`.
     #[error("{reason}")]
     Http { code: u16, reason: String },
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
     Net(NetError),
-    /// A timestamp write failed in the caller's store (behavior section 19.5).
+    /// A timestamp write failed in the caller's store.
     #[error("{0}")]
     Store(String),
     #[error("Canceled")]
     Cancelled,
-    /// The header could not be read, or it reports a zero width or height (behavior section 14.2).
+    /// The header could not be read, or it reports a zero width or height.
     #[error("Failed to initialize decoder")]
     DecodeInit,
-    /// The decoder returned no pixels (behavior section 14.4). Also the second decode of a buffer (E-IMG-12).
+    /// The decoder returned no pixels. Also the second decode of a buffer (E-IMG-12).
     #[error("Failed to decode image")]
     DecodeFailed,
-    /// No decoder for the sniffed type: unknown bytes, or a decoder feature that is not built (design section 4.3).
+    /// No decoder for the sniffed type: unknown bytes, or a decoder feature that is not built.
     #[error("Unsupported image format")]
     UnsupportedFormat,
-    /// More pixels than the request allows, or a side that does not fit a texture (design section 4.6).
+    /// More pixels than the request allows, or a side that does not fit a texture.
     #[error("Image too large")]
     TooLarge,
-    /// The bytes to save are not an image by sniffing (behavior section 21.4).
+    /// The bytes to save are not an image by sniffing.
     #[error("Not an image")]
     NotAnImage,
-    /// The file could not be written under the save folder (behavior section 21.6, key `error_saving_picture`).
+    /// The file could not be written under the save folder (key `error_saving_picture`).
     #[error("Error saving picture")]
     SaveFailed,
 }

@@ -1,13 +1,12 @@
 //! The snackbar, toast and message-key layer of the entry pages (T-39b-019). Upstream: `AnimeScreenModel.kt` (the
-//! `showSnackbar` and toast calls) and behaviour section 19 of the anime plan. A [`Notice`] is what both entry pages
+//! `showSnackbar` and toast calls). A [`Notice`] is what both entry pages
 //! hand to the app's one notification layer (`crate::toast`).
 //!
-//! Decision, queue versus replace (E-UI-3): the plan says both. `p2-edge-cases` E-UI-3 and `p2-rust-design` say a new
-//! message replaces the one on screen and its action is dropped (Compose queues them; a documented difference),
-//! while the first draft of this file queued them. The page shows what just happened, so a new message replaces:
+//! Decision, queue versus replace (E-UI-3): a new message replaces the one on screen and its action is dropped
+//! (Compose queues them; a documented difference), while the first draft of this file queued them. The page shows what just happened, so a new message replaces:
 //! the toast layer keeps one.
 //!
-//! The "16 keys" of the task: section 19 of the behaviour plan has 28 rows. Twelve of them are messages with text of
+//! The "16 keys" of the task: the message table has 28 rows. Twelve of them are messages with text of
 //! their own, and they are the variants of [`UserMessage`]. The other sixteen are labels of buttons, titles and
 //! texts of dialogs that other modules own (the tracking sheet, the date remover, the share chooser, Cancel, OK,
 //! Delete and Add), so there are twelve message keys, not sixteen.
@@ -65,7 +64,7 @@ pub enum Presentation {
     Snack(Snack),
 }
 
-/// The presentation of each message, as in behaviour section 19: deleting the downloads asks with a Delete button, every
+/// The presentation of each message: deleting the downloads asks with a Delete button, every
 /// other message is a plain snackbar.
 pub fn present(message: UserMessage) -> Presentation {
     let action = matches!(message, UserMessage::DeleteDownloadsForAnime).then_some(SnackAction::Delete);

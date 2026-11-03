@@ -1,6 +1,6 @@
 //! Decoded image LRU cache, sized by bytes (area:34 section 6.1, T-34a-071).
 //!
-//! It holds shared RGBA buffers only, never a GTK object (design section 16 item 11), so it is `Send + Sync`
+//! It holds shared RGBA buffers only, never a GTK object, so it is `Send + Sync`
 //! and the textures are built on the main thread from the cached bytes.
 
 use std::collections::HashMap;
@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use crate::decode::Decoded;
 use crate::options::CachePolicy;
 
-/// The decoded-image budget: a fixed 64 MiB instead of Coil's share of the Java heap (design section 6.1).
+/// The decoded-image budget: a fixed 64 MiB instead of Coil's share of the Java heap.
 pub const DEFAULT_BUDGET_BYTES: u64 = 64 * 1024 * 1024;
 
 struct Entry {
@@ -47,7 +47,7 @@ impl MemoryCache {
     }
 
     /// The image cached under `key`, marked as most recently used. A policy that does not read gives `None`
-    /// without looking (behavior section 26.2).
+    /// without looking.
     pub fn get(&self, key: &str, policy: CachePolicy) -> Option<Arc<Decoded>> {
         if !policy.read_enabled() {
             return None;

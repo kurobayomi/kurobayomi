@@ -1,4 +1,4 @@
-//! Pure queue model for the Download queue page (T-25a-020, T-25a-031; 25-downloads-shared p1-rust-design section 2.2).
+//! Pure queue model for the Download queue page (T-25a-020, T-25a-031).
 //!
 //! The engine only knows the flat queue. The page groups it by source, moves rows inside a group, then sends the flat
 //! order back. No GTK and no engine here.

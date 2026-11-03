@@ -153,7 +153,7 @@ pub fn color_hex(argb: i32) -> String {
 /// Chooses the mpv `hwdec` value from the decoder and the candidates reported by mpv.
 /// Copy-back candidates are tried first for `Hw`; `HwPlus` tries zero-copy first. Only what mpv reports is picked, so
 /// the list holds the decoders of every system: VA-API and NVDEC on Linux, D3D11 on Windows. When none of the
-/// candidates is available the result is `auto` (area 45 rust-design section 6).
+/// candidates is available the result is `auto`.
 pub fn resolve_hwdec(decoder: Decoder, available: &[String]) -> String {
     let candidates: &[&str] = match decoder {
         Decoder::AutoCopy | Decoder::Auto | Decoder::Sw => return decoder.mpv_value().to_owned(),

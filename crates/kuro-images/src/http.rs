@@ -1,4 +1,4 @@
-//! Image request construction and HTTP status acceptance (area:34 behavior section 7).
+//! Image request construction and HTTP status acceptance.
 
 use bytes::Bytes;
 use http::{HeaderMap, StatusCode};
@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use crate::error::ImageError;
 use crate::options::CachePolicy;
 
-/// `Cache-Control` of an image request (behavior section 7.2). `no-store` when the network cache may be read.
+/// `Cache-Control` of an image request. `no-store` when the network cache may be read.
 /// Otherwise `no-cache, only-if-cached`, which the server answers with 504 unless a copy is already cached.
 pub fn cache_control(network_cache: CachePolicy) -> CacheControl {
     if network_cache.read_enabled() {
@@ -39,7 +39,7 @@ pub fn image_request(
     Ok(request)
 }
 
-/// Accepts 2xx and 304 (behavior section 7.3). Any other status is an error whose message is the reason phrase.
+/// Accepts 2xx and 304. Any other status is an error whose message is the reason phrase.
 pub fn check_status(status: StatusCode) -> Result<(), ImageError> {
     if status.is_success() || status == StatusCode::NOT_MODIFIED {
         return Ok(());
@@ -50,7 +50,7 @@ pub fn check_status(status: StatusCode) -> Result<(), ImageError> {
     })
 }
 
-/// Runs an image request and returns the body (behavior section 7.4). A cancelled request returns `Cancelled`.
+/// Runs an image request and returns the body. A cancelled request returns `Cancelled`.
 pub async fn fetch_bytes(client: &NetworkClient, request: Request) -> Result<Bytes, ImageError> {
     let response = client.execute(request).await?;
     check_status(response.status)?;

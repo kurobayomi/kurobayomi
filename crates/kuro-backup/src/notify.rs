@@ -1,4 +1,4 @@
-//! Backup and restore notices (area 21, T-21a-028, T-21a-029, T-21a-030; B-15, ui-parity section 3). Builders are pure:
+//! Backup and restore notices (area 21, T-21a-028, T-21a-029, T-21a-030; B-15). Builders are pure:
 //! they return a `Notice` that the caller shows through `kuro_platform::notifier::Notifier`, with its click and its
 //! "Open folder" button ([`Notice::desktop`]).
 
@@ -17,18 +17,18 @@ pub const GENERIC_RESTORE_TEXT: &str = "Restore in progress";
 pub const ID_BACKUP_PROGRESS: &str = "kurobayomi-backup-progress";
 pub const ID_BACKUP_RESULT: &str = "kurobayomi-backup-result";
 pub const ID_AUTO_WARNING: &str = "kurobayomi-auto-backup-warning";
-/// Restore ids follow design section 8: progress and every final notice (complete, canceled, failed) share one id,
+/// Restore ids: progress and every final notice (complete, canceled, failed) share one id,
 /// so the final notice replaces the progress one.
 pub const ID_RESTORE_PROGRESS: &str = "restore-progress";
 pub const ID_RESTORE_RESULT: &str = "restore-complete";
-/// Consecutive failed automatic runs before the one warning (E-10, ui-parity section 3).
+/// Consecutive failed automatic runs before the one warning (E-10).
 pub const FAILURE_STREAK_WARNING: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Urgency {
     Low,
     Normal,
-    /// Restore completed with errors, restore failed (design section 8).
+    /// Restore completed with errors, restore failed.
     High,
 }
 
@@ -175,7 +175,7 @@ pub fn restore_failed(reason: &str) -> Notice {
     Notice::new(ID_RESTORE_RESULT, "Restoring backup failed", Some(reason.to_owned()), Urgency::High)
 }
 
-/// Canceled restore: the failure title with "Canceled restore" (behaviour section 8.3). No summary is shown.
+/// Canceled restore: the failure title with "Canceled restore". No summary is shown.
 pub fn restore_canceled() -> Notice {
     Notice::new(ID_RESTORE_RESULT, "Restoring backup failed", Some("Canceled restore".into()), Urgency::Normal)
 }

@@ -1,4 +1,4 @@
-//! Animated GIF and WebP frames for the full-cover viewer (area:34 behavior section 13.5, T-34a-033).
+//! Animated GIF and WebP frames for the full-cover viewer (T-34a-033).
 //!
 //! Grids use `decode`, which gives the first frame. The full-cover viewer uses `decode_frames`. Frames keep their own
 //! size and are not sampled or border-cropped: the viewer scales the whole picture.

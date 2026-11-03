@@ -1,5 +1,5 @@
 //! Reader colours (T-043a-052) and the reader stylesheet. The page background follows the reader theme preference.
-//! Chrome colours come from the active GTK theme, not from these values (ui-parity section 8).
+//! Chrome colours come from the active GTK theme, not from these values.
 
 use gtk::prelude::*;
 

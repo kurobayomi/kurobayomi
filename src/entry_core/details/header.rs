@@ -1,5 +1,5 @@
 //! Item header of the episode and season lists (T-39a-066) and the missing-count rule that feeds it. Upstream:
-//! `presentation/entries/components/ItemHeader.kt`, `MissingItemCountListItem.kt`, behaviour section 8. The missing
+//! `presentation/entries/components/ItemHeader.kt`, `MissingItemCountListItem.kt`. The missing
 //! count itself is `kuro_domain::items::missing::missing_items_count`, which implements the upstream algorithm.
 
 use kuro_domain::items::missing::missing_items_count;

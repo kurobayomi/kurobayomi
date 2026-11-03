@@ -1,4 +1,4 @@
-//! Logic of the pickers in the per-entry sheet (`TrackInfoDialogSelector.kt`, behaviour section 14). The GUI draws
+//! Logic of the pickers in the per-entry sheet (`TrackInfoDialogSelector.kt`). The GUI draws
 //! the dialogs; this module decides the rows, the start position, the bounds and the value that OK sends. The
 //! value is then written through the remote setters in `remote.rs`.
 

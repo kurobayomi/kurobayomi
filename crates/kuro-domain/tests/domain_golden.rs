@@ -334,7 +334,7 @@ mod domain_end_to_end {
         }
     }
 
-    /// `domain_end_to_end` of the plan: sync (new chapters) -> mark read -> track update while offline (queued) -> go
+    /// `domain_end_to_end`: sync (new chapters) -> mark read -> track update while offline (queued) -> go
     /// online -> the worker replays. Asserts the final database, queue file and tracker state.
     #[tokio::test]
     async fn sync_mark_read_track_offline_then_replay() {

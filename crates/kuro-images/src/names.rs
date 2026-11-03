@@ -1,19 +1,19 @@
 //! File names for saved images: the Android-compatible sanitiser, byte-limited titles and the reader and player
-//! name rules (area:34 behavior section 22, design section 8.2).
+//! name rules.
 //!
 //! The base sanitiser is the shared `kuro_core::text::build_valid_filename`.
 
-/// The title budget in UTF-8 bytes for a saved page or frame name (behavior section 22.3).
+/// The title budget in UTF-8 bytes for a saved page or frame name.
 pub const MAX_TITLE_BYTES: usize = 250;
 
-/// `DiskUtil.buildValidFilename` (behavior section 22.1) with the NTFS rules of the addendum: the shared
+/// `DiskUtil.buildValidFilename` with the NTFS rules of the addendum: the shared
 /// implementation in `kuro-core`.
 pub fn build_valid_filename(orig: &str) -> String {
     kuro_core::text::build_valid_filename(orig, true)
 }
 
 /// Name of a saved reader page: `<title> - <chapter>` cut to fit the budget, sanitised, then ` - <page number>`
-/// appended unsanitised (behavior section 22.3).
+/// appended unsanitised.
 pub fn reader_file_name(title: &str, chapter_name: &str, page_number: usize) -> String {
     titled_name(
         &format!("{title} - {chapter_name}"),
@@ -21,7 +21,7 @@ pub fn reader_file_name(title: &str, chapter_name: &str, page_number: usize) -> 
     )
 }
 
-/// Name of a saved player frame: `<title> - <episode>`, then ` - <HH:MM:SS>` (behavior section 22.4).
+/// Name of a saved player frame: `<title> - <episode>`, then ` - <HH:MM:SS>`.
 pub fn player_file_name(title: &str, episode_name: &str, time_text: &str) -> String {
     titled_name(
         &format!("{title} - {episode_name}"),

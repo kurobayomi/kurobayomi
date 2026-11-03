@@ -1,4 +1,4 @@
-//! JPEG, PNG, GIF, WebP and BMP through the `image` crate (design section 4.1). GIF and WebP give their first frame.
+//! JPEG, PNG, GIF, WebP and BMP through the `image` crate. GIF and WebP give their first frame.
 //!
 //! Every codec module has one `open` that reads the header and hands back a decoder, so the size is known before
 //! any pixel is decoded and the same decoder then produces the pixels.

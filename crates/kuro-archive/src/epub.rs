@@ -1,7 +1,7 @@
 //! `EpubReader`: EPUB page images through the container, package document, spine and manifest.
 //!
-//! Port of `core/archive/.../EpubReader.kt` (T-13a-033); behaviour 4.5 and vectors 9.2 and 9.3 of
-//! the plan. The XML documents are read with `scraper` (html5ever), a lenient HTML parser, as the
+//! Port of `core/archive/.../EpubReader.kt` (T-13a-033).
+//! The XML documents are read with `scraper` (html5ever), a lenient HTML parser, as the
 //! Kotlin reads them with jsoup. Selectors are descendant selectors (`manifest item`,
 //! `spine itemref`) because html5ever ignores the `/` of a self-closing `<item/>` and nests the
 //! following items inside it.

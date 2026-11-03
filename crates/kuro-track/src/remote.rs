@@ -1,4 +1,4 @@
-//! Remote setter rules (`AnimeTracker.kt`, `MangaTracker.kt`, behaviour section 3). These are free
+//! Remote setter rules (`AnimeTracker.kt`, `MangaTracker.kt`). These are free
 //! functions so that trackers cannot change the rules. `now_ms` is passed in so tests fix the clock.
 
 use crate::error::{TrackError, redact};

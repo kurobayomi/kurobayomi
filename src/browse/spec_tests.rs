@@ -1,6 +1,6 @@
 //! The browse anime tests (T-41a-049): the fixtures checked in under
 //! `tests/fixtures/browse_anime/`, the tests named after T-IDs that no other module of this lane carries, the integration
-//! tests I1 to I4, and the string drift test over section 24 of the behavior spec. Every T-ID is accounted for in the
+//! tests I1 to I4, and the string drift test over `strings.json`. Every T-ID is accounted for in the
 //! table below: it names the test that holds it, or the lane that owns the code it tests.
 //!
 //! | T-ID | Where |
@@ -125,7 +125,7 @@ fn every_string_of_section_24_matches_the_english_base_text() {
             drift.push(format!("{id}: no such key"));
             continue;
         };
-        // the plan writes `%s` and `%1$s` where Fluent takes `arg1`, and runs a paragraph break into a space
+        // the table writes `%s` and `%1$s` where Fluent takes `arg1`, and runs a paragraph break into a space
         let squash = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
         let want = squash(&expected.replace("%1$s", "X").replace("%s", "X"));
         let got = squash(&english_of(key));

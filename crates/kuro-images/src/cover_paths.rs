@@ -1,6 +1,6 @@
-//! Cover, custom cover and background file names over `Paths` (area:34 behavior section 18).
+//! Cover, custom cover and background file names over `Paths`.
 //!
-//! The folders sit under `Paths::data_dir()` so that covers survive a cache clear (data section 4.2).
+//! The folders sit under `Paths::data_dir()` so that covers survive a cache clear.
 //! `Paths` has no getter for the anime folders yet, so the three family folder names are the only path
 //! literals in this crate.
 
@@ -12,7 +12,7 @@ use kuro_platform::paths::Paths;
 use crate::art::ArtRef;
 use crate::keys::hash_key;
 
-/// The folder family an image is stored in (behavior section 18.1).
+/// The folder family an image is stored in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Family {
     MangaCover,
@@ -32,7 +32,7 @@ impl Family {
     }
 }
 
-/// `<data>/<family>`, created on first access (behavior section 18.1). A failed creation is logged and the
+/// `<data>/<family>`, created on first access. A failed creation is logged and the
 /// path is still returned, so the caller's own I/O reports the error, as Kotlin's `File` does.
 pub fn dir(paths: &dyn Paths, family: Family) -> PathBuf {
     let dir = paths.cover_family_dir(family.folder());
@@ -53,23 +53,23 @@ fn ensure_dir(dir: &Path) {
     }
 }
 
-/// `<family>/<md5(url)>`. `None` for a missing URL. An empty URL gives the `md5("")` name (behavior section 18.3).
+/// `<family>/<md5(url)>`. `None` for a missing URL. An empty URL gives the `md5("")` name.
 pub fn cover_file(paths: &dyn Paths, family: Family, url: Option<&str>) -> Option<PathBuf> {
     url.map(|url| dir(paths, family).join(hash_key(url)))
 }
 
-/// `<family>/custom/<md5(decimal id)>` (behavior section 18.4). Always a path, even when the file is absent.
+/// `<family>/custom/<md5(decimal id)>`. Always a path, even when the file is absent.
 pub fn custom_file(paths: &dyn Paths, family: Family, entry_id: i64) -> PathBuf {
     custom_dir(paths, family).join(hash_key(&entry_id.to_string()))
 }
 
-/// `<data>/animebackgrounds/<md5(url)>`, the background file for `url` (T-34a-007, behavior section 18.5). Always a
+/// `<data>/animebackgrounds/<md5(url)>`, the background file for `url` (T-34a-007). Always a
 /// path, even when the file is absent.
 pub fn background_file(paths: &dyn Paths, url: &str) -> PathBuf {
     dir(paths, Family::AnimeBackground).join(hash_key(url))
 }
 
-/// `<data>/animebackgrounds/custom/<md5(anime id)>`, the custom background of an anime (T-34a-007, behavior section 18.5).
+/// `<data>/animebackgrounds/custom/<md5(anime id)>`, the custom background of an anime (T-34a-007).
 pub fn custom_background_file(paths: &dyn Paths, anime_id: i64) -> PathBuf {
     custom_file(paths, Family::AnimeBackground, anime_id)
 }
@@ -89,11 +89,11 @@ pub fn has_custom(paths: &dyn Paths, art: &ArtRef) -> bool {
     custom_file_for(paths, art).exists()
 }
 
-/// The marker that keeps Android's media scanner out of a folder (behavior section 18, `DiskUtil.NOMEDIA_FILE`).
+/// The marker that keeps Android's media scanner out of a folder (`DiskUtil.NOMEDIA_FILE`).
 pub const NOMEDIA_FILE: &str = ".nomedia";
 
-/// Creates an empty `.nomedia` in `dir` when the folder exists and the marker is absent (behavior section 21.6
-/// analog, `DiskUtil.createNoMediaFile`). A folder that does not exist is left alone. `true` when the file was
+/// Creates an empty `.nomedia` in `dir` when the folder exists and the marker is absent
+/// (`DiskUtil.createNoMediaFile`). A folder that does not exist is left alone. `true` when the file was
 /// created, so a second call changes nothing.
 pub fn create_nomedia(dir: &Path) -> io::Result<bool> {
     if !dir.is_dir() {

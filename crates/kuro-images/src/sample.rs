@@ -1,4 +1,4 @@
-//! `in_sample_size` and `target_dim` for downsampled decode (area:34 behavior section 15).
+//! `in_sample_size` and `target_dim` for downsampled decode.
 
 use crate::options::{RequestSize, Scale};
 
@@ -29,7 +29,7 @@ impl From<RequestSize> for Size {
 }
 
 impl Dimension {
-    /// `Dimension.toPx(scale)`: a pixel value as is, the sentinel for `Undefined` (behavior section 15.2).
+    /// `Dimension.toPx(scale)`: a pixel value as is, the sentinel for `Undefined`.
     fn to_px(self, scale: Scale) -> i32 {
         match self {
             Dimension::Pixel(n) => n,
@@ -41,7 +41,7 @@ impl Dimension {
     }
 }
 
-/// The destination `(width, height)` in pixels for a source of `src` (behavior section 15.2).
+/// The destination `(width, height)` in pixels for a source of `src`.
 pub fn target_dim(size: Size, scale: Scale, src: (i32, i32)) -> (i32, i32) {
     match size {
         Size::Original => src,
@@ -58,7 +58,7 @@ fn highest_one_bit(x: i32) -> i32 {
     }
 }
 
-/// Coil's `DecodeUtils.calculateInSampleSize` (behavior section 15.1): integer division, highest bit, the
+/// Coil's `DecodeUtils.calculateInSampleSize`: integer division, highest bit, the
 /// smaller of the two for `Fill` and the larger for `Fit`, never below 1. A zero destination side would divide
 /// by zero in Kotlin, so it counts as undefined here (edge E-IMG-7).
 pub fn in_sample_size(

@@ -1,4 +1,4 @@
-# Kitsu live verification checklist (T-30a-033, edge-case plan section 6)
+# Kitsu live verification checklist (T-30a-033)
 
 Run against a throwaway Kitsu account before the Kitsu tracker is enabled by default. No secrets in logs. Record each
 result in the Result column with the date and the observed value. No automated test in this crate contacts kitsu.app.

@@ -1,4 +1,4 @@
-//! Manga chapter list (area:14 behavior section 8, T-14a-014).
+//! Manga chapter list (T-14a-014).
 
 use std::path::Path;
 

@@ -1,4 +1,4 @@
-//! Display ICC profile (area:34 behavior section 14.6, design section 9 deviation D-3, T-34a-031).
+//! Display ICC profile (deviation D-3, T-34a-031).
 //!
 //! The profile is read once when the setting changes ([`load_setting`]) and carried in `DecodeOptions`. Pictures
 //! are taken from sRGB to the display profile after decoding. A profile that cannot be read or used gives `None`

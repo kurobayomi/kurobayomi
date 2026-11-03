@@ -1,4 +1,4 @@
-//! Safe wrapper over libmpv2 (area 45 p1-rust-design section 3.5). One handle per player window,
+//! Safe wrapper over libmpv2. One handle per player window,
 //! used only on the GTK main thread. The GL render context is created here from a caller-supplied
 //! `get_proc_address`; the `gtk::GLArea` wiring lives in the GTK crate, not in this library.
 

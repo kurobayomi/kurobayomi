@@ -1,4 +1,4 @@
-//! Restore screen model (area 22, T-22a-033; ui-parity section 1). The file is decoded and checked off the UI thread
+//! Restore screen model (area 22, T-22a-033). The file is decoded and checked off the UI thread
 //! with `validate::preflight_file`, and the result goes in with `apply_check`. The GTK page renders the states, the
 //! card texts and the action enable rule from here, so none of it lives in widget code.
 

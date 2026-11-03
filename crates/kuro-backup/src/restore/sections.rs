@@ -41,7 +41,7 @@ pub struct Counts {
 }
 
 /// Items per section for these options, in run order. A section that is off has zero items. Categories have two
-/// items (anime, then manga), matching the amount rule of behaviour section 1.4 with the D2 fix.
+/// items (anime, then manga), matching the amount rule with the D2 fix.
 pub fn plan(opts: RestoreOptions, c: Counts) -> Vec<(Section, u32)> {
     let when = |on: bool, n: u32| if on { n } else { 0 };
     vec![
@@ -76,7 +76,7 @@ pub trait Restorer {
     }
 }
 
-/// One collected error: when it happened and the message of its log line (behaviour section 7.2).
+/// One collected error: when it happened and the message of its log line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorLine {
     pub at: DateTime<Local>,

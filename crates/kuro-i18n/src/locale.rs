@@ -42,7 +42,7 @@ pub fn android_dir_to_tag(dir: &str) -> String {
     }
 }
 
-/// Canonical tag for one requested locale string (topic section 5), or `None` when the entry
+/// Canonical tag for one requested locale string, or `None` when the entry
 /// cannot name a locale (`C`, `POSIX`, empty, unparsable). Encoding and modifier are dropped.
 pub fn normalise(raw: &str) -> Option<String> {
     let base = raw.trim().split(['.', '@']).next()?.replace('_', "-");
@@ -88,7 +88,7 @@ fn match_offered(tag: &str, offered: &[&'static str]) -> Option<&'static str> {
         .or_else(|| offered.iter().copied().find(|o| *o == language))
 }
 
-/// Chooses the locale chain (topic section 6). A non-empty `pref` wins when it names an offered
+/// Chooses the locale chain. A non-empty `pref` wins when it names an offered
 /// locale. Otherwise the system list is tried in order. The chain is the matched tag, its language
 /// (when offered and different), then `en`. Nothing matching gives `["en"]`.
 pub fn resolve(pref: &str, system: &[String], offered: &[&'static str]) -> Vec<&'static str> {

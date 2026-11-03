@@ -1,4 +1,4 @@
-//! Where this crate meets the platform (area:34 design sections 3 and 10, T-34a-068).
+//! Where this crate meets the platform (T-34a-068).
 //!
 //! Every folder comes from `Paths`, and nothing in `kuro-images` names an operating system. Desktop notices,
 //! opening a file and sharing go through `kuro_platform::notifier::Notifier` and `kuro_platform::opener`, which the
@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use kuro_platform::paths::Paths;
 
-/// `<cache>/image_cache`, the disk cache of non-library images (behavior section 9).
+/// `<cache>/image_cache`, the disk cache of non-library images.
 pub fn image_cache_dir(paths: &dyn Paths) -> PathBuf {
     paths.image_cache_dir()
 }

@@ -63,7 +63,7 @@ pub fn last_auto_info(last_ms: i64, now_ms: i64) -> String {
     format!("{LAST_AUTO_PREFIX}{}", relative_time(last_ms, now_ms))
 }
 
-/// Relative time buckets (ui-parity section 6). A time in the future reads as "Just now" (E-31).
+/// Relative time buckets. A time in the future reads as "Just now" (E-31).
 pub fn relative_time(last_ms: i64, now_ms: i64) -> String {
     if last_ms == 0 {
         return "Never".into();

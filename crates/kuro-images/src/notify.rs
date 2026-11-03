@@ -1,4 +1,4 @@
-//! Desktop notices for saved pictures (behavior section 23.2, design section 10).
+//! Desktop notices for saved pictures.
 //!
 //! Every save shares one notice id, so a new save replaces the notice of the previous one. The `Notifier` trait only
 //! takes a title and a body, so the preview and the open and share actions of the Android notice are not sent. The
@@ -14,7 +14,7 @@ use crate::error::ImageError;
 use crate::messages::Message;
 use crate::save::{SaveRequest, save_image};
 
-/// The notice id shared by every picture save (behavior section 23.2, `ID_DOWNLOAD_IMAGE`).
+/// The notice id shared by every picture save (`ID_DOWNLOAD_IMAGE`).
 pub const PICTURE_NOTICE_ID: &str = "download-image";
 
 /// Withdraws the previous picture notice. Called at the start of every save.

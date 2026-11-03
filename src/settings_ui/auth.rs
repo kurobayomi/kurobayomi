@@ -1,6 +1,6 @@
 //! The unlock method and the one modal prompt every gate uses (T-47a-063, T-47a-067, T-47a-068).
 //!
-//! Method (decision A of p1-rust-design section 9): an app passphrase. Its argon2id hash, as a PHC string, is the secret
+//! Method (decision A): an app passphrase. Its argon2id hash, as a PHC string, is the secret
 //! `kurobayomi-applock` in the app's secret store; the passphrase itself is never stored. Fingerprint is not built.
 //! The method exists while the Require unlock switch is on: turning the switch on sets the passphrase, turning it off
 //! (after an unlock) removes it. [`confirm`] passes at once when no passphrase is set (T-47a-067), so the Hide

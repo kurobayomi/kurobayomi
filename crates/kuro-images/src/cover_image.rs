@@ -1,4 +1,4 @@
-//! The GTK-free half of `CoverImage` (area:34 design section 5.4, behavior section 25, T-34a-052).
+//! The GTK-free half of `CoverImage` (T-34a-052).
 //!
 //! `kuro-images` has no GTK, so the widget itself (a `gtk::Stack` of placeholder, `gtk::Picture` with
 //! `content_fit = Cover` and the error image, inside a `gtk::AspectFrame`) lives in the GTK crate. What it needs
@@ -13,7 +13,7 @@ use crate::decode::Decoded;
 use crate::error::ImageError;
 use crate::fetch::LoadedImage;
 
-/// `ItemCover` (behavior section 25.1). `ratio` is width over height.
+/// `ItemCover`. `ratio` is width over height.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CoverRatio {
     Square,
@@ -36,11 +36,11 @@ impl CoverRatio {
     }
 }
 
-/// `CoverPlaceholderColor = Color(0x1F888888)`, as ARGB (behavior section 25.2).
+/// `CoverPlaceholderColor = Color(0x1F888888)`, as ARGB.
 pub const PLACEHOLDER_ARGB: u32 = 0x1F88_8888;
 /// The CSS class of the placeholder widget; the app stylesheet gives it `placeholder_css()` as its background.
 pub const PLACEHOLDER_CLASS: &str = "kuro-cover-placeholder";
-/// The bundled image shown on error, `R.drawable.cover_error` (behavior section 25.3).
+/// The bundled image shown on error, `R.drawable.cover_error`.
 pub const ERROR_IMAGE: &str = "cover_error";
 
 /// The placeholder colour as a CSS `rgba()` value: `rgba(136, 136, 136, 0.1216)`.

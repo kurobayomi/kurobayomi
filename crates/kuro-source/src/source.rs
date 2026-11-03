@@ -109,7 +109,7 @@ pub async fn resolve_manga_uri(source: &dyn ResolvableSource, uri: &str) -> Resu
     }
 }
 
-/// What a deep link resolved to (behaviour section 16). The `Loading` state belongs to the caller, which shows it while
+/// What a deep link resolved to. The `Loading` state belongs to the caller, which shows it while
 /// this runs.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DeepLinkOutcome {

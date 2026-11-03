@@ -1,4 +1,4 @@
-//! Background work owned by one screen (behavior section 29.3): a tokio task group that is cancelled when the screen
+//! Background work owned by one screen: a tokio task group that is cancelled when the screen
 //! closes. The screen keeps the value; dropping it cancels and aborts every task still running.
 
 use std::future::Future;

@@ -1,4 +1,4 @@
-//! The share staging folder and the share fallback (behavior sections 21.7 and 23.4, design section 8.3).
+//! The share staging folder and the share fallback.
 //!
 //! Linux has no system share sheet, so sharing hands the staged file to the caller's `share` action. When that
 //! action fails, the file's folder opens in the file manager instead, and the caller shows no error (T-34a-047).
@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use kuro_platform::paths::Paths;
 
-/// The folder under the cache dir that holds the latest shared picture (behavior section 21.3).
+/// The folder under the cache dir that holds the latest shared picture.
 pub const STAGING_FOLDER: &str = "shared_image";
 
 /// `<cache>/shared_image`.

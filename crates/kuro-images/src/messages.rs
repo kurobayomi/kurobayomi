@@ -1,9 +1,9 @@
-//! Result messages of the save, share and cover actions (behavior sections 23.1 and 23.2). The UI shows each one as a
+//! Result messages of the save, share and cover actions. The UI shows each one as a
 //! snackbar or a desktop notice with the text returned here.
 
 use kuro_i18n::{MsgKey, tr};
 
-/// One message key of behavior section 23.1, plus the notice texts of section 23.2.
+/// One message key of the save, share and cover actions, plus the notice texts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Message {
     CoverSaved,

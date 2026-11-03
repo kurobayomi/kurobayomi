@@ -1,4 +1,4 @@
-//! Restore error log (area 22, T-22a-030; behaviour section 7.2). Only the last run's log exists: each run with errors
+//! Restore error log (area 22, T-22a-030). Only the last run's log exists: each run with errors
 //! replaces the file, and a run without errors writes nothing.
 
 use std::fs;
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use super::sections::ErrorLine;
 
-/// File name kept from the Kotlin app (behaviour section 7.2).
+/// File name kept from the Kotlin app.
 pub const LOG_FILE: &str = "aniyomi_restore_error.txt";
 
 /// One log line without its newline: `[yyyy-MM-dd HH:mm:ss.SSS] message`, local time, ASCII digits. Backslash, CR and LF

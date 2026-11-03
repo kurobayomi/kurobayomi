@@ -1,4 +1,4 @@
-//! Mark-read tracking policy (`AutoTrackState.kt`, behaviour section 11).
+//! Mark-read tracking policy (`AutoTrackState.kt`).
 
 use kuro_platform::kind::Kind;
 use kuro_prefs::pref_enum;

@@ -1,4 +1,4 @@
-//! The few texts of the Browse tab that the string catalogue does not hold yet. They are Proposals of the plan
+//! The few texts of the Browse tab that the string catalogue does not hold yet. They are our own texts
 //! (T-41a-027, T-41a-036) that replace an upstream text bug or add a hint, and the catalogue crate is not part of this
 //! lane, so they live here as constants until `kuro-i18n` takes them: each constant names the key it will become.
 

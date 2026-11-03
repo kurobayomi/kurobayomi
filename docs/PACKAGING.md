@@ -25,7 +25,7 @@ The two packages hold identical QML (a test keeps them in step); only `metadata.
 
 `dist/kurobayomi.desktop` adds the `Updates` action (`kurobayomi --open updates`) to the launcher menu. Check it with
 `desktop-file-validate dist/kurobayomi.desktop`. The `DBusActivatable` key of the in-app entry is left out here:
-the validator requires a reverse-DNS file name for it, and this file keeps the name from the plan.
+the validator requires a reverse-DNS file name for it, and this file keeps its short name.
 
 ## Flatpak
 

@@ -1,4 +1,4 @@
-//! mpv events and property observation (area 45 p1-rust-design section 3.3, `observedProps` in
+//! mpv events and property observation (`observedProps` in
 //! `AniyomiMPVView.kt:210-252`, `PlayerObserver.kt`). The conversion from libmpv raw values is
 //! pure here; `mpv.rs` feeds it. Events cross to the GTK main loop through `event_channel`.
 

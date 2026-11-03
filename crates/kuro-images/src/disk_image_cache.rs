@@ -1,4 +1,4 @@
-//! Disk cache for non-library images, equivalent to Coil's disk cache (area:34 section 6.2, behavior section 9).
+//! Disk cache for non-library images, equivalent to Coil's disk cache (area:34 section 6.2).
 //!
 //! Entries live at `<root>/<md5(key)>`. A write goes to `<name>.part` and is renamed into place, and a
 //! second writer of the same key waits for the first. Eviction removes the oldest files (by mtime) until the
@@ -16,7 +16,7 @@ use crate::cover_file::write_atomic;
 use crate::keys::hash_key;
 
 const MIB: u64 = 1024 * 1024;
-/// Coil 3.1.0 defaults (behavior section 9.2): 2 percent of free space, clamped to [10 MiB, 250 MiB].
+/// Coil 3.1.0 defaults: 2 percent of free space, clamped to [10 MiB, 250 MiB].
 const FREE_FRACTION: f64 = 0.02;
 const MIN_BYTES: u64 = 10 * MIB;
 const MAX_BYTES: u64 = 250 * MIB;
@@ -36,7 +36,7 @@ pub struct DiskImageCache {
     max_bytes: u64,
     /// Total size of the finished entries. Writes and removals update it under this lock.
     total: Mutex<u64>,
-    /// One lock per entry name that is being written (design section 6.2, edge E-IMG-29).
+    /// One lock per entry name that is being written (edge E-IMG-29).
     writers: StdMutex<HashMap<String, Arc<Mutex<()>>>>,
 }
 
@@ -134,7 +134,7 @@ impl DiskImageCache {
         }
     }
 
-    /// Removes every finished entry and returns how many were removed (behavior section 20.6). A `.part` file is
+    /// Removes every finished entry and returns how many were removed. A `.part` file is
     /// left alone, because a write in progress may own it.
     pub async fn clear(&self) -> io::Result<usize> {
         let mut total = self.total.lock().await;

@@ -1,4 +1,4 @@
-//! HEIF and HEIC stills through libheif (T-34a-029, behavior section 13.3). Built with the `heif` feature only;
+//! HEIF and HEIC stills through libheif (T-34a-029). Built with the `heif` feature only;
 //! without it every HEIF file is `DecodeInit` ("Failed to initialize decoder"). Animated HEIF is not decoded: the
 //! primary image is the still.
 

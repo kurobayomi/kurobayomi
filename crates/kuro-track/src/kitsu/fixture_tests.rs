@@ -1,4 +1,4 @@
-//! Kitsu tests that run on the recorded fixtures of `tests/fixtures/kitsu/` (T-30a-033, edge-case plan section 4), and
+//! Kitsu tests that run on the recorded fixtures of `tests/fixtures/kitsu/` (T-30a-033), and
 //! the failure-mode tests KT-93, KT-96, KT-98 and KT-99. The fixtures are shaped like Kitsu answers and hold no
 //! credentials. `tests/T_ID_MAP.md` maps every KT id to its test.
 

@@ -1,4 +1,4 @@
-//! AniList descriptions are HTML. The Kotlin code used `Html.fromHtml` (p1-behavior section 9). The Rust
+//! AniList descriptions are HTML. The Kotlin code used `Html.fromHtml`. The Rust
 //! version breaks lines at `<br>`, strips every tag, then decodes entities (E-36).
 
 /// Plain text of an AniList description.

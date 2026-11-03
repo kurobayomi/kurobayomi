@@ -1,5 +1,5 @@
 //! Error helpers over the database error (T-06a-004): constraint classification and the one-row mapping.
-//! The `Pool`, `NestedWrite`, `Join` and `Migration` variants of the plan belong to `kuro-db`, not here.
+//! The `Pool`, `NestedWrite`, `Join` and `Migration` variants belong to `kuro-db`, not here.
 
 use rusqlite::ErrorCode;
 

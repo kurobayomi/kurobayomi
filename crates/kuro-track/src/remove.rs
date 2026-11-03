@@ -1,4 +1,4 @@
-//! Remove-tracking flow (`AnimeTrackInfoDialog.kt`, behaviour section 16). The remote delete runs only when the
+//! Remove-tracking flow (`AnimeTrackInfoDialog.kt`). The remote delete runs only when the
 //! checkbox is ticked and the tracker can delete. By default it runs first: the local row is unregistered after the
 //! remote delete worked or the entry was already absent, and a remote failure keeps the local row and is shown as a
 //! toast (E-19, E-47). A tracker with `removes_local_first` (Kitsu, T-30a-022) deletes the local row first; a failed

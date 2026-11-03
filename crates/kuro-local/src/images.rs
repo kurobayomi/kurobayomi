@@ -134,7 +134,7 @@ pub struct CoverWrite {
     pub cover_last_modified: i64,
 }
 
-/// Set-as-cover for a local manga (behavior section 16): writes `cover` in `dir` and returns the new thumbnail URL.
+/// Set-as-cover for a local manga: writes `cover` in `dir` and returns the new thumbnail URL.
 pub fn set_cover(dir: &Path, bytes: &[u8]) -> io::Result<CoverWrite> {
     let path = write_image(dir, "cover", "cover.jpg", bytes)?;
     let thumbnail_url = file_url(&path).ok_or_else(|| io::Error::other("cover path is not absolute"))?;

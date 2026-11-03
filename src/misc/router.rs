@@ -5,7 +5,7 @@
 //!
 //! Decisions:
 //! - The router lives in `misc` because `src/notify` is not part of this lane. Notice ids are plain strings.
-//! - A notice-carrying action withdraws its notice before the work starts, as the plan says.
+//! - A notice-carrying action withdraws its notice before the work starts.
 //! - Ids at or below 0, more than 10 000 urls and a url longer than 2048 bytes are rejected with a warning.
 
 use kuro_i18n::{MsgKey, tr};

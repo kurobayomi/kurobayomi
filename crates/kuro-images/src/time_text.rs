@@ -1,4 +1,4 @@
-//! Duration and relative update time text for the stats and entry screens (area:34 behavior section 27.2 and 27.3).
+//! Duration and relative update time text for the stats and entry screens.
 
 use chrono::{Local, TimeZone};
 
@@ -7,7 +7,7 @@ const HOUR_MS: i64 = 60 * MINUTE_MS;
 const DAY_MS: i64 = 24 * HOUR_MS;
 const WEEK_MS: i64 = 7 * DAY_MS;
 
-/// Short duration text such as `1d 1h`, `1h 1m`, `5m 30s` (`Duration.toDurationString`, behavior section 27.2).
+/// Short duration text such as `1d 1h`, `1h 1m`, `5m 30s` (`Duration.toDurationString`).
 /// Days show alone with hours. Minutes show unless days and hours both count. Seconds show only when there are no
 /// days and no hours. A zero duration gives `fallback`.
 pub fn duration_text(total_seconds: i64, fallback: &str) -> String {
@@ -36,7 +36,7 @@ pub fn duration_text(total_seconds: i64, fallback: &str) -> String {
     }
 }
 
-/// Relative time of an update, from epoch milliseconds (behavior section 27.3). A non-positive timestamp is
+/// Relative time of an update, from epoch milliseconds. A non-positive timestamp is
 /// `Never`. Anything less than a minute old, including future timestamps, is `Just now`. Older values show
 /// minutes, then hours, then days, up to one week, and an absolute local date after that. The date format is
 /// English and the wording is an approximation of Android's `DateUtils` (open item O-7).

@@ -1,4 +1,4 @@
-//! MangaUpdates tests on the fixtures of `tests/fixtures/mangaupdates/` (T-32a-061, edge-case plan section 7). Every
+//! MangaUpdates tests on the fixtures of `tests/fixtures/mangaupdates/` (T-32a-061). Every
 //! value is invented and holds no real token or user id; a recorded live response replaces each one after the
 //! ignored live run (T-32a-069).
 

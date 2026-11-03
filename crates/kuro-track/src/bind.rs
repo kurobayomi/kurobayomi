@@ -1,4 +1,4 @@
-//! Bind a search result to an entry (`AddAnimeTracks.kt`, `AddMangaTracks.kt`, behaviour sections 6.1 to 6.4).
+//! Bind a search result to an entry (`AddAnimeTracks.kt`, `AddMangaTracks.kt`).
 //! `register_anime` is the plain bind; `bind_anime` and `bind_manga` add the read history and the progress sync;
 //! `bind_enhanced_*` match the entry against the installed sources.
 

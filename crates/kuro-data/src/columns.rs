@@ -1,6 +1,6 @@
 //! Column adapters (`DatabaseAdapter.kt`, T-05a-003): the named decode and encode functions for the columns
 //! that are not plain integers or text. The codec types live in `kuro-db`; this module gives them the names of
-//! the plan and the Kotlin adapters, so repository code reads the same way.
+//! the Kotlin adapters, so repository code reads the same way.
 
 use kuro_db::codecs::GenreList;
 pub use kuro_db::codecs::UpdateStrategy;

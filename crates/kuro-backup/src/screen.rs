@@ -32,7 +32,7 @@ pub enum OptionId {
 }
 
 impl OptionId {
-    /// Rows in display order, grouped by card (p1-ui-parity section 2.1).
+    /// Rows in display order, grouped by card.
     pub const ROWS: [(Card, OptionId); 10] = [
         (Card::Library, OptionId::LibraryEntries),
         (Card::Library, OptionId::Chapters),
@@ -46,7 +46,7 @@ impl OptionId {
         (Card::Extensions, OptionId::Extensions),
     ];
 
-    /// English label (B-02, p1-ui-parity section 2.1).
+    /// English label (B-02).
     pub fn label(self) -> &'static str {
         match self {
             Self::LibraryEntries => "Library entries",

@@ -1,7 +1,7 @@
-//! The full-size cover and background viewer, as a model the UI draws (area:34 behavior section 26, T-34a-053).
+//! The full-size cover and background viewer, as a model the UI draws (T-34a-053).
 //!
 //! Manga shows one page, the cover. Anime shows two: the cover, then the background. The viewer requests the
-//! original size and never reads or writes the memory cache (behavior section 26.2).
+//! original size and never reads or writes the memory cache.
 
 use kuro_platform::kind::Kind;
 use std::time::Duration;
@@ -10,10 +10,10 @@ use crate::decode::{DecodeOptions, Decoded, Frame, decode_frames};
 use crate::error::ImageError;
 use crate::options::{CachePolicy, LoadOptions, RequestSize};
 
-/// Length of the zoom animation when a page opens, in milliseconds (behavior section 26.2).
+/// Length of the zoom animation when a page opens, in milliseconds.
 pub const ZOOM_MS: u64 = 500;
 
-/// How many pages the viewer has (behavior section 26.1).
+/// How many pages the viewer has.
 pub fn page_count(kind: Kind) -> usize {
     match kind {
         Kind::Manga => 1,
@@ -31,7 +31,7 @@ pub fn switch_page(kind: Kind, page: usize) -> usize {
 }
 
 /// Request options of one page: original size, the background for page 1 of an anime entry, and the memory cache
-/// disabled (behavior section 26.2).
+/// disabled.
 pub fn page_options(kind: Kind, page: usize) -> LoadOptions {
     LoadOptions {
         use_background: kind == Kind::Anime && page == 1,
@@ -41,7 +41,7 @@ pub fn page_options(kind: Kind, page: usize) -> LoadOptions {
     }
 }
 
-/// What the edit button does (behavior sections 24.1 and 26.3): with a custom image it opens a menu with Edit and
+/// What the edit button does: with a custom image it opens a menu with Edit and
 /// Delete, otherwise it opens the file picker straight away.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EditButton {

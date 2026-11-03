@@ -113,7 +113,7 @@ fn http_date(map: &HeaderMap, name: HeaderName) -> Option<i64> {
         .map(|d| d.timestamp_millis())
 }
 
-/// Whether a response may be stored (`CacheStrategy.isCacheable`, topic section 2).
+/// Whether a response may be stored (`CacheStrategy.isCacheable`).
 pub fn is_storable(status: u16, headers: &HeaderMap, request: &CacheControl) -> bool {
     let dirs = directives(headers);
     if has_directive(&dirs, "no-store") || request.no_store {
@@ -131,7 +131,7 @@ pub fn is_storable(status: u16, headers: &HeaderMap, request: &CacheControl) -> 
     }
 }
 
-/// The freshness lifetime in ms (topic section 3.1 and 3.2): `max-age`, else `Expires` minus the served date, else
+/// The freshness lifetime in ms: `max-age`, else `Expires` minus the served date, else
 /// the 10 % heuristic for a URL without a query, then capped by the request's `max-age`.
 pub fn freshness_lifetime_ms(meta: &Meta, url: &Url, request: &CacheControl) -> i64 {
     let map = meta.header_map();
@@ -173,7 +173,7 @@ fn header_str(map: &HeaderMap, name: HeaderName) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Whether a stored response may be served with no network call (topic section 3.3 and 3.4).
+/// Whether a stored response may be served with no network call.
 pub fn is_fresh(meta: &Meta, url: &Url, request: &CacheControl, now: i64) -> bool {
     if request.no_cache {
         return false;

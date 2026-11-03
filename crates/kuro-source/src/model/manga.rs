@@ -123,7 +123,7 @@ impl MangaStatus {
         }
     }
 
-    /// The icon of the status badge (`MangaInfoHeader.kt`, behaviour section 12), by Material icon name. `Unknown`
+    /// The icon of the status badge (`MangaInfoHeader.kt`), by Material icon name. `Unknown`
     /// uses the block icon, which is also the icon of any other stored code.
     pub fn icon_name(self) -> &'static str {
         match self {

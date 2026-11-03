@@ -79,7 +79,7 @@ impl Selectable for FeedRow {
 
 /// A new list from the query. Rows that were selected stay selected by unit id, and the bounds are recomputed from the
 /// selected flags (EC-42-U-05, T-42a-006), so they never point past a shorter list. The source leaves them stale
-/// (B 5.4, E-U46); the plan's 42a rule wins here because a stale bound makes a long press select the wrong range.
+/// (B 5.4, E-U46); our 42a rule wins here because a stale bound makes a long press select the wrong range.
 pub fn replace_rows(rows: Vec<UpdateRow>, previous: &[FeedRow], selection: &mut Selection) -> Vec<FeedRow> {
     let was_selected = |id: i64| previous.iter().any(|p| p.selected && p.row.item_id == id);
     let fresh: Vec<FeedRow> = rows.into_iter().map(|row| FeedRow { selected: was_selected(row.item_id), row, download: NOT_DOWNLOADED }).collect();

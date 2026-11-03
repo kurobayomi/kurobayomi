@@ -127,7 +127,7 @@ pub fn parse(input: &[u8]) -> Result<Value, TorrentError> {
     Ok(v)
 }
 
-/// Writes a value. A `BTreeMap` is always in order, so this cannot fail; the `Result` keeps the plan's signature.
+/// Writes a value. A `BTreeMap` is always in order, so this cannot fail; the `Result` keeps the signature uniform.
 pub fn encode(v: &Value) -> Result<Vec<u8>, TorrentError> {
     let mut out = Vec::new();
     write(v, &mut out);

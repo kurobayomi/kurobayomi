@@ -201,7 +201,7 @@ impl Tracker for ShikimoriTracker {
         self.login_with_code(password).await
     }
 
-    /// Credentials first, then the token (`Logout order`, section 5.4 of the design).
+    /// Credentials first, then the token (`Logout order`).
     fn logout(&self) -> Result<(), TrackError> {
         let result = self.api.base().logout();
         self.api.tokens().clear();

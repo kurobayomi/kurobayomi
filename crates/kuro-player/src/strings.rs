@@ -1,4 +1,4 @@
-//! The player's localised string table (area 46 p1-behavior section 14, T-46a-060). One table holds
+//! The player's localised string table (area 46, T-46a-060). One table holds
 //! the English text of every key the player uses, with plural forms where the key needs one. The
 //! Netflix countdown prefix is a key here (E-46-067), not a literal in the toast code.
 //!

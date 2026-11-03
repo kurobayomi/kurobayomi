@@ -1,8 +1,8 @@
-//! Saving images to the pictures folder or the share staging folder (design section 8.1, behavior section 21).
+//! Saving images to the pictures folder or the share staging folder.
 //!
-//! Page bytes are written as they are. A decoded cover is re-encoded as JPEG quality 100 (behavior section 21.2).
-//! A write goes to `<name>.part` and is renamed over the target, so an existing file of the same name is replaced
-//! (behavior section 21.5). The pictures folder comes from the caller, because `Paths` has no pictures getter.
+//! Page bytes are written as they are. A decoded cover is re-encoded as JPEG quality 100.
+//! A write goes to `<name>.part` and is renamed over the target, so an existing file of the same name is replaced.
+//! The pictures folder comes from the caller, because `Paths` has no pictures getter.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ use crate::names::build_valid_filename;
 use crate::share::staging_dir;
 use crate::sniff::sniff;
 
-/// The app folder under the pictures folder (behavior section 21.3, proposal).
+/// The app folder under the pictures folder.
 pub const PICTURES_FOLDER: &str = "Kurobayomi";
 
 /// Where a saved image goes.
@@ -28,22 +28,22 @@ pub const PICTURES_FOLDER: &str = "Kurobayomi";
 pub enum SaveTarget {
     /// `<pictures>/Kurobayomi/<folder>`, or `<pictures>/Kurobayomi` without a folder (folder per title).
     Pictures { folder: Option<String> },
-    /// `<cache>/shared_image`. The folder is emptied first, so only the latest share is kept (behavior section 21.7).
+    /// `<cache>/shared_image`. The folder is emptied first, so only the latest share is kept.
     Staging,
 }
 
 /// What is written.
 #[derive(Clone, Debug)]
 pub enum SaveSource {
-    /// The original bytes, not re-encoded (behavior section 21.2).
+    /// The original bytes, not re-encoded.
     Page(Bytes),
-    /// A decoded image, re-encoded as JPEG quality 100 (behavior section 21.2).
+    /// A decoded image, re-encoded as JPEG quality 100.
     Cover(Arc<Decoded>),
 }
 
 #[derive(Clone, Debug)]
 pub struct SaveRequest {
-    /// The name without an extension. It is sanitised together with the extension (behavior section 21.4).
+    /// The name without an extension. It is sanitised together with the extension.
     pub name: String,
     pub source: SaveSource,
     pub target: SaveTarget,
@@ -88,7 +88,7 @@ pub async fn save_image(
     Ok(target)
 }
 
-/// The decoded pixels as a JPEG at quality 100. The alpha channel is dropped (behavior section 21.2).
+/// The decoded pixels as a JPEG at quality 100. The alpha channel is dropped.
 pub fn encode_cover_jpeg(decoded: &Decoded) -> Result<Vec<u8>, ImageError> {
     let pixels = decoded.width as usize * decoded.height as usize;
     if decoded.rgba.len() != pixels * 4 {

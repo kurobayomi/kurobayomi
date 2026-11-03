@@ -1,5 +1,5 @@
-//! `manga_root` and `anime_root`: the `Local/Manga` and `Local/Anime` folders under the storage base, created on first access
-//! (area:14 behavior section 2). The base comes from `kuro-domain`'s `StorageManager`, which owns the folder names.
+//! `manga_root` and `anime_root`: the `Local/Manga` and `Local/Anime` folders under the storage base, created on first access.
+//! The base comes from `kuro-domain`'s `StorageManager`, which owns the folder names.
 
 use std::path::PathBuf;
 

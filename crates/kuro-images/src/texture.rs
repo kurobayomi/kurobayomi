@@ -1,4 +1,4 @@
-//! GTK-free description of a `gdk::MemoryTexture` (area:34 design section 5.3, T-34a-036).
+//! GTK-free description of a `gdk::MemoryTexture` (T-34a-036).
 //!
 //! `kuro-images` has no GTK. The GTK layer turns this into a texture on the main thread:
 //!

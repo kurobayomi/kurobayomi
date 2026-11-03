@@ -48,7 +48,7 @@ impl Endpoints {
     }
 }
 
-/// One library row for a subject (`BgmLibEntry`, section 3.4 of the design). The subject id stays the track's
+/// One library row for a subject (`BgmLibEntry`). The subject id stays the track's
 /// `remote_id`. Bangumi has no separate library id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BgmLibEntry {

@@ -19,7 +19,7 @@ Checks that CI runs besides the tests: `scripts/check-platform-boundary.sh`, `sc
 
     scripts/coverage.sh
 
-runs `cargo llvm-cov` on `xtask` and fails below 80% line coverage (the target in the area 54 plan; set
+runs `cargo llvm-cov` on `xtask` and fails below 80% line coverage (set
 `COVERAGE_MIN` to change it). It writes `target/llvm-cov/lcov.info`. To include the `build.rs` helper module once it
 has tests, name its package: `COVERAGE_PACKAGES="xtask kurobayomi" scripts/coverage.sh`.
 

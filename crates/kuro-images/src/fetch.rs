@@ -1,4 +1,4 @@
-//! `ImageService::fetch`: resolve, cache layers, network (area:34 behavior sections 5 to 9, 31).
+//! `ImageService::fetch`: resolve, cache layers, network.
 //!
 //! The service returns the image as a file to read or as the response bytes. Decoding belongs to the
 //! decode lane, which holds one of the `decode_permit` slots while it decodes.
@@ -32,15 +32,15 @@ use crate::platform::image_cache_dir;
 use crate::recheck;
 use crate::resource::{self, Resource};
 
-/// At most this many fetches run at once (behavior section 2.3).
+/// At most this many fetches run at once.
 pub const FETCH_CONCURRENCY: usize = 8;
-/// At most this many decodes run at once (behavior section 2.3).
+/// At most this many decodes run at once.
 pub const DECODE_CONCURRENCY: usize = 3;
 /// The extra fetch and decode slots only `Priority::High` requests take, so the open page's picture starts at once even
 /// while every normal slot is busy.
 pub const HIGH_PRIORITY_SLOTS: usize = 1;
 
-/// Where the image came from (behavior sections 4.3 and 6.2). `fetch` returns `Disk` or `Network`; `Memory` is
+/// Where the image came from. `fetch` returns `Disk` or `Network`; `Memory` is
 /// the reader's own buffer (`buffered`) or a decoded image served by the memory cache (`ImageService::load`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DataSource {
@@ -71,7 +71,7 @@ impl Fetched {
     }
 }
 
-/// The HTTP side of a source: its client and its headers (behavior section 7.1).
+/// The HTTP side of a source: its client and its headers.
 pub struct SourceClient {
     pub client: NetworkClient,
     pub headers: HeaderMap,
@@ -123,7 +123,7 @@ pub struct LoadedImage {
     pub image: Arc<Decoded>,
     /// `Memory` for a decoded-image cache hit, otherwise where the bytes came from.
     pub source: DataSource,
-    /// The cache key (behavior section 10), what a widget compares to drop a stale result.
+    /// The cache key, what a widget compares to drop a stale result.
     pub key: String,
 }
 
@@ -205,7 +205,7 @@ impl ImageService {
     }
 
     /// Loads one image: the decoded-image cache, then `fetch`, then decode on a blocking thread under one of the
-    /// three decode slots (design sections 5.1 and 13.1). Cancelling ends the call with `ImageError::Cancelled`
+    /// three decode slots. Cancelling ends the call with `ImageError::Cancelled`
     /// and nothing is cached; a result that finishes after the cancel is dropped (edge E-IMG-30).
     pub async fn load(&self, req: &LoadRequest) -> Result<LoadedImage, ImageError> {
         let paths: &dyn Paths = &*self.paths;
@@ -333,7 +333,7 @@ impl ImageService {
         self.resolve(art, opts, cancel).await
     }
 
-    /// Behavior section 5.1: the custom cover first, then the URL by its kind.
+    /// The custom cover first, then the URL by its kind.
     async fn resolve(
         &self,
         art: &ArtRef,
@@ -366,7 +366,7 @@ impl ImageService {
         }
     }
 
-    /// Behavior section 6.2: library cover file, disk snapshot (promoted for library entries), then network,
+    /// Library cover file, disk snapshot (promoted for library entries), then network,
     /// written through to the cover file or the disk cache when the policy allows.
     async fn fetch_http(
         &self,

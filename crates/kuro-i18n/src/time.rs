@@ -112,7 +112,7 @@ fn local_naive(epoch_millis: i64) -> NaiveDateTime {
 }
 
 /// `Duration.toDurationString` (T-51a-025): `1d 3h`, `2m 30s`, `45s`. Day, hour, minute and
-/// second parts follow the rules in behaviour section 6.3. An empty result is `fallback`.
+/// second parts follow Aniyomi's rules. An empty result is `fallback`.
 pub fn duration_short(total_seconds: i64, fallback: &str) -> String {
     let days = total_seconds / 86_400;
     let rest = total_seconds % 86_400;

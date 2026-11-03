@@ -1,4 +1,4 @@
-//! `classify` for image resource strings (area:34 behavior section 5.2).
+//! `classify` for image resource strings.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Resource {

@@ -1,5 +1,5 @@
 //! Layout and FAB rules of the anime entry screen (T-39a-035, T-39a-037). Upstream: `AnimeScreen.kt` (FAB, lines 432-462
-//! and 779-804; large and small layouts), `LazyListState.kt:22-30` (`shouldExpandFAB`), behaviour sections 1.2, 1.3, 9.
+//! and 779-804; large and small layouts), `LazyListState.kt:22-30` (`shouldExpandFAB`), 9.
 
 use kuro_i18n::{MsgKey, trf};
 
@@ -7,7 +7,7 @@ use kuro_i18n::{MsgKey, trf};
 pub use crate::entry_core::constants::two_pane;
 
 /// The FAB state. The rule uses the unfiltered list for both the visibility and the label, so a filter never hides the
-/// button. This resolves the upstream inconsistency recorded in behaviour section 9.
+/// button. This resolves an upstream inconsistency.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Fab {
     pub visible: bool,

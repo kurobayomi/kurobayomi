@@ -66,8 +66,7 @@ pub enum ZoomStart {
 }
 
 /// The zoom start for a stored `zoom_start` value and the reading mode. Automatic (1) is Left for left-to-right,
-/// Right for right-to-left and Center otherwise. 2 is Left, 3 is Right, and any other value is Center
-/// (behavior section 3.6).
+/// Right for right-to-left and Center otherwise. 2 is Left, 3 is Right, and any other value is Center.
 pub fn zoom_start(stored: i32, mode: ReadingMode) -> ZoomStart {
     match stored {
         1 => match mode {

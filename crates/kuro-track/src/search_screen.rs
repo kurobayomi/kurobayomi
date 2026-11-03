@@ -1,4 +1,4 @@
-//! Logic of the track search screen (`AnimeTrackerSearch.kt`, `MangaTrackerSearch.kt`, behaviour section 15). The
+//! Logic of the track search screen (`AnimeTrackerSearch.kt`, `MangaTrackerSearch.kt`). The
 //! GUI draws it; this holds the query rules, the body state, the selection, the bottom bar and the result card.
 
 use crate::error::TrackError;

@@ -1,4 +1,4 @@
-//! Simkl tests on the fixtures of `tests/fixtures/simkl/` (T-32a-061, edge-case plan section 7). Every value is invented
+//! Simkl tests on the fixtures of `tests/fixtures/simkl/` (T-32a-061). Every value is invented
 //! and holds no real token or user id. The `all-items` and `search` keys stay unverified until a live run records them
 //! (O-8, T-32a-069).
 

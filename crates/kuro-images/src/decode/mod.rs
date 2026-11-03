@@ -1,4 +1,4 @@
-//! Image decode entry point and per-format decoders (area:34 section 1 and behavior sections 13 and 14).
+//! Image decode entry point and per-format decoders.
 //!
 //! Pipeline: sniff the type, pick the decoder path (T-34a-025), read the header, refuse an empty or oversized
 //! image, decode to RGBA8 with straight alpha, and downscale by the in-sample size (T-34a-026).
@@ -25,12 +25,12 @@ use crate::options::{LoadOptions, RequestSize, Scale};
 use crate::sample::{sample_for, sampled_side};
 use crate::sniff::{self, ImageFormat as Sniffed};
 
-/// Most pixels a cover may have (design section 4.6, proposal).
+/// Most pixels a cover may have.
 pub const COVER_MAX_PIXELS: u64 = 40_000_000;
-/// Most pixels a reader page may have (design section 4.6, proposal).
+/// Most pixels a reader page may have.
 pub const PAGE_MAX_PIXELS: u64 = 120_000_000;
 
-/// Which decoder family handles a request (behavior section 13.1).
+/// Which decoder family handles a request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderPath {
     /// The custom decoder: every format, and the only path for AVIF, JXL and HEIF.
@@ -39,8 +39,8 @@ pub enum DecoderPath {
     Platform,
 }
 
-/// The custom decoder takes a request when `custom_decoder` is set or the sniffed type is AVIF, JXL or HEIF
-/// (behavior section 13.1). BMP is not sniffed, so it is always `Platform`.
+/// The custom decoder takes a request when `custom_decoder` is set or the sniffed type is AVIF, JXL or HEIF.
+/// BMP is not sniffed, so it is always `Platform`.
 pub fn select_decoder(custom_decoder: bool, sniffed: Option<Sniffed>) -> DecoderPath {
     let native_only = matches!(sniffed, Some(Sniffed::Avif | Sniffed::Jxl | Sniffed::Heif));
     if custom_decoder || native_only {
@@ -55,8 +55,7 @@ pub struct DecodeOptions {
     pub size: RequestSize,
     pub scale: Scale,
     pub custom_decoder: bool,
-    /// From `LoadOptions::crop_borders`: uniform-colour borders are cut off before the picture is sampled
-    /// (area:44 behavior section 9.4).
+    /// From `LoadOptions::crop_borders`: uniform-colour borders are cut off before the picture is sampled.
     pub crop_borders: bool,
     pub max_pixels: u64,
     /// The display ICC profile (T-34a-031), loaded once when the setting changes. The picture is taken from sRGB to
@@ -108,13 +107,13 @@ impl From<&LoadOptions> for DecodeOptions {
 }
 
 /// A decoded image: row-major RGBA8, straight alpha, `stride = width * 4`. The buffer is shared, so cloning is
-/// cheap and the memory cache can hold it without any GTK object (design section 16 item 11).
+/// cheap and the memory cache can hold it without any GTK object.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Decoded {
     pub width: u32,
     pub height: u32,
     pub rgba: Bytes,
-    /// True when the in-sample size was greater than 1 (behavior section 14.5).
+    /// True when the in-sample size was greater than 1.
     pub is_sampled: bool,
 }
 
@@ -203,7 +202,7 @@ fn decode_with_decoder(
     Ok(image)
 }
 
-/// Decodes the first frame of `bytes` to RGBA8 at the size the request asks for (behavior sections 14 and 15).
+/// Decodes the first frame of `bytes` to RGBA8 at the size the request asks for.
 pub fn decode(bytes: &[u8], opts: &DecodeOptions) -> Result<Decoded, ImageError> {
     let codec = detect(bytes).ok_or(ImageError::UnsupportedFormat)?;
     // The platform path handles the raster formats only; anything else needs the custom decoder.
@@ -219,7 +218,7 @@ pub fn decode(bytes: &[u8], opts: &DecodeOptions) -> Result<Decoded, ImageError>
     if opts.crop_borders {
         image = borders::crop(image);
     }
-    // The target size is matched to the turned and cropped picture (design section 4.5).
+    // The target size is matched to the turned and cropped picture.
     let sample = sample_for(opts.size, opts.scale, (image.width(), image.height()));
     if sample > 1 {
         image = imageops::thumbnail(

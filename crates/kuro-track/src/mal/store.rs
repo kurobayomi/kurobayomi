@@ -68,8 +68,8 @@ impl TokenStore for SecretTokenStore {
 /// Environment variable that holds the MAL client id (T-29a-040). Wins over the config file.
 pub const CLIENT_ID_ENV: &str = "KUROBAYOMI_MAL_CLIENT_ID";
 
-/// The non-secret settings: the username, the auth-expired flag and the user's client id
-///. The client id is configuration, not a secret.
+/// The non-secret settings: the username, the auth-expired flag and the user's client id.
+/// The client id is configuration, not a secret.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 struct SettingsFile {
     #[serde(default)]

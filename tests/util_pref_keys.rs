@@ -5,7 +5,7 @@ use kuro_prefs::keys::Namespace;
 use kuro_prefs::registry::{Lit, lookup};
 use kuro_prefs::store::PrefStore;
 
-/// Key, default and namespace as the plan lists them.
+/// Key, default and namespace of each key.
 const SECTION_4: &[(&str, Lit, Namespace)] = &[
     ("__APP_STATE_pref_downloaded_only", Lit::Bool(false), Namespace::AppState),
     ("__APP_STATE_incognito_mode", Lit::Bool(false), Namespace::AppState),

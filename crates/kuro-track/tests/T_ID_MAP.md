@@ -37,8 +37,8 @@ tests are unit tests in `src/`, `tests/*.rs` are integration tests. Run one with
 
 Tests are in `src/kitsu/`: `api.rs`, `auth.rs`, `dates.rs`, `dto.rs`,
 `mod.rs`, `rules.rs`, `score.rs`, `search.rs`, `status.rs` (unit tests), `wire_tests.rs` and `fixture_tests.rs` (wiremock).
-Fixtures are in `tests/fixtures/kitsu/` (all 18 of section 4). Ids the plan lists as numbered gaps (KT-16..19, 34..39, 67..69,
-81..84, 89, 94) do not exist in the plan. Run one with `cargo test -p kuro-track <name>`.
+Fixtures are in `tests/fixtures/kitsu/` (all 18). The numbering has gaps (KT-16..19, 34..39, 67..69,
+81..84, 89, 94): those ids were never assigned. Run one with `cargo test -p kuro-track <name>`.
 
 | KT | Test names | Status |
 |---|---|---|

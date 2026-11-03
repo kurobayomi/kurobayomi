@@ -92,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(non_snake_case)] // the name is the acceptance test name in the plan
+    #[allow(non_snake_case)] // the name is an acceptance test id
     fn reading_mode_fromPreference_unknown_is_default() {
         assert_eq!(ReadingMode::from_preference(0x06), ReadingMode::Default);
         assert_eq!(reading_mode_of(0x06), ReadingMode::Default);

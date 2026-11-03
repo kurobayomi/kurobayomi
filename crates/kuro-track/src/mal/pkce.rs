@@ -9,7 +9,7 @@ use url::Url;
 use super::consts::OAUTH_BASE;
 
 /// Random bytes behind the verifier (`PkceUtil.kt:9`). 50 bytes encode to 67 unpadded base64url characters, the
-/// length upstream sends. The plan's "68 characters" cannot come from 50 bytes without padding.
+/// length upstream sends.
 const VERIFIER_BYTES: usize = 50;
 
 /// A new verifier from the OS random source, base64url without padding.

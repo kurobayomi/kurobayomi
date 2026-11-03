@@ -1,7 +1,7 @@
 //! Remove-after-read slot arithmetic (`ReaderViewModel.deleteChapterIfNeeded`, `PlayerViewModel`) and the download
 //! warnings. Pure functions; the callers hold the lists.
 
-/// Milliseconds a download-queue notification stays up (`MangaDownloader.kt`, behaviour section 17).
+/// Milliseconds a download-queue notification stays up (`MangaDownloader.kt`).
 pub const DOWNLOAD_NOTIFICATION_TIMEOUT_MS: u64 = 30_000;
 
 /// Chapters in the download queue (unmetered sources left out) above which the bulk warning shows.
@@ -10,7 +10,7 @@ pub const DOWNLOADS_QUEUED_WARNING_THRESHOLD: usize = 30;
 /// Chapters from one source in the download queue above which the bulk warning shows.
 pub const CHAPTERS_PER_SOURCE_QUEUE_WARNING_THRESHOLD: usize = 15;
 
-/// Chapters per source that a library update may queue before its warning shows (behaviour section 17). Unmetered
+/// Chapters per source that a library update may queue before its warning shows. Unmetered
 /// sources are left out of the count, as they are for the download queue.
 pub const LIBRARY_UPDATE_PER_SOURCE_WARNING: usize = 60;
 

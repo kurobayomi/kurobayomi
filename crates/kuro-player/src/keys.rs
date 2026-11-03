@@ -1,5 +1,5 @@
-//! Key map: GDK keyval and modifiers to mpv key string (area 45 p1-rust-design section 8,
-//! `AniyomiMPVView.onKey`). Pure: the GTK layer passes the keyval (`gdk::Key::into_glib`, which
+//! Key map: GDK keyval and modifiers to mpv key string
+//! (`AniyomiMPVView.onKey`). Pure: the GTK layer passes the keyval (`gdk::Key::into_glib`, which
 //! equals the X11 keysym) and the modifier state; the result is the mpv command to send.
 
 /// Modifier state at key time.

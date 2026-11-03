@@ -1,4 +1,4 @@
-//! Anime episode list (area:14 behavior section 11.5, T-14a-023).
+//! Anime episode list (T-14a-023).
 
 use std::io;
 use std::path::{Path, PathBuf};

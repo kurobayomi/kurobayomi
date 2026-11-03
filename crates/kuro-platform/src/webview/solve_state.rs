@@ -1,4 +1,4 @@
-//! The solver state machine of area 12 topic section 2.5, without WebKit. The GTK side feeds it the page and
+//! The Cloudflare solver state machine, without WebKit. The GTK side feeds it the page and
 //! cookie events and runs the 30 s deadline; this type decides when the solve is over. It has no GTK types,
 //! so every row of the table is a unit test.
 

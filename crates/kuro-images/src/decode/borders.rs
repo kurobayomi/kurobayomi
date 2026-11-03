@@ -1,4 +1,4 @@
-//! Crop-borders rule (area:44 behavior section 9.4, a port of `borders.cpp` of the `image-decoder` library).
+//! Crop-borders rule (a port of `borders.cpp` of the `image-decoder` library).
 //!
 //! The rule works on the grayscale plane. A border is a run of rows or columns at an edge that holds only one
 //! kind of pixel, either "black" or "white". The thresholds keep the names and overlap of the original: black is

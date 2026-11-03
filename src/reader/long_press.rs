@@ -1,4 +1,4 @@
-//! Long-press tracker (T-43b-012, behavior section 8). Pure: no GTK types. The page view feeds it presses, motion,
+//! Long-press tracker (T-43b-012). Pure: no GTK types. The page view feeds it presses, motion,
 //! releases and cancels with millisecond timestamps, starts a timer on `Arm`, and calls [`LongPressTracker::fire`]
 //! when the timer runs out.
 //!
@@ -6,7 +6,7 @@
 //! within the double-tap window (the second tap of a double tap, E-08b). Movement beyond the slop, a release, a
 //! cancel or a second pointer disarms it (E-09, E-10, E-11).
 
-/// Movement beyond this many pixels on either axis cancels a pending long press (behavior section 8.1).
+/// Movement beyond this many pixels on either axis cancels a pending long press.
 pub const SLOP_PX: f64 = 8.0;
 /// `gtk-long-press-time` default.
 pub const DEFAULT_LONG_PRESS_MS: u32 = 500;

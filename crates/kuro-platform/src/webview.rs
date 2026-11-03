@@ -18,7 +18,7 @@ use url::Url;
 
 pub use solve_state::{MachineStep, SolveEvent, SolveMachine};
 
-/// Lowest WebKitGTK `(major, minor)` that is not reported as outdated (area 12 topic section 5; the Chrome 118 era).
+/// Lowest WebKitGTK `(major, minor)` that is not reported as outdated (the Chrome 118 era).
 pub const MIN_WEBKITGTK: (u32, u32) = (2, 42);
 
 /// `true` when a WebKitGTK `(major, minor)` is older than [`MIN_WEBKITGTK`].

@@ -628,7 +628,7 @@ mod props {
     }
 
     proptest! {
-        /// `sort_items` of the plan: the row order is a function of the rows, so sorting again changes nothing, and neither
+        /// `sort_items`: the row order is a function of the rows, so sorting again changes nothing, and neither
         /// `apply` (which sorts) nor a stale or repeated result ever adds or drops a row or an item (T-40b-084).
         #[test]
         fn the_row_sort_is_idempotent_and_apply_never_changes_the_row_or_item_count(

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Regenerates the committed fixtures of section 12 of the manga downloads edge-case plan (T-23a-036).
+"""Regenerates the committed manga download fixtures (T-23a-036).
 
 Run once from this folder: `python3 make_fixtures.py` (needs Pillow). The outputs are committed, and no test writes a
-binary fixture at run time. The plan names a Rust script; a Python one is used because nothing here is compiled.
+binary fixture at run time. It is Python, not Rust, because nothing here is compiled.
 """
 import os
 import sqlite3

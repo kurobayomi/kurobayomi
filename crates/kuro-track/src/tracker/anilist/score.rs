@@ -112,7 +112,7 @@ impl ScoreFormat {
         raw.clamp(0, max as i64) as usize
     }
 
-    /// Stored score to the text shown on the track row (p1-behavior 3.5, p1-data section 11).
+    /// Stored score to the text shown on the track row.
     pub fn display(self, score: f64) -> String {
         match self {
             ScoreFormat::Point5 => {

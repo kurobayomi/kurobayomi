@@ -1,4 +1,4 @@
-//! Exception to user message mapping (area:34 behavior section 28, T-34a-059).
+//! Exception to user message mapping (T-34a-059).
 //!
 //! `AppError` is the closed set of errors the formatter tells apart; everything else is `Other`, which keeps the
 //! Kotlin simple class name and the message so the fallback text matches `ExceptionFormatter`.
@@ -44,7 +44,7 @@ impl AppError {
     }
 }
 
-/// The text of `Throwable.formattedMessage`, in the branch order of behavior section 28.1.
+/// The text of `Throwable.formattedMessage`, in the Kotlin branch order.
 pub fn user_message(error: &AppError) -> String {
     match error {
         AppError::TorrServerDisabled => "TorrServer is not running".to_owned(),

@@ -71,7 +71,7 @@ pub fn migrate_list(counts: Vec<(i64, i64)>, directory: Option<&dyn SourceDirect
 }
 
 #[cfg(test)]
-/// The empty state of the picker: upstream's "Your library is empty" for manga, and for anime the plan's own text, since
+/// The empty state of the picker: upstream's "Your library is empty" for manga, and for anime our own text, since
 /// that one is a text bug there (T-41a-036).
 pub fn empty_text(kind: Kind) -> String {
     match kind {

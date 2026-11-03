@@ -1,4 +1,4 @@
-//! Context-menu item selection (behavior section 30.3). The UI builds the `gtk::PopoverMenu` from the result, in
+//! Context-menu item selection. The UI builds the `gtk::PopoverMenu` from the result, in
 //! the order the items were declared.
 
 /// The items that show, in their declared order. Each entry is `(item, hidden)`, where `hidden` is what the menu's
