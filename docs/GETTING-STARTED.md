@@ -63,8 +63,9 @@ Click a title to open its page. You see the cover, the details and the list of e
 - Click **Start** to begin, or **Resume** to go on where you stopped.
 - Click **Add to library** to keep the title in your **Library**.
 
-**Anime** plays inside the app. The player has pause, the time bar, volume, the next and previous episode, a menu for
-quality and server, a menu for subtitles and audio, and speed. The full-screen button shows only the video; press
+**Anime** plays inside the app. The player's bar has pause, the time bar, volume, the next and previous episode, and
+menus for subtitles, speed and quality (with the server). The **⋮** menu at the top, also on a right-click on the video,
+has audio, chapters, autoplay and the automatic skips. The full-screen button shows only the video; press
 **Esc** to leave full screen. When an opening or an ending plays, a **Skip** button appears.
 
 **Manga** opens in the reader. Turn pages with the arrow keys, the space bar or the mouse wheel. The last page of a

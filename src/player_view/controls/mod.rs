@@ -1,6 +1,8 @@
 //! The player's control bar and its behaviour. Hiding the bars is `auto_hide`'s alone (one timer for both bars and the
 //! pointer). A click on the video toggles pause and a double click toggles fullscreen. Previous and next follow the
-//! playing episode: enabled only with a neighbour. Main thread only; the shared logic is in the parent module (`toggle_pause`, `toggle_fullscreen`, `neighbour`).
+//! playing episode: enabled only with a neighbour. The Quality button shows for an online episode, whose servers load
+//! once its file is loaded, and names the playing height; the Speed button names the playing speed; the Subtitles button shows
+//! when the file has subtitles. Main thread only; the shared logic is in the parent module (`toggle_pause`, `toggle_fullscreen`, `neighbour`).
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -10,6 +12,7 @@ use gtk::glib;
 use gtk::prelude::*;
 
 use super::neighbours::{Step, neighbour};
+use super::sheets;
 use super::{Shared, toggle_fullscreen, toggle_pause};
 
 /// How often the buttons are checked.
@@ -24,18 +27,29 @@ pub struct Parts<'a> {
     pub area: &'a gtk::GLArea,
     pub previous: &'a gtk::Button,
     pub next: &'a gtk::Button,
+    pub subtitles: &'a gtk::MenuButton,
+    pub speed: &'a gtk::MenuButton,
+    pub quality: &'a gtk::MenuButton,
+    pub servers: &'a sheets::quality::Servers,
 }
 
 /// The widgets the timer keeps up to date. Clones of the page's own widgets, so no closure holds the page.
 struct Live {
     previous: gtk::Button,
     next: gtk::Button,
+    subtitles: gtk::MenuButton,
+    speed: gtk::MenuButton,
+    quality: gtk::MenuButton,
+    servers: sheets::quality::Servers,
     /// The episode row the buttons last followed. `i64::MIN` before the first check.
     episode: Cell<i64>,
+    /// The episode row whose servers were asked to load ahead.
+    preloaded: Cell<i64>,
 }
 
 impl Live {
-    /// Follows the playing episode: previous and next are enabled only with a neighbour.
+    /// Follows the playing episode: previous and next are enabled only with a neighbour, and the Quality button shows
+    /// only for an online episode.
     fn episode_changed(&self, shared: &Shared) {
         let episode = shared.borrow().episode_id;
         self.episode.set(episode);
@@ -47,6 +61,25 @@ impl Live {
         };
         self.previous.set_sensitive(has_previous);
         self.next.set_sensitive(has_next);
+        let online = sheets::quality::is_online(episode);
+        self.quality.set_visible(online);
+    }
+
+    /// Follows the playing file: its speed, its height and whether it has subtitles. Once mpv has loaded the episode's
+    /// file, its servers load for the Quality menu: after the start, so they never slow it (the file of the episode
+    /// before can still report a duration for a moment, so the duration does not tell).
+    fn follow_file(&self, shared: &Shared) {
+        let episode = self.episode.get();
+        if self.quality.is_visible() && self.preloaded.get() != episode && shared.borrow().loaded_episode == Some(episode) {
+            self.preloaded.set(episode);
+            sheets::quality::preload(shared, &self.servers);
+        }
+        sheets::speed::refresh(&self.speed, shared);
+        sheets::quality::refresh(&self.quality);
+        let subtitles = super::menu::has_subtitles(shared);
+        if self.subtitles.is_visible() != subtitles {
+            self.subtitles.set_visible(subtitles);
+        }
     }
 }
 
@@ -82,9 +115,15 @@ pub fn wire(parts: Parts, shared: &Shared) {
     let live = Live {
         previous: parts.previous.clone(),
         next: parts.next.clone(),
+        subtitles: parts.subtitles.clone(),
+        speed: parts.speed.clone(),
+        quality: parts.quality.clone(),
+        servers: parts.servers.clone(),
         episode: Cell::new(i64::MIN),
+        preloaded: Cell::new(i64::MIN),
     };
     live.episode_changed(shared);
+    live.follow_file(shared);
     let (page, shared) = (parts.page.downgrade(), Rc::clone(shared));
     glib::timeout_add_local(TICK, move || {
         // the page is gone, or the player closed
@@ -94,6 +133,7 @@ pub fn wire(parts: Parts, shared: &Shared) {
         if live.episode.get() != shared.borrow().episode_id {
             live.episode_changed(&shared);
         }
+        live.follow_file(&shared);
         glib::ControlFlow::Continue
     });
 }

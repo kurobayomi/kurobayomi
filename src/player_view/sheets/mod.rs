@@ -1,7 +1,6 @@
-//! The lists the player's menu offers: quality and server (`quality`), speed (`speed`), chapters (`chapters`); the
-//! audio and subtitle tracks are in `menu.rs`. Each list is a column of [`Choice`]s with the current one marked; the
-//! player's one menu (the header's ⋮ and the video's right-click, `widgets::context_menu`) shows each as a submenu
-//! through [`items`]. Main thread only.
+//! The lists the player offers: quality and server (`quality`) and speed (`speed`), each the menu of a bar button, and
+//! chapters (`chapters`) in the ⋮ menu; the audio and subtitle tracks are in `menu.rs`. Each list is a column of
+//! [`Choice`]s with the current one marked; [`items`] turns one into menu entries (`widgets::context_menu`). Main thread only.
 
 pub(super) mod chapters;
 pub(super) mod quality;

@@ -1,10 +1,10 @@
-//! The Quality and Server lists of an online episode, first in the player's menu. When the menu opens, the episode's
-//! servers and their videos load on the source's runtime ("Quality: loading…" until they do, then the list is kept for
-//! the episode and the open menu refreshes). One lists the heights ("1080p, 720p, 360p"), the other the servers. Choosing a height plays it on the playing server (else on the first server that has
+//! The Quality and Server lists of an online episode, in the menu of the bar's Quality button. When the episode starts,
+//! its servers and their videos load on the source's runtime ([`preload`]) and are kept for the episode; a menu opened
+//! before then says "Quality: loading…". One lists the heights ("1080p, 720p, 360p"), the other the servers. Choosing a height plays it on the playing server (else on the first server that has
 //! it); choosing a server plays the playing height there (else its first video). The stream resolves and reloads at the
 //! playing position, with that video's headers, subtitles and audio. The last choice is kept for the session: the next
 //! episode plays the same server and title when its list has them, else the default quality of the settings, else the
-//! source's best video. A local episode has neither list. The menu gets them through [`menu_sections`], over the loaded
+//! source's best video. A local episode has neither list. The menu gets them through [`menu_items`], over the loaded
 //! servers ([`Servers`]).
 
 use std::cell::{Cell, RefCell};
@@ -19,6 +19,10 @@ use kuro_source::SourceError;
 use kuro_source::anime::{
     AnimeSource, Hoster, HosterState, NO_HOSTER_LIST, SEpisode, Video, best_video, http_hosters, load_hoster, resolve_once,
 };
+
+use gtk::prelude::*;
+
+use crate::widgets::context_menu::Item;
 
 use super::super::{Media, Shared, source};
 use super::Choice;
@@ -50,8 +54,7 @@ struct Loaded {
     states: Vec<HosterState>,
 }
 
-/// The servers of the playing episode, loaded once per episode and shared by the quality button and the video's
-/// right-click menu. Cloning shares them.
+/// The servers of the playing episode, loaded once per episode for the Quality button. Cloning shares them.
 #[derive(Clone, Default)]
 pub struct Servers(Rc<ServersInner>);
 
@@ -63,9 +66,11 @@ struct ServersInner {
 }
 
 impl Servers {
-    /// The loaded servers of `episode_id`, or `None` while they load. The first ask starts the load and `done` runs with
-    /// its answer; an ask while it runs starts nothing and its `done` is dropped.
-    fn get_or_load(&self, episode_id: i64, source: Arc<dyn AnimeSource>, episode: SEpisode, done: impl FnOnce(Result<Vec<HosterState>, String>) + 'static) -> Option<Vec<HosterState>> {
+    /// The loaded servers of `episode_id`, or `None` while they load. The first ask starts the load from `known` (the
+    /// servers the episode played from; empty: asked from the source) and `done` runs with its answer; an ask while it
+    /// runs starts nothing and its `done` is dropped. An answer for an episode that is no longer the one loading (the
+    /// next episode started meanwhile) is dropped too, so it neither ends the newer load nor replaces its servers.
+    fn get_or_load(&self, episode_id: i64, source: Arc<dyn AnimeSource>, episode: SEpisode, known: Vec<Hoster>, done: impl FnOnce(Result<Vec<HosterState>, String>) + 'static) -> Option<Vec<HosterState>> {
         let cached = self.0.loaded.borrow().as_ref().filter(|loaded| loaded.episode_id == episode_id).map(|loaded| loaded.states.clone());
         if cached.is_some() {
             return cached;
@@ -75,7 +80,10 @@ impl Servers {
         }
         self.0.pending.set(Some(episode_id));
         let this = self.clone();
-        load(source, episode, move |answer| {
+        load(source, episode, known, move |answer| {
+            if this.0.pending.get() != Some(episode_id) {
+                return;
+            }
             this.0.pending.set(None);
             if let Ok(states) = &answer {
                 *this.0.loaded.borrow_mut() = Some(Loaded { episode_id, states: states.clone() });
@@ -104,22 +112,76 @@ fn height(video: &Video) -> Option<i32> {
 
 
 
-/// The Quality and Server lists of the player's menu, each with its heading. `None` for an episode that is not online;
-/// an empty list while the servers load: the first ask starts the load, then `loaded` runs (the menu refreshes), and a
-/// failure shows its toast.
-pub fn menu_sections(shared: &Shared, servers: &Servers, loaded: impl Fn() + 'static) -> Option<Vec<(Option<String>, Vec<Choice>)>> {
+/// The entries of the bar's Quality menu: the heights, then a Server submenu (a source that lists no servers has none).
+/// The servers load when the episode starts ([`preload`]); a menu opened before they are in shows a greyed-out
+/// "Quality: loading…" and is not changed while it shows: the next opening has the list. A failed load is asked again
+/// by that opening, and its failure is a toast.
+pub fn menu_items(shared: &Shared, servers: &Servers) -> Vec<Item> {
     let episode_id = shared.borrow().episode_id;
-    let (source, episode) = online_episode(episode_id)?;
-    let states = servers.get_or_load(episode_id, Arc::clone(&source), episode, move |answer| match answer {
-        Ok(_) => loaded(),
-        Err(text) => crate::toast::notify(text),
+    let Some((source, episode)) = online_episode(episode_id) else { return Vec::new() };
+    let known = shared.borrow().media.hosters.clone();
+    let states = servers.get_or_load(episode_id, Arc::clone(&source), episode, known, |answer| {
+        if let Err(text) = answer {
+            crate::toast::notify(text);
+        }
     });
-    Some(states.map_or_else(Vec::new, |states| sections(shared, &source, &states)))
+    let Some(states) = states else {
+        return vec![Item::new(tr(MsgKey::ui_quality_loading), 0, || {}).disabled()];
+    };
+    let mut items = Vec::new();
+    // the heights first, as the menu's own entries; the servers in their submenu
+    for (index, (heading, choices)) in sections(shared, &source, &states).into_iter().enumerate() {
+        if index == 0 {
+            items.extend(super::items(choices));
+        } else if !choices.is_empty() {
+            items.push(Item::submenu(heading.unwrap_or_default(), 0, super::items(choices)));
+        }
+    }
+    items
+}
+
+/// Loads the servers of the playing episode from the ones it played from, so the Quality menu has them when it opens.
+/// A file (a download) has none and asks nothing here: the menu asks the source when opened. A failure is only logged
+/// here: opening the menu asks again and says so.
+pub fn preload(shared: &Shared, servers: &Servers) {
+    let (episode_id, known) = {
+        let player = shared.borrow();
+        (player.episode_id, player.media.hosters.clone())
+    };
+    if known.is_empty() {
+        return;
+    }
+    let Some((source, episode)) = online_episode(episode_id) else { return };
+    servers.get_or_load(episode_id, source, episode, known, |answer| {
+        if let Err(text) = answer {
+            tracing::debug!(error = %text, "player: the servers did not load ahead");
+        }
+    });
+}
+
+/// Whether `episode_id` is an episode of an installed source (the Quality button shows only then).
+pub fn is_online(episode_id: i64) -> bool {
+    online_episode(episode_id).is_some()
+}
+
+/// Shows the playing height on the Quality button, or its icon while the height is not known. Called on every tick, so
+/// the button changes only when it differs.
+pub fn refresh(button: &gtk::MenuButton) {
+    match last().and_then(|pick| title_height(&pick.title)) {
+        Some(height) => {
+            let text = height_label(height);
+            if button.label().as_deref() != Some(text.as_str()) {
+                button.set_label(&text);
+            }
+        }
+        None if button.icon_name().is_none() => button.set_icon_name("video-display-symbolic"),
+        None => {}
+    }
 }
 
 /// The video an episode plays (the source's stream choice; see `best_stream` in `source.rs`). The last choice is
 /// used when this episode's servers have the same server and title; the choice made here is then kept for the session.
-pub async fn choose(source: &dyn AnimeSource, hosters: &[Hoster], quality: i32) -> Result<Option<Video>, SourceError> {
+pub async fn choose(source: &dyn AnimeSource, hosters: &mut [Hoster], quality: i32) -> Result<Option<Video>, SourceError> {
     if let Some(pick) = last() {
         if let Some(video) = remembered(source, hosters, &pick).await {
             if let Some(resolved) = resolve_once(source, video).await? {
@@ -142,21 +204,29 @@ pub async fn choose(source: &dyn AnimeSource, hosters: &[Hoster], quality: i32) 
 /// The video a download takes: the first video of the `quality` height, else the source's best video. Unlike [`choose`]
 /// it neither reads nor keeps the session's last choice, which belongs to what is playing.
 pub(crate) async fn default_or_best(source: &dyn AnimeSource, hosters: &[Hoster], quality: i32) -> Result<Option<Video>, SourceError> {
-    if let Some((_, video)) = with_height(source, hosters, quality).await {
+    let mut hosters = hosters.to_vec();
+    if let Some((_, video)) = with_height(source, &mut hosters, quality).await {
         if let Some(resolved) = resolve_once(source, video).await? {
             return Ok(Some(resolved));
         }
     }
-    best_video(source, hosters).await
+    best_video(source, &hosters).await
+}
+
+/// The videos of `hoster`: its list, else fetched now and kept on it, so the Quality menu does not ask again.
+async fn videos_of(source: &dyn AnimeSource, hoster: &mut Hoster) -> Result<Vec<Video>, SourceError> {
+    if let Some(videos) = &hoster.video_list {
+        return Ok(videos.clone());
+    }
+    let videos = source.videos_for_hoster(hoster).await?;
+    hoster.video_list = Some(videos.clone());
+    Ok(videos)
 }
 
 /// The first video of `height`, servers in the source's order (its preferred first). A lazy server's list is fetched here.
-async fn with_height(source: &dyn AnimeSource, hosters: &[Hoster], wanted: i32) -> Option<(Pick, Video)> {
+async fn with_height(source: &dyn AnimeSource, hosters: &mut [Hoster], wanted: i32) -> Option<(Pick, Video)> {
     for hoster in hosters {
-        let videos = match &hoster.video_list {
-            Some(videos) => videos.clone(),
-            None => source.videos_for_hoster(hoster).await.unwrap_or_default(),
-        };
+        let videos = videos_of(source, hoster).await.unwrap_or_default();
         if let Some(video) = videos.into_iter().find(|v| height(v) == Some(wanted)) {
             return Some((Pick { hoster: hoster.hoster_name.clone(), title: video.video_title.clone() }, video));
         }
@@ -165,15 +235,9 @@ async fn with_height(source: &dyn AnimeSource, hosters: &[Hoster], wanted: i32) 
 }
 
 /// The video of `pick` among its server's videos. A lazy server's list is fetched here.
-async fn remembered(source: &dyn AnimeSource, hosters: &[Hoster], pick: &Pick) -> Option<Video> {
-    for hoster in hosters.iter().filter(|h| h.hoster_name == pick.hoster) {
-        let videos = match &hoster.video_list {
-            Some(videos) => videos.clone(),
-            None => match source.videos_for_hoster(hoster).await {
-                Ok(videos) => videos,
-                Err(_) => continue,
-            },
-        };
+async fn remembered(source: &dyn AnimeSource, hosters: &mut [Hoster], pick: &Pick) -> Option<Video> {
+    for hoster in hosters.iter_mut().filter(|h| h.hoster_name == pick.hoster) {
+        let Ok(videos) = videos_of(source, hoster).await else { continue };
         if let Some(video) = videos.into_iter().find(|v| v.video_title == pick.title) {
             return Some(video);
         }
@@ -312,7 +376,7 @@ fn choice(shared: &Shared, source: &Arc<dyn AnimeSource>, hoster: &str, video: &
 
 /// The servers of an episode with their videos, every one loaded (a lazy server too). Runs on the source's runtime and
 /// calls `done` on the GTK thread.
-fn load(source: Arc<dyn AnimeSource>, episode: SEpisode, done: impl FnOnce(Result<Vec<HosterState>, String>) + 'static) {
+fn load(source: Arc<dyn AnimeSource>, episode: SEpisode, known: Vec<Hoster>, done: impl FnOnce(Result<Vec<HosterState>, String>) + 'static) {
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
         done(Err(tr(MsgKey::player_hoster_failed)));
         return;
@@ -321,7 +385,7 @@ fn load(source: Arc<dyn AnimeSource>, episode: SEpisode, done: impl FnOnce(Resul
         &handle,
         async move {
             // the spinner of the menu never stays: after 30 seconds the toast says the source is not answering
-            let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), all_states(source.as_ref(), &episode)).await;
+            let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), all_states(source.as_ref(), &episode, known)).await;
             answer
         },
         move |answer| {
@@ -334,16 +398,14 @@ fn load(source: Arc<dyn AnimeSource>, episode: SEpisode, done: impl FnOnce(Resul
     );
 }
 
-async fn all_states(source: &dyn AnimeSource, episode: &SEpisode) -> Result<Vec<HosterState>, String> {
-    let hosters = crate::browse::errors::plain(source.name(), http_hosters(source, episode)).await?;
-    let mut states = Vec::with_capacity(hosters.len());
-    for hoster in &hosters {
-        let state = load_hoster(source, hoster, true)
-            .await
-            .unwrap_or_else(|_| HosterState::Error { hoster_name: hoster.hoster_name.clone() });
-        states.push(state);
-    }
-    Ok(states)
+/// Every server of an episode with its videos. `known` is the list the episode played from (empty: asked from the source
+/// now). A server whose videos it already holds costs no request; the others load at the same time.
+async fn all_states(source: &dyn AnimeSource, episode: &SEpisode, known: Vec<Hoster>) -> Result<Vec<HosterState>, String> {
+    let hosters = if known.is_empty() { crate::browse::errors::plain(source.name(), http_hosters(source, episode)).await? } else { known };
+    let loads = hosters.iter().map(|hoster| async move {
+        load_hoster(source, hoster, true).await.unwrap_or_else(|_| HosterState::Error { hoster_name: hoster.hoster_name.clone() })
+    });
+    Ok(futures::future::join_all(loads).await)
 }
 
 /// Plays `video` of `pick` in the open page: its stream resolves in the background (a spinner shows), then the page
@@ -399,7 +461,9 @@ fn reload(shared: &Shared, media: Media) {
     }
     let start = player.playback.position_ms().unwrap_or(0);
     let paused = player.playback.is_paused();
-    player.media = media;
+    // the same episode: the servers it played from stay
+    let hosters = std::mem::take(&mut player.media.hosters);
+    player.media = Media { hosters, ..media };
     if let Err(e) = player.playback.load(&player.media.target, player.media.headers.as_deref(), start) {
         tracing::error!(error = %e, "player: the chosen quality could not load");
         crate::toast::notify(tr(MsgKey::player_hoster_failed));

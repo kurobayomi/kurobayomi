@@ -1,8 +1,9 @@
-//! The playback speed list of the player's menu: six presets, the playing one marked. The speed is written to mpv, which
-//! keeps it while the page plays on. Label text comes from `kuro_player::speed`.
+//! The bar's Speed button and its menu: six presets, the playing one marked, and the button names the playing speed.
+//! The speed is written to mpv, which keeps it while the page plays on. Label text comes from `kuro_player::speed`.
 
 use std::rc::Rc;
 
+use gtk::prelude::*;
 use kuro_player::speed::speed_label;
 
 use super::super::Shared;
@@ -10,6 +11,14 @@ use super::Choice;
 
 /// The speeds the menu offers, slowest first.
 pub const PRESETS: [f32; 6] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+/// Shows the playing speed on the bar's Speed button. Called on every tick, so the text changes only when it differs.
+pub fn refresh(button: &gtk::MenuButton, shared: &Shared) {
+    let text = speed_label(playing(shared) as f32);
+    if button.label().as_deref() != Some(text.as_str()) {
+        button.set_label(&text);
+    }
+}
 
 /// The list's entries: the presets with the playing one marked.
 pub fn choices(shared: &Shared) -> Vec<Choice> {
@@ -29,7 +38,7 @@ pub fn choices(shared: &Shared) -> Vec<Choice> {
         .collect()
 }
 
-/// [ and ]: the next slower or faster preset, shown in a toast (the bar has no speed of its own).
+/// [ and ]: the next slower or faster preset, shown in a toast too (the bar may be hidden).
 pub fn step(shared: &Shared, steps: i32) {
     let target = stepped(playing(shared), steps);
     set_speed(shared, target);

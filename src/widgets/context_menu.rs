@@ -3,7 +3,8 @@
 //! the items the caller returns, so the labels always match the current state (Mark as read / Mark as unread). The Menu
 //! key and Shift+F10 open the same menu from the keyboard. An item can carry a check mark or open a submenu. A widget
 //! whose long press means something else (chapter and episode rows select on it) uses `attach_without_long_press`.
-//! [`menu_button`] opens the same kind of menu from a header button (the player's ⋮, which right-click also opens).
+//! [`menu_button`] opens the same kind of menu from a button (the player's ⋮, which right-click also opens, and the
+//! player bar's Subtitles, Speed and Quality).
 
 use std::rc::Rc;
 
@@ -44,33 +45,20 @@ impl Item {
     }
 }
 
-/// A header button that opens a menu of `items()`, rebuilt each time it opens so it shows the state of now. The returned
-/// function rebuilds the open menu in place (a list that finished loading); it does nothing while the menu is closed.
-pub fn menu_button(icon_name: &str, label: &str, items: impl Fn() -> Vec<Item> + 'static) -> (gtk::MenuButton, Rc<dyn Fn()>) {
-    let model = gio::Menu::new();
-    let button = gtk::MenuButton::builder().icon_name(icon_name).menu_model(&model).build();
-    // no tooltip: it would sit over the open menu; screen readers get the label
+/// A button that opens a menu of `items()`, built each time it opens so it shows the state of now. The caller gives it
+/// its icon or text. `label` names it for screen readers.
+pub fn menu_button(label: &str, items: impl Fn() -> Vec<Item> + 'static) -> gtk::MenuButton {
+    let button = gtk::MenuButton::new();
     button.update_property(&[gtk::accessible::Property::Label(label)]);
-    let fill: Rc<dyn Fn(&gtk::MenuButton)> = {
-        let model = model.clone();
-        Rc::new(move |button| {
-            let actions = gio::SimpleActionGroup::new();
-            model.remove_all();
-            fill(&model, items(), &actions, &mut 0);
-            button.insert_action_group("ctx", Some(&actions));
-        })
-    };
-    // GTK's own hook, run each time just before the menu shows: the model is complete before GTK builds the menu from it
-    let on_open = Rc::clone(&fill);
-    button.set_create_popup_func(move |button| on_open(button));
-    // weak on both: the caller's items may hold this refresh (a list that loads), and the button owns the builder
-    let (weak, fill) = (button.downgrade(), Rc::downgrade(&fill));
-    let refresh: Rc<dyn Fn()> = Rc::new(move || {
-        if let (Some(button), Some(fill)) = (weak.upgrade().filter(gtk::MenuButton::is_active), fill.upgrade()) {
-            fill(&button);
-        }
+    // GTK's own hook, run each time just before the menu shows. Each opening gets a new model, so a new menu: a shown
+    // menu is never changed (a model that changes under a built menu leaves its submenu pages behind)
+    button.set_create_popup_func(move |button| {
+        let (model, actions) = (gio::Menu::new(), gio::SimpleActionGroup::new());
+        fill(&model, items(), &actions, &mut 0);
+        button.insert_action_group("ctx", Some(&actions));
+        button.set_menu_model(Some(&model));
     });
-    (button, refresh)
+    button
 }
 
 /// Opens a menu of `items(x, y)` on `widget` at the click position: on a right click, a touch long press, or the
@@ -228,16 +216,16 @@ mod tests {
     }
 
     #[test]
-    fn the_button_rebuilds_its_menu_on_open_with_greyed_out_entries() {
+    fn each_opening_builds_a_new_menu_with_greyed_out_entries() {
         crate::testing::with_display(|| {
             let opened = Rc::new(Cell::new(0));
             let count = Rc::clone(&opened);
-            let (button, refresh) = menu_button("view-more-symbolic", "More", move || {
+            let button = menu_button("More", move || {
                 count.set(count.get() + 1);
                 vec![Item::new("Loading", 0, || {}).disabled(), Item::new("Fullscreen", 1, || {}).checked(true)]
             });
-            refresh();
-            assert_eq!(opened.get(), 0, "a closed menu is not rebuilt");
+            button.set_icon_name("view-more-symbolic");
+            assert_eq!(opened.get(), 0, "nothing is built before the first opening");
             // a menu opens from a button on screen
             let window = gtk::Window::builder().child(&button).build();
             window.present();
@@ -245,9 +233,10 @@ mod tests {
             assert_eq!(opened.get(), 1, "opening builds the menu of now");
             let model = button.menu_model().expect("a model");
             assert_eq!(model.n_items(), 2, "two sections");
-            refresh();
-            assert_eq!(opened.get(), 2, "an open menu is rebuilt in place");
-            assert_eq!(button.menu_model().as_ref(), Some(&model), "the same model, so the open menu updates");
+            button.set_active(false);
+            button.set_active(true);
+            assert_eq!(opened.get(), 2, "the next opening builds it again");
+            assert_ne!(button.menu_model().as_ref(), Some(&model), "a new model: the menu shown before is never changed");
             let (menu, actions) = (gio::Menu::new(), gio::SimpleActionGroup::new());
             fill(&menu, vec![Item::new("Loading", 0, || {}).disabled(), Item::new("Fullscreen", 1, || {})], &actions, &mut 0);
             assert!(!actions.is_action_enabled("item0") && actions.is_action_enabled("item1"), "a disabled entry is greyed out");

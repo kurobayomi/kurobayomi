@@ -26,26 +26,26 @@ pub fn tokens(list: &str) -> Vec<String> {
         .collect()
 }
 
+/// The lowercase words of `text`, split on anything that is not a letter or a digit.
+fn words(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Whether `words` hold the words of `phrase` in a row.
+fn has_phrase(words: &[String], phrase: &str) -> bool {
+    let wanted = self::words(phrase);
+    !wanted.is_empty() && words.windows(wanted.len()).any(|window| window == wanted.as_slice())
+}
+
 /// Whether the track is in the language. The name must contain the tag or a display name of it as
 /// whole words, or the `lang` tag must equal the tag, ignoring case.
 fn contains_lang(track: &TrackCandidate, tag: &str) -> bool {
-    let name = track.name.to_lowercase();
-    let words: Vec<&str> = name
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .collect();
-    let has_phrase = |phrase: &str| {
-        let wanted: Vec<String> = phrase
-            .to_lowercase()
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| !w.is_empty())
-            .map(str::to_owned)
-            .collect();
-        !wanted.is_empty()
-            && words
-                .windows(wanted.len())
-                .any(|window| window.iter().zip(&wanted).all(|(a, b)| a == b))
-    };
+    let words = words(&track.name);
+    let has_phrase = |phrase: &str| has_phrase(&words, phrase);
     let word_in_name = has_phrase(tag)
         || has_phrase(&kuro_i18n::names::english_name(tag))
         || has_phrase(&kuro_i18n::names::native_name(tag));
@@ -94,6 +94,52 @@ pub fn preferred_track(
         })
         .or(filtered.first())
         .map(|t| t.id)
+}
+
+/// Three-letter language codes (ISO 639-2, both forms) of the table's languages, with the tag the
+/// table uses. Files and sources write either form; the remembered language is always the tag.
+const LONG_CODES: &[(&str, &str)] = &[
+    ("eng", "en"), ("jpn", "ja"), ("fre", "fr"), ("fra", "fr"), ("ger", "de"), ("deu", "de"),
+    ("spa", "es"), ("ita", "it"), ("por", "pt"), ("rus", "ru"), ("ara", "ar"), ("kor", "ko"),
+    ("pol", "pl"), ("tur", "tr"), ("vie", "vi"), ("tha", "th"), ("ind", "id"), ("may", "ms"),
+    ("msa", "ms"), ("hin", "hi"), ("heb", "he"), ("dut", "nl"), ("nld", "nl"), ("swe", "sv"),
+    ("dan", "da"), ("fin", "fi"), ("cze", "cs"), ("ces", "cs"), ("ukr", "uk"), ("gre", "el"),
+    ("ell", "el"), ("hun", "hu"), ("rum", "ro"), ("ron", "ro"), ("bul", "bg"), ("hrv", "hr"),
+    ("srp", "sr"), ("slo", "sk"), ("slk", "sk"), ("cat", "ca"), ("fil", "fil"), ("tgl", "fil"),
+    ("per", "fa"), ("fas", "fa"), ("ben", "bn"), ("tam", "ta"), ("tel", "te"), ("urd", "ur"),
+];
+
+/// A language code as the table writes it: a three-letter code becomes the table's tag ("fre" and
+/// "fra" are "fr"); any other code is kept, lowercased.
+fn short_code(code: &str) -> String {
+    let code = code.trim().to_lowercase();
+    LONG_CODES.iter().find(|(long, _)| *long == code).map_or(code, |(_, tag)| (*tag).to_owned())
+}
+
+/// The language of a track as one tag, to remember a pick by: its `lang` code, else what its name
+/// says. A name counts when it holds a language's English or native name as whole words ("French
+/// [CC]", "Français") or is only a code ("FR", "eng"); a regional name wins over its base language
+/// ("Portuguese (Brazil)" is pt-BR). Sources name the same language differently, and a tag matches
+/// all of them on the next file (`preferred_track`). `None` for a name that says no language
+/// ("Track 2").
+pub fn language_tag(lang: Option<&str>, name: &str) -> Option<String> {
+    // `und` is how files write "unknown"
+    if let Some(code) = lang.map(str::trim).filter(|code| !code.is_empty() && !code.eq_ignore_ascii_case("und")) {
+        return Some(short_code(code));
+    }
+    let words = words(name);
+    let named: Vec<&str> = kuro_i18n::names::NAMES
+        .iter()
+        .filter(|row| has_phrase(&words, row.english) || has_phrase(&words, row.native))
+        .map(|row| row.tag)
+        .collect();
+    if let Some(tag) = named.iter().find(|tag| tag.contains('-')).or(named.first()) {
+        return Some((*tag).to_owned());
+    }
+    // a name that is only a code; a code inside longer text ("Sub ID 2") says nothing
+    let code = short_code(name);
+    let known = kuro_i18n::names::find(&code).is_some() || LONG_CODES.iter().any(|(_, tag)| *tag == code);
+    (words.len() == 1 && known).then_some(code)
 }
 
 /// The preference strings `TrackSelect` reads. The subtitle list uses the whitelist and the
@@ -146,6 +192,32 @@ mod tests {
             name: name.to_owned(),
             lang: lang.map(str::to_owned),
         }
+    }
+
+    #[test]
+    fn a_track_language_is_one_tag_however_the_source_writes_it() {
+        assert_eq!(language_tag(Some("fre"), "Anything").as_deref(), Some("fr"), "a three-letter code");
+        assert_eq!(language_tag(Some("FRA"), "").as_deref(), Some("fr"));
+        assert_eq!(language_tag(Some("fr"), "").as_deref(), Some("fr"));
+        assert_eq!(language_tag(None, "French [CC]").as_deref(), Some("fr"), "an English name");
+        assert_eq!(language_tag(None, "Français").as_deref(), Some("fr"), "a native name");
+        assert_eq!(language_tag(Some(" "), "Español (España)").as_deref(), Some("es"), "a blank code falls to the name");
+        assert_eq!(language_tag(Some("und"), "Deutsch").as_deref(), Some("de"), "so does the unknown code");
+        assert_eq!(language_tag(None, "Portuguese (Brazil)").as_deref(), Some("pt-BR"), "the region wins");
+        assert_eq!(language_tag(None, "Portuguese").as_deref(), Some("pt"));
+        assert_eq!(language_tag(None, "FR").as_deref(), Some("fr"), "a name that is a code");
+        assert_eq!(language_tag(None, "eng").as_deref(), Some("en"));
+        assert_eq!(language_tag(None, "Sub ID 2"), None, "a code inside other words says nothing");
+        assert_eq!(language_tag(None, "Track 2"), None);
+    }
+
+    #[test]
+    fn a_remembered_tag_finds_the_language_under_another_source_s_name() {
+        let other_source = [track(1, "English", None), track(2, "Français", None)];
+        let tag = language_tag(None, "French [CC]").expect("a tag");
+        assert_eq!(preferred_track(&other_source, &tag, "", "", ""), Some(2));
+        let tag = language_tag(Some("fre"), "").expect("a tag");
+        assert_eq!(preferred_track(&other_source, &tag, "", "", ""), Some(2), "a file's code finds a source's name");
     }
 
     #[test]

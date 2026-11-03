@@ -101,7 +101,7 @@ pub fn resolve_episode(found: SourceEpisode, done: impl FnOnce(Result<Media, Str
             // the "Loading…" card never stays: after 30 seconds the toast says the source is not answering
             let answer = crate::browse::errors::settle(crate::browse::errors::LOAD_TIMEOUT, source.name(), best_stream(source.as_ref(), &s_episode, quality)).await;
             let answer = match answer {
-                Ok(video) => allowed(source.id(), video).await,
+                Ok((video, hosters)) => allowed(source.id(), video).await.map(|video| (video, hosters)),
                 Err(text) => Err(text),
             };
             answer
@@ -110,19 +110,20 @@ pub fn resolve_episode(found: SourceEpisode, done: impl FnOnce(Result<Media, Str
             // a closed channel means the source task panicked
             let answer = answer.unwrap_or_else(|| Err(tr(MsgKey::video_list_empty_error)));
             drop(busy);
-            done(answer.map(|video| media_of(video, title, &preferred, &preferred_audio)));
+            done(answer.map(|(video, hosters)| Media { hosters, ..media_of(video, title, &preferred, &preferred_audio) }));
         },
     );
     true
 }
 
 /// The video to play: the source's hosters (or its plain video list, as one hoster) through `choose`, which keeps the
-/// session's last quality choice, else plays the `quality` height, else the best video. The error is the text of the toast.
-async fn best_stream(source: &dyn AnimeSource, episode: &SEpisode, quality: i32) -> Result<Video, String> {
+/// session's last quality choice, else plays the `quality` height, else the best video. The hosters come back with it,
+/// holding the video lists `choose` fetched, for the Quality menu. The error is the text of the toast.
+async fn best_stream(source: &dyn AnimeSource, episode: &SEpisode, quality: i32) -> Result<(Video, Vec<Hoster>), String> {
     use crate::browse::errors::plain;
     let name = source.name();
     // every call of the source ends within 30 seconds with a sentence for the toast; the technical text is in the log
-    let hosters = if source.provides_hosters() {
+    let mut hosters = if source.provides_hosters() {
         source.sort_hosters(plain(name, source.hosters(episode)).await?)
     } else {
         vec![Hoster::synthetic(plain(name, source.videos_for_episode(episode)).await?)]
@@ -130,7 +131,8 @@ async fn best_stream(source: &dyn AnimeSource, episode: &SEpisode, quality: i32)
     if hosters.is_empty() {
         return Err(tr(MsgKey::no_hosters));
     }
-    plain(name, super::sheets::quality::choose(source, &hosters, quality)).await?.ok_or_else(|| tr(MsgKey::video_list_empty_error))
+    let video = plain(name, super::sheets::quality::choose(source, &mut hosters, quality)).await?.ok_or_else(|| tr(MsgKey::video_list_empty_error))?;
+    Ok((video, hosters))
 }
 
 /// Side tracks are added with the `auto` flag, which selects a track only when it matches `alang` or `slang`; the source's
@@ -198,6 +200,7 @@ pub(super) fn media_of(video: Video, title: crate::widgets::page_header::MediaTi
         target,
         title,
         headers,
+        hosters: Vec::new(),
     }
 }
 
@@ -281,7 +284,7 @@ mod tests {
 
     fn resolve(fake: &Fake) -> Result<Video, String> {
         let rt = tokio::runtime::Builder::new_current_thread().enable_time().build().expect("runtime");
-        rt.block_on(best_stream(fake, &SEpisode::default(), 1080))
+        rt.block_on(best_stream(fake, &SEpisode::default(), 1080)).map(|(video, _)| video)
     }
 
     #[test]
@@ -308,9 +311,9 @@ mod tests {
         let hoster = |videos| Hoster { hoster_name: "Quality".into(), video_list: Some(videos), ..Hoster::default() };
         let fake = Fake { hosters: vec![hoster(vec![video("https://cdn.test/q1080.m3u8", 1080), video("https://cdn.test/q480.m3u8", 480)])], fail: false };
         let rt = tokio::runtime::Builder::new_current_thread().enable_time().build().expect("runtime");
-        assert_eq!(rt.block_on(best_stream(&fake, &SEpisode::default(), 480)).expect("a video").video_url, "https://cdn.test/q480.m3u8");
+        assert_eq!(rt.block_on(best_stream(&fake, &SEpisode::default(), 480)).expect("a video").0.video_url, "https://cdn.test/q480.m3u8");
         let fake = Fake { hosters: vec![Hoster { hoster_name: "Other".into(), ..hoster(vec![video("https://cdn.test/o1080.m3u8", 1080)]) }], fail: false };
-        assert_eq!(rt.block_on(best_stream(&fake, &SEpisode::default(), 720)).expect("a video").video_url, "https://cdn.test/o1080.m3u8", "no 720p: the best");
+        assert_eq!(rt.block_on(best_stream(&fake, &SEpisode::default(), 720)).expect("a video").0.video_url, "https://cdn.test/o1080.m3u8", "no 720p: the best");
     }
 
     #[test]

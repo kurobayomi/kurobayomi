@@ -75,6 +75,16 @@ struct Media {
     track_headers: Vec<(String, String)>,
     /// `audio-add` and `sub-add` commands, sent each time mpv has loaded the stream (a Retry loads it again).
     tracks: Vec<Vec<String>>,
+    /// The source's servers the stream was chosen from, with every video list already fetched: the Quality menu starts
+    /// from them instead of asking the source again. Empty for a file.
+    hosters: Vec<kuro_source::anime::Hoster>,
+}
+
+impl Media {
+    /// A file on disk: no request headers, side tracks or servers.
+    fn file(target: String, title: page_header::MediaTitle) -> Self {
+        Self { target, title, headers: None, track_headers: Vec::new(), tracks: Vec::new(), hosters: Vec::new() }
+    }
 }
 
 /// Opens `path` in the player for the anime episode `episode_id`.
@@ -87,7 +97,7 @@ pub fn open_episode(path: &Path, episode_id: i64, start_ms: i64) {
         return tracing::error!(path = %path.display(), "player: the path is not UTF-8; not opened");
     };
     let title = title_or_file(episode_id, path);
-    open_media(Media { target: target.to_owned(), title, headers: None, track_headers: Vec::new(), tracks: Vec::new() }, episode_id, start_ms);
+    open_media(Media::file(target.to_owned(), title), episode_id, start_ms);
 }
 
 thread_local! {
@@ -149,6 +159,7 @@ fn open_in(data_dir: std::path::PathBuf, media: Media, episode_id: i64, start_ms
         closed: false,
         media,
         episode_id,
+        loaded_episode: None,
         resolving: false,
         muted_from: None,
         skip: skip_button::State::default(),
@@ -167,6 +178,8 @@ struct Player {
     media: Media,
     /// The episode row that plays now; its neighbours come from it.
     episode_id: i64,
+    /// The episode row whose file mpv has loaded last (its `file-loaded` event); `None` before the first.
+    loaded_episode: Option<i64>,
     /// A source episode is resolving for the previous or next button (or autoplay); a second one waits for it.
     resolving: bool,
     /// The end-of-file save has run, so it runs once.
@@ -296,9 +309,9 @@ fn apply_action(shared: &Shared, page: &gtk::Box, action: Action) -> bool {
     true
 }
 
-/// The player page: a slim header (Back, title, the ⋮ menu of tracks and servers) over the video and its control bar (with the quality
-/// menu). The
-/// page is named `screen:player`, so the main window hides its sidebar while it shows. The caller pushes it.
+/// The player page: a slim header (Back, title, the episode list, the ⋮ menu) over the video and its control bar (with
+/// the Subtitles, Speed and Quality menus). The page is named `screen:player`, so the main window hides its sidebar
+/// while it shows. The caller pushes it.
 fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     let area = gtk::GLArea::new();
     area.set_hexpand(true);
@@ -324,10 +337,36 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     volume.update_property(&[gtk::accessible::Property::Label(&volume_label)]);
     let fullscreen = crate::ui::icon_button("view-fullscreen-symbolic", &fullscreen_tooltip(false));
     let servers = sheets::quality::Servers::default();
+    // what is changed while watching sits on the bar; the rest is in the ⋮ menu (`player_menu`)
+    let subtitles = bar_menu(&tr(MsgKey::pref_player_subtitle), &[], {
+        let shared = Rc::clone(shared);
+        move || sheets::items(menu::subtitles(&shared))
+    });
+    subtitles.set_icon_name("media-view-subtitles-symbolic");
+    let speed = bar_menu(&tr(MsgKey::player_speed_menu), &[gdk::Key::bracketleft, gdk::Key::bracketright, gdk::Key::BackSpace], {
+        let shared = Rc::clone(shared);
+        move || sheets::items(sheets::speed::choices(&shared))
+    });
+    let quality = bar_menu(&tr(MsgKey::player_quality), &[], {
+        let (shared, servers) = (Rc::clone(shared), servers.clone());
+        move || sheets::quality::menu_items(&shared, &servers)
+    });
     let skip = skip_button::Ui::new(shared);
 
     let bar = crate::widgets::osd::bar();
-    for widget in [previous.upcast_ref::<gtk::Widget>(), play.upcast_ref(), next.upcast_ref(), seek.upcast_ref(), time.upcast_ref(), volume.upcast_ref(), fullscreen.upcast_ref()] {
+    let widgets = [
+        previous.upcast_ref::<gtk::Widget>(),
+        play.upcast_ref(),
+        next.upcast_ref(),
+        seek.upcast_ref(),
+        time.upcast_ref(),
+        volume.upcast_ref(),
+        subtitles.upcast_ref(),
+        speed.upcast_ref(),
+        quality.upcast_ref(),
+        fullscreen.upcast_ref(),
+    ];
+    for widget in widgets {
         bar.append(widget);
     }
 
@@ -374,14 +413,13 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
             crate::ui::pop();
         }
     });
-    // the one menu of the player: the header's ⋮ and the video's right-click open the same entries (`player_menu`);
-    // the ⋮ one refreshes in place when the servers finish loading
-    let refresh_menu: Rc<RefCell<Rc<dyn Fn()>>> = Rc::new(RefCell::new(Rc::new(|| {})));
-    let (menu, refresh) = context_menu::menu_button("view-more-symbolic", &tr(MsgKey::player_sheets_more_title), {
-        let (shared, page, servers, refresh_menu) = (Rc::clone(shared), page.downgrade(), servers.clone(), Rc::clone(&refresh_menu));
-        move || page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page, &servers, &refresh_menu))
+    // the header's ⋮ and the video's right-click open the same entries (`player_menu`)
+    let menu = context_menu::menu_button(&tr(MsgKey::player_sheets_more_title), {
+        let (shared, page) = (Rc::clone(shared), page.downgrade());
+        move || page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page))
     });
-    *refresh_menu.borrow_mut() = refresh;
+    // no tooltip: it would sit over the open menu; screen readers get the label
+    menu.set_icon_name("view-more-symbolic");
     let list = crate::ui::icon_button("view-list-symbolic", &format!("{} (E)", tr(MsgKey::episodes)));
     {
         let (shared, episodes, episode_ids) = (Rc::clone(shared), Rc::clone(&episodes), Rc::clone(&episode_ids));
@@ -401,7 +439,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     watch_left(&page, shared, &area);
     {
         let (shared, page) = (Rc::clone(shared), page.downgrade());
-        context_menu::attach(&area, move |_, _| page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page, &servers, &refresh_menu)));
+        context_menu::attach(&area, move |_, _| page.upgrade().map_or_else(Vec::new, |page| player_menu(&shared, &page)));
     }
 
     {
@@ -479,14 +517,15 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     let keys = gtk::EventControllerKey::new();
     keys.set_propagation_phase(gtk::PropagationPhase::Capture);
     {
-        let (shared, page, menu) = (Rc::clone(shared), page.downgrade(), menu.downgrade());
+        let (shared, page) = (Rc::clone(shared), page.downgrade());
+        let menus = [&menu, &subtitles, &speed, &quality].map(|m| m.downgrade());
         let (episodes, episode_ids) = (Rc::clone(&episodes), Rc::clone(&episode_ids));
         keys.connect_key_pressed(move |_, keyval, _, state| {
             let Some(page) = page.upgrade() else {
                 return glib::Propagation::Proceed;
             };
-            // the open menu keeps its own keys
-            if menu.upgrade().is_some_and(|m| m.is_active()) {
+            // an open menu keeps its own keys
+            if menus.iter().any(|m| m.upgrade().is_some_and(|m| m.is_active())) {
                 return glib::Propagation::Proceed;
             }
             if episodes.is_open() && keyval == gdk::Key::Escape {
@@ -514,34 +553,31 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     });
 
     controls::wire(
-        controls::Parts { page: &page, area: &area, previous: &previous, next: &next },
+        controls::Parts { page: &page, area: &area, previous: &previous, next: &next, subtitles: &subtitles, speed: &speed, quality: &quality, servers: &servers },
         shared,
     );
     start_ticks(&page, &two_lines, &hiding, Bar { play: &play, seek: &seek, time: &time, volume: &volume, loading: &loading, failure: &failure }, &skip, shared);
     page
 }
 
-/// The player's one menu, for the header's ⋮ and the video's right-click: Quality and Server (an online episode; while
-/// its servers load, a greyed-out "Quality: loading…" and the open menu refreshes when they are in), Audio, Subtitles,
-/// Speed and Chapters (a file that has them) as submenus, each marking what plays now; then Autoplay next episode and
-/// Fullscreen.
+/// A menu button of the control bar (Subtitles, Speed, Quality), named with its keys when it has some. Its menu opens
+/// upwards, over the video.
+fn bar_menu(label: &str, keys: &[gdk::Key], items: impl Fn() -> Vec<Item> + 'static) -> gtk::MenuButton {
+    let button = context_menu::menu_button(label, items);
+    let label = if keys.is_empty() { label.to_owned() } else { key_hint(label, keys) };
+    button.set_tooltip_text(Some(&label));
+    button.update_property(&[gtk::accessible::Property::Label(&label)]);
+    button.set_direction(gtk::ArrowType::Up);
+    button
+}
+
+/// The player's ⋮ menu, which the video's right-click also opens: Audio and Chapters (a file that has them) as submenus,
+/// each marking what plays now; then Autoplay next episode, the automatic skips and Fullscreen. Subtitles, Speed and
+/// Quality are the bar's own buttons (`bar_menu`).
 /// All in one group: GTK sizes a menu without the separators between groups, so a second group made it scroll.
-fn player_menu(shared: &Shared, page: &gtk::Box, servers: &sheets::quality::Servers, refresh: &Rc<RefCell<Rc<dyn Fn()>>>) -> Vec<Item> {
+fn player_menu(shared: &Shared, page: &gtk::Box) -> Vec<Item> {
     let mut items = Vec::new();
-    let refresh = Rc::clone(refresh);
-    if let Some(sections) = sheets::quality::menu_sections(shared, servers, move || (refresh.borrow())()) {
-        if sections.is_empty() {
-            items.push(Item::new(tr(MsgKey::ui_quality_loading), 0, || {}).disabled());
-        }
-        for (heading, choices) in sections {
-            if !choices.is_empty() {
-                items.push(Item::submenu(heading.unwrap_or_default(), 0, sheets::items(choices)));
-            }
-        }
-    }
-    let lists = menu::track_sections(shared)
-        .into_iter()
-        .chain([(tr(MsgKey::player_speed_menu), sheets::speed::choices(shared)), (tr(MsgKey::chapters), sheets::chapters::choices(shared))]);
+    let lists = [(tr(MsgKey::pref_player_audio), menu::audio(shared)), (tr(MsgKey::chapters), sheets::chapters::choices(shared))];
     for (heading, choices) in lists {
         if !choices.is_empty() {
             items.push(Item::submenu(heading, 0, sheets::items(choices)));
@@ -866,7 +902,7 @@ fn downloaded_media(episode_id: i64) -> Option<Media> {
     let (entry, source) = crate::downloads::directory::AppDirectory::new(db).entry_context(kuro_platform::kind::Kind::Anime, episode.entry_id)?;
     let service = crate::shell::host::Shell::get()?.download_service()?;
     let path = service.locate(&entry, &source, &kuro_downloads::unit::UnitRef::from(&episode))?;
-    Some(Media { target: path.to_string_lossy().into_owned(), title: title_or_file(episode_id, &path), headers: None, track_headers: Vec::new(), tracks: Vec::new() })
+    Some(Media::file(path.to_string_lossy().into_owned(), title_or_file(episode_id, &path)))
 }
 
 /// Plays episode row `episode_id` from its download, for an episode whose source is not loaded (turned off). False when
@@ -886,7 +922,7 @@ fn play_episode(shared: &Shared, episode_id: i64) {
     match crate::local_flow::open::opening_by_id(&db, episode_id) {
         Ok(Some(found)) => {
             let title = title_or_file(episode_id, Path::new(&found.path));
-            let media = Media { target: found.path, title, headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+            let media = Media::file(found.path, title);
             shared.borrow_mut().play(media, episode_id);
         }
         Ok(None) => play_source_episode(shared, episode_id),
@@ -1036,6 +1072,7 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
                         let prepare = sub_cache::preparer(player.episode_id, &player.media.track_headers);
                         player.playback.add_tracks(&tracks, prepare);
                         player.skip.file_loaded();
+                        player.loaded_episode = Some(player.episode_id);
                     }
                     _ => {}
                 }

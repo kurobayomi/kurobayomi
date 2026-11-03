@@ -1,5 +1,5 @@
-//! The Audio and Subtitles lists of the player's menu: the tracks of the loaded file, read from mpv each time the menu
-//! opens. Both lists start with Off (audio Off comes from `load_track_lists`, subtitle Off is added here). The current
+//! The Audio list of the player's ⋮ menu and the Subtitles list of the bar's button: the tracks of the loaded file, read
+//! from mpv each time the menu opens. Both lists start with Off (audio Off comes from `load_track_lists`, subtitle Off is added here). The current
 //! track carries the check mark; choosing one selects it.
 
 use std::rc::Rc;
@@ -32,26 +32,41 @@ impl TrackProps for MpvTracks<'_> {
     }
 }
 
-/// The two lists of the menu, read from mpv now: Audio, then Subtitles, each with the playing track marked.
-pub fn track_sections(shared: &Shared) -> Vec<(String, Vec<Choice>)> {
-    let (lists, aid, sid) = {
-        let player = shared.borrow();
-        let mpv = player.playback.mpv();
-        let current = |name: &str| track_id_from_value(mpv.get_string(name).as_deref());
-        (load_track_lists(&MpvTracks(mpv)), current("aid"), current("sid"))
-    };
-    let mut subtitles = vec![VideoTrack { id: TRACK_NONE, name: tr(MsgKey::off), language: None }];
-    subtitles.extend(lists.subtitles);
-    [(tr(MsgKey::pref_player_audio), "aid", lists.audio, aid), (tr(MsgKey::pref_player_subtitle), "sid", subtitles, sid)]
-        .into_iter()
-        .map(|(heading, property, tracks, selected)| (heading, tracks.into_iter().map(|track| choice(shared, property, track, selected)).collect()))
+/// The Audio list, read from mpv now, the playing track marked.
+pub fn audio(shared: &Shared) -> Vec<Choice> {
+    let (tracks, selected) = read(shared, "aid");
+    tracks.audio.into_iter().map(|track| choice(shared, "aid", track, selected)).collect()
+}
+
+/// The Subtitles list, read from mpv now: Off, then the tracks, the playing one marked.
+pub fn subtitles(shared: &Shared) -> Vec<Choice> {
+    let (tracks, selected) = read(shared, "sid");
+    std::iter::once(VideoTrack { id: TRACK_NONE, name: tr(MsgKey::off), language: None })
+        .chain(tracks.subtitles)
+        .map(|track| choice(shared, "sid", track, selected))
         .collect()
+}
+
+/// Whether the loaded file has a subtitle track (the bar's Subtitles button shows only then).
+pub fn has_subtitles(shared: &Shared) -> bool {
+    let player = shared.borrow();
+    let tracks = MpvTracks(player.playback.mpv());
+    (0..tracks.count().unwrap_or(0)).any(|index| tracks.kind(index).as_deref() == Some("sub"))
+}
+
+/// The track lists of the loaded file and the track that plays under `property` (`aid` or `sid`).
+fn read(shared: &Shared, property: &str) -> (kuro_player::tracks::TrackLists, i64) {
+    let player = shared.borrow();
+    let mpv = player.playback.mpv();
+    (load_track_lists(&MpvTracks(mpv)), track_id_from_value(mpv.get_string(property).as_deref()))
 }
 
 /// One track row. Choosing it selects the track in mpv under `property` (`aid` or `sid`).
 fn choice(shared: &Shared, property: &'static str, track: VideoTrack, selected: i64) -> Choice {
     let title = track_label(track.id, &track.name, track.language.as_deref());
-    let (shared, id, language) = (Rc::clone(shared), track.id, track.language.clone());
+    // kept as one tag: a source's track often has only a name ("French [CC]"), and the next one may call it "Français"
+    let language = kuro_player::track_select::language_tag(track.language.as_deref(), &track.name);
+    let (shared, id) = (Rc::clone(shared), track.id);
     Choice {
         title,
         subtitle: None,

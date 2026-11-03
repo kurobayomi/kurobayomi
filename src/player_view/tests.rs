@@ -176,7 +176,7 @@ fn popping_the_embedded_player_stops_playback_at_once() {
         let was_visible = window.is_visible();
         window.present();
         crate::ui::push(&gtk::Label::new(Some("below")));
-        let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("clip", ""), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+        let media = super::Media::file(clip.display().to_string(), crate::widgets::page_header::MediaTitle::new("clip", ""));
         let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
         pump_for(500);
         assert!(!shared.borrow().closed, "playing");
@@ -204,7 +204,7 @@ fn a_closed_player_is_freed_and_leaves_no_leak() {
         let was_visible = window.is_visible();
         window.present();
         crate::ui::push(&gtk::Label::new(Some("below")));
-        let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("clip", ""), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+        let media = super::Media::file(clip.display().to_string(), crate::widgets::page_header::MediaTitle::new("clip", ""));
         let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
         pump_for(400);
         let weak = std::rc::Rc::downgrade(&shared);
@@ -232,7 +232,7 @@ fn fullscreen_and_escape_act_on_the_window_that_holds_the_player() {
         window.present();
         // a page under the player, so that popping the player has somewhere to go back to
         crate::ui::push(&gtk::Box::new(gtk::Orientation::Vertical, 0));
-        let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("clip", ""), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+        let media = super::Media::file(clip.display().to_string(), crate::widgets::page_header::MediaTitle::new("clip", ""));
         let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
         let page = crate::ui::visible_child().and_downcast::<gtk::Box>().expect("the page is the visible child");
 
@@ -259,7 +259,7 @@ fn fullscreen_and_escape_act_on_the_window_that_holds_the_player() {
     });
 }
 
-/// The control bar is one capsule of seven controls, each named for screen readers (with its key), and no error page
+/// The control bar is one capsule of ten controls, each named for screen readers (with its key), and no error page
 /// covers a video that plays. `KB_PLAYER_SHOT=<file.png>` saves a picture of the window. Needs a display and ffmpeg.
 #[test]
 fn the_control_bar_names_every_control_and_a_playing_video_shows_no_error() {
@@ -273,7 +273,7 @@ fn the_control_bar_names_every_control_and_a_playing_video_shows_no_error() {
         let was_visible = window.is_visible();
         window.set_default_size(1280, 720);
         window.present();
-        let media = super::Media { target: clip.display().to_string(), title: crate::widgets::page_header::MediaTitle::new("Clip", "Episode 1"), headers: None, track_headers: Vec::new(), tracks: Vec::new() };
+        let media = super::Media::file(clip.display().to_string(), crate::widgets::page_header::MediaTitle::new("Clip", "Episode 1"));
         let shared = super::open_in(dir.path().to_owned(), media, 0, 0).expect("the player opens");
         pump_for(1500);
         let page = crate::ui::visible_child().expect("the player page");
@@ -285,7 +285,10 @@ fn the_control_bar_names_every_control_and_a_playing_video_shows_no_error() {
         }
         let bar = all.iter().find(|w| w.has_css_class("osd") && w.has_css_class("toolbar")).expect("the control bar");
         let controls: Vec<gtk::Widget> = std::iter::successors(bar.first_child(), |c| c.next_sibling()).collect();
-        assert_eq!(controls.len(), 7, "previous, play, next, seek, time, volume, fullscreen");
+        assert_eq!(controls.len(), 10, "previous, play, next, seek, time, volume, subtitles, speed, quality, fullscreen");
+        // a file is not an online episode, and the test clip has no subtitles
+        let menus: Vec<&gtk::Widget> = controls.iter().filter(|c| c.is::<gtk::MenuButton>()).collect();
+        assert_eq!(menus.iter().filter(|m| m.is_visible()).count(), 1, "of the three menus only Speed shows");
         for control in controls.iter().filter(|c| !c.is::<gtk::Label>()) {
             assert!(control.tooltip_text().is_some_and(|t| !t.is_empty()), "{} has a tooltip", control.type_().name());
         }
