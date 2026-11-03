@@ -25,7 +25,7 @@ use crate::settings_ui::changelog;
 use crate::settings_ui::clipboard::copy_to_clipboard;
 use crate::settings_ui::rows::{item, tap_item, text, TapRow};
 use crate::ui::{DialogButton, Role};
-use crate::theme::tokens::{SPACE_M, SPACE_S};
+use crate::theme::tokens::SPACE_S;
 
 pub fn version_title() -> String {
     tr(MsgKey::ext_info_version)
@@ -381,22 +381,24 @@ fn whats_new_row() -> PreferenceItem {
     row
 }
 
-/// The bottom row of links: the project page and the issue tracker.
-fn links_row() -> PreferenceItem {
-    let build: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
-        let bar = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_M);
-        bar.set_halign(gtk::Align::Center);
-        // the column's spacing plus this make the 24 px between two groups
-        bar.set_margin_top(SPACE_M);
-        for (label, url) in [("GitHub", PROJECT_URL), (&tr(MsgKey::ui_report_an_issue), ISSUES_URL)] {
-            let button = gtk::Button::with_label(label);
-            button.add_css_class("flat");
-            button.connect_clicked(move |_| crate::ui::open_link(url, None));
-            bar.append(&button);
-        }
-        bar.upcast()
+/// The icon at the end of a row that opens a page in the browser, as libadwaita's own About dialog shows it.
+const EXTERNAL_LINK_ICON: &str = "external-link-symbolic";
+
+/// A row that opens `url` in the browser: the project page or the issue tracker. A plain list row with the external-link
+/// icon, so it lines up with the rows above it on every platform.
+fn link_row(title: &str, url: &'static str) -> PreferenceItem {
+    let icon: Rc<dyn Fn() -> gtk::Widget> = Rc::new(|| {
+        let image = gtk::Image::from_icon_name(EXTERNAL_LINK_ICON);
+        image.set_accessible_role(gtk::AccessibleRole::Presentation);
+        image.upcast()
     });
-    PreferenceItem::Custom { title: tr(MsgKey::ui_links).to_owned(), build }
+    let on_tap: Rc<dyn Fn(&crate::settings_ui::rows::TapRow)> = Rc::new(move |_| crate::ui::open_link(url, None));
+    tap_item(title, None, true, Some(icon), None, on_tap)
+}
+
+/// The two link rows at the end of the page: the project page and the issue tracker.
+fn link_rows() -> [PreferenceItem; 2] {
+    [link_row("GitHub", PROJECT_URL), link_row(&tr(MsgKey::ui_report_an_issue), ISSUES_URL)]
 }
 
 /// The typed rows of the About page, merged over the spec rows of the same titles. The links row has no spec twin and
@@ -417,8 +419,8 @@ pub fn page_rows() -> Vec<Preference> {
         .map(item)
         .chain([
         item(crate::settings_ui::maintenance::share_crash_logs_row()),
-        item(links_row()),
     ])
+    .chain(link_rows().map(item))
     .collect()
 }
 
@@ -436,11 +438,12 @@ mod link_tests {
     }
 
     #[test]
-    fn the_page_has_no_privacy_row_and_the_link_bar_is_the_last_row() {
+    fn the_page_has_no_privacy_row_and_ends_with_the_two_link_rows() {
         let rows = page_rows();
         let titles: Vec<&str> = rows.iter().map(|r| match r { Preference::Item(i) => i.title(), Preference::Group(g) => g.title.as_str() }).collect();
         assert!(!titles.contains(&"Privacy policy"));
-        assert_eq!(titles.last(), Some(&"Links"));
+        assert_eq!(titles[titles.len() - 2..], ["GitHub", "Report an issue"]);
+        assert!(link_rows().iter().all(|row| matches!(row, PreferenceItem::Custom { .. }) && row.enabled()), "two tappable rows");
     }
 }
 
