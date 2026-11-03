@@ -91,10 +91,13 @@ impl TapRecognizer {
     pub fn release(&mut self, t: u64, x: f64, y: f64) -> Vec<Gesture> {
         let mut out = self.poll(t);
         let Some(press) = self.press.take() else { return out };
-        self.last_up = Some(t);
         if press.long_fired || press.moved {
+            // a drag or a long press is no first tap: the next press starts afresh. Counted as one, a second swipe
+            // soon after the first was the second half of a double tap, and quick-scaled (or zoomed) the strip.
+            self.last_up = None;
             return out;
         }
+        self.last_up = Some(t);
         if press.double {
             if !self.on_release {
                 out.push(Gesture::DoubleTap { x: press.x, y: press.y });
@@ -304,6 +307,33 @@ mod tests {
         assert!(past_slop.poll(600).is_empty());
         past_slop.release(100, 9.0, 0.0);
         assert!(past_slop.poll(600).is_empty(), "a drag past the slop is not a tap");
+    }
+
+    #[test]
+    fn a_press_soon_after_a_swipe_or_a_long_press_is_a_first_press() {
+        // two quick swipes: the second is a drag of its own, not the second half of a double tap (a quick scale)
+        let mut r = recognizer();
+        r.press(0, 10.0, 10.0);
+        r.motion(10.0, 200.0);
+        assert!(r.release(150, 10.0, 200.0).is_empty());
+        r.press(250, 10.0, 10.0);
+        assert!(!r.in_double_press(), "no quick scale");
+        assert!(r.release(280, 10.0, 10.0).is_empty(), "a tap after a swipe is no double tap");
+        assert_eq!(r.poll(700), vec![Gesture::Tap { x: 10.0, y: 10.0 }], "it is a tap");
+        // the pager: a tap right after a swipe acts, it is not swallowed as a second tap
+        let mut pager = recognizer().acting_on_release();
+        pager.press(0, 0.0, 0.0);
+        pager.motion(200.0, 0.0);
+        pager.release(150, 200.0, 0.0);
+        pager.press(250, 5.0, 5.0);
+        assert_eq!(pager.release(280, 5.0, 5.0), vec![Gesture::Tap { x: 5.0, y: 5.0 }]);
+        // nor after a long press
+        let mut long = recognizer();
+        long.press(0, 0.0, 0.0);
+        long.poll(600);
+        long.release(700, 0.0, 0.0);
+        long.press(800, 0.0, 0.0);
+        assert!(!long.in_double_press());
     }
 
     #[test]
