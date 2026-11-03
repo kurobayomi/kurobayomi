@@ -521,6 +521,13 @@ impl ReaderCore {
         })
     }
 
+    /// Opens the next viewer on page `number` (1-based) of the current chapter.
+    fn request_page_number(&self, number: i32) {
+        if let Some(chapter) = self.session.borrow().as_ref().and_then(|s| s.current_chapter()) {
+            chapter.requested_page.set(i64::from(number.max(1) - 1));
+        }
+    }
+
     /// Stores the picked reading mode for the open manga (its viewer flags) and reloads the viewers.
     pub fn apply_mode(&self, mode: ReadingMode) {
         if let Some(session) = self.session.borrow_mut().as_mut() {
@@ -1415,6 +1422,10 @@ fn reload_viewer(screen: &Rc<Screen>) {
     }
     let switched = screen.viewer_slot.try_borrow().is_ok_and(|slot| slot.as_ref().is_some_and(|viewer| viewer.set_mode(mode)));
     if !switched {
+        // two pages side by side report their second page last: the new viewer opens on the first one shown
+        if let Some(first) = screen.beside.get() {
+            screen.core.request_page_number(first);
+        }
         install_viewer(screen);
         return;
     }
