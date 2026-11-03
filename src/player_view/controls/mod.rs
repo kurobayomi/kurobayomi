@@ -65,7 +65,7 @@ impl Live {
         self.quality.set_visible(online);
     }
 
-    /// Follows the playing file: its speed, its height and whether it has subtitles. Once mpv has loaded the episode's
+    /// Follows the playing file: its speed, its height, whether it has subtitles and whether they show. Once mpv has loaded the episode's
     /// file, its servers load for the Quality menu: after the start, so they never slow it (the file of the episode
     /// before can still report a duration for a moment, so the duration does not tell).
     fn follow_file(&self, shared: &Shared) {
@@ -79,6 +79,15 @@ impl Live {
         let subtitles = super::menu::has_subtitles(shared);
         if self.subtitles.is_visible() != subtitles {
             self.subtitles.set_visible(subtitles);
+        }
+        // in the accent colour while subtitles show, so a pick (or Off) is seen at once
+        let on = subtitles && super::menu::subtitles_on(shared);
+        if self.subtitles.has_css_class("accent") != on {
+            if on {
+                self.subtitles.add_css_class("accent");
+            } else {
+                self.subtitles.remove_css_class("accent");
+            }
         }
     }
 }

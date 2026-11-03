@@ -48,6 +48,25 @@ fn set_last(pick: Option<Pick>) {
     }
 }
 
+thread_local! {
+    /// The choice whose stream resolves now, picked in the menu: the button and the menu show it at once, until it plays
+    /// (it becomes [`last`]) or fails.
+    static SWITCHING: RefCell<Option<Pick>> = const { RefCell::new(None) };
+}
+
+fn switching() -> Option<Pick> {
+    SWITCHING.with(|s| s.borrow().clone())
+}
+
+fn set_switching(pick: Option<Pick>) {
+    SWITCHING.with(|s| *s.borrow_mut() = pick);
+}
+
+/// The choice the button and the menu show: the one resolving, else the one playing.
+fn shown() -> Option<Pick> {
+    switching().or_else(last)
+}
+
 /// The servers of an episode that the open menu lists, kept for the episode they belong to.
 struct Loaded {
     episode_id: i64,
@@ -164,10 +183,15 @@ pub fn is_online(episode_id: i64) -> bool {
     online_episode(episode_id).is_some()
 }
 
-/// Shows the playing height on the Quality button, or its icon while the height is not known. Called on every tick, so
-/// the button changes only when it differs.
+/// Shows the playing height on the Quality button, or its icon while the height is not known. A height just picked shows
+/// at once, greyed out until its stream plays: a second pick could not start meanwhile. Called on every tick, so the
+/// button changes only when it differs.
 pub fn refresh(button: &gtk::MenuButton) {
-    match last().and_then(|pick| title_height(&pick.title)) {
+    let busy = switching().is_some();
+    if button.is_sensitive() == busy {
+        button.set_sensitive(!busy);
+    }
+    match shown().and_then(|pick| title_height(&pick.title)) {
         Some(height) => {
             let text = height_label(height);
             if button.label().as_deref() != Some(text.as_str()) {
@@ -306,7 +330,7 @@ fn key_label(key: &Key) -> String {
 /// has none).
 fn sections(shared: &Shared, source: &Arc<dyn AnimeSource>, states: &[HosterState]) -> Vec<(Option<String>, Vec<Choice>)> {
     let servers = ready(states);
-    let playing = last();
+    let playing = shown();
     let playing_key = playing.as_ref().and_then(|pick| servers.iter().find(|(n, _)| *n == pick.hoster).and_then(|(_, vs)| vs.iter().find(|v| v.video_title == pick.title)).map(|v| key(v)));
     let playing_server = playing.as_ref().map(|pick| pick.hoster.clone());
     let mut keys: Vec<Key> = Vec::new();
@@ -409,7 +433,8 @@ async fn all_states(source: &dyn AnimeSource, episode: &SEpisode, known: Vec<Hos
 }
 
 /// Plays `video` of `pick` in the open page: its stream resolves in the background (a spinner shows), then the page
-/// reloads at the playing position. A second choice waits for the first, as a previous or next episode does.
+/// reloads at the playing position. The Quality button shows the choice meanwhile, greyed out ([`refresh`]); a failure
+/// puts back the one playing. Nothing starts while another stream resolves.
 fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Video) {
     let title = {
         let mut player = shared.borrow_mut();
@@ -420,7 +445,9 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
         let title = player.media.title.clone();
         title
     };
+    set_switching(Some(pick.clone()));
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        set_switching(None);
         shared.borrow_mut().resolving = false;
         crate::toast::notify(tr(MsgKey::player_hoster_failed));
         return;
@@ -439,6 +466,7 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
         move |answer| {
             // a closed channel means the source task panicked
             let answer = answer.unwrap_or_else(|| Err(tr(MsgKey::video_list_empty_error)));
+            set_switching(None);
             shared.borrow_mut().resolving = false;
             match answer {
                 Ok(Some(resolved)) => {

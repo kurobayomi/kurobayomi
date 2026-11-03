@@ -54,6 +54,11 @@ pub fn has_subtitles(shared: &Shared) -> bool {
     (0..tracks.count().unwrap_or(0)).any(|index| tracks.kind(index).as_deref() == Some("sub"))
 }
 
+/// Whether a subtitle track is shown now (the bar's Subtitles button is marked then).
+pub fn subtitles_on(shared: &Shared) -> bool {
+    track_id_from_value(shared.borrow().playback.mpv().get_string("sid").as_deref()) != TRACK_NONE
+}
+
 /// The track lists of the loaded file and the track that plays under `property` (`aid` or `sid`).
 fn read(shared: &Shared, property: &str) -> (kuro_player::tracks::TrackLists, i64) {
     let player = shared.borrow();
