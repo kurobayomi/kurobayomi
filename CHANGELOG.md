@@ -6,6 +6,55 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-03
+
+### Added
+
+- Shikimori tracking, next to AniList and MyAnimeList: log in from Settings → Sources and tracking, then follow a title's
+  status, progress and score from its Tracking page. Shikimori keeps no start or finish dates, so its section has none.
+- Track privately on AniList: a tracked entry has a Track privately switch, and the search page offers it when you bind.
+  An entry that is private on AniList stays private when it is bound.
+- The player can skip openings and endings by itself. Turn it on for every anime in Settings → Player, or per anime from
+  the player's menu; the skip button counts down first, and Don't skip cancels it. The seek bar marks each known opening
+  and ending.
+- The player keeps the audio, subtitle and quality picked for an anime and starts its next episodes the same way.
+- Player keys: F11 for fullscreen, M to mute, [ and ] for a slower or faster speed, Backspace for normal speed.
+- The reader shows two pages side by side on a wide window in the left-to-right and right-to-left modes, or always or
+  never with the title's "Two pages side by side" setting.
+- Webtoon, manhwa, manhua and long-strip titles open as the vertical strip, and the new default reading mode, Adaptive,
+  turns the pages of everything else right to left. A mode picked for a title still wins.
+- The reader reads JPEG XL, HEIF and AVIF pages, and a page that fails says why.
+- A mouse drag scrolls a webtoon strip and glides on after you let go.
+
+### Changed
+
+- The whole app is built on libadwaita: native window, header bars, page navigation, dialogs, toasts, settings rows and
+  list rows, which follow your desktop's light or dark style.
+- The player and the reader share one floating control bar. The player has one menu (the ⋮ button and a right-click on
+  the video) with Quality, Server, Audio, Subtitles and Speed, and its volume button is GTK's own.
+- The reader's top-bar menu holds every reader setting for the open title: reading mode, page layout, crop borders,
+  split wide pages, background colour, scale type and zoom start position.
+- The reader's tap zones say Previous and Next instead of Left and Right, so their names follow the reading direction.
+- Settings → Player is grouped into Languages, Playback and Controls, and the volume a video starts at is no longer
+  overwritten by the last slider move.
+- New windows open at 1280 × 720, and a window narrower than 720 px hides the sidebar for the bottom tab bar.
+- Switching tabs and page states crossfades instead of popping in.
+- The app ID is now `io.github.kurobayomi.Kurobayomi`. The AppImage removes the launcher and icons it installed under
+  the old ID; your library and settings stay where they are.
+
+### Fixed
+
+- Buttons on empty pages, such as History's Library button, keep their own width instead of filling the page.
+- Incognito mode now guards every place that writes history or progress, and posts no desktop notifications.
+- A background job that crashes is logged and shows an error instead of leaving a spinner turning.
+- An update download whose connection breaks resumes from where it stopped, on a fresh connection.
+- Window buttons and sidebar rows stay readable under themes that draw them differently.
+
+### Removed
+
+- The automatic library update interval: every launch already checks the whole library, and the refresh button stays.
+- The reader settings window, and the reader's Open in browser and Share actions; the top-bar menu holds the settings.
+
 ## [0.2.8] - 2026-10-29
 
 ### Added
