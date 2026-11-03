@@ -31,13 +31,18 @@ define_prefs! {
         autoplay_enabled: bool = "pref_auto_play_enabled" => false;
         /// The video height an episode starts at when its servers offer it (user, 2026-10-15: 1080p by default).
         default_quality: i32 = "pref_player_default_quality" => 1080;
+        /// Openings are skipped by themselves (after a short countdown that can be cancelled), for every anime that has no
+        /// choice of its own from the player menu.
+        auto_skip_opening: bool = "pref_auto_skip_opening" => false;
+        /// The same for endings.
+        auto_skip_ending: bool = "pref_auto_skip_ending" => false;
     }
 }
 
 /// What the player keeps for one anime (user, 2026-11-02): the language of a track picked in it, the quality picked in it,
 /// and whether its openings and endings are skipped by themselves, so its next episodes start the same way. A key never
-/// written reads as the Settings value as it is now (`pref_audio_lang`, `pref_subtitle_lang`, the default quality); the
-/// skips are off until turned on for the anime.
+/// written reads as the Settings value as it is now (`pref_audio_lang`, `pref_subtitle_lang`, the default quality and the
+/// two automatic skips).
 #[derive(Clone)]
 pub struct AnimePlayerPrefs {
     store: PrefStore,
@@ -63,14 +68,17 @@ impl AnimePlayerPrefs {
         self.store.pref(format!("anime_quality_{}", self.anime_id), settings)
     }
 
-    /// Openings of this anime are skipped by themselves (after a short countdown that can be cancelled).
+    /// Openings of this anime are skipped by themselves (after a short countdown that can be cancelled); the Settings
+    /// switch until one is picked for the anime.
     pub fn auto_skip_opening(&self) -> Pref<bool> {
-        self.store.pref(format!("anime_auto_skip_opening_{}", self.anime_id), false)
+        let settings = PlayerPrefs::new(self.store.clone()).auto_skip_opening.get();
+        self.store.pref(format!("anime_auto_skip_opening_{}", self.anime_id), settings)
     }
 
-    /// Endings of this anime are skipped by themselves (after a short countdown that can be cancelled).
+    /// Endings of this anime are skipped by themselves; the Settings switch until one is picked for the anime.
     pub fn auto_skip_ending(&self) -> Pref<bool> {
-        self.store.pref(format!("anime_auto_skip_ending_{}", self.anime_id), false)
+        let settings = PlayerPrefs::new(self.store.clone()).auto_skip_ending.get();
+        self.store.pref(format!("anime_auto_skip_ending_{}", self.anime_id), settings)
     }
 
     /// The anime's key `<prefix>_<id>`, read fresh each time so an unset key follows the Settings language.
@@ -91,7 +99,7 @@ mod tests {
     fn every_player_section_matches_its_registry_rows() {
         let store = PrefStore::in_memory();
         let player = PlayerPrefs::new(store.clone());
-        assert_eq!(PlayerPrefs::FIELDS.len(), 4);
+        assert_eq!(PlayerPrefs::FIELDS.len(), 6);
         assert_section_registered(PlayerPrefs::TABLE, PlayerPrefs::FIELDS, &player.defaults());
     }
 
@@ -116,11 +124,26 @@ mod tests {
     }
 
     #[test]
+    fn an_anime_follows_the_settings_skips_until_it_picks_its_own() {
+        let store = PrefStore::in_memory();
+        let settings = PlayerPrefs::new(store.clone());
+        let (one, two) = (AnimePlayerPrefs::new(store.clone(), 1), AnimePlayerPrefs::new(store.clone(), 2));
+        settings.auto_skip_opening.set(true).unwrap();
+        assert!(one.auto_skip_opening().get() && two.auto_skip_opening().get(), "every anime follows the Settings switch");
+        assert!(!one.auto_skip_ending().get());
+        one.auto_skip_opening().set(false).unwrap();
+        settings.auto_skip_ending.set(true).unwrap();
+        assert!(!one.auto_skip_opening().get(), "the choice made for anime 1 in the player stays");
+        assert!(two.auto_skip_opening().get() && one.auto_skip_ending().get() && two.auto_skip_ending().get());
+    }
+
+    #[test]
     fn plan_defaults_hold_on_an_empty_store() {
         let p = PlayerPrefs::new(PrefStore::in_memory());
         assert_eq!(p.player_volume_value.get(), -1.0);
         assert!(!p.autoplay_enabled.get());
         assert_eq!(p.default_quality.get(), 1080);
+        assert!(!p.auto_skip_opening.get() && !p.auto_skip_ending.get(), "nothing is skipped by itself until turned on");
     }
 
     #[test]

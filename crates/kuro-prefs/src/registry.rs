@@ -281,6 +281,8 @@ define_prefs! {
     "__APP_STATE_appimage_menu_removed", AppState, Bool, false, "base", "appimage_menu_removed";
     "auto_hide_bars", Normal, Bool, true, "base", "auto_hide_bars";
     "pref_player_default_quality", Normal, Int, 1080, "player", "default_quality";
+    "pref_auto_skip_opening", Normal, Bool, false, "player", "auto_skip_opening";
+    "pref_auto_skip_ending", Normal, Bool, false, "player", "auto_skip_ending";
     "enabled_sources", Normal, Set, &[], "sources", "enabled_sources";
     "__APP_STATE_source_keys", AppState, Set, &[], "sources", "source_keys";
     "cache_size_mb", Normal, Int, 500, "storage", "cache_size_mb";

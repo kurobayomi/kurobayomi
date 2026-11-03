@@ -64,7 +64,7 @@ fn quality_options() -> Vec<(i32, String)> {
 }
 
 /// The root page rows, in three groups: Languages (the default for every anime; a track picked in the player is kept
-/// for its anime), Playback and Controls.
+/// for its anime), Playback (the automatic skips are a default the same way) and Controls.
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     let p = &prefs.player;
     let store = prefs.store();
@@ -81,6 +81,9 @@ pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
                 crate::settings_ui::rows::int_choice(&tr(MsgKey::player_default_quality), &p.default_quality, &quality_options(), true),
                 volume_row(&p.player_volume_value),
                 switch(&tr(MsgKey::ui_autoplay_next_episode), &p.autoplay_enabled, true),
+                // the default for every anime; the player menu keeps a choice of its own per anime
+                switch(&tr(MsgKey::player_auto_skip_openings), &p.auto_skip_opening, true),
+                switch(&tr(MsgKey::player_auto_skip_endings), &p.auto_skip_ending, true),
             ],
         ),
         group(&tr(MsgKey::pref_category_controls), vec![crate::settings_ui::rows::auto_hide_bars(&prefs.base)]),
@@ -124,7 +127,7 @@ mod tests {
             groups,
             [
                 ("Languages".to_owned(), row(&["Subtitle language", "Audio language"])),
-                ("Playback".to_owned(), row(&["Default quality", &volume_title(), "Autoplay next episode"])),
+                ("Playback".to_owned(), row(&["Default quality", &volume_title(), "Autoplay next episode", "Skip openings automatically", "Skip endings automatically"])),
                 ("Controls".to_owned(), row(&["Hide the bars automatically"])),
             ]
         );
