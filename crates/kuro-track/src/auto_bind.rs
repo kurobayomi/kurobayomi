@@ -1,5 +1,5 @@
 //! Auto-track (user, 2026-10-25): a title that joins the library is bound on each switched-on tracker the user is logged
-//! in to (AniList and MyAnimeList today), when that tracker's search finds exactly one result with a name equal to the
+//! in to (AniList, MyAnimeList and Shikimori today), when that tracker's search finds exactly one result with a name equal to the
 //! title. A title with no such result, or with several, stays unbound there and the user picks on the tracking page as
 //! before. On by default (`TrackPrefs::auto_track`); with no tracker logged in it binds nothing. Self-hosted trackers bind on their own (`bind_enhanced_*`).
 

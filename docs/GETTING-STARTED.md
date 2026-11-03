@@ -120,6 +120,24 @@ You can bring back a backup from Kurobayomi, Aniyomi or Tachiyomi (a file that e
 To keep your progress on AniList, open **Settings → Sources and tracking** and log in to AniList. You can skip
 this.
 
+## Connect Shikimori (optional)
+
+Shikimori needs an OAuth application of your own, so its row in **Settings → Sources and tracking** says it is not
+configured until you add one:
+
+1. Sign in on shikimori.io, open `https://shikimori.io/oauth/applications` and create an application with the
+   redirect URI `kurobayomi://shikimori-auth`.
+2. Close Kurobayomi and add its client ID and secret to `config.toml` in the app's configuration folder
+   (`~/.config/kurobayomi` on Linux, `%APPDATA%\kurobayomi\config` on Windows):
+
+   ```toml
+   [track.clients.shikimori]
+   client_id = "your client ID"
+   client_secret = "your client secret"
+   ```
+
+3. Start Kurobayomi again and log in from the Shikimori row. The browser comes back to the app once you allow access.
+
 ## If a source is not working
 
 A source can stop working when its website changes. Kurobayomi then shows a short message with a **Retry** button.

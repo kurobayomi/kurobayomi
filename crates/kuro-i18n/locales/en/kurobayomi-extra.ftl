@@ -1075,3 +1075,15 @@ action_jump_to_unread = Jump to first unread
 
 # source: kurobayomi
 action_jump_to_unseen = Jump to first unseen
+
+# source: kurobayomi
+ui_connect_shikimori = Connect Shikimori
+
+# source: kurobayomi
+ui_tracking_keeps_your_progress_on_shikimori = Tracking keeps your progress on Shikimori.
+
+# source: kurobayomi
+ui_search_shikimori = Search Shikimori
+
+# source: kurobayomi
+ui_open_on_shikimori = Open on Shikimori

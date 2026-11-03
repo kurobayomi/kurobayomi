@@ -1,10 +1,12 @@
 //! The tracking page of an entry (the `tracking_sheet` and `tracker_search` screens, E-25). Tracking keeps the progress on
-//! the switched-on trackers (`tracking::ENABLED`: AniList and MyAnimeList), so the page has one section per tracker: a
-//! connect button while it is not logged in, a search for the title while the entry is not tracked there, and once it
-//! is, its summary over native edit rows (status, progress, score, start and finish dates, Open on the site, Stop
-//! tracking). Each edit is written to that tracker at once (`actions`), and a failure shows a toast. The entry is named by
-//! [`open_sheet`] before the page is pushed, and the search page reads the same entry and the tracker its Search button
-//! named. A bind, an edit or a stop tells the details page, so its Tracking button follows.
+//! the switched-on trackers (`tracking::ENABLED`: AniList, MyAnimeList and Shikimori), so the page has one section per
+//! tracker: a connect button while it is not logged in, a search for the title while the entry is not tracked there,
+//! and once it is, its summary over native edit rows (status, progress, score, start and finish dates where the tracker
+//! keeps them, Open on the site, Stop tracking). A tracker that cannot log in yet (Shikimori without its OAuth client in
+//! `config.toml`) has no section; its Settings row says why. Each edit is written to that tracker at once (`actions`),
+//! and a failure shows a toast. The entry is named by [`open_sheet`] before the page is pushed, and the search page reads
+//! the same entry and the tracker its Search button named. A bind, an edit or a stop tells the details page, so its
+//! Tracking button follows.
 
 use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
@@ -72,20 +74,46 @@ struct Texts {
 }
 
 fn texts(tracker: TrackerId) -> Texts {
-    if tracker == TrackerId::MYANIMELIST {
-        Texts {
+    match tracker {
+        TrackerId::MYANIMELIST => Texts {
             intro: MsgKey::ui_tracking_keeps_your_progress_on_myanimelist,
             connect: MsgKey::ui_connect_myanimelist,
             search: MsgKey::ui_search_myanimelist,
             open: MsgKey::ui_open_on_myanimelist,
-        }
-    } else {
-        Texts {
+        },
+        TrackerId::SHIKIMORI => Texts {
+            intro: MsgKey::ui_tracking_keeps_your_progress_on_shikimori,
+            connect: MsgKey::ui_connect_shikimori,
+            search: MsgKey::ui_search_shikimori,
+            open: MsgKey::ui_open_on_shikimori,
+        },
+        _ => Texts {
             intro: MsgKey::ui_tracking_keeps_your_progress_on_anilist,
             connect: MsgKey::ui_connect_anilist,
             search: MsgKey::ui_search_anilist,
             open: MsgKey::ui_open_on_anilist,
-        }
+        },
+    }
+}
+
+/// What one tracker's section shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Section {
+    /// The entry's rows there.
+    Track,
+    /// The connect button.
+    Connect,
+    /// Nothing: the tracker cannot log in yet, and its Settings row says why.
+    Hidden,
+}
+
+/// The section of a tracker that is logged in or not, and ready to log in or not (`Tracker::setup_message`). Before the
+/// services are built every tracker counts as ready, so the page shows its connect buttons at once.
+fn section(logged_in: bool, ready: bool) -> Section {
+    match (logged_in, ready) {
+        (true, _) => Section::Track,
+        (false, true) => Section::Connect,
+        (false, false) => Section::Hidden,
     }
 }
 
@@ -191,15 +219,19 @@ fn say(label: &Label, text: &str) {
     label.set_visible(!text.is_empty());
 }
 
-/// One section per switched-on tracker: connect while it is logged out, the entry's rows there once it is in.
+/// One section per switched-on tracker: connect while it is logged out, the entry's rows there once it is in, nothing
+/// while it cannot log in.
 fn render(root: &GBox) {
     clear(root);
     let host = tracker_host::host();
     for id in tracking::ENABLED {
         let tracker = host.as_ref().and_then(|host| host.manager.get(id));
-        match (tracker, host.as_ref()) {
-            (Some(tracker), Some(host)) if tracker.is_logged_in() => track_section(root, &tracker, Arc::clone(&host.ctx)),
-            (_, host) => connect_section(root, id, host.is_some_and(|host| host.is_waiting(id, now_ms()))),
+        let logged_in = tracker.as_ref().is_some_and(|tracker| tracker.is_logged_in());
+        let ready = tracker.as_ref().is_none_or(|tracker| tracker.setup_message().is_none());
+        match (section(logged_in, ready), tracker, host.as_ref()) {
+            (Section::Track, Some(tracker), Some(host)) => track_section(root, &tracker, Arc::clone(&host.ctx)),
+            (Section::Hidden, _, _) => {}
+            (_, _, host) => connect_section(root, id, host.is_some_and(|host| host.is_waiting(id, now_ms()))),
         }
     }
 }
@@ -293,6 +325,8 @@ struct Shown {
     score: String,
     start: i64,
     finish: i64,
+    /// Whether the tracker keeps the start and finish dates (Shikimori does not, so it gets no date rows).
+    dates: bool,
     url: String,
     deletable: bool,
     /// Whether the entry is hidden from the public list there, or `None` when the tracker has no private tracking.
@@ -321,6 +355,7 @@ fn shown(tracker: &dyn Tracker, bound: &Bound) -> Option<Shown> {
                 scores,
                 start: track.start_date,
                 finish: track.finish_date,
+                dates: tracker.supports_reading_dates(),
                 url: track.remote_url.clone(),
                 deletable: tracker.as_deletable_anime().is_some(),
                 private: tracker.supports_private_tracking().then_some(track.private),
@@ -339,6 +374,7 @@ fn shown(tracker: &dyn Tracker, bound: &Bound) -> Option<Shown> {
                 scores,
                 start: track.start_date,
                 finish: track.finish_date,
+                dates: tracker.supports_reading_dates(),
                 url: track.remote_url.clone(),
                 deletable: tracker.as_deletable_manga().is_some(),
                 private: tracker.supports_private_tracking().then_some(track.private),
@@ -384,8 +420,10 @@ fn edit_rows(list: &ListBox, entry: &Entry, shown: Shown, bound: Bound, redraw: 
     });
     list.append(&ui::row(&tr(MsgKey::score), None, Some(score.upcast())));
 
-    list.append(&date_row(true, shown.start, shown.finish, Rc::clone(&write)));
-    list.append(&date_row(false, shown.finish, shown.start, Rc::clone(&write)));
+    if shown.dates {
+        list.append(&date_row(true, shown.start, shown.finish, Rc::clone(&write)));
+        list.append(&date_row(false, shown.finish, shown.start, Rc::clone(&write)));
+    }
 
     if let Some(private) = shown.private {
         let row = crate::widgets::row::switch(&tr(MsgKey::action_toggle_private_on), None, None, private);
@@ -691,6 +729,46 @@ mod tests {
         assert_eq!(status_text(Some("plan_to_read")), "Plan to read");
         assert_eq!(status_text(Some("no_such_key_here")), "no_such_key_here", "an unknown key shows as it is");
         assert_eq!(status_text(None), "");
+    }
+
+    #[test]
+    fn shikimori_has_its_own_texts() {
+        let shikimori = texts(TrackerId::SHIKIMORI);
+        assert_eq!(tr(shikimori.intro), "Tracking keeps your progress on Shikimori.");
+        assert_eq!(tr(shikimori.connect), "Connect Shikimori");
+        assert_eq!(tr(shikimori.search), "Search Shikimori");
+        assert_eq!(tr(shikimori.open), "Open on Shikimori");
+        assert_eq!(tr(texts(TrackerId::MYANIMELIST).connect), "Connect MyAnimeList");
+        assert_eq!(tr(texts(TrackerId::ANILIST).connect), "Connect AniList");
+    }
+
+    #[test]
+    fn a_tracker_that_cannot_log_in_yet_has_no_section() {
+        assert_eq!(section(true, true), Section::Track);
+        assert_eq!(section(true, false), Section::Track, "a stored login still shows its rows");
+        assert_eq!(section(false, true), Section::Connect);
+        assert_eq!(section(false, false), Section::Hidden);
+    }
+
+    #[test]
+    fn shikimori_without_its_client_is_not_ready_and_gets_no_date_rows() {
+        use kuro_track::shikimori::api::{Endpoints, OAuthClient};
+        use kuro_track::shikimori::ShikimoriTracker;
+
+        let secrets = || Arc::new(kuro_prefs::memory::MemorySecrets::default()) as Arc<dyn kuro_platform::secrets::SecretStore>;
+        let redirect = kuro_track::shikimori::registry::SHIKIMORI_REDIRECT;
+        let off = ShikimoriTracker::new(Endpoints::production(), None, redirect, secrets()).unwrap();
+        assert!(off.setup_message().is_some(), "no client in config.toml: the section is hidden");
+        let client = OAuthClient { client_id: "id".into(), client_secret: "secret".into() };
+        let on = ShikimoriTracker::new(Endpoints::production(), Some(client), redirect, secrets()).unwrap();
+        assert!(on.setup_message().is_none());
+
+        let row = kuro_data::track::Track::new(Kind::Manga, TrackerId::SHIKIMORI.0);
+        let manga = shown(&on, &Bound::Manga(MangaTrack::from_db(&row))).expect("Shikimori tracks manga");
+        assert!(!manga.dates, "Shikimori keeps no start or finish date");
+        assert!(manga.deletable && manga.private.is_none());
+        let row = kuro_data::track::Track::new(Kind::Anime, TrackerId::SHIKIMORI.0);
+        assert!(!shown(&on, &Bound::Anime(AnimeTrack::from_db(&row))).expect("and anime").dates);
     }
 
     #[test]

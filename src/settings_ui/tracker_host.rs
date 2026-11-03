@@ -63,7 +63,7 @@ impl Connectivity for GioNetwork {
     }
 }
 
-/// The services of the Tracking screen. AniList and MyAnimeList are switched on in this build: the other trackers are
+/// The services of the Tracking screen. AniList, MyAnimeList and Shikimori are switched on in this build: the other trackers are
 /// built (the registry holds all eleven) but no screen shows them and no session reads them.
 pub struct Host {
     pub manager: Arc<TrackerManager>,

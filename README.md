@@ -42,8 +42,9 @@ The name is *kurobako* (黒箱, "black box") plus *-yomi* ("reading").
   follows the last page.
 - **Library, Updates and History**: at every launch the library checks your titles for new chapters and episodes, and
   they show in Updates. Downloads for offline use.
-- **Tracking with AniList and MyAnimeList** (optional): log in from Settings, then follow a title's status, progress,
-  score and dates from its Tracking page. Progress moves on by itself as you read and watch.
+- **Tracking with AniList, MyAnimeList and Shikimori** (optional): log in from Settings, then follow a title's status,
+  progress, score and dates from its Tracking page. Progress moves on by itself as you read and watch. Shikimori needs
+  your own OAuth application ([how](docs/GETTING-STARTED.md#connect-shikimori-optional)).
 - **Aniyomi and Tachiyomi backups** (`.tachibk`) restore into Kurobayomi. Their extension repositories do not work here:
   those extensions are Android apps.
 - **Keeps itself up to date.** The AppImage and the Windows app download a newer version in the background and use it
@@ -170,7 +171,7 @@ every open window as a PNG; used for the guide's screenshots).
 | `crates/kuro-prefs`, `kuro-db`, `kuro-data`, `kuro-domain` | settings, databases, repositories, domain rules |
 | `crates/kuro-extensions`, `kuro-source*`, `kuro-net` | repositories, the recipe engine, the WASM plug-in host, HTTP |
 | `crates/kuro-player`, `kuro-downloads`, `kuro-images`, `kuro-local`, `kuro-archive` | mpv player, downloads, images, local files, CBZ |
-| `crates/kuro-backup`, `kuro-track` | backups (Aniyomi compatible), AniList and MyAnimeList tracking |
+| `crates/kuro-backup`, `kuro-track` | backups (Aniyomi compatible), AniList, MyAnimeList and Shikimori tracking |
 | `docs/` | the user guide, design notes and audits |
 
 ## Licence

@@ -1,5 +1,5 @@
 //! The Tracking rows this module binds (tasks T-47a-053 to T-47a-059), now on the Sources and tracking page: the
-//! progress switch, the auto-track switch (on only while a tracker is logged in) and the MyAnimeList and AniList rows with their login and logout dialogs. Those two are the only
+//! progress switch, the auto-track switch (on only while a tracker is logged in) and the MyAnimeList, AniList and Shikimori rows with their login and logout dialogs. Those three are the only
 //! trackers with a row; the other trackers keep their code and their token keys but are not shown (settings diet). The three cut switches
 //! (open the track menu, next airing time, progress on mark) are not shown either.
 //!
@@ -223,7 +223,8 @@ pub fn connect(tracker: kuro_track::model::TrackerId, changed: Rc<dyn Fn()>) {
 
 /// The trackers the app switches on, in the order the entry's tracking page shows them. The others keep their code and
 /// their token keys, but get no row, no progress write and no refresh.
-pub const ENABLED: [kuro_track::model::TrackerId; 2] = [kuro_track::model::TrackerId::ANILIST, kuro_track::model::TrackerId::MYANIMELIST];
+pub const ENABLED: [kuro_track::model::TrackerId; 3] =
+    [kuro_track::model::TrackerId::ANILIST, kuro_track::model::TrackerId::MYANIMELIST, kuro_track::model::TrackerId::SHIKIMORI];
 
 /// The trackers that have a row: the [`ENABLED`] ones.
 pub fn tracker_enabled(tracker: kuro_track::model::TrackerId) -> bool {
@@ -289,7 +290,7 @@ mod tests {
     }
 
     #[test]
-    fn the_page_holds_the_progress_and_auto_track_switches_and_a_tracker_group_with_myanimelist_and_anilist() {
+    fn the_page_holds_the_progress_and_auto_track_switches_and_a_tracker_group_with_myanimelist_anilist_and_shikimori() {
         let prefs = Prefs::in_memory();
         let rows = page_rows(&prefs, Rc::new(|| {}));
         let titles: Vec<&str> = rows.iter().filter_map(|entry| match entry {
@@ -301,15 +302,16 @@ mod tests {
             panic!("the Trackers group")
         };
         let names: Vec<&str> = trackers.items.iter().map(|row| row.title()).collect();
-        assert_eq!(names, ["MyAnimeList", "AniList", &tracking_info()]);
+        assert_eq!(names, ["MyAnimeList", "AniList", "Shikimori", &tracking_info()]);
     }
 
     #[test]
-    fn only_anilist_and_myanimelist_can_log_in_until_the_others_are_fixed() {
+    fn only_anilist_myanimelist_and_shikimori_can_log_in_until_the_others_are_fixed() {
         use kuro_track::model::TrackerId;
         assert!(tracker_enabled(TrackerId::ANILIST));
         assert!(tracker_enabled(TrackerId::MYANIMELIST));
-        for other in [TrackerId::KITSU, TrackerId::SIMKL] {
+        assert!(tracker_enabled(TrackerId::SHIKIMORI));
+        for other in [TrackerId::KITSU, TrackerId::SIMKL, TrackerId::BANGUMI] {
             assert!(!tracker_enabled(other));
         }
     }
