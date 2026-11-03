@@ -847,14 +847,21 @@ impl PageView {
     /// Starts decoding `bytes` for this page. A page still loading is replaced, and its result is dropped. The decode
     /// belongs to the current reader session; a result from any other session is dropped (T-43b-059).
     pub fn set_image(&self, bytes: Vec<u8>, config: PageConfig) {
-        self.load(bytes, config, DecodeIntent::NONE, None);
+        self.load(bytes, config, DecodeIntent::NONE, None, false);
     }
 
     /// Like [`set_image`], with the transform to apply on the worker. The decoded page is kept in the byte-budget cache
     /// under `source` and `intent`, so [`show_cached`] finds it again (T-44a-069).
     pub fn set_image_from(&self, source: ByteSource, bytes: Vec<u8>, config: PageConfig, intent: DecodeIntent) {
         let key = self.cache_key(source, intent);
-        self.load(bytes, config, intent, Some(key));
+        self.load(bytes, config, intent, Some(key), false);
+    }
+
+    /// Like [`set_image_from`], for a page on screen that decodes again with other options (a crop, a rotation): it keeps
+    /// showing until the new decode replaces it, instead of going blank meanwhile. A page that is not shown loads as usual.
+    pub fn redecode_from(&self, source: ByteSource, bytes: Vec<u8>, config: PageConfig, intent: DecodeIntent) {
+        let key = self.cache_key(source, intent);
+        self.load(bytes, config, intent, Some(key), true);
     }
 
     /// Whether the cache key of this page is settled: a webtoon page is keyed by the view width, which is 0 until the
@@ -880,15 +887,21 @@ impl PageView {
         DecodeKey { source, intent, crop: self.imp().crop_borders.get(), width }
     }
 
-    fn load(&self, bytes: Vec<u8>, config: PageConfig, intent: DecodeIntent, key: Option<DecodeKey>) {
+    fn load(&self, bytes: Vec<u8>, config: PageConfig, intent: DecodeIntent, key: Option<DecodeKey>, keep_shown: bool) {
         let imp = self.imp();
         imp.stop_animation();
         imp.config.set(config);
-        imp.fitted.set(None);
-        imp.drop_pages();
+        // a page on screen that decodes again stays until `show_pyramid` replaces it
+        let keep = keep_shown && imp.state.get() == LoadState::Ready;
+        if !keep {
+            imp.fitted.set(None);
+            imp.drop_pages();
+        }
         let generation = imp.generation.get() + 1;
         imp.generation.set(generation);
-        imp.set_state(LoadState::Loading);
+        if !keep {
+            imp.set_state(LoadState::Loading);
+        }
         let ticket = Ticket::now(generation);
         let width = key.as_ref().map_or_else(|| imp.decode_to_view.get().then(|| self.width().max(0) as u32).filter(|w| *w > 0), |k| k.width);
         let crop = imp.crop_borders.get();

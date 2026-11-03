@@ -158,16 +158,6 @@ pub fn wheel_delta(dy: f64, viewport: i32) -> f64 {
     clamp_step(dy * f64::from(viewport.max(0)).powf(2.0 / 3.0), viewport)
 }
 
-/// The items whose decoded page is rebound after a display setting changes: exactly `[centre-3, centre+3]`
-/// (B§7.7, E-30). `None` when there is nothing to rebind.
-pub fn refresh_range(centre: Option<usize>, count: usize) -> Option<std::ops::RangeInclusive<usize>> {
-    if count == 0 {
-        return None;
-    }
-    let centre = centre.unwrap_or(0).min(count - 1);
-    Some(centre.saturating_sub(3)..=(centre + 3).min(count - 1))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,15 +281,6 @@ mod tests {
     fn scroll_distance_is_three_quarters_of_the_viewport_with_integer_division() {
         assert_eq!(StripLayout::scroll_distance(1080), 810);
         assert_eq!(StripLayout::scroll_distance(7), 5);
-    }
-
-    #[test]
-    fn refresh_rebinds_exactly_three_either_side_of_the_centre() {
-        assert_eq!(refresh_range(Some(10), 50), Some(7..=13));
-        assert_eq!(refresh_range(Some(1), 50), Some(0..=4));
-        assert_eq!(refresh_range(Some(48), 50), Some(45..=49));
-        assert_eq!(refresh_range(None, 50), Some(0..=3));
-        assert_eq!(refresh_range(Some(0), 0), None);
     }
 
     /// T-44a-079: the strip geometry and the current-item sequence of a scroll through a strip with cards, a page that

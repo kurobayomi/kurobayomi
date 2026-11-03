@@ -1403,14 +1403,25 @@ fn move_references(held: &RefCell<Option<ViewerChapters>>, next: Option<ViewerCh
     }
 }
 
-/// `ReloadViewerChapters`: a new viewer when the reading mode changed (the old one is destroyed first), otherwise the
-/// same viewer with the new chapters.
+/// `ReloadViewerChapters`: the same viewer with the new chapters. A new reading mode is switched to in place when the
+/// viewer shows it (left to right, right to left and vertical are one engine, so are the two webtoon modes), keeping
+/// its pages on screen; only between the paged modes and the webtoon is a new viewer built (the old one destroyed first).
 fn reload_viewer(screen: &Rc<Screen>) {
-    if screen.viewer_kind.get() == Some(adapter::kind_of(screen.core.reading_mode())) {
+    let mode = screen.core.reading_mode();
+    let kind = adapter::kind_of(mode);
+    if screen.viewer_kind.get() == Some(kind) {
         reload_chapters(screen);
-    } else {
-        install_viewer(screen);
+        return;
     }
+    let switched = screen.viewer_slot.try_borrow().is_ok_and(|slot| slot.as_ref().is_some_and(|viewer| viewer.set_mode(mode)));
+    if !switched {
+        install_viewer(screen);
+        return;
+    }
+    screen.viewer_kind.set(Some(kind));
+    let settings = screen.core.viewer_settings();
+    screen.nav_overlay.set_navigation(nav_overlay::zones_for(kind, &settings), settings.overlay_on_start || diet::READER_OVERLAY_NEW_USER);
+    reload_chapters(screen);
 }
 
 /// Carries out what the core's session has sent since the last call. Events arrive in order and none is dropped.
@@ -2323,11 +2334,17 @@ mod tests {
                     std::thread::sleep(std::time::Duration::from_millis(5));
                 }
             };
+            // the viewer's address: the same one after a switch it made in place
+            let viewer_id = || inner.viewer_slot.borrow().as_ref().map(|v| v.as_ref() as *const dyn Viewer as *const () as usize);
+            let mut was = (viewer_id(), adapter::kind_of(screen.core.reading_mode()));
             for mode in [ReadingMode::Vertical, ReadingMode::RightToLeft, ReadingMode::LeftToRight, ReadingMode::Webtoon, ReadingMode::ContinuousVertical, ReadingMode::Vertical] {
                 screen.core.apply_mode(mode);
                 drain_events(&inner);
                 settle();
                 assert_eq!(screen.core.page_counts().0, 4, "still on page 4 after switching to {mode:?}");
+                let (now, kind) = (viewer_id(), adapter::kind_of(mode));
+                assert_eq!(now == was.0, kind.is_pager() == was.1.is_pager(), "{mode:?}: switched in place exactly when the engine stays");
+                was = (now, kind);
             }
             window.destroy();
         });

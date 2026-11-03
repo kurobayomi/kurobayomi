@@ -360,11 +360,15 @@ impl Image {
     }
 
     /// Reads the page's bytes and decodes them, or shows the decoded page from the cache. A fetched page whose file has
-    /// gone waits for the loader (which queued it again) instead of failing (E-IMG-3).
+    /// gone waits for the loader (which queued it again) instead of failing (E-IMG-3). A page already on screen (a
+    /// setting changed its crop or its rotation) keeps showing until the new decode replaces it: no spinner, no blank.
     fn load(&self) {
         self.waiting.set(false);
-        self.set_child("status");
-        self.indicator.show_spinner();
+        let shown = self.stack.visible_child_name().as_deref() == Some("page") && self.view.state() == LoadState::Ready;
+        if !shown {
+            self.set_child("status");
+            self.indicator.show_spinner();
+        }
         let Some(source) = self.located.resolve() else {
             if self.located.is_fetched() {
                 self.wait();
@@ -374,6 +378,9 @@ impl Image {
             return;
         };
         let (config, intent) = self.decode_request();
+        // a webtoon page is decoded (and cached) for the view's width: a page view that has no width yet decodes at full
+        // size, under another key than the one it shows later
+        tracing::debug!(view_width = self.view.width(), stack_width = self.stack.width(), key_ready = self.view.cache_key_ready(), shown, "reader page load");
         if self.view.cache_key_ready() && self.view.show_cached(source.clone(), config, intent) {
             return;
         }
@@ -387,7 +394,11 @@ impl Image {
                     let (config, intent) = me.decode_request();
                     // the view has its width by now, so a page that was decoded before is found under its key
                     if !view.show_cached(source.clone(), config, intent) {
-                        view.set_image_from(source, bytes, config, intent);
+                        if shown {
+                            view.redecode_from(source, bytes, config, intent);
+                        } else {
+                            view.set_image_from(source, bytes, config, intent);
+                        }
                     }
                 }
                 _ => me.show_error(),

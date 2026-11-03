@@ -16,6 +16,11 @@ pub trait Viewer {
     fn move_to_page(&self, page: &Rc<ReaderPage>);
     /// Releases everything the viewer holds. Called once, before a replacement viewer is attached.
     fn destroy(&self);
+    /// Shows the same chapters in another reading mode, in place and on the page shown. `false` when this viewer
+    /// cannot show that mode (a paged viewer asked for the webtoon strip): the core then swaps in a new viewer.
+    fn set_mode(&self, _mode: kuro_prefs::reader::ReadingMode) -> bool {
+        false
+    }
     /// A key press the viewer owns (arrow and page keys). `true` when it consumed the key.
     fn handle_key(&self, key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType) -> bool;
     #[cfg(test)]

@@ -32,7 +32,7 @@ use super::pager::controller::{PagerController, PagerOptions};
 use super::settings::{self, Family, Reaction, SettingsWatch, ViewerSettings};
 use super::webtoon::controller::{WebtoonController, WebtoonOptions};
 use super::webtoon::frame::ZoomFrame;
-use super::webtoon::layout::{StripLayout, anchor_delta, clamp_step, gap_px, refresh_range, reserved_height, wheel_delta};
+use super::webtoon::layout::{StripLayout, anchor_delta, clamp_step, gap_px, reserved_height, wheel_delta};
 use super::webtoon::zoom::{Anim, WebtoonZoom};
 use super::{Emitter, ViewerContext, ViewerEngine, ViewerKind};
 use crate::reader::error_card;
@@ -47,6 +47,9 @@ const CARD_HEIGHT: i32 = 200;
 const SCROLL_MS: i64 = 250;
 /// How often the gesture timers are polled (long press and the double-click window).
 const POLL_MS: u64 = 20;
+/// A new strip stays see-through until it sits on the shown item, two or three frames; it shows after this at the
+/// latest, so a strip that never settles is not left invisible.
+const REVEAL_AT_LATEST: Duration = Duration::from_millis(300);
 
 /// The chapters and pages a viewer was handed, keyed the way the events name them.
 #[derive(Default)]
@@ -401,7 +404,7 @@ impl PagerEngine {
 impl ViewerEngine for PagerEngine {
     #[cfg(test)]
     fn kind(&self) -> ViewerKind {
-        self.0.kind
+        self.0.kind.get()
     }
 
     fn widget(&self) -> &gtk::Widget {
@@ -430,6 +433,14 @@ impl ViewerEngine for PagerEngine {
     fn destroy(&self) {
         self.0.destroy();
     }
+
+    fn set_kind(&self, kind: ViewerKind) -> bool {
+        if !kind.is_pager() {
+            return false;
+        }
+        self.0.set_kind(kind);
+        true
+    }
 }
 
 struct PagerInner {
@@ -441,7 +452,8 @@ struct PagerInner {
     /// When the scroll last panned the shown page, or was swallowed after it: a swipe that reaches the page's edge
     /// stops there, and only a new one after a pause turns the page.
     panned_at: Cell<u64>,
-    kind: ViewerKind,
+    /// The paged mode shown; another one is switched to in place (`set_kind`).
+    kind: Cell<ViewerKind>,
     root: gtk::ScrolledWindow,
     fixed: gtk::Fixed,
     ctl: RefCell<PagerController>,
@@ -466,6 +478,8 @@ struct PagerInner {
     laid_size: Cell<(i32, i32)>,
     /// Two pages side by side are shown (`settings::two_pages_on`).
     two_pages: Cell<bool>,
+    /// The strip has been painted on the shown item once. Until then it is see-through (`reveal`).
+    revealed: Cell<bool>,
 }
 
 fn pager_options(s: &ViewerSettings) -> PagerOptions {
@@ -485,7 +499,7 @@ impl PagerInner {
             wheel_sum: Cell::new(0.0),
             wheel_at: Cell::new(0),
             panned_at: Cell::new(0),
-            kind,
+            kind: Cell::new(kind),
             root,
             fixed,
             ctl: RefCell::new(PagerController::new(kind, pager_options(&settings.clone().before_first_emission()))),
@@ -503,6 +517,7 @@ impl PagerInner {
             settled: Cell::new(0),
             laid_size: Cell::new((-1, -1)),
             two_pages: Cell::new(false),
+            revealed: Cell::new(false),
         });
         wire_surface(&inner);
         // The first emission of the store gives page transitions their stored value (E-22).
@@ -518,7 +533,7 @@ impl PagerInner {
     }
 
     fn horizontal(&self) -> bool {
-        self.kind != ViewerKind::Vertical
+        self.kind.get() != ViewerKind::Vertical
     }
 
     /// What a new row is handed. A split page asks for its insert page, and a wide page tells the pairing, on the next
@@ -535,7 +550,7 @@ impl PagerInner {
                 });
             })
         };
-        let mut host = page_host(&self.page_settings(), self.kind, &self.emit, later(Self::on_page_split), Rc::new(|| {}), &self.downloads, &self.menu_open);
+        let mut host = page_host(&self.page_settings(), self.kind.get(), &self.emit, later(Self::on_page_split), Rc::new(|| {}), &self.downloads, &self.menu_open);
         host.on_wide = later(Self::on_wide_page);
         host
     }
@@ -552,11 +567,11 @@ impl PagerInner {
     /// wide). The shown pages take the split setting that goes with it.
     fn sync_two_pages(&self) {
         let size = (self.root.width(), self.root.height());
-        let on = settings::two_pages_on(self.settings.borrow().two_pages, self.kind, size);
+        let on = settings::two_pages_on(self.settings.borrow().two_pages, self.kind.get(), size);
         if self.two_pages.replace(on) == on {
             return;
         }
-        let opts = page_opts(&self.page_settings(), self.kind, crate::reader::theme::system_prefers_dark());
+        let opts = page_opts(&self.page_settings(), self.kind.get(), crate::reader::theme::system_prefers_dark());
         self.slots.borrow().values().for_each(|(_, row)| row.apply(&opts));
         let fx = self.ctl.borrow_mut().set_two_pages(on);
         self.run(fx);
@@ -619,6 +634,17 @@ impl PagerInner {
                     self.realign();
                 }
                 Effect::Show => {
+                    // see-through until the strip sits on the shown item: its first frame has no size yet, and the
+                    // rows drawn there on top of one another showed a chapter card before the page
+                    if !self.revealed.get() {
+                        self.root.set_opacity(0.0);
+                        let weak = self.me.clone();
+                        glib::timeout_add_local_once(REVEAL_AT_LATEST, move || {
+                            if let Some(this) = weak.upgrade() {
+                                this.reveal();
+                            }
+                        });
+                    }
                     self.root.set_visible(true);
                     self.rebuild();
                 }
@@ -878,8 +904,21 @@ impl PagerInner {
                 let view = this.ctl.borrow().view_index() as f64;
                 this.adjustment().set_value(view * f64::from(this.extent()));
             }
+            if !this.revealed.get() && root.is_visible() && this.extent() > 0 && this.laid_size.get() == (root.width(), root.height()) {
+                let view = this.ctl.borrow().view_index() as f64;
+                if (this.adjustment().value() - view * f64::from(this.extent())).abs() < 1.0 {
+                    this.reveal();
+                }
+            }
             ControlFlow::Continue
         });
+    }
+
+    /// Shows the strip once it sits on the shown item (or once [`REVEAL_AT_LATEST`] has passed).
+    fn reveal(&self) {
+        if !self.revealed.replace(true) {
+            self.root.set_opacity(1.0);
+        }
     }
 
     /// Runs `f` on the row of the page that is shown, when it has one.
@@ -893,7 +932,7 @@ impl PagerInner {
     /// A move command. The shown page's pan room in the direction of the command decides whether it pans first
     /// (`navigate_to_pan`, B§6.3), for keys, wheel and side-zone taps alike.
     fn command(&self, cmd: super::pager::nav::PageCmd) {
-        let dir = super::pager::nav::physical(self.kind, cmd);
+        let dir = super::pager::nav::physical(self.kind.get(), cmd);
         let mut can_pan = false;
         self.on_current_row(|row| can_pan = row.can_pan(dir));
         let fx = self.ctl.borrow_mut().command(cmd, can_pan);
@@ -905,10 +944,40 @@ impl PagerInner {
         self.run(fx);
     }
 
+    /// Another paged mode in place (`PagerController::set_kind`): the same chapters on the same page, without a new
+    /// viewer. The rows are made again, since a spread changes sides and every row holds the options of the old mode;
+    /// their pages come from the decode cache, so they show at once. Two pages follow the mode (vertical never pairs).
+    fn set_kind(&self, kind: ViewerKind) {
+        if self.kind.get() == kind {
+            return;
+        }
+        // a glide heading for an index of the old order would land on another item: it stops where it is
+        if !self.ctl.borrow().is_idle() {
+            self.anim.set(self.anim.get() + 1);
+            self.set_idle(true);
+        }
+        self.kind.set(kind);
+        for (_, (_, row)) in std::mem::take(&mut *self.slots.borrow_mut()) {
+            self.fixed.remove(&row.widget);
+        }
+        // the other axis keeps no offset, and the slots are placed again for the new axis
+        self.root.hadjustment().set_value(0.0);
+        self.root.vadjustment().set_value(0.0);
+        self.laid_size.set((-1, -1));
+        self.wheel_sum.set(0.0);
+        let mut fx = self.ctl.borrow_mut().set_kind(kind);
+        let size = (self.root.width(), self.root.height());
+        let on = settings::two_pages_on(self.settings.borrow().two_pages, kind, size);
+        if self.two_pages.replace(on) != on {
+            fx.extend(self.ctl.borrow_mut().set_two_pages(on));
+        }
+        self.run(fx);
+    }
+
     fn apply_settings(&self, new: ViewerSettings) {
         let old = std::mem::replace(&mut *self.settings.borrow_mut(), new.clone());
         self.ctl.borrow_mut().set_options(pager_options(&new));
-        let opts = page_opts(&self.page_settings(), self.kind, crate::reader::theme::system_prefers_dark());
+        let opts = page_opts(&self.page_settings(), self.kind.get(), crate::reader::theme::system_prefers_dark());
         self.slots.borrow().values().for_each(|(_, row)| row.apply(&opts));
         self.sync_two_pages();
         for reaction in settings::diff(&old, &new, Family::Pager) {
@@ -1046,7 +1115,7 @@ impl Surface for PagerInner {
         let (nx, ny) = normalised(x, y, f64::from(self.root.width()), f64::from(self.root.height()));
         let outcome = {
             let s = self.settings.borrow();
-            let action = nav::hit_test(nav::layout(s.nav_mode_pager, self.kind), s.tapping_pager, nx, ny);
+            let action = nav::hit_test(nav::layout(s.nav_mode_pager, self.kind.get()), s.tapping_pager, nx, ny);
             nav::pager_tap(action)
         };
         match outcome {
@@ -1087,7 +1156,7 @@ impl WebtoonEngine {
 impl ViewerEngine for WebtoonEngine {
     #[cfg(test)]
     fn kind(&self) -> ViewerKind {
-        self.0.kind
+        self.0.kind.get()
     }
 
     fn widget(&self) -> &gtk::Widget {
@@ -1117,11 +1186,20 @@ impl ViewerEngine for WebtoonEngine {
     fn destroy(&self) {
         self.0.destroy();
     }
+
+    fn set_kind(&self, kind: ViewerKind) -> bool {
+        if kind.is_pager() {
+            return false;
+        }
+        self.0.set_kind(kind);
+        true
+    }
 }
 
 struct WebtoonInner {
     me: Weak<WebtoonInner>,
-    kind: ViewerKind,
+    /// Webtoon or webtoon with gaps; the other one is switched to in place (`set_kind`).
+    kind: Cell<ViewerKind>,
     root: gtk::ScrolledWindow,
     fixed: gtk::Fixed,
     ctl: RefCell<WebtoonController>,
@@ -1171,6 +1249,9 @@ struct WebtoonInner {
     layout_pending: Cell<bool>,
     /// A quick scale in progress: a drag that began on a double tap (T-44a-040).
     quick: RefCell<Option<QuickScale>>,
+    /// The strip has been painted on the page asked for once. Until then it is see-through, so the top of the strip
+    /// (the previous chapter's card) never shows before the jump.
+    revealed: Cell<bool>,
 }
 
 fn webtoon_options(s: &ViewerSettings) -> WebtoonOptions {
@@ -1188,7 +1269,7 @@ impl WebtoonInner {
         let settings = ctx.settings;
         let inner = Rc::new_cyclic(|me| WebtoonInner {
             me: me.clone(),
-            kind,
+            kind: Cell::new(kind),
             root,
             fixed,
             frame,
@@ -1219,6 +1300,7 @@ impl WebtoonInner {
             recognizer: RefCell::new(recognizer(false)),
             anim: Rc::default(),
             transitions_live: Cell::new(false),
+            revealed: Cell::new(false),
         });
         wire_surface(&inner);
         let weak = Rc::downgrade(&inner);
@@ -1248,7 +1330,7 @@ impl WebtoonInner {
                 this.request_layout();
             }
         });
-        page_host(&self.settings.borrow(), self.kind, &self.emit, Rc::new(|_| {}), on_layout, &self.downloads, &self.menu_open)
+        page_host(&self.settings.borrow(), self.kind.get(), &self.emit, Rc::new(|_| {}), on_layout, &self.downloads, &self.menu_open)
     }
 
     /// Lays the strip out again on the next idle: the report can come while the rows are being built.
@@ -1288,8 +1370,26 @@ impl WebtoonInner {
             } else if resized {
                 this.sync();
             }
+            if this.pending_scroll.get().is_none() {
+                this.reveal();
+            }
             ControlFlow::Continue
         });
+    }
+
+    /// Shows the strip once the jump to the page asked for has landed (or once [`REVEAL_AT_LATEST`] has passed).
+    fn reveal(&self) {
+        if !self.revealed.replace(true) {
+            self.root.set_opacity(1.0);
+        }
+    }
+
+    /// Webtoon with or without gaps, in place: only the room under every item changes, and the anchor keeps the item
+    /// at the top of the view where it is.
+    fn set_kind(&self, kind: ViewerKind) {
+        if self.kind.replace(kind) != kind {
+            self.sync();
+        }
     }
 
     /// Scrolls to the pending item when the scroll range holds the strip. `true` when it did.
@@ -1297,6 +1397,12 @@ impl WebtoonInner {
         let Some(index) = self.pending_scroll.get() else { return false };
         let (_, layout) = self.current_layout();
         let adj = self.root.vadjustment();
+        // the range follows the strip's size one layout later; widened here (as `anchor` does), the jump lands before
+        // the first paint instead of a frame after it, which showed the top of the strip first
+        let total = layout.total_height() as f64;
+        if self.root.height() > 0 && self.laid_size.get().1 > 0 && adj.upper() < total {
+            adj.set_upper(total);
+        }
         if !layout.fits_range(adj.upper()) {
             return false;
         }
@@ -1332,7 +1438,7 @@ impl WebtoonInner {
         let vh = self.viewport();
         let width = self.row_width();
         // gapped mode leaves room under every item; the row itself is the item height without the gap
-        let gap = gap_px(self.kind == ViewerKind::WebtoonGapped);
+        let gap = gap_px(self.kind.get() == ViewerKind::WebtoonGapped);
         {
             let mut sizes = self.sizes.borrow_mut();
             for (key, row) in self.realised.borrow().iter() {
@@ -1396,6 +1502,16 @@ impl WebtoonInner {
             match effect {
                 Effect::Rebuilt => self.sync(),
                 Effect::Show => {
+                    // see-through until the jump to the page asked for has landed (`wire_resize`)
+                    if !self.revealed.get() {
+                        self.root.set_opacity(0.0);
+                        let weak = self.me.clone();
+                        glib::timeout_add_local_once(REVEAL_AT_LATEST, move || {
+                            if let Some(this) = weak.upgrade() {
+                                this.reveal();
+                            }
+                        });
+                    }
                     self.root.set_visible(true);
                     self.sync();
                 }
@@ -1528,7 +1644,7 @@ impl WebtoonInner {
                 .clone();
             // every row is inset by the side padding on both sides (T-43b-047). A row's margins add to its width, so
             // the request leaves them out: otherwise the strip's minimum grows by them on every pass (BUG-READER-2).
-            let gap = gap_px(self.kind == ViewerKind::WebtoonGapped);
+            let gap = gap_px(self.kind.get() == ViewerKind::WebtoonGapped);
             let margins = widget.margin_start() + widget.margin_end();
             widget.set_size_request((width - 2 * pad - margins).max(0), (layout.height(i) - gap).max(0));
             self.fixed.move_(&widget, f64::from(pad), layout.offset(i) as f64);
@@ -1786,25 +1902,21 @@ impl WebtoonInner {
         f64::from(StripLayout::scroll_distance(self.root.height().max(0)))
     }
 
-    /// `refreshAdapter` (B§7.7, E-30): drops the rows in `[centre-3, centre+3]` so they are rebuilt.
+    /// `refreshAdapter` (B§7.7, E-30), in place: the shown rows already decode again with the new options
+    /// (`Row::apply`), each keeping its picture until the new one is ready. A page off screen forgets its decoded size,
+    /// which a crop or a rotation changes, and the strip is laid out again around the item at the top of the view.
     fn refresh_images(&self) {
-        let scroll = self.root.vadjustment().value().round() as i64;
-        let vh = self.viewport();
-        let (items, layout) = self.current_layout();
-        let centre = layout.last_end_visible(scroll, vh, layout.realised(scroll, vh));
-        if let Some(range) = refresh_range(centre, items.len()) {
-            let mut realised = self.realised.borrow_mut();
-            let dropped: Vec<Row> = range.filter_map(|i| realised.remove(&items[i])).collect();
-            drop(realised);
-            dropped.iter().for_each(|row| self.fixed.remove(&row.widget));
+        {
+            let realised = self.realised.borrow();
+            self.sizes.borrow_mut().retain(|key, _| realised.contains_key(key));
         }
-        self.sync();
+        self.request_layout();
     }
 
     fn apply_settings(&self, new: ViewerSettings) {
         let old = std::mem::replace(&mut *self.settings.borrow_mut(), new.clone());
         self.ctl.borrow_mut().set_options(webtoon_options(&new));
-        let opts = page_opts(&new, self.kind, crate::reader::theme::system_prefers_dark());
+        let opts = page_opts(&new, self.kind.get(), crate::reader::theme::system_prefers_dark());
         self.realised.borrow().values().for_each(|row| row.apply(&opts));
         for reaction in settings::diff(&old, &new, Family::Webtoon) {
             match reaction {
@@ -1897,7 +2009,7 @@ impl Surface for WebtoonInner {
         let (nx, ny) = normalised(x, y, f64::from(self.root.width()), original);
         let outcome = {
             let s = self.settings.borrow();
-            let action = nav::hit_test(nav::layout(s.nav_mode_webtoon, self.kind), s.tapping_webtoon, nx, ny);
+            let action = nav::hit_test(nav::layout(s.nav_mode_webtoon, self.kind.get()), s.tapping_webtoon, nx, ny);
             nav::webtoon_tap(action)
         };
         match outcome {
@@ -2247,6 +2359,111 @@ mod tests {
             pump_ms(300);
             assert!(on_view(), "and it stays there");
             assert_eq!(inner.ctl.borrow().view_index(), view, "the same page is shown");
+            window.destroy();
+        });
+    }
+
+    #[test]
+    fn another_paged_mode_keeps_the_engine_on_the_page_and_places_the_slots_on_its_axis() {
+        crate::testing::with_display(|| {
+            use super::super::pager::nav::PageCmd;
+            let chapter = chapter(1, &[image("kind-a", 400, 600), image("kind-b", 400, 600), image("kind-c", 400, 600)]);
+            let engine = PagerEngine::new(ViewerKind::LeftToRight, context(ViewerSettings::from_prefs(&prefs())));
+            let window = show(engine.widget());
+            engine.set_chapters(handed(&chapter));
+            let inner = Rc::clone(&engine.0);
+            assert!(pump_until(|| inner.slots.borrow().get(&1).is_some_and(|(_, row)| row.page_ready())), "the page is decoded");
+            pump_ms(300);
+            inner.command(PageCmd::Next);
+            pump_ms(300);
+            let shown = || {
+                let ctl = inner.ctl.borrow();
+                ctl.items()[ctl.view_index()].clone()
+            };
+            let page = shown();
+            // every slot at its index along the strip's axis, and the strip on the shown one
+            let placed = || {
+                let (extent, horizontal) = (f64::from(inner.extent()), inner.horizontal());
+                let view = inner.ctl.borrow().view_index() as f64;
+                extent > 0.0
+                    && (inner.adjustment().value() - view * extent).abs() < 1.0
+                    && inner.slots.borrow().iter().all(|(i, (_, row))| {
+                        let (x, y) = inner.fixed.child_position(&row.widget);
+                        let at = *i as f64 * extent;
+                        if horizontal { close(x, at) && close(y, 0.0) } else { close(x, 0.0) && close(y, at) }
+                    })
+            };
+            for kind in [ViewerKind::Vertical, ViewerKind::RightToLeft, ViewerKind::LeftToRight] {
+                assert!(engine.set_kind(kind), "{kind:?} is shown in place");
+                assert_eq!(shown(), page, "{kind:?}: the same page");
+                assert!(pump_until(&placed), "{kind:?}: the slots sit on the new axis, the strip on the page");
+                let view = inner.ctl.borrow().view_index();
+                assert!(inner.slots.borrow().get(&view).is_some_and(|(_, row)| row.page_ready()), "{kind:?}: the page shows");
+            }
+            assert!(!engine.set_kind(ViewerKind::Webtoon), "the webtoon strip is another engine");
+            window.destroy();
+        });
+    }
+
+    #[test]
+    fn a_new_pager_shows_nothing_until_it_sits_on_the_page_asked_for() {
+        crate::testing::with_display(|| {
+            let chapter = chapter(1, &[image("reveal-a", 400, 600), image("reveal-b", 400, 600), image("reveal-c", 400, 600)]);
+            chapter.requested_page.set(2);
+            let engine = PagerEngine::new(ViewerKind::LeftToRight, context(ViewerSettings::from_prefs(&prefs())));
+            let window = show(engine.widget());
+            engine.set_chapters(handed(&chapter));
+            let inner = Rc::clone(&engine.0);
+            assert!(close(inner.root.opacity(), 0.0), "see-through before its first layout");
+            assert!(pump_until(|| inner.root.opacity() > 0.5), "it shows");
+            let view = inner.ctl.borrow().view_index();
+            assert_eq!(inner.ctl.borrow().items()[view].page().map(|p| p.index), Some(2), "on the page asked for");
+            assert!((inner.adjustment().value() - view as f64 * f64::from(inner.extent())).abs() < 1.0, "and only once the strip sits on it");
+            window.destroy();
+        });
+    }
+
+    #[test]
+    fn a_new_webtoon_strip_shows_nothing_until_the_jump_to_the_page_asked_for_has_landed() {
+        crate::testing::with_display(|| {
+            let files: Vec<PathBuf> = (0..6).map(|i| image(&format!("strip-{i}"), 400, 600)).collect();
+            let chapter = chapter(1, &files);
+            chapter.requested_page.set(4);
+            let engine = WebtoonEngine::new(false, context(ViewerSettings::from_prefs(&prefs())));
+            let window = show(engine.widget());
+            engine.set_chapters(handed(&chapter));
+            let inner = Rc::clone(&engine.0);
+            assert!(close(inner.root.opacity(), 0.0), "see-through before its first layout");
+            assert!(pump_until(|| inner.root.opacity() > 0.5), "it shows");
+            assert!(inner.pending_scroll.get().is_none(), "only once the jump has landed");
+            assert!(inner.root.vadjustment().value() > 0.0, "not on the top of the strip, where the chapter card is");
+            window.destroy();
+        });
+    }
+
+    #[test]
+    fn a_webtoon_crop_change_keeps_the_rows_and_their_pictures() {
+        crate::testing::with_display(|| {
+            let files: Vec<PathBuf> = (0..3).map(|i| image(&format!("crop-{i}"), 400, 600)).collect();
+            let chapter = chapter(1, &files);
+            let engine = WebtoonEngine::new(false, context(ViewerSettings::from_prefs(&prefs())));
+            let window = show(engine.widget());
+            engine.set_chapters(handed(&chapter));
+            let inner = Rc::clone(&engine.0);
+            assert!(pump_until(|| inner.realised.borrow().values().any(Row::page_ready)), "a page is decoded");
+            pump_ms(300);
+            let before: Vec<(ItemKey, gtk::Widget, bool)> =
+                inner.realised.borrow().iter().map(|(key, row)| (key.clone(), row.widget.clone(), row.page_ready())).collect();
+            let mut settings = inner.settings.borrow().clone();
+            settings.crop_webtoon = !settings.crop_webtoon;
+            engine.apply_settings(settings);
+            let realised = inner.realised.borrow();
+            for (key, widget, ready) in &before {
+                let row = realised.get(key).expect("no row is dropped");
+                assert_eq!(&row.widget, widget, "the row stays");
+                assert_eq!(row.page_ready(), *ready, "a shown page keeps its picture while it decodes again");
+            }
+            drop(realised);
             window.destroy();
         });
     }

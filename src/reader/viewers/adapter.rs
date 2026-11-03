@@ -70,6 +70,10 @@ impl Viewer for EngineViewer {
         }
     }
 
+    fn set_mode(&self, mode: ReadingMode) -> bool {
+        !self.destroyed.get() && self.engine.set_kind(kind_of(mode))
+    }
+
     fn handle_key(&self, key: gdk::Key, modifiers: gdk::ModifierType) -> bool {
         !self.destroyed.get()
             && self.engine.handle_key(KeyEvent {

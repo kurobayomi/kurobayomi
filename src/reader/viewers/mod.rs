@@ -96,6 +96,11 @@ pub trait ViewerEngine {
     fn handle_scroll(&self, dy: f64) -> bool;
     /// Releases everything. No event is sent after this (E-78). A viewer with nothing to release keeps the default.
     fn destroy(&self) {}
+    /// Switches to `kind` in place, keeping the chapters and the page shown. `false` when this engine does not show
+    /// that kind (the pager and the webtoon strip are separate engines); the core then builds a new one.
+    fn set_kind(&self, _kind: ViewerKind) -> bool {
+        false
+    }
 }
 
 /// Sends viewer events to the core, and nothing once the viewer is destroyed (E-78).

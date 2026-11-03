@@ -335,6 +335,26 @@ impl PagerController {
         vec![Effect::Rebuilt]
     }
 
+    /// Another paged mode (left to right, right to left, vertical) for the same chapters: the list in the new order,
+    /// still on the item shown, so the engine keeps its pages instead of starting over. Right to left is the same list
+    /// reversed (`build_pager_items`), and a split insert placed after its page lands before it, which is its right to
+    /// left place (`place_insert`). The engine stops a running glide first.
+    pub fn set_kind(&mut self, kind: ViewerKind) -> Vec<Effect> {
+        if self.kind == kind {
+            return Vec::new();
+        }
+        let flipped = (self.kind == ViewerKind::RightToLeft) != (kind == ViewerKind::RightToLeft);
+        self.kind = kind;
+        if flipped {
+            self.flat.reverse();
+            // the index counts from the other end; `reanchor` finds the item by key when one is current
+            self.view_index = self.items.len().saturating_sub(1).saturating_sub(self.view_index);
+        }
+        self.items = self.paired();
+        self.reanchor();
+        vec![Effect::Rebuilt]
+    }
+
     /// A dual-page split of `parent` (B§5.6). A split of a neighbour's page waits in `preprocessed`.
     pub fn on_page_split(&mut self, parent: &PageRef, insert: PageRef) -> Vec<Effect> {
         // two pages side by side show a wide page whole
@@ -605,6 +625,45 @@ mod tests {
         let index = c.items().iter().position(|i| i == &ItemKey::Spread(page(1), page(2))).unwrap();
         assert_eq!(selected(&c.on_settled(index)), ["hide", "sel:2:1", "sel:2:2"]);
         assert!(c.on_page_split(&page(3), PageRef::insert_of(&page(3))).is_empty());
+    }
+
+    #[test]
+    fn another_paged_mode_keeps_the_page_shown_and_reverses_the_list_for_right_to_left() {
+        let page = |i| loaded(2, 2.0, 24).page(i);
+        let mut c = opened(ViewerKind::LeftToRight);
+        let on_five = at(&c, 2, 4);
+        c.on_settled(on_five);
+        let ltr = c.items().to_vec();
+        assert_eq!(c.set_kind(ViewerKind::RightToLeft), [Effect::Rebuilt]);
+        let reversed: Vec<ItemKey> = ltr.iter().rev().cloned().collect();
+        assert_eq!(c.items(), reversed.as_slice(), "the same list from the other end");
+        assert_eq!(c.items()[c.view_index()], ItemKey::Page(page(4)), "still on page 5");
+        assert_eq!(c.view_index(), ltr.len() - 1 - on_five);
+        assert_eq!(c.set_kind(ViewerKind::Vertical), [Effect::Rebuilt]);
+        assert_eq!(c.items(), ltr.as_slice(), "vertical reads in the left to right order");
+        assert_eq!(c.items()[c.view_index()], ItemKey::Page(page(4)));
+        assert!(c.set_kind(ViewerKind::Vertical).is_empty(), "the same mode changes nothing");
+    }
+
+    #[test]
+    fn another_paged_mode_keeps_the_spread_shown_and_a_split_page_on_its_side() {
+        let page = |i| loaded(2, 2.0, 24).page(i);
+        let mut c = opened(ViewerKind::LeftToRight);
+        c.set_two_pages(true);
+        let spread = ItemKey::Spread(page(1), page(2));
+        let index = c.items().iter().position(|i| i == &spread).unwrap();
+        c.on_settled(index);
+        c.set_kind(ViewerKind::RightToLeft);
+        assert_eq!(c.items()[c.view_index()], spread, "the pair on screen stays on screen");
+        let mut rtl = opened(ViewerKind::RightToLeft);
+        rtl.set_two_pages(true);
+        assert_eq!(c.items(), rtl.items(), "paired as a right to left pager pairs them");
+
+        let mut c = opened(ViewerKind::LeftToRight);
+        assert_eq!(c.on_page_split(&page(3), PageRef::insert_of(&page(3)))[0], Effect::Rebuilt);
+        c.set_kind(ViewerKind::RightToLeft);
+        let parent = c.items().iter().position(|i| i == &ItemKey::Page(page(3))).unwrap();
+        assert_eq!(c.items()[parent - 1], ItemKey::Page(PageRef::insert_of(&page(3))), "the insert sits on the page's right to left side");
     }
 
     #[test]
