@@ -43,8 +43,7 @@ The name is *kurobako* (黒箱, "black box") plus *-yomi* ("reading").
 - **Library, Updates and History**: at every launch the library checks your titles for new chapters and episodes, and
   they show in Updates. Downloads for offline use.
 - **Tracking with AniList, MyAnimeList and Shikimori** (optional): log in from Settings, then follow a title's status,
-  progress, score and dates from its Tracking page. Progress moves on by itself as you read and watch. Shikimori needs
-  your own OAuth application ([how](docs/GETTING-STARTED.md#connect-shikimori-optional)).
+  progress, score and dates from its Tracking page. Progress moves on by itself as you read and watch.
 - **Aniyomi and Tachiyomi backups** (`.tachibk`) restore into Kurobayomi. Their extension repositories do not work here:
   those extensions are Android apps.
 - **Keeps itself up to date.** The AppImage and the Windows app download a newer version in the background and use it

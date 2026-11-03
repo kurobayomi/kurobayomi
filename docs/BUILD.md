@@ -21,6 +21,14 @@ end-to-end test checks this: `cargo test --release -p kuro-core --test crash_mai
   `APP_INFO.updater_enabled`.
 - `kuro-db/legacy-import` (on by default): the Aniyomi database importer and the embedded legacy migrations.
 
+## Build-time variables
+
+- `KB_SHIKIMORI_CLIENT_ID` and `KB_SHIKIMORI_CLIENT_SECRET`: Kurobayomi's Shikimori application. The release
+  workflows set them from the repository secrets `SHIKIMORI_CLIENT_ID` and `SHIKIMORI_CLIENT_SECRET`. A build without
+  them has no Shikimori login until `config.toml` names a client (`[track.clients.shikimori]` with `client_id` and
+  `client_secret`, registered with the redirect `kurobayomi://shikimori-auth`). AniList and MyAnimeList need no
+  secret, so their client ids are in the source.
+
 ## Android build settings that are dropped
 
 Aniyomi's Gradle build has settings that have no Cargo equivalent here and are not ported:

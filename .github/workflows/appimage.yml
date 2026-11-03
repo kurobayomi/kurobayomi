@@ -78,9 +78,12 @@ jobs:
         # the commit and the channel are baked in: the self-updater compares them with the nightly release
         # and it skips the slow optimisations of the release profile (link-time optimisation, one codegen unit): a faster
         # build, a slightly slower app. Stable builds keep them. The profile stays "release", so the app still says Stable.
+        # Kurobayomi's Shikimori client comes from the repository secrets (`crates/kuro-track/src/shikimori/config.rs`).
         env:
           KB_COMMIT: ${{ env.SHA }}
           KB_CHANNEL: nightly
+          KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
+          KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
           CARGO_PROFILE_RELEASE_LTO: "false"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
         run: cargo build --release --locked
@@ -162,6 +165,8 @@ jobs:
         env:
           KB_COMMIT: ${{ env.SHA }}
           KB_CHANNEL: nightly
+          KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
+          KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
           CARGO_PROFILE_RELEASE_LTO: "false"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
         run: cargo build --release --locked

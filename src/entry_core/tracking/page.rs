@@ -2,8 +2,8 @@
 //! the switched-on trackers (`tracking::ENABLED`: AniList, MyAnimeList and Shikimori), so the page has one section per
 //! tracker: a connect button while it is not logged in, a search for the title while the entry is not tracked there,
 //! and once it is, its summary over native edit rows (status, progress, score, start and finish dates where the tracker
-//! keeps them, Open on the site, Stop tracking). A tracker that cannot log in yet (Shikimori without its OAuth client in
-//! `config.toml`) has no section; its Settings row says why. Each edit is written to that tracker at once (`actions`),
+//! keeps them, Open on the site, Stop tracking). A tracker that cannot log in yet (`Tracker::setup_message`, such as an
+//! OAuth client missing from the build and from `config.toml`) has no section; its Settings row says why. Each edit is written to that tracker at once (`actions`),
 //! and a failure shows a toast. The entry is named by [`open_sheet`] before the page is pushed, and the search page reads
 //! the same entry and the tracker its Search button named. A bind, an edit or a stop tells the details page, so its
 //! Tracking button follows.

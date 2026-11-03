@@ -93,8 +93,11 @@ jobs:
       - name: Build
         # the stable build has no KB_CHANNEL (it is not a nightly); the release checker of the About page is on and reads
         # this repository's releases, wherever it lives
+        # Kurobayomi's Shikimori client comes from the repository secrets (`crates/kuro-track/src/shikimori/config.rs`).
         env:
           KB_UPDATE_REPOSITORY: ${{ github.repository }}
+          KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
+          KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
         run: cargo build --release --locked --features updater
 
       # A decode-only FFmpeg replaces Ubuntu's in the AppImage (scripts/build-ffmpeg.sh says why); built once and kept
@@ -178,6 +181,8 @@ jobs:
         # as the AppImage above: no KB_CHANNEL, the release checker on
         env:
           KB_UPDATE_REPOSITORY: ${{ github.repository }}
+          KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
+          KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
         run: cargo build --release --locked --features updater
 
       - name: Bundle

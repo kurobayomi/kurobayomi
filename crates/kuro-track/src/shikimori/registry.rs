@@ -18,16 +18,16 @@ pub const SHIKIMORI_REDIRECT: &str = "kurobayomi://shikimori-auth";
 /// The redirect of the Bangumi login.
 pub const BANGUMI_REDIRECT: &str = "kurobayomi://bangumi-auth";
 
-/// Builds Shikimori and Bangumi, in that order (registry order). A tracker whose client is absent from `config` is
-/// still built: login is refused with `NotConfigured` and its Settings row says why. `episode_progress` is
-/// `TrackPrefs::bangumi_episode_progress`.
+/// Builds Shikimori and Bangumi, in that order (registry order). Shikimori uses the build's built-in client unless `config`
+/// names one. Bangumi without a client is still built: login is refused with `NotConfigured` and its Settings row says
+/// why. `episode_progress` is `TrackPrefs::bangumi_episode_progress`.
 pub fn shikimori_and_bangumi(
     config: &TrackClientConfig,
     episode_progress: Pref<bool>,
     secrets: Arc<dyn SecretStore>,
 ) -> Result<Vec<Arc<dyn Tracker>>, TrackError> {
     let shikimori = ShikimoriTracker::production(
-        config.shikimori.clone(),
+        config.shikimori_or_built_in(),
         SHIKIMORI_REDIRECT,
         Arc::clone(&secrets),
     )?;
@@ -59,6 +59,26 @@ mod tests {
         .unwrap();
         let ids: Vec<TrackerId> = got.iter().map(|t| t.id()).collect();
         assert_eq!(ids, [TrackerId::SHIKIMORI, TrackerId::BANGUMI]);
+    }
+
+    #[tokio::test]
+    async fn without_a_config_table_shikimori_logs_in_with_the_build_s_client_if_it_has_one() {
+        let prefs = TrackPrefs::new(PrefStore::in_memory());
+        let got = shikimori_and_bangumi(
+            &TrackClientConfig::default(),
+            prefs.bangumi_episode_progress,
+            secrets(),
+        )
+        .unwrap();
+        match crate::shikimori::config::built_in_shikimori() {
+            Some(client) => {
+                assert!(got[0].setup_message().is_none(), "a released build is ready for everyone");
+                let url = got[0].browser_auth_url().expect("a login URL");
+                assert!(url.contains(&format!("client_id={}", client.client_id)), "{url}");
+            }
+            None => assert!(got[0].setup_message().is_some(), "a local build says Shikimori is not configured"),
+        }
+        assert!(got[1].setup_message().is_some(), "Bangumi still needs its own client");
     }
 
     #[tokio::test]

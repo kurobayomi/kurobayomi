@@ -5,8 +5,8 @@
 //! tracker builds its own network client), inside the app's runtime, which the manager's watcher tasks need.
 //!
 //! Decisions:
-//! - Shikimori and Bangumi read their OAuth client from `config.toml`; without one their rows say they are not
-//!   configured. MyAnimeList uses the app's built-in client id unless the config file or `KUROBAYOMI_MAL_CLIENT_ID`
+//! - Shikimori uses the client the release workflows bake in unless `config.toml` names another; a build with neither
+//!   (a local build) says it is not configured. Bangumi reads its OAuth client from `config.toml` only. MyAnimeList uses the app's built-in client id unless the config file or `KUROBAYOMI_MAL_CLIENT_ID`
 //!   names another; its login comes back to a loopback listener (`http://localhost:8765/myanimelist-auth`).
 //! - The enhanced trackers see no installed-source directory yet (they are built over an empty one), so they cannot
 //!   start a sync; this screen only needs their names and accepted source identities.
@@ -226,7 +226,7 @@ fn build(inputs: Inputs, secrets: Arc<kuro_platform::secrets::FallbackSecrets>, 
     let mal = Arc::new(MalTracker::from_config(config_dir, tokens).map_err(|e| text(&e))?);
     let anilist = Arc::new(kuro_track::tracker::anilist::AniList::with_http(Arc::clone(&store), &prefs, events.clone()).map_err(|e| text(&e))?);
     let kitsu = KitsuTracker::new(kuro_track::kitsu::api::Endpoints::production(), Arc::clone(&store)).map_err(|e| text(&e))?;
-    let shikimori = Arc::new(ShikimoriTracker::production(clients.shikimori.clone(), SHIKIMORI_REDIRECT, Arc::clone(&store)).map_err(|e| text(&e))?);
+    let shikimori = Arc::new(ShikimoriTracker::production(clients.shikimori_or_built_in(), SHIKIMORI_REDIRECT, Arc::clone(&store)).map_err(|e| text(&e))?);
     let bangumi = Arc::new(BangumiTracker::production(clients.bangumi.clone(), BANGUMI_REDIRECT, Arc::clone(&store)).map_err(|e| text(&e))?);
     let mangaupdates = MangaUpdatesTracker::new(Arc::clone(&store), events.clone()).map_err(|e| text(&e))?;
     let simkl = Arc::new(SimklTracker::new(Arc::clone(&store), events.clone()).map_err(|e| text(&e))?);

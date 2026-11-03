@@ -1,11 +1,34 @@
 //! The OAuth clients of Shikimori and Bangumi from the user's configuration (`[track.clients]`, T-31a-039, D-OPEN-1).
-//! Each client is the user's own registration. No client value is in the source.
+//! Shikimori falls back to Kurobayomi's own application when the build carries it, so every user of a released build
+//! can log in; a configured table replaces it. Bangumi has no built-in client.
 
 use std::path::Path;
 
 use serde::Deserialize;
 
 use super::api::OAuthClient;
+
+/// Kurobayomi's Shikimori application (redirect `kurobayomi://shikimori-auth`, scope `user_rates`), the way AniList and
+/// MyAnimeList have a built-in client id. Shikimori's code exchange needs the secret too, so neither value is in the
+/// source: the release workflows bake them in from the repository secrets `SHIKIMORI_CLIENT_ID` and
+/// `SHIKIMORI_CLIENT_SECRET`. A build without them (a local or forked build) has no built-in client.
+const BUILT_IN_SHIKIMORI_CLIENT_ID: Option<&str> = option_env!("KB_SHIKIMORI_CLIENT_ID");
+const BUILT_IN_SHIKIMORI_CLIENT_SECRET: Option<&str> = option_env!("KB_SHIKIMORI_CLIENT_SECRET");
+
+/// The client of an id and a secret baked into the build. `None` unless both are there and non-empty (a workflow
+/// without the repository secrets sets them to an empty string).
+fn baked_client(id: Option<&str>, secret: Option<&str>) -> Option<OAuthClient> {
+    RawClient {
+        client_id: id.unwrap_or_default().trim().to_owned(),
+        client_secret: secret.unwrap_or_default().trim().to_owned(),
+    }
+    .into_client()
+}
+
+/// The built-in Shikimori client of this build, if it carries one.
+pub fn built_in_shikimori() -> Option<OAuthClient> {
+    baked_client(BUILT_IN_SHIKIMORI_CLIENT_ID, BUILT_IN_SHIKIMORI_CLIENT_SECRET)
+}
 
 #[derive(Debug, Default, Deserialize)]
 struct RawClient {
@@ -53,6 +76,12 @@ pub struct TrackClientConfig {
 }
 
 impl TrackClientConfig {
+    /// The Shikimori client the app logs in with: the configured one, else the build's built-in one. `None` leaves
+    /// Shikimori unconfigured, and its Settings row says so.
+    pub fn shikimori_or_built_in(&self) -> Option<OAuthClient> {
+        self.shikimori.clone().or_else(built_in_shikimori)
+    }
+
     /// Reads `[track.clients]` from the text of `config.toml`. A file without the section has no clients, and unknown
     /// keys are ignored.
     pub fn from_toml(text: &str) -> Result<Self, toml_edit::de::Error> {
@@ -165,6 +194,32 @@ mod tests {
         flag.set(true).unwrap();
         let c = TrackClientConfig::load(config.path());
         assert_eq!(c.shikimori.unwrap().client_id, "s-id");
+    }
+
+    #[test]
+    fn without_a_table_shikimori_uses_the_built_in_client_and_a_table_replaces_it() {
+        let none = TrackClientConfig::default();
+        assert_eq!(none.shikimori_or_built_in(), built_in_shikimori(), "whatever this build carries");
+        let own = TrackClientConfig::from_toml(
+            "[track.clients.shikimori]\nclient_id = \"s-id\"\nclient_secret = \"s-sec\"\n",
+        )
+        .unwrap();
+        assert_eq!(own.shikimori_or_built_in().unwrap().client_id, "s-id");
+        assert!(own.bangumi.is_none(), "Bangumi has no built-in client");
+    }
+
+    #[test]
+    fn a_built_in_client_needs_both_values_baked_in() {
+        assert_eq!(baked_client(None, None), None, "a local build");
+        assert_eq!(baked_client(Some(""), Some("")), None, "a workflow without the repository secrets");
+        assert_eq!(baked_client(Some("id"), Some(" ")), None);
+        assert_eq!(
+            baked_client(Some("id"), Some("secret")),
+            Some(OAuthClient {
+                client_id: "id".into(),
+                client_secret: "secret".into()
+            })
+        );
     }
 
     #[test]

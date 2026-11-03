@@ -54,7 +54,7 @@ impl Endpoints {
     }
 }
 
-/// The OAuth client of the user's configuration (`[track.clients]`, D-OPEN-1). The values are not in the source.
+/// An OAuth client: the user's `[track.clients]` table, or Kurobayomi's built-in Shikimori application (D-OPEN-1).
 #[derive(Clone, PartialEq, Eq)]
 pub struct OAuthClient {
     pub client_id: String,
