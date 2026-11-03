@@ -292,7 +292,7 @@ mod tests {
         plan_sync(PlanInput { source, db, now_ms, added_ms: 0, mark_duplicate_as_read: mark, prepare })
     }
 
-    /// The worked example of `p1-topic-chapter-episode-sync.md` section 3, with the stored sourceOrder values that make
+    /// The chapter and episode sync worked example, with the stored sourceOrder values that make
     /// `/c2` and `/c1` update.
     #[test]
     fn worked_example() {

@@ -6,7 +6,7 @@ use kuro_prefs::network::NetworkPrefs;
 
 use crate::doh::DohProvider;
 
-/// The helper line under the DoH dropdown while DoH is on (T-12a-044; a Linux addition, `p1-topic-doh.md` section 2).
+/// The helper line under the DoH dropdown while DoH is on (T-12a-044; a Linux addition).
 pub const LOCAL_NAME_HINT: &str = "Local names such as localhost are not resolved while DoH is on.";
 
 /// Whether the DoH helper line is shown: only while a provider is selected (T-12a-044).
@@ -14,8 +14,7 @@ pub fn local_name_hint_visible(doh_provider: i32) -> bool {
     DohProvider::from_pref(doh_provider).is_some()
 }
 
-/// The user agent dialog's OK button: the entry is not blank and differs from the stored value (T-12a-031,
-/// `p1-ui-parity.md` section 4.1).
+/// The user agent dialog's OK button: the entry is not blank and differs from the stored value (T-12a-031).
 pub fn user_agent_ok_enabled(entry: &str, stored: &str) -> bool {
     !entry.trim().is_empty() && entry != stored
 }

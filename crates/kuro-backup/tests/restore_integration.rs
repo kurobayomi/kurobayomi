@@ -1,5 +1,5 @@
-//! Restore into real databases built from the area 03 and 04 schemas (area 22, T-22a-042, p1-edge-cases-and-tests.md
-//! section 8, X-06, X-07, X-100 to X-102, X-108). Fixtures come from `fixtures_gen`, so nothing depends on Kotlin files.
+//! Restore into real databases built from the area 03 and 04 schemas (area 22, T-22a-042,
+//! X-06, X-07, X-100 to X-102, X-108). Fixtures come from `fixtures_gen`, so nothing depends on Kotlin files.
 
 mod fixtures_gen;
 
@@ -187,7 +187,7 @@ fn cancel_before_the_first_entry_writes_nothing() {
     assert_eq!(entries(&dbs.db, "manga"), 0);
 }
 
-// ---- X-103 to X-113: the fixtures restored into a database (area 22, p1-edge-cases-and-tests.md section 8) ----
+// ---- X-103 to X-113: the fixtures restored into a database (area 22) ----
 
 use kuro_backup::schema::{Backup, BackupAnime, BackupChapter, BackupManga};
 use kuro_backup::wire::Message;

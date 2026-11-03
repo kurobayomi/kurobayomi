@@ -1,4 +1,4 @@
-//! Golden tables of area:34 (`p1-edge-cases-and-tests.md` section 6), through the public API only. No network
+//! Golden tables of area:34, through the public API only. No network
 //! and no display.
 
 use kuro_platform::kind::Kind;

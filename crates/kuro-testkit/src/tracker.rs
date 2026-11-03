@@ -1,5 +1,5 @@
-//! `FakeTracker`, the Rust analogue of Aniyomi's `DummyTracker` (T-01a-039). The defaults are the ones of
-//! `p1-edge-cases-and-tests.md` section 3.12; every field is public, so a test overrides what it needs.
+//! `FakeTracker`, the Rust analogue of Aniyomi's `DummyTracker` (T-01a-039).
+//! Every field is public, so a test overrides what it needs.
 
 use async_trait::async_trait;
 use kuro_track::error::TrackError;

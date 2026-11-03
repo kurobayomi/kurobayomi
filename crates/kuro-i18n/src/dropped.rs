@@ -16,7 +16,7 @@
 //!     and `pref_player_audio_pitch_correction`) both stay. The UI uses one of each pair.
 //!   - Identical plural forms stay as they are.
 //! * Build plumbing (T-51a-022). No Gradle, moko, AGP or locales-config code is ported. The build script `build.rs`
-//!   and the `xtask` replace them, and the plan in `p1-data-and-config.md` section 2 is the reference.
+//!   and the `xtask` replace them.
 //! * Notification channels (T-51a-036). Linux notifications have no channels, so the `channel_*` names are not
 //!   used as channel ids. They stay in the catalog (no name is removed, above), and no code reads them yet. The
 //!   notification settings view can use them as category labels later.

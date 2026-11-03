@@ -1,4 +1,4 @@
-//! Tracker id and endpoint constants (`p1-behavior.md` section 0, `p1-data-and-config.md` section 8).
+//! Tracker id and endpoint constants.
 //! The app's own OAuth client id is built in; the user's config or `KUROBAYOMI_MAL_CLIENT_ID` can replace it.
 
 use crate::model::TrackerId;

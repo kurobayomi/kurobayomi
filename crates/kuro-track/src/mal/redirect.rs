@@ -1,4 +1,4 @@
-//! Redirect strategy (T-29a-039, `p1-rust-design.md` section 3.6). A loopback listener on `127.0.0.1` takes the
+//! Redirect strategy (T-29a-039). A loopback listener on `127.0.0.1` takes the
 //! code from the browser redirect. The paste field takes the redirect URL or the bare code when the port cannot be
 //! bound, or when the redirect never arrives. Nothing here opens a browser; the caller does.
 
@@ -10,10 +10,10 @@ use url::Url;
 
 use super::error::MalError;
 
-/// Port registered with MAL as `http://localhost:<port>/myanimelist-auth` (proposal, `p1-rust-design.md` section 5).
+/// Port registered with MAL as `http://localhost:<port>/myanimelist-auth` (proposal).
 pub const DEFAULT_PORT: u16 = 8765;
 pub const REDIRECT_PATH: &str = "/myanimelist-auth";
-/// How long the listener waits for the redirect (proposal, `p1-rust-design.md` section 3.6).
+/// How long the listener waits for the redirect (proposal).
 pub const LOGIN_TIMEOUT: Duration = Duration::from_secs(300);
 /// Shortest bare code the paste field accepts. MAL's code length is not documented; `hello` must be refused.
 pub const MIN_CODE_LEN: usize = 16;

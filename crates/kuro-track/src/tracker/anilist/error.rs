@@ -1,4 +1,4 @@
-//! Typed failures of the AniList tracker (`p1-rust-design.md` section 3).
+//! Typed failures of the AniList tracker.
 
 use std::time::Duration;
 

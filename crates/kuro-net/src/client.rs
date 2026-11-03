@@ -31,8 +31,7 @@ pub type UserAgentSource = Arc<dyn Fn() -> String + Send + Sync>;
 /// The HTTP client. Every request goes through the interceptor chain, then the transport.
 ///
 /// Extensions get the `rateLimit` and `rateLimitHost` builders and `add_interceptor`. There is no
-/// `cloudflareClient` alias: the Cloudflare step is always part of this client (see `p1-edge-cases-and-tests.md`
-/// section 3 of area 12).
+/// `cloudflareClient` alias: the Cloudflare step is always part of this client.
 #[derive(Clone)]
 pub struct NetworkClient {
     inner: Arc<ClientInner>,

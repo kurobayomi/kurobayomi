@@ -1,4 +1,4 @@
-//! Kavita response shapes (`KavitaModels.kt`; `p1-data-and-config.md` section 2.1). Only the fields the tracker reads
+//! Kavita response shapes (`KavitaModels.kt`). Only the fields the tracker reads
 //! are declared. Unknown fields are ignored, as Kotlin's `ignoreUnknownKeys` does (T-33a-051).
 
 use serde::Deserialize;

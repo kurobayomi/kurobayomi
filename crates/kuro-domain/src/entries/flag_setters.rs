@@ -11,7 +11,7 @@ use kuro_platform::kind::Kind;
 use super::season_display::SeasonDisplayMode;
 use crate::flags::set_flag;
 
-/// Sort-or-flip state machine (`p1-behavior.md` 3.1.1). When `flag` is the sort already in use, the direction bit
+/// Sort-or-flip state machine. When `flag` is the sort already in use, the direction bit
 /// flips; otherwise `flag` becomes the sort, ascending. `sorting_mask` and `dir_mask` are the layout of the word;
 /// `asc` is the bit that means ascending.
 pub fn sort_or_flip(current: i64, flag: i64, sorting_mask: i64, dir_mask: i64, asc: i64) -> i64 {

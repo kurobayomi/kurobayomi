@@ -1,5 +1,5 @@
-//! Sliding-window rate limiter, globally or for one host (T-12a-010, T-12a-011). `p1-topic-rate-limiter.md`
-//! section 5. Waiters are served in FIFO order: a fair async mutex is the turn, and only the turn holder sleeps.
+//! Sliding-window rate limiter, globally or for one host (T-12a-010, T-12a-011).
+//! Waiters are served in FIFO order: a fair async mutex is the turn, and only the turn holder sleeps.
 //! The window itself sits behind a short std mutex that is never held across an await, so a cache-hit refund can
 //! always get in and wake the sleeper.
 

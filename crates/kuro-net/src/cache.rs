@@ -1,4 +1,4 @@
-//! The HTTP response cache (area 12, T-12a-027; `p1-topic-http-cache.md`). GET responses are stored under
+//! The HTTP response cache (area 12, T-12a-027). GET responses are stored under
 //! `<cache>/network_cache` and capped at 5 MiB, with least-recently-used eviction after each write. Storage rules
 //! and freshness follow OkHttp `CacheStrategy` as the topic records. Downloads and progress calls never reach it
 //! (`CallOptions::use_cache`), and a request with any other method removes the entry for its URL.

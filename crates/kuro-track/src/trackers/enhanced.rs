@@ -1,6 +1,6 @@
 //! Shared contract of the enhanced trackers (`EnhancedMangaTracker.kt`, `EnhancedAnimeTracker.kt`): the entry
 //! reference the bind path passes in, the error type, the source-identity helpers, and the login flag that replaces
-//! the dummy credentials (`p1-rust-design.md` sections 3.1, 3.3, 3.4; T-33a-005, T-33a-007, T-33a-008).
+//! the dummy credentials (T-33a-005, T-33a-007, T-33a-008).
 
 use std::sync::Arc;
 #[cfg(test)]
@@ -55,7 +55,7 @@ pub enum EnhancedError {
 }
 
 impl EnhancedError {
-    /// The `track.enhanced.*` message key shown to the user (`p1-rust-design.md` section 7.2). `None` for the
+    /// The `track.enhanced.*` message key shown to the user. `None` for the
     /// variants that only reach the log.
     pub fn message_key(&self) -> Option<&'static str> {
         match self {
@@ -118,7 +118,7 @@ pub fn migrate_remote_url(
     accepts(accepted, new_source_identity).then(|| new_entry_url.to_owned())
 }
 
-/// The preference key of the login flag (`p1-data-and-config.md` section 5.2, Proposal).
+/// The preference key of the login flag (Proposal).
 pub fn enabled_key(id: TrackerId) -> String {
     format!("enhanced_tracker_enabled_{}", id.0)
 }

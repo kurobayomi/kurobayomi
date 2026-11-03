@@ -1,4 +1,4 @@
-//! OAuth token model and the expiry rule (`p1-behavior.md` section 4.6, `p1-data-and-config.md` section 3.1).
+//! OAuth token model and the expiry rule.
 
 use std::fmt;
 

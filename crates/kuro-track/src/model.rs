@@ -1,4 +1,4 @@
-//! Domain models of a tracker binding (`p1-rust-design.md` section 3.1 and 3.2).
+//! Domain models of a tracker binding.
 
 pub mod search;
 

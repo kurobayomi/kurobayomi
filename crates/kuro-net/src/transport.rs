@@ -1,6 +1,6 @@
 //! The terminal stage: reqwest with the Aniyomi transport limits (T-12a-004) and the dispatcher emulation.
 //! A request waits for its host slot and then for a global slot, both before its call timeout starts, so a
-//! queued request never times out while it waits (`p1-rust-design.md` section 2.6 step 3).
+//! queued request never times out while it waits.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

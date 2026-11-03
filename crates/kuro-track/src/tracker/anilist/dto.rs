@@ -1,4 +1,4 @@
-//! Serde shapes of the AniList responses (`p1-data-and-config.md` section 5). Every field the API may send
+//! Serde shapes of the AniList responses. Every field the API may send
 //! as `null` is an `Option`, so a missing staff list or studio list is an empty list and never a panic (E-07,
 //! E-08, E-09).
 

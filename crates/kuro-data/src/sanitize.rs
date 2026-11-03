@@ -16,7 +16,7 @@ pub fn sanitize_item_name(name: &str, title: &str) -> String {
 mod tests {
     use super::*;
 
-    /// The behaviour table of `p1-topic-item-sanitizer.md` section 3.
+    /// The sanitizer's behaviour table.
     #[test]
     fn behaviour_table_vectors() {
         let cases: &[(&str, &str, &str)] = &[

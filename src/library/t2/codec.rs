@@ -1,4 +1,4 @@
-//! T2-CODEC-01 to T2-CODEC-08 (`p1-edge-cases-and-tests.md` section T-2): the flag codec and the display-mode tokens.
+//! T2-CODEC-01 to T2-CODEC-08: the flag codec and the display-mode tokens.
 
 use kuro_domain::library::flags::{contains, merge};
 use kuro_platform::kind::Kind;

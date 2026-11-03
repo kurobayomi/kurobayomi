@@ -1,4 +1,4 @@
-//! Search routing and result mapping (`p1-behavior.md` sections 5.3 to 5.5 and 7, `p1-rust-design.md` section 4).
+//! Search routing and result mapping.
 //! Query routing: `id:<n>` is a direct lookup, `my:<title>` searches the user's own list, anything else is a text
 //! search. Detail requests run with bounded concurrency, and results keep MAL's order.
 

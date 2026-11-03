@@ -1,4 +1,4 @@
-//! Komga response shapes and request bodies (`KomgaModels.kt`; `p1-data-and-config.md` section 2.2). Only the fields the
+//! Komga response shapes and request bodies (`KomgaModels.kt`). Only the fields the
 //! tracker reads are declared, and unknown fields are ignored. Wire names are camelCase, as Komga sends them.
 
 use serde::{Deserialize, Serialize};

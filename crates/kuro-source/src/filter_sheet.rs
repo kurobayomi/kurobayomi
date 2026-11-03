@@ -1,4 +1,4 @@
-//! The filter sheet without its widgets (`SourceFilterMangaDialog.kt`, `p1-topic-filters.md` section 5; T-15a-039).
+//! The filter sheet without its widgets (`SourceFilterMangaDialog.kt`; T-15a-039).
 //! The UI draws the rows from [`FilterSheet::items`] and writes each change through the edit methods. An edit names its
 //! filter by a path: the index at each level, down through groups. Every state rule lives here, so the GTK layer only
 //! maps widgets to these calls. The sheet owns its own copy of the list: a running search keeps its own clone (RC-06).

@@ -1,4 +1,4 @@
-//! MAL status codes and the wire mapping (`p1-behavior.md` sections 1.1 to 1.5, `p1-rust-design.md` section 3.1).
+//! MAL status codes and the wire mapping.
 //! Rows keep the raw `i64`; conversion happens at the API boundary.
 
 /// Local status codes, as stored in `manga_sync.status` and `anime_sync.status`.

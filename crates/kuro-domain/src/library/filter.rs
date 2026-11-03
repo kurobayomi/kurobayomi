@@ -131,7 +131,7 @@ mod tests {
         }
     }
 
-    /// The fixture of `p1-edge-cases-and-tests.md` 2.2: id, total, read, status, source.
+    /// The library fixture: id, total, read, status, source.
     fn fixture() -> Vec<LibraryRow> {
         let mut alpha = row(1, 10, 10);
         alpha.status = 2;

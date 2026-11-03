@@ -1,4 +1,4 @@
-//! Pure reader rules of the behaviour tables (`p1-edge-cases-and-tests.md` sections 7 and 10): the remove-after-read
+//! Pure reader rules of the behaviour tables: the remove-after-read
 //! target (E-DEL-1, E-DEL-2), the page-change flash (E-FLASH-1, E-FLASH-2) and the saved-page file name (E-PATH-1).
 //!
 //! The history rule (E-HIST-1) lives in `kuro-data` (`HistoryRepo::upsert` adds the session time and a zero

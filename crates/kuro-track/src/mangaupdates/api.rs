@@ -1,4 +1,4 @@
-//! MangaUpdates REST calls M1 to M9 (`p1-data-and-config.md` section 4.1). Authenticated calls take the bearer token
+//! MangaUpdates REST calls M1 to M9. Authenticated calls take the bearer token
 //! from [`MuAuth`] and fail with `NotAuthenticated` before any request when there is none. Search and login are
 //! unauthenticated. Bodies are typed structs, so their key order is the declaration order (byte-compared in tests).
 

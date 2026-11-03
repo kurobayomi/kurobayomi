@@ -1,4 +1,4 @@
-//! Suwayomi response shapes (`SuwayomiModels.kt`; `p1-data-and-config.md` section 2.3). Wire names are camelCase.
+//! Suwayomi response shapes (`SuwayomiModels.kt`). Wire names are camelCase.
 //! A key without `Option` is required: serde rejects a payload that lacks it (E-65). An `Option` key may be absent
 //! or null, because serde reads a missing optional key as `None`.
 

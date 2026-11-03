@@ -7,7 +7,7 @@ use wasmtime::{Config, Engine, OptLevel, StoreLimits, StoreLimitsBuilder};
 
 use crate::error::WasmError;
 
-/// Largest `source.wasm` the host compiles (FEATURE-PARITY-2 X-07).
+/// Largest `source.wasm` the host compiles.
 pub const MAX_WASM_BYTES: usize = 32 << 20;
 /// Most linear memory one guest instance may hold (W3).
 pub const MEMORY_LIMIT_BYTES: usize = 256 << 20;

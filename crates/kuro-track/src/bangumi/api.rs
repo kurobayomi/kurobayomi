@@ -28,7 +28,7 @@ use crate::shikimori::dto::ensure_finite;
 const JSON_MIME: &str = "application/json";
 /// Search returns the first 20 results (T-31a-028, `limit=20`).
 const SEARCH_LIMIT: &str = "20";
-/// The server's largest page of episodes (`limit` max 1000, p1-behavior.md 7). Keeps a long series in one page.
+/// The server's largest page of episodes (`limit` max 1000). Keeps a long series in one page.
 const EPISODE_PAGE: &str = "1000";
 
 /// Where the calls go. `api` is `https://api.bgm.tv` and `web` is `https://bgm.tv` in production (the code exchange and

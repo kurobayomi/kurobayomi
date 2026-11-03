@@ -1,4 +1,4 @@
-//! The entry kind of the tracking flows (`Kind` of `p2-rust-design.md` section 3). It is the binding kind, the
+//! The entry kind of the tracking flows. It is the binding kind, the
 //! shared `Kind`, so anime and manga share one type and one code path.
 
 use kuro_platform::kind::Kind;

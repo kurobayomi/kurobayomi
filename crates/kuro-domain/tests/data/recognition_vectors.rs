@@ -1,4 +1,4 @@
-// The recognition vectors of `p1-topic-item-number-recognition.md` sections 5.1 to 5.4 as constant arrays (T-07a-034):
+// The chapter, episode and season recognition vectors as constant arrays (T-07a-034):
 // `(title, name, expected number)`. Shared by the unit tests of `kuro-domain/src/items/recognition.rs` and the
 // integration test `tests/recognition_vectors.rs`, so one table serves both.
 

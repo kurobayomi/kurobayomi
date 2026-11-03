@@ -1,6 +1,6 @@
 //! Integer bit layouts that default-template preferences and the database share.
 //!
-//! Values come from `p1-data-and-config.md` sections 3.1 and 3.2 (`Manga.kt` and `Anime.kt`). The
+//! Values come from `Manga.kt` and `Anime.kt`. The
 //! database area stores the same integers in `mangas.chapter_flags` and `animes.episode_flags`.
 //! Season flags (section 3.3) are at the end of this file.
 
@@ -93,7 +93,7 @@ pub const EPISODE_DISPLAY_MASK: i64 = 0x100000;
 pub const EPISODE_DISPLAY_NAME: i64 = 0x0;
 pub const EPISODE_DISPLAY_NUMBER: i64 = 0x100000;
 
-// Anime `season_flags` (p1-data-and-config.md section 3.3, `Anime.kt`). Bit set means on for the overlays.
+// Anime `season_flags` (`Anime.kt`). Bit set means on for the overlays.
 
 pub const SEASON_SORT_DIR_MASK: i64 = 0x1;
 pub const SEASON_SORT_DESC: i64 = 0x0;

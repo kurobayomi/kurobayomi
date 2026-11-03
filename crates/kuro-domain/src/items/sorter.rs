@@ -1,5 +1,5 @@
 //! Item and season comparators (`ChapterSorter.kt`, `EpisodeSorter.kt`, `SeasonSorter.kt`) and the collator used for
-//! alphabetical order (`SortUtil.kt`). Table: `p1-topic-sorting-and-filtering.md`.
+//! alphabetical order (`SortUtil.kt`).
 //!
 //! One comparator serves both kinds: the sort value is the unified `item_flags` group (`kuro_db::flags::item`).
 //!

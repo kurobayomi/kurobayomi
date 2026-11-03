@@ -1,6 +1,5 @@
-//! The unit tests of `p2-edge-cases-and-tests.md` section 7.1, under the names the plan lists. The plan files them under
-//! `src/browse/model/*`; the code lives in the modules named in each section header below, so the tests sit here, one module
-//! per plan module, and call the code where it is. None of them needs a display, a runtime or the network (T-40b-084). The
+//! The unit tests of the browse model. The code lives in the modules named in each section header below, so the tests
+//! sit here, one module per model module, and call the code where it is. None of them needs a display, a runtime or the network (T-40b-084). The
 //! property tests of the same task are at the end of this file (`group_key_cmp`) and in `names` (`primary_cmp`) and
 //! `global_search` (`sort_items`, `apply`).
 

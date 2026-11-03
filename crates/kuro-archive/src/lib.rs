@@ -3,8 +3,8 @@
 //! `reader` lists and streams archive entries through the system libarchive (`libarchive.rs`).
 //! `epub` reads EPUB page images (T-13a-033); `zip_writer` writes stored CBZ files (T-13a-034).
 //!
-//! Layout: the T-13a-001 `kuro-core/src/archive/` module lives in this crate instead, as CRATE-MAP
-//! section 2.1 says (kuro-archive owns archives; kuro-core has no `archive` module or feature).
+//! Layout: the T-13a-001 `kuro-core/src/archive/` module lives in this crate instead
+//! (kuro-archive owns archives; kuro-core has no `archive` module or feature).
 
 pub mod epub;
 mod libarchive;

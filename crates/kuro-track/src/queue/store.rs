@@ -1,4 +1,4 @@
-//! SQL of `track_retry_queue` (`p1-data-and-config.md` section 7.2). The table is part of the unified database schema
+//! SQL of `track_retry_queue`. The table is part of the unified database schema
 //! (`kuro-db/sql/unified/schema.sql`); its key is `(kind, entry_id, tracker_id)`, so anime and manga with the same
 //! numbers stay apart and a binding has one pending progress.
 

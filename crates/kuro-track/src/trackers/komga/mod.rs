@@ -1,7 +1,7 @@
-//! Komga tracker (manga, id 6; `Komga.kt`, `p1-rust-design.md` section 3.7; T-33a-060 to T-33a-065).
+//! Komga tracker (manga, id 6; `Komga.kt`; T-33a-060 to T-33a-065).
 //!
-//! Komga has no URL or key in its source, so the user logs in with the Komga username and password (decision
-//! `p1-rust-design.md` section 10.1, option a). The password is kept in the secret store through [`BaseTracker`].
+//! Komga has no URL or key in its source, so the user logs in with the Komga username and password.
+//! The password is kept in the secret store through [`BaseTracker`].
 //! The enhanced flag of the other trackers does not apply here: a logged-in tracker is one with both credentials.
 
 pub mod api;
@@ -34,7 +34,7 @@ pub const READING: i64 = 2;
 pub const COMPLETED: i64 = 3;
 pub const REREADING: i64 = -1;
 
-/// Accepted source identity: `komga/all` (`p1-rust-design.md` section 4).
+/// Accepted source identity: `komga/all`.
 pub const ACCEPTED_SOURCES: &[&str] = &["komga/all"];
 
 /// Logo colour `rgb(51, 37, 50)` as `0xAARRGGBB` (`Komga.kt`, T-33a-065).

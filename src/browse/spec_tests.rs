@@ -1,4 +1,4 @@
-//! The test plan of part 1 (T-41a-049, `p1-edge-cases-and-tests.md` sections 4 and 5): the fixtures checked in under
+//! The browse anime tests (T-41a-049): the fixtures checked in under
 //! `tests/fixtures/browse_anime/`, the tests named after T-IDs that no other module of this lane carries, the integration
 //! tests I1 to I4, and the string drift test over section 24 of the behavior spec. Every T-ID is accounted for in the
 //! table below: it names the test that holds it, or the lane that owns the code it tests.

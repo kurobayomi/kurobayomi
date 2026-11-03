@@ -1,5 +1,5 @@
 //! Komga HTTP calls: the series or readlist read, the progress read, and the progress write (`KomgaApi.kt`;
-//! `p1-behavior.md` section 3; T-33a-061, T-33a-063, T-33a-070 to T-33a-073).
+//! T-33a-061, T-33a-063, T-33a-070 to T-33a-073).
 
 use reqwest::header::CONTENT_TYPE;
 use serde::Serialize;

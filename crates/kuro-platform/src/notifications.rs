@@ -67,7 +67,7 @@ pub struct Hints {
     pub resident: Option<bool>,
 }
 
-/// The `Notifier` mapping of a channel (`p1-rust-design.md` 3.7): Low gives urgency low, Default and High give
+/// The `Notifier` mapping of a channel: Low gives urgency low, Default and High give
 /// urgency normal, `silent` suppresses sound, and the category hint depends on the channel.
 pub fn hints(category: &NotificationCategory) -> Hints {
     let urgency = match category.importance {

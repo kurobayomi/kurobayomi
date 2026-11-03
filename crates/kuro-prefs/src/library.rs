@@ -402,7 +402,7 @@ mod tests {
         assert!(!lib.filter_downloaded_manga.is_set());
     }
 
-    /// Table of `p1-data-and-config.md` section 5 (the 18 rows the settings diet kept). Columns: index, key, namespace, Rust field, kind
+    /// The library preferences (the 18 rows the settings diet kept). Columns: index, key, namespace, Rust field, kind
     /// (`bool`, `int`, `long`, `str`, `set`) and the default in stored form (a set is comma-separated, empty for `{}`).
     const SECTION_5: &str = include_str!("../tests/fixtures/library_prefs_table.tsv");
 

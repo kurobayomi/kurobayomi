@@ -18,7 +18,7 @@ use crate::trackers::sources::memory::MemDirectory;
 
 const KEY: &str = "K1";
 
-/// Recorded server responses (`tests/fixtures/jellyfin/`, `p1-edge-cases-and-tests.md` section 9).
+/// Recorded server responses (`tests/fixtures/jellyfin/`).
 const ITEM_MOVIE: &str = include_str!("../../../tests/fixtures/jellyfin/item_movie.json");
 const EPISODES_MIXED: &str = include_str!("../../../tests/fixtures/jellyfin/episodes_mixed.json");
 const EPISODES_UNSORTED: &str =

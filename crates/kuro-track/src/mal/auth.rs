@@ -1,5 +1,5 @@
-//! Token state, refresh with single flight, and the auth-expired flag (`p1-behavior.md` sections 4.7 to 4.10,
-//! `p1-rust-design.md` section 3.5). The state lock is a `std` mutex that is never held across an await. The
+//! Token state, refresh with single flight, and the auth-expired flag.
+//! The state lock is a `std` mutex that is never held across an await. The
 //! refresh gate is a `tokio` mutex, so only one refresh is in flight.
 
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};

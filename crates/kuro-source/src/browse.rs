@@ -1,4 +1,4 @@
-//! Browse state of one source (`BrowseMangaSourceScreenModel.kt`, `p1-topic-filters.md` sections 3 and 6; T-15a-040).
+//! Browse state of one source (`BrowseMangaSourceScreenModel.kt`; T-15a-040).
 //! It holds the listing that runs and the sheet's filters. It makes no source call: the screen runs the call for the
 //! listing it holds. A running listing owns its own clone of the filters, so sheet edits never change it (RC-06, RC-07).
 

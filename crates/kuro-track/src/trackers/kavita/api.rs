@@ -1,5 +1,5 @@
 //! Kavita HTTP calls: JWT login, the series read, the volume walk, the latest-chapter read and the chapter mark
-//! (`KavitaApi.kt`; `p1-behavior.md` section 2; T-33a-050 to T-33a-056).
+//! (`KavitaApi.kt`; T-33a-050 to T-33a-056).
 
 use reqwest::header::CONTENT_TYPE;
 use reqwest::{RequestBuilder, Response, StatusCode, Url};

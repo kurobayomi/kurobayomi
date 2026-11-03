@@ -14,8 +14,7 @@
 //! - T-41b-056: no assist-content hook. The source home URL stays reachable through "Open in WebView". Loss: Android
 //!   assistant only.
 //! - T-41b-057: no row movement animation. Results reorder as they arrive. Pages change with the stack's crossfade only.
-//! - T-41b-058: navigation uses `ui::push` and `ui::pop` with no Voyager types. Escape and Back match section 4 of
-//!   `p2-topic-browse-listing.md`.
+//! - T-41b-058: navigation uses `ui::push` and `ui::pop` with no Voyager types.
 //! - T-41b-059: Injekt is replaced by explicit services: `browse_screen::BrowseEnv` holds the browse collaborators of a
 //!   page of either kind. Named gaps: (1) the cover and background caches are passed to the favourite stores as `|_| 0`
 //!   clearers, because the image layer keeps no per-entry cover files yet; (2) the page constructors still read

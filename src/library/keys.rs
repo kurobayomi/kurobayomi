@@ -1,4 +1,4 @@
-//! The keyboard and mouse matrix of the library (`p1-topic-selection-and-bulk-actions.md` section 7, T4-UI-01).
+//! The keyboard and mouse matrix of the library (T4-UI-01).
 //! Pure, so the view only applies the answer. Escape clears the selection first, then the search text.
 
 use gtk::gdk::Key;

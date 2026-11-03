@@ -1,5 +1,5 @@
-//! The Jellyfin tracking URL: an item URL whose fragment says what the item is (`p1-topic-jellyfin-progress-model.md`
-//! section 1; `p1-behavior.md` section 5.1; T-33a-011, T-33a-014).
+//! The Jellyfin tracking URL: an item URL whose fragment says what the item is
+//! (T-33a-011, T-33a-014).
 
 use url::Url;
 

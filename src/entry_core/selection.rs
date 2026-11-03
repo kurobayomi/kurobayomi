@@ -1,5 +1,5 @@
 //! Chapter selection engine and the keyboard / pointer gesture map.
-//! Upstream: `MangaScreenModel.kt:971-1057` (toggle, select all, invert). Plan: `p2-behavior.md` 6.8.
+//! Upstream: `MangaScreenModel.kt:971-1057` (toggle, select all, invert).
 //!
 //! Selection is keyed by chapter id over the raw list. Anchors are chapter ids, resolved against the
 //! current view on every gesture, so a filter change does not move them to another row.

@@ -137,7 +137,7 @@ impl MangaStatus {
         }
     }
 
-    /// The English text for the key, as in `p1-behavior.md` section 12.
+    /// The English text for the key.
     pub fn english_text(self) -> &'static str {
         match self {
             Self::Unknown => "Unknown",

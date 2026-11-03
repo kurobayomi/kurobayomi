@@ -64,8 +64,7 @@ pub fn matches(query: &str, item: &SearchFields<'_>) -> bool {
         })
 }
 
-/// The text of an empty page while a search, filters or the library itself leave nothing to show
-/// (`p1-behavior.md` 2.6 step 5).
+/// The text of an empty page while a search, filters or the library itself leave nothing to show.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EmptyPage {
     NoResults,

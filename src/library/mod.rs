@@ -3,8 +3,7 @@
 //!
 //! Tests: the package is a binary, so there is no `--lib` target. Run them without a display with
 //! `cargo test -p kurobayomi --bin kurobayomi library::`. The widget checks in `view::options` need a display and skip
-//! themselves without one (they run on the shared GTK thread of `crate::testing`). `t2` holds the T2-* tests of
-//! `p1-edge-cases-and-tests.md` section T-2.
+//! themselves without one (they run on the shared GTK thread of `crate::testing`). `t2` holds the T2-* tests.
 //!
 //! Fixtures: the T-3 data sets live with the code that reads them, in `crates/kuro-domain` (its `testdb` and the
 //! row builders in `fixtures`), not in `tests/fixtures/library`, because every pure rule they feed is tested there

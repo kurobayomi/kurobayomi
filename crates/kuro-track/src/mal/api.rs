@@ -1,4 +1,4 @@
-//! HTTP endpoints of MAL (`p1-data-and-config.md` section 7, `p1-rust-design.md` section 3.4). Every call except the
+//! HTTP endpoints of MAL. Every call except the
 //! token exchange sends a Bearer value from [`MalAuth::bearer`]. Non-2xx responses become [`MalError::Http`].
 
 use std::sync::Arc;

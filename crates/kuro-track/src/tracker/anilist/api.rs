@@ -1,4 +1,4 @@
-//! GraphQL transport (`p1-rust-design.md` sections 3, 5 and 7, `p1-behavior.md` section 5). One rate limiter
+//! GraphQL transport (5 and 7). One rate limiter
 //! and one auth state serve every AniList call. The HTTP call sits behind [`Transport`] so tests can answer
 //! without a network.
 

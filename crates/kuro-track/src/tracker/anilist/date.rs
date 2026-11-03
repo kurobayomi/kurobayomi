@@ -1,5 +1,5 @@
-//! AniList fuzzy dates and the epoch-millisecond values kept in the track rows (`p1-data-and-config.md`
-//! section 12). Dates are local calendar days: AniList receives year, month and day, and the local track
+//! AniList fuzzy dates and the epoch-millisecond values kept in the track rows.
+//! Dates are local calendar days: AniList receives year, month and day, and the local track
 //! stores local midnight of that day. Time of day is lost on purpose.
 
 use chrono::{Datelike, Local, NaiveDate, TimeZone};

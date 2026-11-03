@@ -1,7 +1,7 @@
 //! The pure toggles of the source lists (`ToggleMangaSource`, `ToggleLanguage`;
 //! T-17a-019, T-17a-020, T-17a-022). Each function changes one set and returns the new
-//! membership, so the UI can update without reading the set again. A set holds decimal source ids (`p1-data-and-config.md`
-//! section 7). The naming trap is gone: a "disabled" set is never read through a helper called `is_enabled`.
+//! membership, so the UI can update without reading the set again. A set holds decimal source ids.
+//! The naming trap is gone: a "disabled" set is never read through a helper called `is_enabled`.
 
 use std::collections::BTreeSet;
 

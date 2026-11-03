@@ -1,5 +1,5 @@
 //! "Show in folder" for a finished backup (area 21, T-21a-042). The D-Bus call is behind `FileManager` so this module
-//! stays free of D-Bus code (CRATE-MAP: that lives in kuro-platform). The caller runs this off the GTK thread.
+//! stays free of D-Bus code (that lives in kuro-platform). The caller runs this off the GTK thread.
 
 use std::io;
 use std::path::{Path, PathBuf};

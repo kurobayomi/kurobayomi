@@ -1,4 +1,4 @@
-//! JavaScript evaluation for sources (area 12, T-12a-028; `JavaScriptEngine.kt`, `p1-rust-design.md` section 5).
+//! JavaScript evaluation for sources (area 12, T-12a-028; `JavaScriptEngine.kt`).
 //! Compiled only with the `js-sources` feature. Each call gets its own QuickJS runtime and context, with a memory
 //! limit, a stack limit and a wall-clock deadline, and runs on a blocking thread so the caller's runtime is not held.
 

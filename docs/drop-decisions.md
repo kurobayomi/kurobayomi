@@ -28,7 +28,7 @@ No `kb-widget` crate exists in v1. A desktop widget was added later as an option
 `dist/plasmoid/` show recent updates from the same data source (`kurobayomi --updates-json`; see `PACKAGING.md`).
 A GNOME extension is still a possible later feature with the same data source.
 
-## CI steps (p1-topic-ci-and-release.md, section 1)
+## CI steps
 
 No `setup-java` or `setup-gradle` action remains in any workflow.
 

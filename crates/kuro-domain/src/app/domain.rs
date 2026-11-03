@@ -5,7 +5,7 @@
 //! repositories (accessors above). The construction test uses `kuro-testkit` fakes.
 //!
 //! Deferred, with the exact gap:
-//! - None of the 47 owner-`area:10` rows of `p1-topic-domainmodule-registry.md` has its accessor on `Domain` yet. Some
+//! - None of the 47 `DomainModule` rows owned by area 10 has its accessor on `Domain` yet. Some
 //!   of their behaviour is built under other names and is not wired here: `TrustExtension` (`extension/trust.rs`).
 //!   Per-extension incognito is cut (settings diet); only the global incognito flag exists. Most of the remaining rows have no type in the workspace yet.
 //! - `Domain::start(replay)` is built (T-10a-029): it schedules the delayed tracking worker when the stored queue is

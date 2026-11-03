@@ -6,7 +6,7 @@
 
 use super::notify::Post;
 
-/// Freedesktop servers commonly show up to 3 buttons (PROPOSAL of p1-rust-design.md 2.1).
+/// Freedesktop servers commonly show up to 3 buttons.
 pub const MAX_BUTTONS: usize = 3;
 /// Longest body, in characters, ellipsis included (PROPOSAL).
 pub const MAX_BODY_CHARS: usize = 200;

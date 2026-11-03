@@ -1,4 +1,4 @@
-//! Simkl REST calls (`p1-data-and-config.md` section 4.2, S2 to S11). Authenticated calls take the bearer token from
+//! Simkl REST calls (S2 to S11). Authenticated calls take the bearer token from
 //! [`SimklAuth`] and fail with `NotAuthenticated` before any request when there is none. The token exchange and search
 //! are unauthenticated. Bodies are typed structs, so their key order is the declaration order.
 

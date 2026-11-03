@@ -1,4 +1,4 @@
-//! The desktop notification boundary (CRATE-MAP C-04). The app implements [`Notifier`] over `gio::Notification`; library
+//! The desktop notification boundary. The app implements [`Notifier`] over `gio::Notification`; library
 //! code only calls it, so it never needs GTK.
 
 use std::path::PathBuf;

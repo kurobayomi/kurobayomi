@@ -1,4 +1,4 @@
-//! Simkl wire shapes (`p1-data-and-config.md` section 4.2 and section 8). Nullable keys are `Option`, so a missing key
+//! Simkl wire shapes. Nullable keys are `Option`, so a missing key
 //! reads as absent; the required keys are the ones the Kotlin declares without a default.
 
 use serde::{Deserialize, Serialize};

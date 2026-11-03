@@ -1,5 +1,5 @@
 //! `SyncSeasonsWithSource` (T-10a-010): the season twin of [`crate::items::sync`]. A season is an anime entry whose
-//! `parent_id` points at the parent. The order follows the Kotlin `await` (p1-behavior.md 6.3): every source season goes
+//! `parent_id` points at the parent. The order follows the Kotlin `await`: every source season goes
 //! through `network_to_local` first (which inserts the unseen ones), then the stored children are diffed, then the
 //! removed seasons are detached and the changed fields are written. Nothing is deleted.
 

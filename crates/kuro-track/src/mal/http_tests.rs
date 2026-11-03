@@ -1,4 +1,4 @@
-//! Tests against a local wiremock server (`p1-edge-cases-and-tests.md` section 5, integration table).
+//! Tests against a local wiremock server (integration table).
 
 use std::sync::Arc;
 use std::time::Duration;

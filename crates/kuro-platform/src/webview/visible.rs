@@ -1,4 +1,4 @@
-//! The rules of the visible challenge window (T-12a-032, `p1-ui-parity.md` section 3), without GTK. The hidden solve is
+//! The rules of the visible challenge window (T-12a-032), without GTK. The hidden solve is
 //! tried first; when it times out and the host can show a window, the same challenge runs again in a 960 x 720 window
 //! titled `cloudflare_check_title` with the hint `cloudflare_check_hint` and a Cancel button. The window closes by itself
 //! when the check clears. Cancel, Escape and the window's close button all cancel the solve. A person needs longer than a

@@ -1,6 +1,6 @@
 //! The files packaging installs (T-53a-002, T-53a-003, T-53a-011, T-53a-041): the desktop entry, the shared-mime-info
 //! file, the hicolor icons and the post-install hook. They live in `data/` next to this module; the tests hold them to
-//! the golden text of `p1-rust-design.md` section 2.6 and to the launch code that serves them.
+//! a golden copy and to the launch code that serves them.
 
 #[cfg(test)]
 mod tests {

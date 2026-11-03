@@ -1,5 +1,5 @@
 //! Shared state of the tracking flows: the registry, the repositories, the retry queue and the per-binding
-//! locks (race R1 of `p1-edge-cases-and-tests.md`). Every flow takes `&TrackCtx`.
+//! locks (race R1). Every flow takes `&TrackCtx`.
 
 use kuro_platform::kind::Kind;
 use std::collections::HashMap;

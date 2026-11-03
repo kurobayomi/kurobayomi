@@ -1,4 +1,4 @@
-//! Bangumi tests: identity and rules (pure), and wiremock tests for the endpoints of `p1-data-and-config.md` 7.2.
+//! Bangumi tests: identity and rules (pure), and wiremock tests for the endpoints.
 //! Fixtures are inline JSON written from the DTO fields and the server schema, not from a live account.
 
 use std::sync::Arc;

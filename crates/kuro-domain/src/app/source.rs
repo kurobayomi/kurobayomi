@@ -280,7 +280,7 @@ mod tests {
         assert!(prefs.enabled_languages.get().contains("ja"));
     }
 
-    /// The section 2 input of `p1-edge-cases-and-tests.md`, as rows, with the settings the vector names.
+    /// The section 2 input, as rows, with the settings the vector names.
     fn section2() -> (Vec<Source>, BTreeSet<String>, BTreeSet<String>) {
         let rows = crate::source::fakes::enabled_rows();
         (rows, set(&["en", "ja"]), set(&["4"]))

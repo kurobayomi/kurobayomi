@@ -8,7 +8,7 @@
 //! | TC-40-112, 113 | not built: the migrate dialog and its engine are not in `src/browse` (T-40a-015, T-40a-016), so no code exists to test |
 //! | TC-40-114, 115 | here, over `migrate_nav`; its widget check is `migrate_nav::tests::smoke` |
 //! | TC-40-116, 117 | here |
-//! | TC-40-118 | manual: the key map needs a window and a real key press (`p1-ui-parity.md` section 9) |
+//! | TC-40-118 | manual: the key map needs a window and a real key press |
 //! | TC-40-119 | manual: the 360 px layout needs a real window; no automated check exists |
 //! | TC-40-120 | here, over a settings file in the Aniyomi key names |
 //! | TC-40-121 | here, over the message keys of section 18 |
@@ -295,7 +295,7 @@ fn tc_40_120_aniyomi_style_settings_in_a_toml_file_read_as_the_same_modes_and_se
 
 // ---------- TC-40-121: the message keys of section 18 ----------
 
-/// Every key of section 18 of `p1-behavior.md`, as a `MsgKey`: a key that is not in the table does not compile.
+/// Every browse message key, as a `MsgKey`: a key that is not in the table does not compile.
 fn section_18_keys() -> Vec<(&'static str, kuro_i18n::MsgKey)> {
     use kuro_i18n::MsgKey as K;
     macro_rules! keys {

@@ -1,5 +1,5 @@
 //! Kitsu search through Algolia (T-30a-017, T-30a-018, T-30a-028). The key comes from Kitsu with the bearer token,
-//! then the query goes to Algolia without one. The hit mapping follows `p1-behavior.md` section 12.
+//! then the query goes to Algolia without one.
 
 use kuro_platform::kind::Kind;
 use chrono::{DateTime, Local};

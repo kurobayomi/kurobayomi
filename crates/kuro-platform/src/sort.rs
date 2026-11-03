@@ -162,7 +162,7 @@ impl SortType {
     }
 
     /// `valueOf(flag)`: the type whose bits match `flags & SORT_TYPE_MASK`, or `Alphabetical` when none does
-    /// (the unassigned patterns of the table in `p1-topic-flag-algebra-and-sort-modes.md`).
+    /// (the unassigned bit patterns).
     pub fn from_flags(kind: Kind, flags: i64) -> Self {
         Self::types(kind).iter().copied().find(|t| t.flag() == flags & SORT_TYPE_MASK).unwrap_or(Self::Alphabetical)
     }

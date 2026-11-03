@@ -1,5 +1,5 @@
 //! Golden and integration tests of the domain layer (T-10a-036). They use only the public API, `kuro-testkit` and a
-//! migrated database in a temporary directory. Test names follow `p1-edge-cases-and-tests.md` section 4.
+//! migrated database in a temporary directory.
 
 use kuro_platform::kind::Kind;
 use std::sync::{Arc, Mutex};

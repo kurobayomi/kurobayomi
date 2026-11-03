@@ -1,4 +1,4 @@
-//! Kavita tracker (manga, id 8; `Kavita.kt`, `p1-rust-design.md` section 3.5; T-33a-040 to T-33a-046).
+//! Kavita tracker (manga, id 8; `Kavita.kt`; T-33a-040 to T-33a-046).
 //!
 //! The server URL and API key come from the Kavita sources (slots 1 to 3), so the tracker has no credentials of its
 //! own. Login is the enhanced flag (`loginNoop`, T-33a-046).
@@ -33,7 +33,7 @@ pub const READING: i64 = 2;
 pub const COMPLETED: i64 = 3;
 pub const REREADING: i64 = -1;
 
-/// Accepted source identity: `kavita/all` (`p1-rust-design.md` section 4).
+/// Accepted source identity: `kavita/all`.
 pub const ACCEPTED_SOURCES: &[&str] = &["kavita/all"];
 
 /// Logo colour `rgb(74, 198, 148)` as `0xAARRGGBB` (`Kavita.kt`, T-33a-041).
@@ -136,7 +136,7 @@ impl Tracker for KavitaTracker {
         self.login.login_state()
     }
 
-    /// Nothing is stored: enhanced trackers keep no secret (`p1-data-and-config.md` section 5.2).
+    /// Nothing is stored: enhanced trackers keep no secret.
     fn save_credentials(&self, _username: &str, _password: &str) -> Result<(), TrackError> {
         Ok(())
     }

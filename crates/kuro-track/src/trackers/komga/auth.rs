@@ -1,4 +1,4 @@
-//! Komga credentials, sent as HTTP Basic auth on every request (`p1-rust-design.md` section 10.1, option a; T-33a-062).
+//! Komga credentials, sent as HTTP Basic auth on every request (option a; T-33a-062).
 //!
 //! Kotlin sends no `Authorization` header and relies on a cookie in the shared cookie jar. Kurobayomi has no such jar,
 //! so the username and password the user enters for the tracker are sent instead. The Komga host comes from the

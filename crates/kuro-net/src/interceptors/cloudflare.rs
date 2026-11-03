@@ -1,5 +1,5 @@
-//! Cloudflare challenge handling (T-12a-015, T-12a-016, T-12a-021, T-12a-022). `p1-topic-cloudflare-and-webview.md`
-//! sections 2.2 and 2.3. A 403 or 503 from a Cloudflare server is solved once per registrable domain in a WebView;
+//! Cloudflare challenge handling (T-12a-015, T-12a-016, T-12a-021, T-12a-022).
+//! A 403 or 503 from a Cloudflare server is solved once per registrable domain in a WebView;
 //! the solve is shared by every request that hit the same domain, and each of them then retries once.
 
 use std::collections::HashMap;

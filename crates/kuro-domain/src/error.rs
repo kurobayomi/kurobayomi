@@ -4,7 +4,7 @@
 //!
 //! ## Error and logging policy (T-09a-059)
 //!
-//! Three patterns, chosen per interactor (`p1-behavior.md` section 0; the plan file is read-only, so the table lives here).
+//! Three patterns, chosen per interactor.
 //!
 //! | Interactor (module) | Pattern | Result to the caller |
 //! |---|---|---|
@@ -36,7 +36,7 @@ pub enum DomainError {
     Join(#[from] tokio::task::JoinError),
     #[error("invalid input: {0}")]
     Invalid(&'static str),
-    /// A store-flow failure whose text the dialog shows as is (`StoreError` in `p1-topic-extension-store-index.md`).
+    /// A store-flow failure whose text the dialog shows as is (`StoreError`).
     #[error("{0}")]
     Store(&'static str),
     #[error("source not installed: {0}")]

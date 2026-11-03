@@ -1,7 +1,7 @@
 //! The item-state copy of a migration (behavior 15 step 2; T-40a-016), for both kinds: `merge_item_state` carries the fetch
 //! date and the bookmark of the old item over to the new item with the same number (an anime item also its resume point
 //! and filler mark), and marks the new items done up to the highest done number of the old ones. Pure: the engine reads
-//! the rows and writes the result (`p1-rust-design.md`).
+//! the rows and writes the result.
 
 use kuro_data::item::{Item, ItemUpdate};
 use kuro_domain::items::model::ItemExt;

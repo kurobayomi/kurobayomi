@@ -1,4 +1,4 @@
-//! Suwayomi tracker (manga, id 9; `Suwayomi.kt`, `p1-rust-design.md` section 3.8; T-33a-080 to T-33a-096).
+//! Suwayomi tracker (manga, id 9; `Suwayomi.kt`; T-33a-080 to T-33a-096).
 //!
 //! The server address and the Basic credential come from the Tachidesk extension's preferences, read on every call
 //! (see [`api::SuwayomiApi::settings`]). The enhanced login takes no credentials and only sets a flag.

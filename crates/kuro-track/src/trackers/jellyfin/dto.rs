@@ -1,4 +1,4 @@
-//! Jellyfin response shapes (`dto/JFItem.kt`; `p1-data-and-config.md` section 2.4). Unknown fields are ignored.
+//! Jellyfin response shapes (`dto/JFItem.kt`). Unknown fields are ignored.
 
 use serde::Deserialize;
 

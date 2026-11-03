@@ -1,4 +1,4 @@
-//! Jellyfin tracker (anime, id 102; `Jellyfin.kt`, `p1-rust-design.md` section 3.9; T-33a-030 to T-33a-035).
+//! Jellyfin tracker (anime, id 102; `Jellyfin.kt`; T-33a-030 to T-33a-035).
 //!
 //! Matching, `is_track_from` and `migrate_track` go through the `EnhancedAnimeTracker` contract (T-33a-006,
 //! T-33a-034), so the bind path reaches them through `as_enhanced_anime`.
@@ -35,7 +35,7 @@ pub const WATCHING: i64 = 2;
 pub const COMPLETED: i64 = 3;
 pub const REWATCHING: i64 = -1;
 
-/// Accepted source identity: `jellyfin/all` (`p1-rust-design.md` section 4).
+/// Accepted source identity: `jellyfin/all`.
 pub const ACCEPTED_SOURCES: &[&str] = &["jellyfin/all"];
 
 /// Logo colour `rgb(0, 11, 37)` as `0xAARRGGBB` (`Jellyfin.kt:39`).
@@ -135,7 +135,7 @@ impl Tracker for JellyfinTracker {
         self.login.login_state()
     }
 
-    /// Nothing is stored: enhanced trackers keep no secret (`p1-data-and-config.md` section 5.2).
+    /// Nothing is stored: enhanced trackers keep no secret.
     fn save_credentials(&self, _username: &str, _password: &str) -> Result<(), TrackError> {
         Ok(())
     }

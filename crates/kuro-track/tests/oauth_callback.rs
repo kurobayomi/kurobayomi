@@ -1,4 +1,4 @@
-//! T-01, T-25 and T-26 of `p2-edge-cases-and-tests.md` section 6, through the public parser.
+//! OAuth callback tests T-01, T-25 and T-26, through the public parser.
 
 use kuro_track::model::TrackerId;
 use kuro_track::oauth::{Redirect, parse_callback};

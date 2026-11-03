@@ -80,7 +80,7 @@ pub struct Item {
     pub cover_path: Option<String>,
 }
 
-/// The schema-1 success payload. Field order is the order of `p1-data-and-config.md` 11.1.
+/// The schema-1 success payload. Fields are written in declaration order.
 #[derive(Debug, Serialize)]
 pub struct Envelope {
     pub schema: u32,

@@ -1,6 +1,5 @@
 //! Auto-download of new items (`FilterChaptersForDownload.kt`, `FilterEpisodesForDownload.kt`). One algorithm serves
-//! manga chapters and anime episodes through the [`NewItem`] and [`ReadState`] traits. Behaviour 5.1 and 5.2 of
-//! `p1-behavior.md`.
+//! manga chapters and anime episodes through the [`NewItem`] and [`ReadState`] traits.
 
 use std::collections::BTreeSet;
 

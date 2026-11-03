@@ -1,4 +1,4 @@
-//! T-52a-065: every preference key the util code reads (`p1-data-and-config.md` section 4) is registered with the
+//! T-52a-065: every preference key the util code reads is registered with the
 //! listed default and in the listed store.
 
 use kuro_prefs::keys::Namespace;

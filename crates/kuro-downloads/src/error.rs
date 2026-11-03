@@ -75,7 +75,7 @@ pub enum FailureKind {
 }
 
 impl DownloadError {
-    /// Message key for the UI (`p1-behavior.md` section 15). `None` when the text is raw source or I/O text.
+    /// Message key for the UI. `None` when the text is raw source or I/O text.
     pub fn key(&self) -> Option<&'static str> {
         match self {
             Self::InvalidLocation(_) => Some("invalid_location"),

@@ -1,4 +1,4 @@
-//! MAL date conversion (`p1-behavior.md` section 3, `p1-rust-design.md` section 9.1). Wire dates are
+//! MAL date conversion. Wire dates are
 //! `yyyy-MM-dd` in the local calendar. Local fields are epoch milliseconds at local midnight, and 0 means unset.
 
 use chrono::{DateTime, Local, NaiveDate, TimeDelta, TimeZone};

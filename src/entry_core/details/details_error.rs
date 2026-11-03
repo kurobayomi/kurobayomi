@@ -1,5 +1,5 @@
 //! Typed errors of the anime details page (T-39a-060, D-5). Each place the Kotlin used `!!` or a failing lookup now
-//! returns one of these, shows its text, and logs it with `tracing::error!`. Upstream: `p1-rust-design.md` section 10.
+//! returns one of these, shows its text, and logs it with `tracing::error!`.
 
 use kuro_i18n::{MsgKey, tr};
 use std::fmt;

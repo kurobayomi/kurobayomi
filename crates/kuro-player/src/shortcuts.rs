@@ -1,4 +1,4 @@
-//! Keyboard shortcut table (area 46 `p1-ui-parity.md` section 10.2, T-46a-043). Pure: the window's
+//! Keyboard shortcut table (area 46, T-46a-043). Pure: the window's
 //! key controller passes the keyval and modifiers and acts on the returned `Action`. Shortcuts are
 //! off while a text entry has focus. Alt and Meta combinations are left to the desktop.
 //!

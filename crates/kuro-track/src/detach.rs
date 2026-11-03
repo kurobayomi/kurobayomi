@@ -1,4 +1,4 @@
-//! Threading of the write paths (`p1-rust-design.md` section 4, behaviour section 19). The source runs the bind,
+//! Threading of the write paths. The source runs the bind,
 //! the progress writes and the remove as non-cancellable work, so closing the page never stops them. The GUI
 //! spawns them here and drops the handle. Results reach the GTK thread through a channel, in the GUI crate.
 

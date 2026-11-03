@@ -95,7 +95,7 @@ mod tests {
         NaiveDate::from_ymd_opt(2026, 10, day).unwrap()
     }
 
-    /// Vector of p2-edge-cases-and-tests.md section 3.5, in UTC so the local dates are the ones written there.
+    /// A test vector, in UTC so the local dates are the ones written here.
     #[test]
     fn build_upcoming_matches_the_vector() {
         let entries = vec![entry(1, at(8, 1)), entry(2, at(8, 20)), entry(3, at(9, 5)), entry(4, at(15, 12))];

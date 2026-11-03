@@ -13,13 +13,12 @@
 //! * Android-to-Rust map (T-30a-034, T-28a-041, T-32a-062). `android.graphics.Color` is a `u32` constant, `Uri` is
 //!   `url::Url`, kotlinx.serialization is serde, OkHttp is reqwest, injekt is constructor injection through
 //!   `TrackerDeps`, moko `StringResource` is a key, `withIOContext` is tokio, `SimpleDateFormat` is chrono, and
-//!   `URLEncoder` is `url::form_urlencoded`. Replacement table: `p1-rust-design.md` section 12. There is no
+//!   `URLEncoder` is `url::form_urlencoded`. There is no
 //!   `openInBrowser(forceDefaultBrowser)`: links open in the default browser only. `MURating.copyTo` was dead code
 //!   and is not ported.
 //! * Score display (T-30a-035). A score is shown with Rust's `f64` display, so `7.5` reads `7.5` in every locale.
 //!   Stored values do not change.
-//! * Interceptors (T-33a-023). The OkHttp interceptors are not ported. Each request builder takes its auth context
-//!   (`p1-rust-design.md` section 11).
+//! * Interceptors (T-33a-023). The OkHttp interceptors are not ported. Each request builder takes its auth context.
 //! * Service locator (T-33a-103). Injekt, `injectLazy` and lazy wiring are not ported. Dependencies come from
 //!   constructor injection through `TrackerDeps`.
 //! * Android resources (T-33a-104). `R.drawable.*`, `Color.rgb(...)` and `MR.strings.*` become asset keys, a `u32`

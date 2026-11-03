@@ -1,4 +1,4 @@
-//! Generator for the restore fixtures Q-01 to Q-03 (area 22, p1-edge-cases-and-tests.md section 7). Pure Rust, no
+//! Generator for the restore fixtures Q-01 to Q-03 (area 22). Pure Rust, no
 //! Kotlin input. `write` puts each fixture and its `expected.json` into a folder.
 
 use std::io::Write;

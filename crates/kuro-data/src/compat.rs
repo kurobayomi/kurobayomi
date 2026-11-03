@@ -1,4 +1,4 @@
-//! Legacy return shapes for the interactor layer (T-05a-028, `p1-behavior.md` section 0).
+//! Legacy return shapes for the interactor layer (T-05a-028).
 //!
 //! Kotlin's update and reset methods return `Boolean`, and its `remove` methods return nothing. Both
 //! swallow the database error after logging it, so these wrappers do the same. Every other repository

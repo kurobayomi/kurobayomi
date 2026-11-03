@@ -16,7 +16,7 @@ use rusqlite::Connection;
 
 use crate::schema::{BackupCategory, BackupPreference, BackupSourcePreferences, PrefValue};
 
-/// The scheduler re-arm after app preferences change (p1-rust-design.md section 9). Implemented by the owning areas.
+/// The scheduler re-arm after app preferences change. Implemented by the owning areas.
 pub trait Scheduler {
     /// Reads `backup_interval`. 0 disables the automatic backup.
     fn rearm_auto_backup(&self);

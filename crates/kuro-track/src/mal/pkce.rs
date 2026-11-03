@@ -1,4 +1,4 @@
-//! PKCE verifier and the browser authorise URL (`p1-behavior.md` sections 4.1 and 4.2, `PkceUtil.kt:8-14`).
+//! PKCE verifier and the browser authorise URL (`PkceUtil.kt:8-14`).
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;

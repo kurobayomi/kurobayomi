@@ -28,7 +28,7 @@ pub struct TypeStyle {
 }
 
 #[cfg(test)]
-/// The Material 3 styles the app uses (`p1-rust-design.md` section 5).
+/// The Material 3 styles the app uses.
 pub const TYPOGRAPHY: [TypeStyle; 6] = [
     TypeStyle { class: "kuro-body-medium", size_em: 0.875, weight: None, line_height_px: Some(20.0) },
     TypeStyle { class: "kuro-label-large", size_em: 0.875, weight: Some(500), line_height_px: None },

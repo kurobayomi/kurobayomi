@@ -1,5 +1,5 @@
 //! `Hoster`, `HosterState` and the hoster discovery per episode kind (`Hoster.kt`, `EpisodeLoader.kt`; T-16a-017,
-//! T-16a-019). The source-facing rules are in `p1-rust-design.md` section 5.1 and `p1-behavior.md` section 5.
+//! T-16a-019).
 
 use serde_json::{Map, Value};
 

@@ -1,4 +1,4 @@
-//! OAuth login plumbing (`p1-topic-tracker-oauth.md` sections 4 to 7, `p2-topic-oauth-callback.md`): authorise URLs,
+//! OAuth login plumbing: authorise URLs,
 //! PKCE, the `state` value, pending attempts with a TTL, and redirect parsing. The random source is the only
 //! side effect. The caller owns the token exchange and the secret store.
 
@@ -11,7 +11,7 @@ use url::Url;
 use crate::messages::MsgKey;
 use crate::model::TrackerId;
 
-/// A login attempt stays valid this long after its authorise URL was opened (`p1-topic-tracker-oauth.md` section 4).
+/// A login attempt stays valid this long after its authorise URL was opened.
 pub const PENDING_TTL_MS: i64 = 5 * 60 * 1000;
 
 /// `state` bytes. 32 bytes encode to 43 URL-safe characters.

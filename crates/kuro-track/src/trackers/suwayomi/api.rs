@@ -1,5 +1,5 @@
 //! Suwayomi HTTP calls: the manga read, the chapter list and the chapter write (`SuwayomiApi.kt`;
-//! `p1-behavior.md` section 4; T-33a-090 to T-33a-093, T-33a-096).
+//! T-33a-090 to T-33a-093, T-33a-096).
 
 use std::sync::Arc;
 

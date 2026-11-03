@@ -157,7 +157,7 @@ mod tests {
         (dir, db, ids)
     }
 
-    /// The five-row scenario of `p1-topic-history-and-updates-views.md` section 1 with two manga.
+    /// A five-row scenario with two manga.
     #[test]
     fn list_shows_the_latest_item_per_entry_and_follows_resets() {
         let (_d, db, ids) = repo_with_chapters(&[("Alpha", &["a1", "a2"]), ("Beta", &["b1"])]);

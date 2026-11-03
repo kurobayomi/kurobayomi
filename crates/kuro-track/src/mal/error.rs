@@ -1,4 +1,4 @@
-//! Errors of the MAL tracker (`p1-rust-design.md` section 6). The texts come from [`super::messages`]. The first
+//! Errors of the MAL tracker. The texts come from [`super::messages`]. The first
 //! four are the Kotlin literals, kept verbatim so logs match upstream.
 
 use super::messages as text;

@@ -1,4 +1,4 @@
-//! Shikimori tests: identity and rules (pure), and wiremock tests for every endpoint of `p1-data-and-config.md` 7.1.
+//! Shikimori tests: identity and rules (pure), and wiremock tests for every endpoint.
 
 use std::sync::Arc;
 

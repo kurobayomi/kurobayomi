@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-/// How many messages may wait at once (`p1-rust-design.md` section 3.4).
+/// How many messages may wait at once.
 pub const MAX_QUEUED: usize = 5;
 
 /// `Toast.LENGTH_SHORT` and `Toast.LENGTH_LONG` on Android.

@@ -1,5 +1,5 @@
-//! The anime source API (area 16, `p1-rust-design.md` sections 2 and 3). It lives in this crate, next to the manga
-//! API, as `ARCHITECTURE.md` and `CRATE-MAP.md` place it. No GTK and no HTTP here: the HTTP adapter lands in
+//! The anime source API (area 16). It lives in this crate, next to the manga
+//! API. No GTK and no HTTP here: the HTTP adapter lands in
 //! `kuro-source-http`, the same as for manga.
 
 /// The thumbnail a listing gives for an anime whose poster it does not know yet: `kb-cover:<anime url>`. The image

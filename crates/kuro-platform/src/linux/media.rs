@@ -1,4 +1,4 @@
-//! MPRIS media controls through `souvlaki` (CRATE-MAP C-32). Media keys and the desktop media widget read the same
+//! MPRIS media controls through `souvlaki`. Media keys and the desktop media widget read the same
 //! `org.mpris.MediaPlayer2.<name>` service.
 
 use std::sync::Mutex;

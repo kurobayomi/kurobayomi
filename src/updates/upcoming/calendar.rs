@@ -139,7 +139,7 @@ mod tests {
         NaiveDate::from_ymd_opt(y, m, day).unwrap()
     }
 
-    /// Vectors of p2-edge-cases-and-tests.md section 3.3.
+    /// Calendar test vectors.
     #[test]
     fn leading_blanks_match_the_vectors() {
         let mon = week_days(Weekday::Mon);

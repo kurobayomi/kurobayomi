@@ -1,4 +1,4 @@
-//! MangaUpdates wire shapes (`p1-data-and-config.md` section 4.1). A missing nullable key parses as `None`. A missing
+//! MangaUpdates wire shapes. A missing nullable key parses as `None`. A missing
 //! required key (for example `context` in the login reply) is a decode error.
 
 use serde::Deserialize;

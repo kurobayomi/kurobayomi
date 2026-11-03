@@ -64,8 +64,8 @@ pub fn initial_index(ids: &[i64], requested: i64) -> Result<usize, String> {
     ids.iter().position(|&id| id == requested).ok_or_else(|| trf(MsgKey::reader_requested_chapter_not_found, &[("arg1", Arg::Int(requested))]))
 }
 
-/// The message for a list that could not be built. The downloaded-only text is the proposal in
-/// `p1-edge-cases-and-tests.md` for E-LIST-2, flagged there for strings review.
+/// The message for a list that could not be built. The downloaded-only text (E-LIST-2) still
+/// needs a strings review.
 pub fn list_error_message(error: &ListError) -> String {
     match error {
         ListError::ChapterNotFound(id) => trf(MsgKey::reader_requested_chapter_not_found, &[("arg1", Arg::Int(*id))]),

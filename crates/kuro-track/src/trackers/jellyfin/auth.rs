@@ -1,4 +1,4 @@
-//! Jellyfin API key lookup (`JellyfinInterceptor.kt:44-67`; `p1-rust-design.md` section 3.9; T-33a-020).
+//! Jellyfin API key lookup (`JellyfinInterceptor.kt:44-67`; T-33a-020).
 //!
 //! No cache: the preferences are read on every call, so there is no shared mutable map (D-15) and an empty key is
 //! never remembered (D-16).

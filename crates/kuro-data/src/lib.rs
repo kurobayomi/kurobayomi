@@ -28,7 +28,7 @@ pub use kuro_db::open::{DbError as DataError, DbResult as DataResult};
 /// Ids per statement chunk in batch deletes (`remove_with_ids`, EC-17).
 pub(crate) const ID_CHUNK: usize = 500;
 
-/// Quiet time before an entry subscription re-queries after a change (`p1-behavior.md` section 11).
+/// Quiet time before an entry subscription re-queries after a change.
 pub(crate) const ENTRY_DEBOUNCE: Duration = Duration::from_millis(50);
 
 /// Quiet time before a library subscription re-queries after a change.

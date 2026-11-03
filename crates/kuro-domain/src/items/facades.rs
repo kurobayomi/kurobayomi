@@ -1,5 +1,5 @@
 //! Item facades of both kinds (`GetChapter.kt`, `GetChapterByUrlAndMangaId.kt`, `GetChaptersByMangaId.kt`,
-//! `UpdateChapter.kt` and the episode twins). Error contracts follow `p1-behavior.md` section 4: reads log and
+//! `UpdateChapter.kt` and the episode twins). Error contracts: reads log and
 //! return `None` or an empty list, the by-url variant without a log stays silent, and writes log and return `()`.
 
 use kuro_data::item::{Item, ItemRepo, ItemUpdate};

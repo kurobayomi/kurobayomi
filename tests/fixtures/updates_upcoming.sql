@@ -1,4 +1,4 @@
--- Fixture of the Updates feed edge cases E-U1 to E-U4 (p2-edge-cases-and-tests.md section 7), loaded by
+-- Fixture of the Updates feed edge cases E-U1 to E-U4, loaded by
 -- src/updates/store.rs into an empty manga database. The feed window cut-off the tests use is 1_700_000_000_000.
 -- M1 is a favourite added at 1_700_000_000_000; M2 is not a favourite.
 INSERT INTO entries(_id, kind, source, url, title, status, favorite, initialized, viewer, item_flags, cover_last_modified, date_added)

@@ -1,4 +1,4 @@
-//! Score formats, picker lists and conversions (`p1-behavior.md` section 3). The stored score is always on
+//! Score formats, picker lists and conversions. The stored score is always on
 //! the 0 to 100 scale. The picker works on indices, so an unscored POINT_3 opens at index 0 (E-13).
 
 use super::error::AniListError;

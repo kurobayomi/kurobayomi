@@ -1,4 +1,4 @@
-//! DTO to domain conversion (`p1-behavior.md` sections 7.1 to 7.5). Search results keep `score` as `None`
+//! DTO to domain conversion. Search results keep `score` as `None`
 //! for the source's `-1` placeholder. Anime search results never carry artists (E-66).
 
 use crate::model::search::{AnimeTrackSearch, MangaTrackSearch};

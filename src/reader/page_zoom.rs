@@ -1,5 +1,5 @@
 //! Page zoom model (T-43b-015, T-43b-016, T-43b-017). Pure: no GTK types. Mirrors `SubsamplingScaleImageView.minScale`
-//! (fork, `p2-topic-page-image-view.md` section 3) and `ReaderPageImageView.setupZoom` (behavior section 9.5).
+//! (fork) and `ReaderPageImageView.setupZoom`.
 //!
 //! Coordinates: a scale is screen pixels per source pixel; a centre is in source pixels.
 

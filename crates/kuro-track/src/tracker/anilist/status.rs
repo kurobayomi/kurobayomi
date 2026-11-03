@@ -1,4 +1,4 @@
-//! Local statuses (stored integers) and the AniList `MediaListStatus` strings (`p1-behavior.md` section 2).
+//! Local statuses (stored integers) and the AniList `MediaListStatus` strings.
 //! Manga and anime keep separate enums because `COMPLETED = 2` is shared and the other integers differ.
 
 use super::error::AniListError;

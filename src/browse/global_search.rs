@@ -2,7 +2,7 @@
 //! source-filter state, the plan a search starts, the results applied by one writer, their order, the single-result
 //! auto-open and the entry routes. Pure: the page runs the fetches (at most `MAX_IN_FLIGHT` at once) and calls `apply`
 //! on the GTK thread, so no two results write the rows at the same time (GS-EC-05). Ports `MangaSearchScreenModel` and
-//! its subclasses (`p2-topic-global-search-engine.md`).
+//! its subclasses.
 
 use std::collections::{BTreeSet, VecDeque};
 use std::sync::{Arc, OnceLock};

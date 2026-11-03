@@ -1,4 +1,4 @@
-//! Fakes and fixtures for the source tests (T-17a-038; `p1-edge-cases-and-tests.md` section 8). Test-only. Each fake keeps
+//! Fakes and fixtures for the source tests (T-17a-038). Test-only. Each fake keeps
 //! its calls, so a test can check what was asked and in which order.
 
 use std::collections::HashMap;
@@ -446,7 +446,7 @@ fn fixture() -> MangaRows {
     serde_json::from_str(include_str!("../../tests/fixtures/sources/manga_rows.json")).expect("manga_rows.json parses")
 }
 
-/// The six rows of `p1-edge-cases-and-tests.md` section 2, in repository order.
+/// The six enabled source rows, in repository order.
 pub fn enabled_rows() -> Vec<Source> {
     fixture()
         .enabled_rows

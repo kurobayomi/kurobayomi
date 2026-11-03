@@ -1,4 +1,4 @@
-//! The application interceptor chain (`p1-rust-design.md` section 2.4). An interceptor sees the request, may
+//! The application interceptor chain. An interceptor sees the request, may
 //! change it, calls `chain.proceed` once, and may change the response. The last step is the transport.
 
 pub mod cloudflare;

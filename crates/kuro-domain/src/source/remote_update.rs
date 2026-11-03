@@ -2,7 +2,7 @@
 //! stored episodes or seasons in source order, asks the source for fresh metadata and the list, writes the metadata,
 //! runs the list sync on the ORIGINAL anime, then re-reads the anime and returns it with the new rows.
 //!
-//! The cover and background rules are pure functions of the stored row (`p1-topic-remote-entry-update.md` 5.2, 5.3).
+//! The cover and background rules are pure functions of the stored row.
 //! The source calls, the list sync and the cover files are ports, so the orchestration is testable without a source or
 //! a cover cache. The episode and season sync (T-10a-009 and T-10a-010) implement [`ListSync`].
 

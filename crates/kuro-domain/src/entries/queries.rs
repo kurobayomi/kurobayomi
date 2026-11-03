@@ -1,6 +1,6 @@
 //! Read-side query facades of both kinds (`GetManga.kt`, `GetAnime.kt`, `GetMangaFavorites.kt`,
 //! `GetDuplicateLibraryManga.kt`, `GetMangaWithChapters.kt`, `GetAnimeWithEpisodesAndSeasons.kt` and the anime twins), over
-//! the shared repositories; the kind is a parameter. Error contracts follow `p1-behavior.md` section 4:
+//! the shared repositories; the kind is a parameter. Error contracts:
 //! `get_entry_or_none` logs and returns `None` on any error, the others pass the repository result through.
 
 use kuro_data::DataResult;

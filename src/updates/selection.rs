@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn vector_3_1_long_press_and_tap_sequence() {
-        // p2-edge-cases-and-tests.md 3.1: rows with ids 1..8 at index id - 1; here ids are the indices 0..7
+        // rows with ids 1..8 at index id - 1; here ids are the indices 0..7
         let mut items = rows(8);
         let mut sel = Selection::default();
         sel.toggle(&mut items, 2, true, true, true);

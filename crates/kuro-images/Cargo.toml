@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = ["avif", "jxl"]
-# AVIF stills through the image crate's dav1d backend. avif-decode (CRATE-MAP C-23) needs `nasm` to build rav1d on
+# AVIF stills through the image crate's dav1d backend. avif-decode needs `nasm` to build rav1d on
 # x86_64, and the workspace already links dav1d through kuro-core's image dependency. Without the feature an AVIF
 # file is `UnsupportedFormat`.
 avif = ["image/avif-native"]
@@ -15,7 +15,7 @@ avif = ["image/avif-native"]
 jxl = ["dep:jxl-oxide"]
 # Display ICC profile through lcms2 (system liblcms2). Off by default (T-34a-031, design section 9).
 icc = ["dep:lcms2"]
-# HEIF and HEIC stills through the system libheif (CRATE-MAP C-24). Off by default: it needs the `libheif` package to
+# HEIF and HEIC stills through the system libheif. Off by default: it needs the `libheif` package to
 # build and run. Without the feature a HEIF file is `DecodeInit` ("Failed to initialize decoder").
 heif = ["dep:libheif-rs"]
 

@@ -1,5 +1,5 @@
 //! The fetch interval ("smart update") engine, shared by manga and anime (`MangaFetchInterval.kt`,
-//! `AnimeFetchInterval.kt`). Algorithm and vectors: `p1-topic-fetch-interval.md`.
+//! `AnimeFetchInterval.kt`).
 //!
 //! Every calendar computation takes a `chrono::TimeZone`, so tests run with UTC and a fixed Europe/Berlin
 //! rule. The clock is passed in as epoch milliseconds (`clock_now_ms`), where Kotlin read `Instant.now()`.

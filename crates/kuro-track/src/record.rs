@@ -1,9 +1,8 @@
 //! One tracking row as the flows see it, anime or manga. The two stored shapes stay in `model.rs`; this enum is the
-//! one type the Home list and the dialogs pass around (`TrackRecord` of `p2-rust-design.md` section 3).
+//! one type the Home list and the dialogs pass around.
 //!
-//! Decision (T-27b-001): the enum over `AnimeTrack` and `MangaTrack` replaces the flat struct of `p2-rust-design.md`
-//! section 3. The stored shapes already carry the fields with their own types, and `p1-data-and-config.md` section
-//! 4.2 gives the id as `Option<i64>`, where `None` is a row that is not saved. The `-1` sentinel of the flat struct is
+//! Decision (T-27b-001): the enum over `AnimeTrack` and `MangaTrack` replaces a flat struct.
+//! The stored shapes already carry the fields with their own types, and the id is an `Option<i64>`, where `None` is a row that is not saved. The `-1` sentinel of the flat struct is
 //! not used, because `None` cannot be mistaken for a real id. The accessors below are the one way the flows read a
 //! field.
 

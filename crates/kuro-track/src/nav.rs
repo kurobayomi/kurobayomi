@@ -1,4 +1,4 @@
-//! Modal navigation stack of the tracking dialogs (`TrackNav`, `p2-rust-design.md` section 5.2). The GUI maps each
+//! Modal navigation stack of the tracking dialogs (`TrackNav`). The GUI maps each
 //! page to a modal window; this decides which page is on top. It is generic so the pages can hold GUI-free models.
 
 /// A page that is the Home page of the stack.

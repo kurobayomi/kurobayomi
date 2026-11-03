@@ -1,5 +1,5 @@
 //! Fixtures Q-01 to Q-19 from `fixtures_gen`: decode outcomes, counts and the restore rules each one exercises
-//! (area 22, T-22a-042, p1-edge-cases-and-tests.md section 7; T-22a-003, p1-topic-seasons-and-legacy.md 2.1).
+//! (area 22, T-22a-042; T-22a-003).
 
 mod fixtures_gen;
 

@@ -1,5 +1,5 @@
-//! Page state machines of the reader and the downloader (`HttpPageLoader.kt`, `MangaDownloader.kt`; T-15a-027;
-//! `p1-topic-http-source-pipeline.md` sections 8 and 9). The source and cache calls are traits, so this module holds the
+//! Page state machines of the reader and the downloader (`HttpPageLoader.kt`, `MangaDownloader.kt`; T-15a-027).
+//! The source and cache calls are traits, so this module holds the
 //! state rules, the reader's priority queue and the image URL step, and makes no network call of its own.
 
 use std::cmp::Ordering;

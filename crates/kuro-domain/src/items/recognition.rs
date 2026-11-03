@@ -1,5 +1,5 @@
 //! Chapter, episode and season number recognition from titles (`ChapterRecognition.kt`,
-//! `EpisodeRecognition.kt`, `SeasonRecognition.kt`). Algorithm and vectors: `p1-topic-item-number-recognition.md`.
+//! `EpisodeRecognition.kt`, `SeasonRecognition.kt`).
 //!
 //! The Kotlin regexes use look-behind; the `regex` crate has none, so each look-behind is rewritten as a
 //! consuming prefix with the same capture groups. `\b` and `\s` are forced to ASCII to match Java.
@@ -111,7 +111,7 @@ fn value_of(caps: &Captures<'_>) -> f64 {
     initial + addition(decimal, alpha)
 }
 
-/// The 7-step algorithm of `p1-topic-item-number-recognition.md` section 2. `known` is returned as is when
+/// The 7-step recognition algorithm. `known` is returned as is when
 /// it is `-2` or above `-1`.
 fn parse(rec: &Recogniser, title: &str, name: &str, known: Option<f64>) -> f64 {
     if let Some(n) = known {
@@ -176,7 +176,7 @@ mod tests {
         (a - b).abs() < 1e-9
     }
 
-    /// Upstream ChapterRecognitionTest vectors (`p1-topic-item-number-recognition.md` 5.1).
+    /// Upstream ChapterRecognitionTest vectors.
     #[test]
     fn upstream_chapter_vectors() {
         let rows = CHAPTER_VECTORS;
@@ -206,7 +206,7 @@ mod tests {
         );
     }
 
-    /// Additional chapter vectors (`p1-topic-item-number-recognition.md` 5.2).
+    /// Additional chapter vectors.
     #[test]
     fn additional_chapter_vectors() {
         assert!(
@@ -236,7 +236,7 @@ mod tests {
         );
     }
 
-    /// Episode vectors (`p1-topic-item-number-recognition.md` 5.3).
+    /// Episode vectors.
     #[test]
     fn episode_vectors() {
         let rows = EPISODE_VECTORS;
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(parse_episode_number("x", "(2020) [HD] Show 04", None), 4.0);
     }
 
-    /// Season vectors (`p1-topic-item-number-recognition.md` 5.4).
+    /// Season vectors.
     #[test]
     fn season_vectors() {
         let rows = SEASON_VECTORS;

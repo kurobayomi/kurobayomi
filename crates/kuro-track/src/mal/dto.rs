@@ -1,4 +1,4 @@
-//! Response DTOs (`p1-data-and-config.md` section 3). Optional keys are `Option` or `#[serde(default)]`, and
+//! Response DTOs. Optional keys are `Option` or `#[serde(default)]`, and
 //! unknown keys are ignored, as the Kotlin `ignoreUnknownKeys` setting does.
 
 use serde::{Deserialize, Deserializer};

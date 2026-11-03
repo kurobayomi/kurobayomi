@@ -1,7 +1,7 @@
 //! Planning for done / undone and bookmark writes of both pages (read and unread for a chapter, seen and unseen for an
 //! episode). The store writes the rows in one update.
 //! Upstream: `app/src/main/java/eu/kanade/domain/items/chapter/interactor/SetReadStatus.kt`,
-//! `MangaScreenModel.kt:832-840` (bookmarkChapters). Plan: `p2-behavior.md` 6.9.9a and 6.10.
+//! `MangaScreenModel.kt:832-840` (bookmarkChapters).
 
 use kuro_data::item::Item;
 use kuro_domain::items::status::items_to_change;

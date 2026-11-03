@@ -462,7 +462,7 @@ mod tests {
         }
     }
 
-    /// The worked example of `p1-topic-chapter-episode-sync.md` section 3, against the database, for both kinds.
+    /// The chapter and episode sync worked example, against the database, for both kinds.
     #[tokio::test]
     async fn worked_example_for_both_kinds() {
         for kind in [Kind::Manga, Kind::Anime] {

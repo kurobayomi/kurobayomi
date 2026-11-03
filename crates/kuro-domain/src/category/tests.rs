@@ -1,4 +1,4 @@
-//! Category write and read tests against a migrated database (`p1-edge-cases-and-tests.md` 2.3).
+//! Category write and read tests against a migrated database.
 
 use kuro_platform::kind::Kind;
 use std::collections::BTreeSet;

@@ -1,7 +1,7 @@
 //! Entry metadata writes of both kinds (`UpdateManga.kt`, `UpdateAnime.kt`, `UpdateAnimeFromRemote.awaitUpdateFromSource`;
 //! T-10a-007, T-17a-027 to T-17a-032). Every write is a coalesce update, so a `None` field keeps the stored column.
 //!
-//! The cover and background rule is ONE function, [`image_action`] (`p1-topic-remote-entry-update.md` 5.2, 5.3; decision
+//! The cover and background rule is ONE function, [`image_action`] (decision
 //! 11b): the cached file is always deleted before a new timestamp is set, also when the stored URL is empty. The cache
 //! files are a port ([`CacheFiles`]): the rule decides and the port deletes, so the decision is testable without files.
 //! A source's answer becomes a [`RemoteEntry`] through [`remote_from_manga`] or [`remote_from_anime`] and the rest is

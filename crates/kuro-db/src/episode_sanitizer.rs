@@ -1,6 +1,6 @@
 //! The item name sanitizer (`ChapterSanitizer.kt` and `EpisodeSanitizer.kt`, which are the same algorithm with the same
 //! trim array): the name a source gives a chapter or episode, cleaned of the title and of the separators around it.
-//! Applied where items are created from source data, not by SQL (`p1-behavior.md` section 12). Pure.
+//! Applied where items are created from source data, not by SQL. Pure.
 //! This is the only copy; `kuro_data::sanitize::sanitize_item_name` is the public entry point the sync code calls.
 
 /// The characters stripped from both ends in the last step: the 30 entries of `EPISODE_TRIM_CHARS`

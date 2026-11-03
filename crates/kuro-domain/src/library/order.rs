@@ -170,7 +170,7 @@ mod tests {
         }
     }
 
-    /// The four-entry fixture of `p1-edge-cases-and-tests.md` 2.2 (ids 1, 2, 3, 4 with their titles).
+    /// The four-entry library fixture (ids 1, 2, 3, 4 with their titles).
     fn fixture() -> Vec<LibraryItem> {
         vec![
             item(1, "Alpha", 10, 10, 500, 100),

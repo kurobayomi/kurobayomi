@@ -1,4 +1,4 @@
-//! Track flows of AniList (`p1-behavior.md` section 10): the progress-driven status rules, the update that
+//! Track flows of AniList: the progress-driven status rules, the update that
 //! resolves a missing `library_id` first, bind (register) and refresh. The functions change the track in
 //! memory only. The caller stores the result in the same write, so a `library_id` learnt here is never lost
 //! (E-11). Every operation is over one entry; nothing here touches the local database.
@@ -10,7 +10,7 @@ use super::convert::{anime_url, manga_url};
 use super::error::AniListError;
 use super::status::{AnimeStatus, MangaStatus};
 
-/// Progress-driven rules for a manga read event (`p1-behavior.md` 10.1, E-24, E-25). Only applies when
+/// Progress-driven rules for a manga read event (E-24, E-25). Only applies when
 /// `did_read` is true and the status is not COMPLETED.
 pub fn apply_manga_read(t: &mut MangaTrack, did_read: bool, now_ms: i64) {
     if t.status == MangaStatus::Completed.to_db() || !did_read {
@@ -99,7 +99,7 @@ pub async fn update_anime(
     Ok(())
 }
 
-/// Bind of a manga to the local entry (`p1-behavior.md` 10.3). A remote entry copies the personal fields,
+/// Bind of a manga to the local entry. A remote entry copies the personal fields,
 /// keeps the local `private` (E-18) unless the remote entry is private, which stays private (a bind, auto-track's
 /// included, never makes a hidden entry public), and is saved. No remote entry adds it, and the new id becomes
 /// `library_id`.
@@ -211,7 +211,7 @@ fn absent_on_remote(media_id: i64) {
     tracing::info!(target: "kurobayomi::tracker::anilist", media_id, "entry already absent on AniList");
 }
 
-/// Refresh of a manga from the list (`p1-behavior.md` 10.4). Copies the personal fields including
+/// Refresh of a manga from the list. Copies the personal fields including
 /// `private`, the title and the total. `library_id` and the link are kept.
 pub async fn refresh_manga(api: &AniList, t: &mut MangaTrack) -> Result<(), AniListError> {
     let remote = api

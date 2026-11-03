@@ -1,4 +1,4 @@
-//! The Home model of the tracking sheet (`HomeModel`, behaviour 3.2 and 3.3, `p2-rust-design.md` section 5.1). It
+//! The Home model of the tracking sheet (`HomeModel`, behaviour 3.2 and 3.3). It
 //! re-assembles the rows on every store change and every login change, emits a list only when the rows differ, and
 //! keeps the last good list when the store fails. Refresh on open reports one toast per failed tracker.
 

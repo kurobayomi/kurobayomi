@@ -1,5 +1,5 @@
 //! The best-video algorithms of the player loader (`HosterLoader.kt`, `EpisodeLoader.loadHosterVideos`; T-16a-020 to
-//! T-16a-023, `p1-rust-design.md` section 5). Playback goes through these functions only.
+//! T-16a-023). Playback goes through these functions only.
 //!
 //! Phase A probes run as one `FuturesUnordered` on the caller's task, because this crate has no runtime. Dropping the
 //! set when a probe wins cancels the probes still running, which is what `cancelChildren()` does in Kotlin. Only this

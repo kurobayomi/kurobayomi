@@ -1,4 +1,4 @@
-//! Golden order of the library sorts on the four-entry fixture of `p1-edge-cases-and-tests.md` 2.2. The expected
+//! Golden order of the library sorts on the four-entry library fixture. The expected
 //! orders live in `golden/sort_orders.json` and were derived by hand from the vectors, not by running the code.
 
 use std::collections::BTreeMap;

@@ -1,5 +1,5 @@
-//! Installed-source lookup and source preferences for the enhanced trackers (`p1-rust-design.md` section 3.2), and the
-//! source-id generator they use to find a source by its name (`p1-rust-design.md` section 4, T-33a-002).
+//! Installed-source lookup and source preferences for the enhanced trackers, and the
+//! source-id generator they use to find a source by its name (T-33a-002).
 
 use std::sync::Arc;
 

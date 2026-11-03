@@ -8,7 +8,7 @@
 //! that show them. The effect the edge case asks for is the same: a bound row always shows the library's flag, a row that
 //! is off screen holds nothing that outlives it (it is a `ListStore` item, not a live subscription), and the watcher is
 //! one per page and ends with it. Appending a page extends the store in place (`extend_from_slice`), so the rows already
-//! on screen are not rebuilt. The 2,000-item scroll check is manual (`p2-edge-cases-and-tests.md` section 7.3).
+//! on screen are not rebuilt. The 2,000-item scroll check is manual.
 
 use std::cell::{Cell, RefCell};
 use std::collections::{BTreeSet, HashSet};

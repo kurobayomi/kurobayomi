@@ -1,4 +1,4 @@
-//! The unit tests of `p1-edge-cases-and-tests.md` section T-2, one `t2_<area>_<nn>` test per id (test-only).
+//! The library's T2 unit tests, one `t2_<area>_<nn>` test per id (test-only).
 //! They run with `cargo test -p kurobayomi --bin kurobayomi library::`:
 //! the package is a binary, so there is no `--lib` target.
 

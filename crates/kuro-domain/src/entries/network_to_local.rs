@@ -1,4 +1,4 @@
-//! `NetworkToLocalManga` and `NetworkToLocalAnime` (`p1-behavior.md` 4.2): turn an entry from a source listing
+//! `NetworkToLocalManga` and `NetworkToLocalAnime`: turn an entry from a source listing
 //! into the stored row. The lookup and the insert run in one writer transaction (in `kuro-data`), so two
 //! callers with the same `(url, source)` leave one row. The title of a non-favourite is replaced in memory
 //! only; the database keeps its title until a later update writes it. The cover address is written: a stored

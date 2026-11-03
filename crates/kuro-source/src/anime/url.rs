@@ -1,5 +1,5 @@
-//! `getUrlWithoutDomain` for anime (`AnimeHttpSource.kt:685-699`), with `java.net.URI` parity (T-16a-027,
-//! p1-topic-url-and-id-compat.md sections 2 and 3). Stored rows were written with these rules, so the output must match.
+//! `getUrlWithoutDomain` for anime (`AnimeHttpSource.kt:685-699`), with `java.net.URI` parity (T-16a-027).
+//! Stored rows were written with these rules, so the output must match.
 
 /// The relative form stored for an anime or episode URL. Path, query and fragment come out percent-decoded, as
 /// `java.net.URI` returns them. An input that `URI` rejects, and an opaque URI such as `mailto:x`, comes back unchanged
@@ -37,7 +37,7 @@ struct Parts<'a> {
 
 /// Splits the raw text the way `URI` does, and returns `None` for every input `URI` would reject or treat as opaque.
 fn split(orig: &str) -> Option<Parts<'_>> {
-    // Never legal raw, in any component (p1-topic-url-and-id-compat.md section 2.2).
+    // Never legal raw, in any component.
     if orig.chars().any(|c| {
         c.is_control() || c.is_whitespace() || matches!(c, '"' | '<' | '>' | '\\' | '^' | '{' | '}' | '|' | '`')
     }) {
@@ -124,7 +124,7 @@ fn hex(b: u8) -> Option<u8> {
 mod tests {
     use super::url_without_domain as ani;
 
-    /// Every row of p1-topic-url-and-id-compat.md section 3, ANI column. A rejected input is returned unchanged.
+    /// Every anime row of the URL compatibility table. A rejected input is returned unchanged.
     #[test]
     fn the_anime_column_of_the_java_vectors() {
         let rows: &[(&str, &str)] = &[

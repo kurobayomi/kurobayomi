@@ -23,7 +23,7 @@ pub const NAME: &str = "MyAnimeList";
 pub const LOGO_RGB: (u8, u8, u8) = (46, 81, 162);
 
 impl From<MalError> for TrackError {
-    /// The error text is the toast (`p1-ui-parity.md` section 9). Refusals with their own UI text use their key.
+    /// The error text is the toast. Refusals with their own UI text use their key.
     fn from(e: MalError) -> Self {
         match e {
             MalError::LoginNotCompleted => TrackError::Key(MsgKey::MalLoginNotCompleted),
@@ -33,7 +33,7 @@ impl From<MalError> for TrackError {
     }
 }
 
-/// The toast of a finished browser login (T-29a-051, `p1-ui-parity.md` section 9). A success shows nothing, as the
+/// The toast of a finished browser login (T-29a-051). A success shows nothing, as the
 /// source does. A refusal shows "Login was not completed" and keeps the login (D-04). Any other failure shows its own
 /// text.
 pub fn login_toast(result: &Result<(), MalError>) -> Option<MsgKey> {

@@ -1,4 +1,4 @@
-//! `NetError` (T-12a-001) and the user-facing message mapping (`p1-behavior.md` section 9).
+//! `NetError` (T-12a-001) and the user-facing message mapping.
 
 use std::error::Error as _;
 

@@ -21,7 +21,7 @@
 //! assert_eq!(serde_conv::to_json(&e).unwrap(), r#"{"title":"t"}"#);
 //! ```
 //!
-//! XML is covered by [`crate::xml`]; the protobuf backup container is hand-written in `kuro-backup` (CRATE-MAP C-36).
+//! XML is covered by [`crate::xml`]; the protobuf backup container is hand-written in `kuro-backup`.
 
 use serde::{Serialize, de::DeserializeOwned};
 

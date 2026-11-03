@@ -1,6 +1,4 @@
-//! The tests of section 5 of `p1-edge-cases-and-tests.md` (T-42a-060), under the names the plan gives them. The plan puts
-//! the pure ones in `crates/kuro-domain/tests` and the SQLite ones in `crates/kuro-data/tests` over a shared fixture file;
-//! this lane owns only `src/updates`, so they live here and call the same public code of those crates. [`fixtures`] is
+//! The updates tests (T-42a-060). They live here and call the same public code of those crates. [`fixtures`] is
 //! the shared fixture of area 42: temporary manga and anime databases and their rows. The tests that already exist under
 //! another name in the module of the code they cover are not repeated here: `history_next_units_*` (history),
 //! `selection_*` (selection), `group_by_local_date_*` (kuro-domain) and the storage ones named below.

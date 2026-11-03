@@ -1,5 +1,5 @@
 //! Sample tracks and search results for logic tests and GTK snapshot tests (T-27a-061). The values follow the Kotlin preview data
-//! (`AnimeTrackInfoDialogHomePreviewProvider.kt:14-29`) and `p1-edge-cases-and-tests.md` section 8. The Compose preview
+//! (`AnimeTrackInfoDialogHomePreviewProvider.kt:14-29`). The Compose preview
 //! annotations are not ported.
 
 use kuro_track::model::search::{AnimeTrackSearch, MangaTrackSearch};

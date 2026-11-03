@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn first_load_with_no_items_and_more_to_come_is_still_the_no_results_error() {
-        // p2-topic-browse-listing.md section 2, page-1 table, row "0 animes, hasNextPage any".
+        // page 1 with "0 animes, hasNextPage any"
         let mut listing = Listing::new(BrowseQuery::Popular);
         let ask = listing.ask().expect("page");
         assert_eq!(listing.deliver(ask.generation, page(&[], true)), Some(0));

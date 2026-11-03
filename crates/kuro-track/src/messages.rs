@@ -1,4 +1,4 @@
-//! Message keys of the tracking flows (`p1-rust-design.md` section 3.7, behaviour section 18). The core returns
+//! Message keys of the tracking flows. The core returns
 //! keys; the GUI resolves them with the i18n crate. `english` gives the source's English text, used by the tests
 //! and as the fallback. Every key maps to a Fluent id in the English catalogue, checked at build time.
 
@@ -395,7 +395,7 @@ pub fn english(key: &MsgKey) -> String {
     }
 }
 
-/// English text of a `track.enhanced.*` key (`p1-rust-design.md` section 7.2).
+/// English text of a `track.enhanced.*` key.
 fn enhanced_text(key: &str, arg: &str) -> String {
     match key {
         "track.enhanced.unauthorized" => "Unauthorized / api key not valid".into(),

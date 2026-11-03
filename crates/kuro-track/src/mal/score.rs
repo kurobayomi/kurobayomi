@@ -1,4 +1,4 @@
-//! MAL score model (`p1-behavior.md` section 2, `p1-rust-design.md` section 3.2). Scores are 0 to 10, and the
+//! MAL score model. Scores are 0 to 10, and the
 //! stored score equals the index in [`SCORE_LIST`].
 
 /// Labels the score picker offers (`MyAnimeList.kt:49-51`).

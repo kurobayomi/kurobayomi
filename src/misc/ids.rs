@@ -2,8 +2,8 @@
 //! share a slot. The Android collision (`ID_APP_UPDATE_PROMPT` and `ID_DOWNLOAD_IMAGE` were both 2) is fixed by giving
 //! `save-image` and `app-update.install` their own ids.
 //!
-//! Decision: the registry lives in `misc` because `src/notify` is not part of this lane; the ids are the strings of
-//! p1-rust-design.md 3.2. A per-entry slot (one notice per manga or anime) is the base id plus `:` and the entry id.
+//! Decision: the registry lives in `misc` because `src/notify` is not part of this lane; the ids are fixed strings.
+//! A per-entry slot (one notice per manga or anime) is the base id plus `:` and the entry id.
 
 use kuro_platform::kind::Kind;
 

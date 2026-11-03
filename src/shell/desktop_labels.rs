@@ -4,7 +4,7 @@
 //! installed locale next to it, with the text of the matching string key. This module holds the key table, reads a locale
 //! folder of Fluent files for the texts, and renders the entry.
 //!
-//! The English values are those of `p1-ui-parity.md` section 4. `Updates`, `History` and `Browse` already have keys with
+//! The English values are the entry's `Name=` lines. `Updates`, `History` and `Browse` already have keys with
 //! those values. "Manga library" and "Anime library" have no key yet: the table names the keys they need
 //! (`desktop_action_manga_library`, `desktop_action_anime_library`, owned by the i18n crate) and falls back to the existing
 //! `label_manga_library` and `label_anime_library` texts of each locale until those keys exist.
@@ -24,7 +24,7 @@ pub struct ActionLabel {
     pub key: &'static str,
     /// The key used while `key` does not exist in a locale.
     pub fallback_key: &'static str,
-    /// The English value (`p1-ui-parity.md` section 4).
+    /// The English value.
     pub english: &'static str,
 }
 

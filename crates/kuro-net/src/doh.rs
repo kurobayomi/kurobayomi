@@ -1,4 +1,4 @@
-//! DNS over HTTPS (area 12, T-12a-024 and T-12a-025; `p1-topic-doh.md`, `p1-data-and-config.md` section 3).
+//! DNS over HTTPS (area 12, T-12a-024 and T-12a-025).
 //!
 //! The provider table and its bootstrap addresses are the Kotlin `DohProviders.kt` values. The resolver is
 //! plugged into the reqwest client as its DNS hook: A and AAAA queries are sent concurrently in RFC 8484 GET form,

@@ -1,5 +1,5 @@
 {
-  "fixture": "p1-edge-cases-and-tests.md 2.2: id 1 Alpha, 2 beta, 3 Gamma, 4 Emile (the title is written with an accent in the library)",
+  "fixture": "id 1 Alpha, 2 beta, 3 Gamma, 4 Emile (the title is written with an accent in the library)",
   "default_page": {
     "ALPHABETICAL,ASCENDING": [1, 2, 4],
     "ALPHABETICAL,DESCENDING": [4, 2, 1],

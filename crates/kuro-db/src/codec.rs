@@ -84,7 +84,7 @@ impl ToSql for FetchType {
 
 /// `memo`: a JSON object stored as BLOB (or TEXT in the fresh default `'{}'`). A cell that is not a
 /// JSON object reads as the empty object with a warning. `FromSql` has no table or row to report, so
-/// the read is tolerant rather than an error (the decision of `p1-rust-design.md` section 5).
+/// the read is tolerant rather than an error.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Memo(pub serde_json::Map<String, serde_json::Value>);
 

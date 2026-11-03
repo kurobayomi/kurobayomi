@@ -1,5 +1,5 @@
 //! Pure progress rules of the Jellyfin tracker: the season continuous rule, the episodes to mark, and the `DatePlayed`
-//! format (`p1-topic-jellyfin-progress-model.md` sections 3 to 5; T-33a-015, T-33a-016).
+//! format (T-33a-015, T-33a-016).
 
 use chrono::{DateTime, Utc};
 

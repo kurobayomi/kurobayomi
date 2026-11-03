@@ -1,4 +1,4 @@
-//! OAuth for AniList (`p1-topic-auth-and-token-lifecycle.md`, `p1-rust-design.md` section 6): the implicit
+//! OAuth for AniList: the implicit
 //! grant, the redirect fragment, token expiry in seconds, and the state of the login.
 
 use std::fmt;

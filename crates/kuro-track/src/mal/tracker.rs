@@ -1,4 +1,4 @@
-//! The MAL tracker operations (`p1-behavior.md` sections 4.3, 5.6 to 5.9 and 6.1 to 6.4). Manga and anime share the
+//! The MAL tracker operations. Manga and anime share the
 //! same rules; each has its own functions because the list fields differ. Pure functions (`advance_*`,
 //! `*_put_form`, `apply_*`) carry the rules, and the async methods only add the network call.
 
@@ -150,7 +150,7 @@ impl MalTracker {
     }
 
     /// Starts a browser login: a new verifier replaces any earlier one, and the authorise URL is returned for the
-    /// caller to open (`p1-rust-design.md` section 3.6). Fails before any state changes when no client id is set.
+    /// caller to open. Fails before any state changes when no client id is set.
     pub fn begin_login(&self) -> Result<Url, MalError> {
         let client_id = self.client_id()?;
         let verifier = new_verifier();

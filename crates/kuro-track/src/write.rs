@@ -1,4 +1,4 @@
-//! Writes of the per-entry dialogs (`p2-rust-design.md` section 6, behaviour 14). Each confirm becomes one detached
+//! Writes of the per-entry dialogs (behaviour 14). Each confirm becomes one detached
 //! job: it takes the binding's lock, reads the stored binding, applies one edit through the remote setter, and
 //! stores the result. Dropping the handle does not cancel it, because the user already pressed OK.
 

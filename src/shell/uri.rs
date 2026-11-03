@@ -1,5 +1,5 @@
 //! The link routes of the `kurobayomi://` scheme (T-53a-004) and the URL decoding the launch parsing shares (T-53a-010).
-//! The route table is the one of `p1-data-and-config.md` section 4.2, without Aniyomi's and Tachiyomi's own schemes: their
+//! The route table leaves out Aniyomi's and Tachiyomi's own schemes: their
 //! repository links name repositories of Android extensions, which Kurobayomi cannot use (user, 2026-10-24). Pure: the
 //! window maps a [`UriRoute`] to a screen and an error to a toast.
 

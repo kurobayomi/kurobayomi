@@ -1,4 +1,4 @@
-//! Persistence (`p1-rust-design.md` section 3.5, `p1-data-and-config.md` sections 5 and 6). The token lives in the
+//! Persistence. The token lives in the
 //! platform secret store (which falls back to its own encrypted file). The username and the auth-expired flag
 //! live in a small TOML file in the config directory. The token never goes into that file.
 
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use super::error::MalError;
 use super::token::MalToken;
 
-/// Secret store service name. The item is the one account for the MAL token (`p1-data-and-config.md` section 6).
+/// Secret store service name. The item is the one account for the MAL token.
 pub const TOKEN_SERVICE: &str = "kurobayomi";
 pub const TOKEN_ACCOUNT: &str = "myanimelist/oauth-token";
 
@@ -69,7 +69,7 @@ impl TokenStore for SecretTokenStore {
 pub const CLIENT_ID_ENV: &str = "KUROBAYOMI_MAL_CLIENT_ID";
 
 /// The non-secret settings: the username, the auth-expired flag and the user's client id
-/// (`p1-data-and-config.md` section 9). The client id is configuration, not a secret.
+///. The client id is configuration, not a secret.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 struct SettingsFile {
     #[serde(default)]

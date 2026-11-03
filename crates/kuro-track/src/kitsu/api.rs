@@ -212,7 +212,7 @@ impl KitsuApi {
             .ok_or(KitsuError::NotAuthenticated)
     }
 
-    /// The access token to send. An expired token is refreshed first (`bearer()` of `p1-rust-design.md` section 4).
+    /// The access token to send. An expired token is refreshed first.
     /// Only one refresh runs at a time: a caller that waited for the lock reuses the token the first one stored
     /// (T-30a-027). A refresh that finishes after logout or login is discarded.
     async fn bearer(&self) -> Result<String, KitsuError> {

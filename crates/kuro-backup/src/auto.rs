@@ -1,5 +1,5 @@
 //! Automatic backup scheduler (area 21, T-21a-026, T-21a-031). `decide` is a pure function over the due rule,
-//! deferrals and retry backoff (p1-topic-autobackup-scheduling.md section 2). `run_loop` ticks while the app is open
+//! deferrals and retry backoff. `run_loop` ticks while the app is open
 //! and calls `decide`; it never runs a backup unless the job slot is free.
 
 use std::fs::{self, File, TryLockError};

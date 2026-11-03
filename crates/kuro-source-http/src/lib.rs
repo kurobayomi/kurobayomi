@@ -1,4 +1,4 @@
-//! HTTP layer of the source API (area 15, `p1-rust-design.md` section 8). `kuro-net` does the transport, the
+//! HTTP layer of the source API (area 15). `kuro-net` does the transport, the
 //! interceptors and the cookies. This crate adds the source rules on top: request builders, the success check and
 //! error mapping, URL helpers, the jsoup-compatible HTML helpers, and the `HttpCore` state.
 

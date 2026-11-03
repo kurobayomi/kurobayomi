@@ -1,4 +1,4 @@
-//! `SourceError`: the failure kinds of a source call (`p1-rust-design.md` section 3, T-15a-001).
+//! `SourceError`: the failure kinds of a source call (T-15a-001).
 
 /// A failure of a source call. The UI maps the variant to a message; `Display` is for logs.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

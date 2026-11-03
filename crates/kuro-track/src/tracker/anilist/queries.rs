@@ -1,4 +1,4 @@
-//! GraphQL documents, copied from `p1-data-and-config.md` section 4. Two deliberate differences: the add
+//! GraphQL documents. Two deliberate differences from the upstream queries: the add
 //! mutations name their variable `$mediaId` (the variable list the task contract asks for), and the Viewer
 //! query carries no variables.
 

@@ -27,7 +27,7 @@ pub struct NextItem {
 ///
 /// `only_pending` keeps unread items only, and then the `from` anchor just moves the start. Without it, the list
 /// starts at the anchor. An anchor that is missing, or read, is passed over (the first element is dropped). With no
-/// anchor at all nothing is dropped. This matches the table of `p1-topic-history-and-next-item.md` section 4.
+/// anchor at all nothing is dropped.
 pub fn next_in_order<T: Clone>(
     ordered: &[T],
     id: impl Fn(&T) -> i64,

@@ -1,5 +1,5 @@
-//! Jellyfin HTTP calls: the item read, the episode walk and the played marks (`p1-behavior.md` section 5.3 to 5.5;
-//! T-33a-012, T-33a-014, T-33a-016, T-33a-021, T-33a-032).
+//! Jellyfin HTTP calls: the item read, the episode walk and the played marks
+//! (T-33a-012, T-33a-014, T-33a-016, T-33a-021, T-33a-032).
 
 use chrono::Utc;
 use futures::{StreamExt, TryStreamExt};
@@ -16,9 +16,9 @@ use crate::model::{AnimeTrack, TrackerId};
 use crate::trackers::enhanced::EnhancedError;
 use crate::trackers::http::USER_AGENT as APP_USER_AGENT;
 
-/// Mark-range switch (`p1-rust-design.md` section 8). `true` is the D-11 range rule, `false` is the Kotlin rule.
+/// Mark-range switch. `true` is the D-11 range rule, `false` is the Kotlin rule.
 pub const JELLYFIN_MARK_RANGE: bool = true;
-/// Concurrent played POSTs (`buffer_unordered`, `p1-rust-design.md` section 5).
+/// Concurrent played POSTs (`buffer_unordered`).
 pub const JELLYFIN_MARK_CONCURRENCY: usize = 4;
 /// The auth header. The key stays out of URLs and logs (P-8).
 const TOKEN_HEADER: &str = "X-Emby-Token";
