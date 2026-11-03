@@ -326,6 +326,8 @@ mod imp {
             z.center = zoom::clamp_center_hugging(z.center, view, src, z.scale, self.hug.get());
             self.zoom.set(z);
             self.fitted.set(Some(key));
+            // where a fitted page lands in its view, for the layout of a spread on a resize (RUST_LOG=kurobayomi::reader=debug)
+            tracing::debug!(view_w = view.w, view_h = view.h, src_w = src.w, src_h = src.h, scale = z.scale, center_x = z.center.0, center_y = z.center.1, hug = ?self.hug.get(), "reader page fitted");
             if (z.scale - before.scale).abs() > 1e-9 {
                 // Every scale change reports, the first fit included. Deferred, because this
                 // runs inside a snapshot.

@@ -704,6 +704,7 @@ impl PagerInner {
                 .clone();
             let (x, y) = if self.horizontal() { (i as i32 * w, 0) } else { (0, i as i32 * h) };
             self.fixed.move_(&widget, f64::from(x), f64::from(y));
+            tracing::debug!(index = i, x, y, w, h, natural_w = widget.measure(gtk::Orientation::Horizontal, -1).1, "reader slot placed");
             // a row's margins add to its request, so they are left out (a transition card has side margins)
             let (mx, my) = (widget.margin_start() + widget.margin_end(), widget.margin_top() + widget.margin_bottom());
             widget.set_size_request((w - mx).max(0), (h - my).max(0));
@@ -719,6 +720,8 @@ impl PagerInner {
         // afterwards. A first scroll made before the strip had a size would otherwise stay at 0 (the Prev card).
         if resized {
             self.adjustment().set_value(view as f64 * f64::from(self.extent()));
+            let adjustment = self.adjustment();
+            tracing::debug!(w, h, view, value = adjustment.value(), upper = adjustment.upper(), page_size = adjustment.page_size(), "reader strip laid out");
         }
     }
 
