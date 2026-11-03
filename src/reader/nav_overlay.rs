@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn the_default_navigation_depends_on_the_viewer() {
-        assert!(zones(NavMode::Default, TappingInvertMode::NONE, ViewerKind::LeftToRight).iter().all(|z| matches!(z.action, Action::Left | Action::Right)));
+        assert!(zones(NavMode::Default, TappingInvertMode::NONE, ViewerKind::LeftToRight).iter().all(|z| matches!(z.action, Action::Prev | Action::Next)));
         assert!(zones(NavMode::Default, TappingInvertMode::NONE, ViewerKind::Webtoon).iter().all(|z| matches!(z.action, Action::Prev | Action::Next)));
     }
 

@@ -105,13 +105,27 @@ pub const RIGHT_AND_LEFT: &[Region] = &[
     Region { rect: Rect::new(0.66, 0.00, 1.00, 1.00), action: Action::Right },
 ];
 
+/// The default of the page-turning viewers, named by what a tap does (user, 2026-11-03: the zones say Previous and
+/// Next, not Left and Right). Left to right, the left third goes back and the right third on; right to left the pages
+/// run leftwards, so the two swap. It turns the same pages as the absolute `RIGHT_AND_LEFT`.
+pub const PAGES_LEFT_TO_RIGHT: &[Region] = &[
+    Region { rect: Rect::new(0.00, 0.00, 0.33, 1.00), action: PREV },
+    Region { rect: Rect::new(0.66, 0.00, 1.00, 1.00), action: NEXT },
+];
+pub const PAGES_RIGHT_TO_LEFT: &[Region] = &[
+    Region { rect: Rect::new(0.00, 0.00, 0.33, 1.00), action: NEXT },
+    Region { rect: Rect::new(0.66, 0.00, 1.00, 1.00), action: PREV },
+];
+
 /// Mode 5, `DisabledNavigation`: every tap is `Menu`.
 pub const DISABLED: &[Region] = &[];
 
-/// The regions a mode uses for a viewer. `Default` is `RightAndLeft` for the horizontal pager and `L` otherwise.
+/// The regions a mode uses for a viewer. `Default` is previous and next by the reading direction for the horizontal pager
+/// and `L` otherwise.
 pub fn layout(mode: NavMode, viewer: ViewerKind) -> &'static [Region] {
     let default = match viewer {
-        ViewerKind::LeftToRight | ViewerKind::RightToLeft => RIGHT_AND_LEFT,
+        ViewerKind::LeftToRight => PAGES_LEFT_TO_RIGHT,
+        ViewerKind::RightToLeft => PAGES_RIGHT_TO_LEFT,
         ViewerKind::Vertical | ViewerKind::Webtoon | ViewerKind::WebtoonGapped => L_SHAPED,
     };
     match mode {
@@ -182,7 +196,7 @@ pub mod colors {
 pub fn label(action: Action) -> (&'static str, &'static str) {
     match action {
         Action::Menu => ("action_menu", "Menu"),
-        Action::Prev => ("nav_zone_prev", "Prev"),
+        Action::Prev => ("nav_zone_prev", "Previous"),
         Action::Next => ("nav_zone_next", "Next"),
         Action::Left => ("nav_zone_left", "Left"),
         Action::Right => ("nav_zone_right", "Right"),
@@ -205,9 +219,13 @@ mod tests {
     }
 
     #[test]
-    fn default_is_right_and_left_for_the_horizontal_pager_and_l_otherwise() {
-        assert_eq!(layout(NavMode::Default, ViewerKind::LeftToRight), RIGHT_AND_LEFT);
-        assert_eq!(layout(NavMode::Default, ViewerKind::RightToLeft), RIGHT_AND_LEFT);
+    fn default_is_previous_and_next_for_the_horizontal_pager_and_l_otherwise() {
+        assert_eq!(layout(NavMode::Default, ViewerKind::LeftToRight), PAGES_LEFT_TO_RIGHT);
+        assert_eq!(layout(NavMode::Default, ViewerKind::RightToLeft), PAGES_RIGHT_TO_LEFT);
+        assert_eq!(at(NavMode::Default, ViewerKind::LeftToRight, 0.1, 0.5), Action::Prev);
+        assert_eq!(at(NavMode::Default, ViewerKind::LeftToRight, 0.9, 0.5), Action::Next);
+        assert_eq!(at(NavMode::Default, ViewerKind::RightToLeft, 0.1, 0.5), Action::Next, "right to left, the left side goes on");
+        assert_eq!(at(NavMode::Default, ViewerKind::RightToLeft, 0.9, 0.5), Action::Prev);
         assert_eq!(layout(NavMode::Default, ViewerKind::Vertical), L_SHAPED);
         assert_eq!(layout(NavMode::Default, ViewerKind::Webtoon), L_SHAPED);
     }
@@ -231,7 +249,7 @@ mod tests {
     fn overlay_colours_and_labels_are_the_observed_constants() {
         assert_eq!(colors::of(Action::Menu), 0xCC95818D);
         assert_eq!(colors::of(Action::Right), 0xCCA6CFD5);
-        assert_eq!(label(Action::Prev), ("nav_zone_prev", "Prev"));
+        assert_eq!(label(Action::Prev), ("nav_zone_prev", "Previous"));
     }
 
     const GRID: [f64; 12] = [0.0, 0.1, 0.2, 0.33, 0.4, 0.5, 0.6, 0.66, 0.7, 0.8, 0.9, 1.0];
