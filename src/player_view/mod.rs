@@ -162,6 +162,8 @@ fn open_in(data_dir: std::path::PathBuf, media: Media, episode_id: i64, start_ms
         loaded_episode: None,
         resolving: false,
         muted_from: None,
+        still: Still::default(),
+        held: Held::No,
         skip: skip_button::State::default(),
         awake: crate::reader::keep_awake::KeepAwake::default(),
     }));
@@ -194,7 +196,48 @@ struct Player {
     awake: crate::reader::keep_awake::KeepAwake,
     /// The level before M muted the sound, which M brings back; `None` while not muted.
     muted_from: Option<f64>,
+    /// The picture that holds the last frame over the video while a quality switch reloads the stream.
+    still: Still,
+    /// How far that reload has got.
+    held: Held,
 }
+
+/// How far a reload under a held frame has got: the frame goes once the new stream has loaded and then plays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Held {
+    No,
+    Loading,
+    Loaded,
+}
+
+/// The last frame of the video, shown over it while the stream reloads (another quality or server): mpv drops the old
+/// video at once and draws black until the new one plays, which looked like a new player. Weak, so the page owns it.
+#[derive(Clone, Default)]
+struct Still {
+    picture: glib::WeakRef<gtk::Picture>,
+    area: glib::WeakRef<gtk::GLArea>,
+}
+
+impl Still {
+    /// Puts the frame on screen now over the video. It goes with [`Self::release`], or after [`STILL_AT_MOST`].
+    fn hold(&self) {
+        let (Some(picture), Some(area)) = (self.picture.upgrade(), self.area.upgrade()) else { return };
+        picture.set_paintable(Some(&gtk::WidgetPaintable::new(Some(&area)).current_image()));
+        picture.set_visible(true);
+        let still = self.clone();
+        glib::timeout_add_local_once(STILL_AT_MOST, move || still.release());
+    }
+
+    fn release(&self) {
+        if let Some(picture) = self.picture.upgrade().filter(|p| p.is_visible()) {
+            picture.set_visible(false);
+            picture.set_paintable(None::<&gdk::Paintable>);
+        }
+    }
+}
+
+/// A held frame goes after this even when the new stream never plays (its error page shows instead).
+const STILL_AT_MOST: Duration = Duration::from_secs(15);
 
 type Shared = Rc<RefCell<Player>>;
 
@@ -372,6 +415,10 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
 
     let overlay = gtk::Overlay::new();
     overlay.set_child(Some(&area));
+    // the last frame, held over the video while a quality switch reloads the stream (`Still`); under every control
+    let still = gtk::Picture::builder().can_shrink(true).content_fit(gtk::ContentFit::Fill).can_target(false).visible(false).build();
+    overlay.add_overlay(&still);
+    shared.borrow_mut().still = Still { picture: still.downgrade(), area: area.downgrade() };
     skip.place_above(&bar);
     skip.mark_on(&seek);
     overlay.add_overlay(skip.widget());
@@ -1058,9 +1105,10 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
         if page.upgrade().is_none() || shared.borrow().closed {
             return glib::ControlFlow::Break;
         }
-        let (snapshot, failed, ended) = {
+        let (snapshot, failed, ended, release_still) = {
             let mut player = shared.borrow_mut();
             let mut failed = false;
+            let mut release_still = false;
             for event in player.playback.mpv_mut().drain_events() {
                 match event {
                     MpvEvent::EndFile { error: Some(_), .. } => {
@@ -1073,9 +1121,22 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
                         player.playback.add_tracks(&tracks, prepare);
                         player.skip.file_loaded();
                         player.loaded_episode = Some(player.episode_id);
+                        if player.held == Held::Loading {
+                            player.held = Held::Loaded;
+                        }
+                    }
+                    // the reloaded stream plays: its frames take over from the held one (a restart before its load is
+                    // the old stream's, from a seek)
+                    MpvEvent::PlaybackRestart if player.held == Held::Loaded => {
+                        player.held = Held::No;
+                        release_still = true;
                     }
                     _ => {}
                 }
+            }
+            if failed && player.held != Held::No {
+                player.held = Held::No;
+                release_still = true;
             }
             if !player.ahead_done && !player.playback.is_paused() {
                 let (position, duration) = (player.playback.position_ms().unwrap_or(0) / 1000, player.playback.duration_ms().unwrap_or(0) / 1000);
@@ -1097,8 +1158,12 @@ fn start_ticks(page: &gtk::Box, title: &page_header::TwoLineTitle, hiding: &Rc<a
                 duration_s: player.playback.duration_ms().unwrap_or(0) as f32 / 1000.0,
                 volume: player.playback.volume(),
             };
-            (snapshot, failed, ended)
+            (snapshot, failed, ended, release_still)
         };
+        if release_still {
+            let still = shared.borrow().still.clone();
+            still.release();
+        }
         shared.borrow().awake.sync_for(!snapshot.paused && !ended, &tr(MsgKey::ui_playing_video));
         skip_button::tick(&shared, &skip);
 

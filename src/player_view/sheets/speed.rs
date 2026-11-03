@@ -32,7 +32,10 @@ pub fn choices(shared: &Shared) -> Vec<Choice> {
                 subtitle: None,
                 current: is_current(speed, playing),
                 enabled: true,
-                pick: Box::new(move || set_speed(&shared, speed)),
+                pick: Box::new(move || {
+                    set_speed(&shared, speed);
+                    shared.borrow().playback.show_text(&speed_label(speed));
+                }),
             }
         })
         .collect()

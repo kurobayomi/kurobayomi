@@ -121,7 +121,7 @@ pub fn wire(parts: Parts, shared: &Shared) {
         parts.area.add_controller(click);
     }
 
-    let live = Live {
+    let live = Rc::new(Live {
         previous: parts.previous.clone(),
         next: parts.next.clone(),
         subtitles: parts.subtitles.clone(),
@@ -130,9 +130,25 @@ pub fn wire(parts: Parts, shared: &Shared) {
         servers: parts.servers.clone(),
         episode: Cell::new(i64::MIN),
         preloaded: Cell::new(i64::MIN),
-    };
+    });
     live.episode_changed(shared);
     live.follow_file(shared);
+    // a pick shows on its button as the menu closes, not on the next tick: the pick runs on idle once the menu closed,
+    // so the follow-up is queued after it
+    for button in [&live.subtitles, &live.speed, &live.quality] {
+        let (live, shared) = (Rc::downgrade(&live), Rc::downgrade(shared));
+        button.connect_active_notify(move |button| {
+            if button.is_active() {
+                return;
+            }
+            let (live, shared) = (live.clone(), shared.clone());
+            glib::idle_add_local_once(move || {
+                if let (Some(live), Some(shared)) = (live.upgrade(), shared.upgrade()) {
+                    live.follow_file(&shared);
+                }
+            });
+        });
+    }
     let (page, shared) = (parts.page.downgrade(), Rc::clone(shared));
     glib::timeout_add_local(TICK, move || {
         // the page is gone, or the player closed

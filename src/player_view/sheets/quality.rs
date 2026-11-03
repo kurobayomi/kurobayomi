@@ -382,7 +382,7 @@ fn heading(hoster_name: &str) -> Option<&str> {
 
 fn choice(shared: &Shared, source: &Arc<dyn AnimeSource>, hoster: &str, video: &Video, title: String, current: bool) -> Choice {
     let pick = Pick { hoster: hoster.to_owned(), title: video.video_title.clone() };
-    let (shared, source, video) = (Rc::clone(shared), Arc::clone(source), video.clone());
+    let (shared, source, video, shown) = (Rc::clone(shared), Arc::clone(source), video.clone(), title.clone());
     Choice {
         title,
         subtitle: None,
@@ -393,7 +393,7 @@ fn choice(shared: &Shared, source: &Arc<dyn AnimeSource>, hoster: &str, video: &
             if let Some(height) = height(&video) {
                 super::super::remember_quality(shared.borrow().episode_id, height);
             }
-            switch(&shared, Arc::clone(&source), pick.clone(), video.clone());
+            switch(&shared, Arc::clone(&source), pick.clone(), video.clone(), &shown);
         }),
     }
 }
@@ -434,8 +434,8 @@ async fn all_states(source: &dyn AnimeSource, episode: &SEpisode, known: Vec<Hos
 
 /// Plays `video` of `pick` in the open page: its stream resolves in the background (a spinner shows), then the page
 /// reloads at the playing position. The Quality button shows the choice meanwhile, greyed out ([`refresh`]); a failure
-/// puts back the one playing. Nothing starts while another stream resolves.
-fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Video) {
+/// puts back the one playing. Nothing starts while another stream resolves. `shown` is said on the video at once.
+fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Video, shown: &str) {
     let title = {
         let mut player = shared.borrow_mut();
         if player.resolving {
@@ -446,6 +446,7 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
         title
     };
     set_switching(Some(pick.clone()));
+    shared.borrow().playback.show_text(shown);
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
         set_switching(None);
         shared.borrow_mut().resolving = false;
@@ -481,18 +482,28 @@ fn switch(shared: &Shared, source: Arc<dyn AnimeSource>, pick: Pick, video: Vide
     );
 }
 
-/// Loads `media` at the playing position and keeps the pause state. Its side tracks are added when mpv has loaded it.
+/// Loads `media` at the playing position and keeps the pause state. Its side tracks are added when mpv has loaded it,
+/// with the audio and subtitles picked now selected again. The last frame stays over the video until the new stream
+/// plays (`Still`), so the switch shows no black and no new player.
 fn reload(shared: &Shared, media: Media) {
-    let mut player = shared.borrow_mut();
-    if player.closed {
+    if shared.borrow().closed {
         return;
     }
+    let still = shared.borrow().still.clone();
+    still.hold();
+    let mut player = shared.borrow_mut();
+    player.held = super::super::Held::Loading;
     let start = player.playback.position_ms().unwrap_or(0);
     let paused = player.playback.is_paused();
     // the same episode: the servers it played from stay
     let hosters = std::mem::take(&mut player.media.hosters);
-    player.media = Media { hosters, ..media };
+    let mut media = Media { hosters, ..media };
+    super::super::menu::picked(player.playback.mpv()).apply(&mut media.tracks);
+    player.media = media;
     if let Err(e) = player.playback.load(&player.media.target, player.media.headers.as_deref(), start) {
+        player.held = super::super::Held::No;
+        drop(player);
+        still.release();
         tracing::error!(error = %e, "player: the chosen quality could not load");
         crate::toast::notify(tr(MsgKey::player_hoster_failed));
         return;

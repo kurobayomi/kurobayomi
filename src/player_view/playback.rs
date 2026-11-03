@@ -44,6 +44,14 @@ impl Playback {
             .map_err(|e| e.to_string())
     }
 
+    /// A line on the video for a moment (mpv's own on-screen text): what a menu pick chose, shown at once while the
+    /// change itself may take a moment (a quality loads, a subtitle shows at its next line).
+    pub fn show_text(&self, text: &str) {
+        if let Err(e) = self.mpv.command(&["show-text", text, "1500"]) {
+            tracing::debug!(error = %e, "player: the on-screen text was not shown");
+        }
+    }
+
     /// Adds the side tracks of a stream (`audio-add`, `sub-add`). Runs once mpv has loaded the file; a track that
     /// fails is logged and the others still load.
     /// Adds the side tracks off the GTK thread: each one is fetched over the network, so a source with a dozen
