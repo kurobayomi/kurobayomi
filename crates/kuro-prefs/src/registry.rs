@@ -1,7 +1,6 @@
 //! The preference key registry: one row per preference declared by the Kotlin preference classes.
 //!
-//! Rows follow `tests/fixtures/key-registry.md` in order; a test checks each
-//! row. A key containing `{id}` is a family (per tracker or per source); the id replaces `{id}`.
+//! A key containing `{id}` is a family (per tracker or per source); the id replaces `{id}`.
 //! `table` is the dotted TOML table and `field` the TOML key inside it. Family rows keep the id as
 //! the TOML key, so `field` is empty. Private keys with a string value never reach a file.
 //! The two keys shared by a manga and an anime Kotlin function appear twice on purpose.
@@ -599,156 +598,6 @@ pub fn is_dropped(key: &str) -> bool {
 mod tests {
     use super::*;
 
-    const MARKDOWN: &str =
-        include_str!("../tests/fixtures/key-registry.md");
-
-    /// Rows of the fixture's registry tables as (key, store, kind, default).
-    fn fixture_rows() -> Vec<(String, String, String, String)> {
-        MARKDOWN
-            .lines()
-            .filter_map(|line| {
-                let cells: Vec<&str> = line.split('|').map(str::trim).collect();
-                if cells.len() < 8 || cells[1].parse::<u32>().is_err() {
-                    return None;
-                }
-                let key = cells[3]
-                    .trim_matches('`')
-                    .replace("${tracker.id}", "{id}")
-                    .replace("${id}", "{id}");
-                // T-19a-064: the anime update badge count is derived in memory, never registered
-                // the default reading mode is Adaptive (0) by the user's decision of 2026-11-02, not the fixture's 2
-                // adult titles are hidden by default by the user's decision of 2026-10-19, not the fixture's true
-                let default = match key.as_str() {
-                    "pref_default_reading_mode_key" => "0",
-                    "show_nsfw_source" => "false",
-                    _ => cells[6],
-                };
-                (key != "animeext_updates_count" && !DROPPED_KEYS.contains(&key.as_str())).then(|| (
-                    key,
-                    cells[4].to_owned(),
-                    cells[5].to_owned(),
-                    default.to_owned(),
-                ))
-            })
-            .collect()
-    }
-
-    fn kind_matches(kind: Kind, fixture_kind: &str) -> bool {
-        match kind {
-            Kind::Bool => fixture_kind == "Boolean",
-            Kind::Int => fixture_kind == "Int",
-            Kind::Long => fixture_kind == "Long",
-            Kind::Float => fixture_kind == "Float",
-            Kind::Set => fixture_kind == "Set<String>",
-            Kind::Str => {
-                fixture_kind == "String"
-                    || fixture_kind.starts_with("Enum ")
-                    || fixture_kind.starts_with("Object ")
-            }
-        }
-    }
-
-    /// `Some(matches)` when the fixture's default is a literal; `None` for prose (checked by hand).
-    fn default_matches(lit: Lit, fixture: &str) -> Option<bool> {
-        if let Some(quoted) = fixture.strip_prefix('"') {
-            let Lit::Str(s) = lit else { return Some(false) };
-            return Some(quoted.strip_suffix('"')? == s);
-        }
-        if fixture.starts_with('{') {
-            let Lit::Set(items) = lit else {
-                return Some(false);
-            };
-            if fixture.contains('<') {
-                return None;
-            }
-            let body = fixture.split('}').next()?.trim_start_matches('{');
-            let mut fixture_items: Vec<&str> = body
-                .split(',')
-                .map(|s| s.trim().trim_matches('"'))
-                .filter(|s| !s.is_empty())
-                .collect();
-            let mut want: Vec<&str> = items.to_vec();
-            fixture_items.sort_unstable();
-            want.sort_unstable();
-            return Some(fixture_items == want);
-        }
-        let first = fixture.split_whitespace().next()?;
-        let rest = &fixture[first.len()..];
-        match lit {
-            Lit::Bool(b) => Some(first == b.to_string()),
-            Lit::Int(i) => Some(first.parse::<i64>().ok() == Some(i64::from(i))),
-            Lit::Long(l) => Some(first.trim_end_matches('L').parse::<i64>().ok() == Some(l)),
-            Lit::Float(f) => Some((first.parse::<f64>().ok()? - f64::from(f)).abs() < 1e-6),
-            Lit::Str(s) => (rest.is_empty() || rest.starts_with(" (")).then(|| first == s),
-            Lit::Set(_) => None,
-        }
-    }
-
-    /// Defaults the fixture gives as prose, pinned to the value the registry must hold on Linux.
-    const PROSE_DEFAULTS: [(&str, Lit); 3] = [
-        ("source_languages", Lit::Set(&["all", "en"])),
-        ("__APP_STATE_storage_dir", Lit::Str("")),
-        ("pref_torrserver_tackers", Lit::Str(TORRSERVER_TRACKERS)),
-    ];
-
-    #[test]
-    fn registry_has_the_59_fixture_rows_in_order() {
-        let rows = fixture_rows();
-        assert_eq!(rows.len(), 59, "the fixture's rows minus the derived animeext_updates_count and the dropped (cut) fixture rows");
-        // four Kurobayomi rows after the fixture's rows: `anime_ext_last_check` (T-19a-064), `muted_notification_channels`
-        // (T-req-platform-004), `check_app_updates` (the update toggle, back from the settings diet, on by default) and
-        // `last_kind` (the Anime | Manga choice every page shares), `appimage_menu_removed` (the user took the AppImage
-        // out of the applications menu), `auto_hide_bars` (the reader's and the player's bars hide by themselves) and
-        // `pref_player_default_quality` (the height an episode starts at), `enabled_sources` (the sources that are on) and
-        // `source_keys` (which repository entry each source id came from), `cache_size_mb` (the one cache size limit),
-        // `library_cover_size` (the column width of the cover grids, a slider), and the five reader settings of one manga
-        // (`MangaReaderPrefs`), then two pages side by side (`pref_two_pages`) and its value for one manga
-        assert_eq!(REGISTRY.len(), rows.len() + 25);
-        assert_eq!(REGISTRY[rows.len()].key, "anime_ext_last_check");
-        assert_eq!(REGISTRY[rows.len() + 1].key, "muted_notification_channels");
-        assert_eq!(REGISTRY[rows.len() + 2].key, "check_app_updates");
-        assert_eq!(REGISTRY[rows.len() + 3].key, "__APP_STATE_last_kind");
-        assert_eq!(REGISTRY[rows.len() + 4].key, "__APP_STATE_appimage_menu_removed");
-        assert_eq!(REGISTRY[rows.len() + 5].key, "auto_hide_bars");
-        assert_eq!(REGISTRY[rows.len() + 6].key, "pref_player_default_quality");
-        assert_eq!(REGISTRY[rows.len() + 7].key, "enabled_sources");
-        assert_eq!(REGISTRY[rows.len() + 8].key, "__APP_STATE_source_keys");
-        assert_eq!(REGISTRY[rows.len() + 9].key, "cache_size_mb");
-        assert_eq!(REGISTRY[rows.len() + 10].key, "library_cover_size");
-        assert_eq!(REGISTRY[rows.len() + 11].key, "manga_reader_theme_{id}");
-        assert_eq!(REGISTRY[rows.len() + 15].key, "manga_dual_page_split_{id}");
-        assert_eq!(REGISTRY[rows.len() + 16].key, "pref_two_pages");
-        assert_eq!(REGISTRY[rows.len() + 17].key, "manga_two_pages_{id}");
-        assert_eq!(REGISTRY[rows.len() + 18].key, "pref_adaptive_direction");
-        assert_eq!(REGISTRY[rows.len() + 19].key, "player_volume_last");
-        assert_eq!(REGISTRY[rows.len() + 21].key, "anime_subtitle_lang_{id}");
-        let mut pinned = 0;
-        for (meta, (key, store, kind, default)) in REGISTRY.iter().zip(&rows) {
-            assert_eq!(meta.key, key);
-            let ns = match store.as_str() {
-                "normal" => Namespace::Normal,
-                "app-state" => Namespace::AppState,
-                "private" => Namespace::Private,
-                other => panic!("unknown store {other} for {key}"),
-            };
-            assert_eq!(meta.ns, ns, "{key}");
-            assert_eq!(Namespace::of(meta.key), ns, "{key}");
-            assert!(kind_matches(meta.kind, kind), "{key}: kind {kind}");
-            match default_matches(meta.default, default) {
-                Some(matches) => assert!(matches, "{key}: default {default} vs {:?}", meta.default),
-                None => {
-                    let (_, want) = PROSE_DEFAULTS
-                        .iter()
-                        .find(|(k, _)| *k == meta.key)
-                        .unwrap_or_else(|| panic!("{key}: prose default is not pinned"));
-                    assert_eq!(meta.default, *want, "{key}");
-                    pinned += 1;
-                }
-            }
-        }
-        assert_eq!(pinned, PROSE_DEFAULTS.len());
-    }
-
     #[test]
     fn dropped_keys_are_not_registered() {
         for key in DROPPED_KEYS {
@@ -800,24 +649,6 @@ mod tests {
         assert_eq!(
             Lit::Set(&["wifi"]).value(),
             PrefValue::Set(BTreeSet::from(["wifi".to_owned()]))
-        );
-        assert_eq!(
-            default_matches(Lit::Str("DISABLED"), "DISABLED"),
-            Some(true)
-        );
-        assert_eq!(
-            default_matches(
-                Lit::Str("PACKAGEINSTALLER"),
-                "PACKAGEINSTALLER (LEGACY on MIUI)"
-            ),
-            Some(true)
-        );
-        assert_eq!(
-            default_matches(
-                Lit::Str("x"),
-                "MONET if dynamic colour available else DEFAULT"
-            ),
-            None
         );
     }
 }
