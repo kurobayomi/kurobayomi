@@ -99,7 +99,7 @@ pub fn loading(label: Option<&str>) -> gtk::Widget {
 }
 
 /// A status page with `icon` (none for a plain title), `title`, an optional `detail` line under it and `actions` as
-/// pill buttons in a centred row. It fills its parent.
+/// buttons in a centred row. It fills its parent.
 pub fn page(icon: Option<&str>, title: &str, detail: Option<&str>, actions: &[gtk::Button]) -> adw::StatusPage {
     let page = adw::StatusPage::builder().title(title).vexpand(true).hexpand(true).build();
     if let Some(icon) = icon {
@@ -109,14 +109,23 @@ pub fn page(icon: Option<&str>, title: &str, detail: Option<&str>, actions: &[gt
         page.set_description(Some(detail));
     }
     if !actions.is_empty() {
-        let row = gtk::Box::new(O::Horizontal, SPACE_S);
-        row.set_halign(Align::Center);
-        for action in actions {
-            row.append(action);
-        }
-        page.set_child(Some(&row));
+        set_actions(&page, actions);
     }
     page
+}
+
+/// Puts `actions` on `page` as a centred row, replacing its child. The page stretches its child across its whole width,
+/// so a button set as the child itself would run from edge to edge. A button that sits in an earlier row moves.
+pub fn set_actions(page: &adw::StatusPage, actions: &[gtk::Button]) {
+    let row = gtk::Box::new(O::Horizontal, SPACE_S);
+    row.set_halign(Align::Center);
+    for action in actions {
+        if let Some(old) = action.parent().and_downcast::<gtk::Box>() {
+            old.remove(action);
+        }
+        row.append(action);
+    }
+    page.set_child(Some(&row));
 }
 
 /// The empty page of a list that returned nothing.

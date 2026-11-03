@@ -38,7 +38,7 @@ impl PageStates {
     pub fn set_empty_look(&self, icon: &str, action: Option<&Button>) {
         self.empty.set_icon_name(Some(icon));
         if let Some(action) = action {
-            self.empty.set_child(Some(action));
+            status::set_actions(&self.empty, std::slice::from_ref(action));
         }
     }
 
@@ -77,7 +77,13 @@ mod tests {
             assert_eq!(pages.stack.visible_child_name().as_deref(), Some("empty"));
             assert_eq!(pages.empty.title(), "No recent updates");
             assert_eq!(pages.empty.icon_name().as_deref(), Some("software-update-available-symbolic"));
-            assert_eq!(pages.empty.child().as_ref(), Some(action.upcast_ref::<gtk::Widget>()));
+            let row = pages.empty.child().and_downcast::<gtk::Box>().expect("the action sits in a row");
+            assert_eq!(row.halign(), gtk::Align::Center, "the button keeps its own width instead of filling the page");
+            assert_eq!(action.parent().as_ref(), Some(row.upcast_ref::<gtk::Widget>()));
+            // setting the same action again moves it into the new row, once
+            pages.set_empty_look("software-update-available-symbolic", Some(&action));
+            let row = pages.empty.child().and_downcast::<gtk::Box>().expect("the new row");
+            assert_eq!((row.first_child().as_ref(), row.last_child().as_ref()), (Some(action.upcast_ref::<gtk::Widget>()), Some(action.upcast_ref::<gtk::Widget>())));
             pages.show(&PageState::Error("boom".into()));
             assert_eq!(pages.stack.visible_child_name().as_deref(), Some("error"));
             let error = pages.stack.child_by_name("error").and_downcast::<adw::StatusPage>().expect("the error page");
