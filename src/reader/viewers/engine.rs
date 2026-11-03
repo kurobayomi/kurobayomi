@@ -856,6 +856,17 @@ impl PagerInner {
 
     /// A resize moves the slots and the strip to the new extent. Checked once per frame, which is cheap.
     fn wire_resize(&self) {
+        // GTK sets the strip's new range one layout after the slots moved, and a scroll position set before that is lost
+        // to it: the strip kept the offset of the old width (a maximized or fullscreen window showed the background, or
+        // half of the next page). Once the range changes, the strip goes back onto the shown item.
+        for adjustment in [self.root.hadjustment(), self.root.vadjustment()] {
+            let weak = self.me.clone();
+            adjustment.connect_changed(move |_| {
+                if let Some(this) = weak.upgrade() {
+                    this.realign();
+                }
+            });
+        }
         let weak = self.me.clone();
         self.root.add_tick_callback(move |root, _| {
             let Some(this) = weak.upgrade() else { return ControlFlow::Break };
@@ -2209,6 +2220,33 @@ mod tests {
             inner.command(PageCmd::Next);
             pump_ms(300);
             assert_eq!(inner.ctl.borrow().view_index(), 2);
+            window.destroy();
+        });
+    }
+
+    #[test]
+    fn a_resize_keeps_the_strip_on_the_shown_page() {
+        crate::testing::with_display(|| {
+            use super::super::pager::nav::PageCmd;
+            let chapter = chapter(1, &[image("resize-a", 400, 600), image("resize-b", 400, 600), image("resize-c", 400, 600)]);
+            let engine = PagerEngine::new(ViewerKind::LeftToRight, context(ViewerSettings::from_prefs(&prefs())));
+            let window = show(engine.widget());
+            engine.set_chapters(handed(&chapter));
+            let inner = Rc::clone(&engine.0);
+            assert!(pump_until(|| inner.slots.borrow().get(&1).is_some_and(|(_, row)| row.page_ready())), "the page is decoded");
+            pump_ms(300);
+            inner.command(PageCmd::Next);
+            pump_ms(300);
+            let view = inner.ctl.borrow().view_index();
+            let on_view = || (inner.adjustment().value() - view as f64 * f64::from(inner.extent())).abs() < 1.0;
+            assert!(on_view(), "the strip shows the page before the resize");
+            let before = inner.extent();
+            // the window grows to fit the strip's larger request, as a maximized or fullscreen window does
+            engine.widget().set_size_request(before * 2, 800);
+            assert!(pump_until(|| inner.extent() > before && on_view()), "after the resize the strip is on page {view}, not at the old offset");
+            pump_ms(300);
+            assert!(on_view(), "and it stays there");
+            assert_eq!(inner.ctl.borrow().view_index(), view, "the same page is shown");
             window.destroy();
         });
     }
