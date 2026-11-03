@@ -10,6 +10,9 @@ use std::rc::Rc;
 use gtk::glib;
 use gtk::prelude::*;
 
+/// How wide the panel is, in px. The reader's floating bottom bar stops this far from the right edge while it is open.
+pub const WIDTH: i32 = 320;
+
 /// One chapter of the reader's list, as the panel shows it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Row {
@@ -102,7 +105,7 @@ impl ChapterPanel {
         let column = gtk::Box::new(gtk::Orientation::Vertical, 8);
         column.add_css_class("background");
         column.add_css_class("reader-chapter-panel");
-        column.set_width_request(320);
+        column.set_width_request(WIDTH);
         let top = gtk::Box::new(gtk::Orientation::Vertical, 8);
         top.set_margin_top(8);
         top.set_margin_start(12);

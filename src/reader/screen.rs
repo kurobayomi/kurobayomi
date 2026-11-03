@@ -927,7 +927,9 @@ pub fn open_with(
     });
     let closed = weak.clone();
     chapter_panel.connect_closed(move || {
-        if let Some(root) = closed.upgrade().and_then(|s| s.root.upgrade()) {
+        let Some(screen) = closed.upgrade() else { return };
+        room_for_chapter_panel(&screen, false);
+        if let Some(root) = screen.root.upgrade() {
             root.grab_focus();
         }
     });
@@ -1079,6 +1081,7 @@ fn set_menu(screen: &Screen, visible: bool) {
     // the top bar stays
     screen.top.set_reveal_child(visible || !screen.auto_hide);
     screen.bottom.set_reveal_child(visible);
+    room_for_chapter_panel(screen, screen.chapter_panel.is_open());
     refresh(screen);
 }
 
@@ -1477,6 +1480,28 @@ fn is_chapter_list_key(key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType) ->
     !modifiers.intersects(held) && key.to_unicode().is_some_and(|c| c.eq_ignore_ascii_case(&'l'))
 }
 
+/// The room the bars leave the open chapter list: the floating bottom bar's end margin, and the list's top margin. With
+/// auto-hide the top bar floats over the pages, so the list starts under it while it shows and at the top edge while it
+/// is hidden; the bottom bar always stops beside the list. Neither bar then covers the list when it comes back. A shut
+/// list takes no room.
+fn chapter_panel_room(open: bool, auto_hide: bool, top_bar_shown: bool, top_bar_height: i32) -> (i32, i32) {
+    match (open, auto_hide && top_bar_shown) {
+        (false, _) => (0, 0),
+        (true, true) => (chapter_panel::WIDTH, top_bar_height),
+        (true, false) => (chapter_panel::WIDTH, 0),
+    }
+}
+
+/// Fits the chapter list between the bars as they are now; called when the list opens or closes and whenever the bars
+/// hide or come back.
+fn room_for_chapter_panel(screen: &Screen, open: bool) {
+    // the bar's natural height, measured even while it is hidden
+    let top_bar = screen.top.child().map_or(0, |bar| bar.measure(gtk::Orientation::Vertical, -1).1);
+    let (bottom_end, panel_top) = chapter_panel_room(open, screen.auto_hide, screen.top.reveals_child(), top_bar);
+    screen.bottom.set_margin_end(bottom_end);
+    screen.chapter_panel.root().set_margin_top(panel_top);
+}
+
 /// Opens the chapter list, or closes it when it is open. Nothing opens before a chapter is loaded.
 fn toggle_chapter_panel(screen: &Rc<Screen>) {
     if screen.chapter_panel.is_open() {
@@ -1486,6 +1511,7 @@ fn toggle_chapter_panel(screen: &Rc<Screen>) {
     let rows = screen.core.chapter_rows();
     if !rows.is_empty() {
         keep_menu_for_a_moment(screen);
+        room_for_chapter_panel(screen, true);
         screen.chapter_panel.open(rows);
     }
 }
@@ -2363,6 +2389,14 @@ mod tests {
         assert!(at_bar_edge(2.0, 800.0) && at_bar_edge(796.0, 800.0));
         assert!(!at_bar_edge(400.0, 800.0));
         assert!(!at_bar_edge(400.0, 0.0), "no size yet: only the top edge counts");
+    }
+
+    #[test]
+    fn the_bars_leave_room_for_the_open_chapter_list() {
+        assert_eq!(chapter_panel_room(false, true, true, 46), (0, 0), "a shut list takes no room");
+        assert_eq!(chapter_panel_room(true, true, true, 46), (chapter_panel::WIDTH, 46), "the list starts under the floating top bar");
+        assert_eq!(chapter_panel_room(true, true, false, 46), (chapter_panel::WIDTH, 0), "with the bars hidden it reaches the top edge");
+        assert_eq!(chapter_panel_room(true, false, true, 46), (chapter_panel::WIDTH, 0), "a top bar above the pages already clears it");
     }
 
     #[test]
