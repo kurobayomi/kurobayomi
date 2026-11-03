@@ -34,7 +34,7 @@ pub const NAME: &str = "Shikimori";
 /// `Color.rgb(40, 40, 40)` (`Shikimori.kt`), `0xAARRGGBB`.
 pub const LOGO_COLOR: u32 = 0xFF28_2828;
 /// The 48 px logo (T-31a-047). The provider's mark: shipping it is the user's licence decision (OQ-3).
-const LOGO_PNG: &[u8] = include_bytes!("../../../../assets/tracker/shikimori.png");
+const LOGO_PNG: &[u8] = include_bytes!("../../assets/tracker/ic_tracker_shikimori.png");
 const COMPLETED: i64 = 2;
 const READING: i64 = 1;
 const REREADING: i64 = 6;

@@ -13,7 +13,6 @@ on:
       - 'crates/**'
       - 'src/**'
       - 'tests/**'
-      - 'assets/**'
       - 'spec/**'
       - 'build.rs'
       - 'Cargo.toml'

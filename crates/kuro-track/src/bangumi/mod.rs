@@ -33,7 +33,7 @@ pub const NAME: &str = "Bangumi";
 /// `Color.rgb(240, 145, 153)` (`Bangumi.kt:150`), `0xAARRGGBB`.
 pub const LOGO_COLOR: u32 = 0xFFF0_9199;
 /// The 48 px logo (T-31a-047). The provider's mark: shipping it is the user's licence decision (OQ-3).
-const LOGO_PNG: &[u8] = include_bytes!("../../../../assets/tracker/bangumi.png");
+const LOGO_PNG: &[u8] = include_bytes!("../../assets/tracker/ic_tracker_bangumi.png");
 const COMPLETED: i64 = 2;
 const READING: i64 = 3;
 /// Bangumi has no rereading or rewatching status (`Bangumi.kt:182-184`, both `-1`).
