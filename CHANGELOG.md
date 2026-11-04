@@ -6,6 +6,32 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-04
+
+### Changed
+
+- The player's bar has Subtitles, Speed and Quality buttons again (Quality names the playing height, with the servers in
+  a submenu); the ⋮ menu and a right-click on the video keep Audio, Chapters, Autoplay, the automatic skips and
+  Fullscreen.
+- A pick in the player shows at once: the video says what you chose ("720p", "Subtitles: Français", "1.25x") and its
+  button follows. A quality switch keeps the last frame on screen until the new stream plays, instead of going black.
+- The player keeps the audio and subtitles you picked through a quality or server switch, and remembers a picked track
+  by its language even when the source names it differently ("French [CC]", "Français").
+- Switching between left to right, right to left and vertical, or between the two webtoon modes, keeps the reader on
+  its page without reloading the pages.
+- The About page's GitHub and Report an issue links are plain rows.
+
+### Fixed
+
+- The player's menu no longer changes while it is open, which could crash it.
+- The reader stays on its page when the window is maximized or made fullscreen.
+- A new reading mode opens on the page you were reading, also in incognito and with two pages side by side, and no
+  longer flashes the chapter cards first.
+- A second quick swipe in the webtoon modes no longer zooms the strip, and a tap right after a swipe works in every mode.
+- A webtoon crop, split or rotation keeps the pages on screen while they update.
+- The reader's floating bars make room for the chapter list.
+- Track search results can be tapped again, and the first search also tries a shorter title.
+
 ## [0.3.0] - 2026-11-03
 
 ### Added
