@@ -6,6 +6,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-05
+
+### Fixed
+
+- Shikimori search works again: it failed with "Invalid response" for every anime and manga.
+
 ## [0.3.1] - 2026-11-04
 
 ### Changed
