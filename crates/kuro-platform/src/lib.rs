@@ -97,6 +97,7 @@ pub mod opener;
 pub mod paths;
 pub mod power_network;
 pub mod process;
+pub mod sandbox;
 pub mod self_update;
 pub mod secrets;
 mod secrets_file;

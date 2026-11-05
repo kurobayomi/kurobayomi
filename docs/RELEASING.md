@@ -43,6 +43,32 @@ installer from the branch you pick and attaches them to the run as downloads (ke
 - Windows, stable: `https://github.com/kurobayomi/kurobayomi/releases/latest/download/Kurobayomi-Setup-x86_64.exe`
 - Windows, nightly: `https://github.com/kurobayomi/kurobayomi/releases/download/nightly/Kurobayomi-Nightly-Setup-x86_64.exe`
 
+## Flatpak
+
+For now `.github/workflows/flatpak.yml` runs by hand only (Actions, "Flatpak", Run workflow): it builds and offers the
+bundle as a download of the run, and publishes nothing. Once the GPG key and Pages below are set up, its tag trigger comes
+back, and every version tag then also runs it. It builds `flatpak/io.github.kurobayomi.Kurobayomi.yml`
+(GNOME runtime 51, libmpv and FFmpeg built in, the app with its default features and no self-updater), attaches
+`Kurobayomi-x86_64.flatpak` to the release, and publishes a signed Flatpak repository on GitHub Pages. A manual run of the
+workflow only builds.
+
+- **Install:** open `https://kurobayomi.github.io/kurobayomi/io.github.kurobayomi.Kurobayomi.flatpakref` (GNOME Software
+  and KDE Discover take it), or `flatpak install --from <that link>`. After that the software centre updates it from the
+  repository. The bundle file on the release installs too, but does not update.
+- **What the workflow writes:** the AppStream metadata, from `src/shell/data/io.github.kurobayomi.Kurobayomi.metainfo.xml.in`
+  and `CHANGELOG.md` (`scripts/metainfo.sh VERSION`); `kb-build.env` with the Shikimori client from the repository secrets;
+  `flatpak/cargo-sources.json` from `Cargo.lock` (flatpak-builder builds offline). None of them is committed.
+- **Sandbox:** network, sound, GPU (`--device=dri`), Wayland and X11, the `~/Kurobayomi` storage folder, the desktop
+  keyring (tracker logins), NetworkManager and UPower (the Wi-Fi-only and charging-only conditions). Other folders come
+  through the folder picker. The app checks `kuro_platform::sandbox::is_flatpak()`: no self-update or self-made launcher,
+  the crash reporter and Restart start through the Flatpak portal (`flatpak-spawn`), and the external player and the
+  torrent server, which are programs of the system, are not used.
+- **Needed once:** a GPG key for the repository, its private key armoured in the `FLATPAK_GPG_PRIVATE_KEY` secret; GitHub
+  Pages set to "GitHub Actions" as its source, with tags allowed to deploy to the `github-pages` environment.
+- **Flathub, later:** Flathub's rules forbid AI-written manifests and AI-opened submission PRs, and ask for AI-made code to be
+  disclosed. A Flathub submission therefore needs a manifest written by hand (this one shows what it must build), the
+  keyring moved to the Secret portal (oo7), and no Shikimori secret (a public build cannot hold one).
+
 ## Licences inside the AppImage
 
 `usr/share/licenses/kurobayomi/` holds our `LICENSE` and `NOTICE`, `SOURCE-OFFER.txt`, and in `libraries/` the copyright file

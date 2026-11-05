@@ -4,6 +4,8 @@
 use kuro_i18n::{MsgKey, tr};
 use std::cell::RefCell;
 
+use gtk::prelude::*;
+use gtk::{gio, glib};
 use kuro_platform::idle::{IdleGuard, IdleInhibitor};
 
 /// The inhibit is wanted while the preference is on and the reader is open.
@@ -25,8 +27,7 @@ impl KeepAwake {
 
     /// Takes or releases the inhibit to match `want`; `reason` is what the desktop shows for it.
     pub fn sync_for(&self, want: bool, reason: &str) {
-        let Some(idle) = kuro_platform::idle::system() else { return };
-        self.sync_with(idle, want, reason);
+        self.sync_with(&AppInhibit, want, reason);
     }
 
     fn sync_with(&self, idle: &dyn IdleInhibitor, want: bool, reason: &str) {
@@ -39,6 +40,29 @@ impl KeepAwake {
             (false, true) => *guard = None,
             _ => {}
         }
+    }
+}
+
+/// The inhibit of the GTK application: the desktop portal in a sandbox (Flatpak), the session manager outside it, so it
+/// needs no bus name of its own. Where GTK cannot inhibit, the platform's own inhibit takes over.
+struct AppInhibit;
+
+impl IdleInhibitor for AppInhibit {
+    fn inhibit(&self, reason: &str) -> std::io::Result<IdleGuard> {
+        let app = gio::Application::default().and_downcast::<gtk::Application>();
+        let cookie = app.as_ref().map_or(0, |app| app.inhibit(app.active_window().as_ref(), gtk::ApplicationInhibitFlags::IDLE, Some(reason)));
+        if cookie == 0 {
+            let system = kuro_platform::idle::system().ok_or_else(|| std::io::Error::other("no way to keep the screen on"))?;
+            return system.inhibit(reason);
+        }
+        // the guard may drop on any thread; the application is the GTK thread's
+        Ok(IdleGuard::new(move || {
+            glib::MainContext::default().invoke(move || {
+                if let Some(app) = gio::Application::default().and_downcast::<gtk::Application>() {
+                    app.uninhibit(cookie);
+                }
+            });
+        }))
     }
 }
 

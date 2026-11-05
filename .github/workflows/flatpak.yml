@@ -1,0 +1,123 @@
+name: Flatpak
+
+# The stable Flatpak, for our own repository (docs/RELEASING.md, "Flatpak"). With the tag trigger, a version tag builds it from
+# flatpak/io.github.kurobayomi.Kurobayomi.yml, attaches Kurobayomi-x86_64.flatpak to that release and publishes the signed
+# Flatpak repository on GitHub Pages, where kurobayomi.flatpakrepo and the .flatpakref point. A manual run only builds,
+# and offers the bundle as a download of the run.
+on:
+  # by hand only for now: the tag trigger (push: tags: ['v[0-9]+.[0-9]+.[0-9]+']) comes back once the repository's GPG
+  # key and GitHub Pages are set up (docs/RELEASING.md, "Flatpak")
+  workflow_dispatch:
+
+concurrency:
+  group: flatpak-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  sources:
+    # flatpak-builder builds offline: every crate of Cargo.lock becomes a source of the manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Crate sources
+        run: |
+          pip install aiohttp tomlkit
+          curl -fsSLo flatpak-cargo-generator.py https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+          python3 flatpak-cargo-generator.py Cargo.lock -o cargo-sources.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cargo-sources
+          path: cargo-sources.json
+
+  build:
+    needs: sources
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cargo-sources
+          path: flatpak
+      - name: Metainfo and build settings
+        shell: bash
+        env:
+          SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
+          SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
+        run: |
+          version="$(grep -m1 '^version' Cargo.toml | cut -d '"' -f2)"
+          if [ "${GITHUB_REF_TYPE}" = tag ] && [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "The tag ${GITHUB_REF_NAME} is not the Cargo.toml version ${version}" >&2; exit 1
+          fi
+          scripts/metainfo.sh "$version" > io.github.kurobayomi.Kurobayomi.metainfo.xml
+          appstreamcli validate --no-net --explain io.github.kurobayomi.Kurobayomi.metainfo.xml
+          printf "KB_SHIKIMORI_CLIENT_ID='%s'\nKB_SHIKIMORI_CLIENT_SECRET='%s'\n" "$SHIKIMORI_CLIENT_ID" "$SHIKIMORI_CLIENT_SECRET" > kb-build.env
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          manifest-path: flatpak/io.github.kurobayomi.Kurobayomi.yml
+          bundle: Kurobayomi-x86_64.flatpak
+          cache-key: flatpak-builder-${{ hashFiles('flatpak/io.github.kurobayomi.Kurobayomi.yml') }}
+          upload-artifact: true
+      - name: Lint
+        # informational: our own repository grants the keyring and the storage folder, which Flathub would question
+        continue-on-error: true
+        run: |
+          flatpak-builder-lint manifest flatpak/io.github.kurobayomi.Kurobayomi.yml
+          flatpak-builder-lint repo repo
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type == 'tag'
+        with:
+          name: bundle
+          path: Kurobayomi-x86_64.flatpak
+      - name: Sign the repository and write its install files
+        if: github.ref_type == 'tag'
+        shell: bash
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+        run: |
+          export GNUPGHOME="$(mktemp -d)"
+          printf '%s' "$GPG_PRIVATE_KEY" | gpg --batch --import
+          key="$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')"
+          flatpak build-sign repo --gpg-sign="$key" --gpg-homedir="$GNUPGHOME"
+          flatpak build-update-repo repo --generate-static-deltas --prune --title=Kurobayomi --gpg-sign="$key" --gpg-homedir="$GNUPGHOME"
+          public="$(gpg --export "$key" | base64 -w0)"
+          url="https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/repo/"
+          mkdir -p site
+          mv repo site/repo
+          printf '[Flatpak Repo]\nTitle=Kurobayomi\nUrl=%s\nHomepage=https://github.com/%s\nIcon=https://raw.githubusercontent.com/%s/%s/src/shell/data/icons/hicolor/scalable/apps/io.github.kurobayomi.Kurobayomi.svg\nGPGKey=%s\n' \
+            "$url" "$GITHUB_REPOSITORY" "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" "$public" > site/kurobayomi.flatpakrepo
+          printf '[Flatpak Ref]\nName=io.github.kurobayomi.Kurobayomi\nBranch=master\nTitle=Kurobayomi\nUrl=%s\nRuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo\nIsRuntime=false\nGPGKey=%s\n' \
+            "$url" "$public" > site/io.github.kurobayomi.Kurobayomi.flatpakref
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref_type == 'tag'
+        with:
+          path: site
+
+  publish:
+    # the whole site is replaced by the newest release: a client updates to its commit, no history is needed
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundle
+      - name: Attach the bundle to the release
+        run: gh release upload "${GITHUB_REF_NAME}" Kurobayomi-x86_64.flatpak --clobber --repo "${GITHUB_REPOSITORY}"
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -17,3 +17,11 @@
 /.p2-queue.json
 /.p3-queue.json
 /.p1-queue.json
+
+# Flatpak build: generated files and flatpak-builder state (.github/workflows/flatpak.yml)
+/io.github.kurobayomi.Kurobayomi.metainfo.xml
+/kb-build.env
+/flatpak/cargo-sources.json
+/flatpak/.flatpak-builder
+/flatpak/build
+/flatpak/repo

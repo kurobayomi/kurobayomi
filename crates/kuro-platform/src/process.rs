@@ -27,9 +27,18 @@ pub fn no_console(cmd: &mut Command) -> &mut Command {
     cmd
 }
 
-/// Starts `program` with `args` in its own process group, with stdio closed. The child is not waited for.
+/// Starts `program` with `args` in its own process group, with stdio closed. The child is not waited for. In a Flatpak the
+/// sandbox ends with the app and takes its children with it, so the child is started through the Flatpak portal
+/// (`flatpak-spawn`, without `--watch-bus`) in a sandbox of its own, which outlives this one: the crash reporter and a
+/// restart need that.
 pub fn spawn_detached(program: &Path, args: &[&OsStr]) -> io::Result<()> {
-    let mut cmd = Command::new(program);
+    let mut cmd = if crate::sandbox::is_flatpak() {
+        let mut spawn = Command::new("flatpak-spawn");
+        spawn.arg(program);
+        spawn
+    } else {
+        Command::new(program)
+    };
     no_console(cmd.args(args).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()));
     #[cfg(unix)]
     {

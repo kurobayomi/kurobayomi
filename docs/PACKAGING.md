@@ -30,7 +30,7 @@ the validator requires a reverse-DNS file name for it, and this file keeps its s
 ## Flatpak
 
 The Flatpak build ships the `.desktop` action only. The applet runs inside the Plasma shell on the host, so it is a
-host package and cannot be part of the Flatpak.
+host package and cannot be part of the Flatpak. How the Flatpak is built and published: `docs/RELEASING.md`, "Flatpak".
 
 ## Cover thumbnails
 

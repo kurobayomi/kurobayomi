@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata of the app, for software centres (Flatpak). `scripts/metainfo.sh VERSION` writes the installed
+     copy: the screenshot links get the release tag, and the releases come from CHANGELOG.md. -->
+<component type="desktop-application">
+  <id>io.github.kurobayomi.Kurobayomi</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- the app is Apache-2.0; the Flatpak bundles libmpv and FFmpeg, which bring GPL parts -->
+  <project_license>Apache-2.0 AND GPL-3.0-or-later</project_license>
+  <name>Kurobayomi</name>
+  <summary>Read manga and watch anime</summary>
+  <developer id="io.github.kurobayomi">
+    <name>Kurobayomi</name>
+  </developer>
+  <description>
+    <p>
+      Kurobayomi keeps your manga and anime in one library: read chapters, watch episodes, and pick up where you left
+      off. It plays local folders and the sources you add yourself, and it ships no sources of its own.
+    </p>
+    <ul>
+      <li>A reader with page-by-page, right-to-left, vertical and webtoon modes, and two pages side by side</li>
+      <li>A video player with quality, subtitle and audio choices, and automatic opening and ending skips</li>
+      <li>Your own folders of manga and video files</li>
+      <li>Progress tracking with AniList, MyAnimeList and Shikimori</li>
+      <li>Downloads, updates of your library, history and backups</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.kurobayomi.Kurobayomi.desktop</launchable>
+  <url type="homepage">https://github.com/kurobayomi/kurobayomi</url>
+  <url type="bugtracker">https://github.com/kurobayomi/kurobayomi/issues</url>
+  <url type="vcs-browser">https://github.com/kurobayomi/kurobayomi</url>
+  <provides>
+    <binary>kurobayomi</binary>
+    <mediatype>application/x-tachibk</mediatype>
+  </provides>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+  </categories>
+  <keywords>
+    <keyword>manga</keyword>
+    <keyword>anime</keyword>
+    <keyword>comics</keyword>
+    <keyword>webtoon</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#d9d6e6</color>
+    <color type="primary" scheme_preference="dark">#26233a</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">720</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Getting started</caption>
+      <image>https://raw.githubusercontent.com/kurobayomi/kurobayomi/@TAG@/docs/images/getting-started/01-welcome.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A title and its chapters</caption>
+      <image>https://raw.githubusercontent.com/kurobayomi/kurobayomi/@TAG@/docs/images/getting-started/09-details.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Search across your sources</caption>
+      <image>https://raw.githubusercontent.com/kurobayomi/kurobayomi/@TAG@/docs/images/getting-started/08-search.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1">
+    <!-- tracking accounts share the reading and watching progress with the service the user logs in to -->
+    <content_attribute id="social-info">mild</content_attribute>
+  </content_rating>
+  <releases>
+@RELEASES@
+  </releases>
+</component>

@@ -222,6 +222,8 @@ fn now_ms() -> i64 {
 
 /// The preference of the player the taps use (`pref_always_use_external_player`).
 fn always_external(prefs: &PrefStore) -> bool {
+    // a Flatpak reaches no player of the system
+    !kuro_platform::sandbox::is_flatpak() &&
     prefs.pref::<bool>("pref_always_use_external_player", false).get()
 }
 
@@ -1629,6 +1631,8 @@ impl View {
         if !crate::ui::first_within("player", 1500) {
             return;
         }
+        // a Flatpak reaches no program of the system: the built-in player plays, with no torrent server to start
+        let plan = if kuro_platform::sandbox::is_flatpak() { OpenPlan { external: false, torrent_server: false } } else { plan };
         // a local episode plays in the internal player at its saved position, whatever the plan says
         if crate::local_flow::open::open_local_episode(episode_id) {
             return;

@@ -1,0 +1,157 @@
+# Kurobayomi as a Flatpak, built by `.github/workflows/flatpak.yml` for our own repository (docs/RELEASING.md). The
+# libmpv modules follow the ones Flathub ships for Delfin (cafe.avery.Delfin), cut to what playback needs: no encoders,
+# no Lua or JavaScript scripting, no X11 clipboard tools. FFmpeg also installs its `ffmpeg` and `ffprobe` programs,
+# which anime downloads and local video previews run.
+id: io.github.kurobayomi.Kurobayomi
+runtime: org.gnome.Platform
+runtime-version: '51'
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: kurobayomi
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # libmpv's GL video, hardware decoding, WebKit
+  - --device=dri
+  - --socket=pulseaudio
+  - --share=network
+  # the default storage folder: downloads, backups and the library's own folders. Other folders come through the
+  # folder picker (the document portal)
+  - --filesystem=~/Kurobayomi:create
+  # tracker logins are kept in the desktop keyring; without it they fall back to an encrypted file
+  - --talk-name=org.freedesktop.secrets
+  # the "Wi-Fi only" and "only while charging" conditions of library updates and downloads
+  - --system-talk-name=org.freedesktop.NetworkManager
+  - --system-talk-name=org.freedesktop.UPower
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+  - '*.a'
+  - '*.la'
+
+modules:
+  - name: libmpv
+    buildsystem: meson
+    config-opts:
+      - -Dbuild-date=false
+      - -Dcplayer=false
+      - -Dlibmpv=true
+      - -Dmanpage-build=disabled
+      - -Dlua=disabled
+      - -Djavascript=disabled
+      - -Dvulkan=enabled
+    sources:
+      - type: archive
+        url: https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz
+        sha256: ee21092a5ee427353392360929dc64645c54479aefdb5babc5cfbb5fad626209
+    modules:
+      - name: uchardet
+        buildsystem: cmake-ninja
+        config-opts:
+          - -DCMAKE_BUILD_TYPE=Release
+          - -DBUILD_STATIC=0
+          - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        cleanup:
+          - /bin
+        sources:
+          - type: archive
+            url: https://www.freedesktop.org/software/uchardet/releases/uchardet-0.0.8.tar.xz
+            sha256: e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0
+
+      - name: libass
+        config-opts:
+          - --disable-static
+        sources:
+          - type: git
+            url: https://github.com/libass/libass.git
+            tag: 0.17.4
+            commit: bbb3c7f1570a4a021e52683f3fbdf74fe492ae84
+
+      - name: zimg
+        config-opts:
+          - --disable-static
+        sources:
+          - type: archive
+            archive-type: tar
+            url: https://api.github.com/repos/sekrit-twc/zimg/tarball/release-3.0.6
+            sha256: 15140e491c4ce9db5f02a038d8a1eb53e9151b55eeed06a2899425a6ebfef367
+
+      - name: ffmpeg
+        cleanup:
+          - /share/ffmpeg/examples
+        config-opts:
+          - --disable-debug
+          - --disable-doc
+          - --disable-static
+          - --enable-shared
+          - --enable-gpl
+          - --enable-version3
+          - --enable-gnutls
+          - --enable-libass
+          - --enable-libdav1d
+          - --enable-libfreetype
+          - --enable-libopus
+          - --enable-libvorbis
+          - --enable-libvpx
+          - --enable-libaom
+          - --enable-libwebp
+          - --enable-libjxl
+        sources:
+          - type: git
+            url: https://github.com/FFmpeg/FFmpeg.git
+            tag: n8.1
+            commit: 9047fa1b084f76b1b4d065af2d743df1b40dfb56
+
+      - name: libplacebo
+        buildsystem: meson
+        config-opts:
+          - -Dvulkan=enabled
+          - -Dshaderc=enabled
+        sources:
+          - type: git
+            url: https://code.videolan.org/videolan/libplacebo.git
+            tag: v7.360.1
+            commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
+
+  - name: kurobayomi
+    buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/kurobayomi/cargo
+        CARGO_NET_OFFLINE: 'true'
+    build-commands:
+      # the release build passes the Shikimori client in kb-build.env (the workflow writes it from its secrets; it is
+      # not in the repository); a build without it has no built-in Shikimori login
+      - if [ -f kb-build.env ]; then set -a; . ./kb-build.env; set +a; fi; cargo --offline build --release --locked
+      - install -Dm755 target/release/kurobayomi -t /app/bin
+      - install -Dm644 src/shell/data/io.github.kurobayomi.Kurobayomi.desktop -t /app/share/applications
+      - install -Dm644 src/shell/data/io.github.kurobayomi.Kurobayomi.xml -t /app/share/mime/packages
+      - install -Dm644 src/shell/data/io.github.kurobayomi.Kurobayomi.search-provider.ini -t /app/share/gnome-shell/search-providers
+      - install -Dm644 src/shell/data/io.github.kurobayomi.Kurobayomi.service -t /app/share/dbus-1/services
+      - install -Dm644 src/shell/data/io.github.kurobayomi.Kurobayomi.SearchProvider.service -t /app/share/dbus-1/services
+      - install -Dm644 io.github.kurobayomi.Kurobayomi.metainfo.xml -t /app/share/metainfo
+      - cp -r src/shell/data/icons/hicolor /app/share/icons/
+      - install -Dm644 src/theme/icons/symbolic/apps/io.github.kurobayomi.Kurobayomi-symbolic.svg -t /app/share/icons/hicolor/symbolic/apps
+      - install -Dm644 LICENSE NOTICE -t /app/share/licenses/io.github.kurobayomi.Kurobayomi
+    sources:
+      # the checkout this workflow runs on, where it first writes the metainfo (scripts/metainfo.sh) and kb-build.env; the
+      # crate sources (cargo-sources.json) are generated next to this manifest
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - .git
+          - flatpak/.flatpak-builder
+          - flatpak/build
+          - flatpak/repo
+      - cargo-sources.json

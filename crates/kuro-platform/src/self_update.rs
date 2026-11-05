@@ -13,8 +13,12 @@ pub enum Package {
     Installer,
 }
 
-/// The package of this run, or `None` for any other build (a local one, a distribution package, an unpacked zip).
+/// The package of this run, or `None` for any other build (a local one, a distribution package, an unpacked zip). A
+/// Flatpak is updated by Flatpak itself, never by the app.
 pub fn package() -> Option<Package> {
+    if crate::sandbox::is_flatpak() {
+        return None;
+    }
     appimage_file().map(Package::AppImage).or_else(|| installed_by_setup().then_some(Package::Installer))
 }
 
@@ -43,8 +47,12 @@ pub fn run_installer(setup: &Path, relaunch: bool) -> io::Result<()> {
     crate::process::spawn_detached(setup, &args)
 }
 
-/// The AppImage file this process runs from: the AppImage runtime sets `APPIMAGE` to its path. `None` for any other build.
+/// The AppImage file this process runs from: the AppImage runtime sets `APPIMAGE` to its path. `None` for any other build,
+/// and in a Flatpak (which neither updates itself nor adds its own launcher).
 pub fn appimage_file() -> Option<PathBuf> {
+    if crate::sandbox::is_flatpak() {
+        return None;
+    }
     std::env::var_os("APPIMAGE").map(PathBuf::from).filter(|path| path.is_file())
 }
 

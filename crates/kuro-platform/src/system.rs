@@ -27,12 +27,13 @@ fn system_locale() -> Option<String> {
     None
 }
 
-/// `PRETTY_NAME` from `/etc/os-release`, else `ID`, else `unknown`. Windows: its product name and version.
+/// `PRETTY_NAME` from `/etc/os-release`, else `ID`, else `unknown`. Windows: its product name and version. In a Flatpak the
+/// system's own file is at `/run/host/os-release` (`/etc` holds the runtime's).
 #[allow(unreachable_code)]
 fn os_name() -> String {
     #[cfg(all(target_os = "windows", feature = "platform-windows"))]
     return or_unknown(crate::windows::system::os_name());
-    let text = fs::read_to_string("/etc/os-release").unwrap_or_default();
+    let text = fs::read_to_string("/run/host/os-release").or_else(|_| fs::read_to_string("/etc/os-release")).unwrap_or_default();
     or_unknown(os_release_value(&text, "PRETTY_NAME").or_else(|| os_release_value(&text, "ID")))
 }
 
