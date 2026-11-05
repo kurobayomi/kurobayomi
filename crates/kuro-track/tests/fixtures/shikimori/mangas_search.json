@@ -1,5 +1,5 @@
 [
-  {"id":5,"name":"Berserk 🗡","russian":"Берсерк","image":{"original":"/o/5.jpg","preview":"/p/5.jpg","x96":"/x96/5.jpg","x48":"/x48/5.jpg"},"url":"/mangas/5-Berserk","kind":"manga","score":9.4,"status":"ongoing","volumes":41,"chapters":380,"released_on":null,"aired_on":"1989-08-25"},
-  {"id":6,"name":"No Chapter Count","russian":"","image":{"original":"/o/6.jpg","preview":"/p/6.jpg","x96":"/x96/6.jpg","x48":"/x48/6.jpg"},"url":"/mangas/6-No-Chapter-Count","kind":"manga","score":7.0,"status":"ongoing","volumes":0,"chapters":null,"released_on":null,"aired_on":"2001-01-01"},
-  {"id":7,"name":"Undated Manhwa","russian":"","image":{"original":"/o/7.jpg","preview":"/p/7.jpg","x96":"/x96/7.jpg","x48":"/x48/7.jpg"},"url":"/mangas/7-Undated-Manhwa","kind":"manhwa","score":6.5,"status":"released","volumes":1,"chapters":7,"released_on":null,"aired_on":null}
+  {"id":5,"name":"Berserk 🗡","russian":"Берсерк","image":{"original":"/o/5.jpg","preview":"/p/5.jpg","x96":"/x96/5.jpg","x48":"/x48/5.jpg"},"url":"/mangas/5-Berserk","kind":"manga","score":"9.4","status":"ongoing","volumes":41,"chapters":380,"released_on":null,"aired_on":"1989-08-25"},
+  {"id":6,"name":"No Chapter Count","russian":"","image":{"original":"/o/6.jpg","preview":"/p/6.jpg","x96":"/x96/6.jpg","x48":"/x48/6.jpg"},"url":"/mangas/6-No-Chapter-Count","kind":"manga","score":"7.0","status":"ongoing","volumes":0,"chapters":null,"released_on":null,"aired_on":"2001-01-01"},
+  {"id":7,"name":"Undated Manhwa","russian":"","image":{"original":"/o/7.jpg","preview":"/p/7.jpg","x96":"/x96/7.jpg","x48":"/x48/7.jpg"},"url":"/mangas/7-Undated-Manhwa","kind":"manhwa","score":"6.5","status":"released","volumes":1,"chapters":7,"released_on":null,"aired_on":null}
 ]
