@@ -9,6 +9,7 @@
 
 pub mod actions;
 pub mod auto_track;
+pub mod community_page;
 pub mod dates;
 pub mod facts;
 pub mod page;

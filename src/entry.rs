@@ -6,6 +6,7 @@ pub fn body(id: &str) -> Option<Built> {
     match id {
         "tracking_sheet" => crate::entry_core::tracking::page::sheet(),
         "tracker_search" => crate::entry_core::tracking::page::search(),
+        "community_score_search" => crate::entry_core::tracking::community_page::search(),
         "extension_repos" => crate::settings::body("settings_extension_repos"),
         _ => crate::settings::body(id),
     }

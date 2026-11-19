@@ -5279,3 +5279,21 @@ ui_your_score_value = Your score: { $score }
 
 # source: kurobayomi
 ui_score_matched_as = Matched on MyAnimeList as { $title }
+
+# source: kurobayomi
+ui_community_score = Community score
+
+# source: kurobayomi
+ui_change = Change
+
+# source: kurobayomi
+ui_score_not_looked_up = Not looked up yet
+
+# source: kurobayomi
+ui_score_not_found = Not found on MyAnimeList
+
+# source: kurobayomi
+ui_no_score_for_this_title = No score for this title
+
+# source: kurobayomi
+ui_score_none_yet = No score yet

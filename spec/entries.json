@@ -1678,6 +1678,17 @@
    "notes": "Bottom sheet (AdaptiveSheet) opened from the Tracking action button. Column, padding 16dp, 24dp spacing between trackers, scrollable.\nBOUND TRACKER: header Row: tracker logo tile (48dp rounded square in tracker brand color; tap = open in browser, long-press = copy link; small primary badge with eye-off icon when 'Tracked privately') | title (titleMedium, 1 line, 48dp tall, weight 1, padding start 16; tap = re-search, long-press = copy title) | vertical divider | overflow (more-vert) menu: Open in browser, Copy link, Track privately/Track publicly (if supported), Remove. Below (12dp top): rounded card surfaceContainerHighest padding 8dp containing a grid of cells divided by thin dividers: row 1 = Status | '12 / 24' chapters (or episodes) | Score (only if tracker supports scoring); row 2 (if dates supported) = Start date | Finish date. Each cell: centered bodyMedium, 12dp padding, unset values show placeholder at 50% alpha. Tapping a cell opens its picker dialog.\nUNBOUND TRACKER: Row [logo] [full-width TextButton 'Add tracking'].\nPickers: Status = radio list in a scrolling column; Chapters/Episodes = wheel number picker (0..total or 0..10000); Score = wheel text picker (options come from the tracker, e.g. 0-10, 0-100, stars, smileys); Dates = Material date picker with Remove/Cancel/OK. Tracker error snackbar: 'AniList error: message'."
   },
   {
+   "id": "community_score_search",
+   "title": "Community score",
+   "kind": "custom",
+   "toolbar": [],
+   "menu": [],
+   "tabs": [],
+   "groups": [],
+   "sheets": [],
+   "dialogs": []
+  },
+  {
    "id": "tracker_search",
    "title": "Track search",
    "kind": "custom",

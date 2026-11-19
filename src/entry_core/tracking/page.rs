@@ -6,7 +6,7 @@
 //! OAuth client missing from the build and from `config.toml`) has no section; its Settings row says why. Each edit is written to that tracker at once (`actions`),
 //! and a failure shows a toast. The entry is named by [`open_sheet`] before the page is pushed, and the search page reads
 //! the same entry and the tracker its Search button named. A bind, an edit or a stop tells the details page, so its
-//! Tracking button follows.
+//! Tracking button follows. Under the trackers the page ends with the entry's community score (`community_page`).
 
 use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
@@ -124,12 +124,12 @@ pub fn open_sheet(entry: Entry, on_change: impl Fn() + 'static) {
     ui::open("tracking_sheet");
 }
 
-fn entry() -> Option<Entry> {
+pub(super) fn entry() -> Option<Entry> {
     ENTRY.with(|slot| slot.borrow().clone())
 }
 
 /// Tells the details page that the binding changed. The callback is taken out of the slot before it runs.
-fn changed() {
+pub(super) fn changed() {
     let on_change = ON_CHANGE.with(|slot| slot.borrow().clone());
     if let Some(on_change) = on_change {
         on_change();
@@ -208,7 +208,7 @@ fn redraw(root: &GBox) -> Rc<dyn Fn()> {
     })
 }
 
-fn clear(root: &GBox) {
+pub(super) fn clear(root: &GBox) {
     while let Some(child) = root.first_child() {
         root.remove(&child);
     }
@@ -219,8 +219,13 @@ fn say(label: &Label, text: &str) {
     label.set_visible(!text.is_empty());
 }
 
+/// The spinner of a search that is running, on either search page.
+pub(super) fn searching() -> gtk::Widget {
+    crate::widgets::status::loading(Some("Searching…"))
+}
+
 /// One section per switched-on tracker: connect while it is logged out, the entry's rows there once it is in, nothing
-/// while it cannot log in.
+/// while it cannot log in. Then the entry's community score, which needs no login.
 fn render(root: &GBox) {
     clear(root);
     let host = tracker_host::host();
@@ -233,6 +238,9 @@ fn render(root: &GBox) {
             (Section::Hidden, _, _) => {}
             (_, _, host) => connect_section(root, id, host.is_some_and(|host| host.is_waiting(id, now_ms()))),
         }
+    }
+    if let Some(entry) = entry() {
+        super::community_page::section(root, &entry);
     }
 }
 
@@ -518,7 +526,7 @@ fn date_row(is_start: bool, stored: i64, other: i64, write: Rc<dyn Fn(Edit)>) ->
 }
 
 /// A row that is one flat button across the list, the way GNOME lists show an action.
-fn button_row(label: &str, css: &[&str], run: impl Fn() + 'static) -> gtk::ListBoxRow {
+pub(super) fn button_row(label: &str, css: &[&str], run: impl Fn() + 'static) -> gtk::ListBoxRow {
     let button = Button::builder().label(label).css_classes(css.to_vec()).build();
     button.connect_clicked(move |_| run());
     gtk::ListBoxRow::builder().child(&button).activatable(false).build()
@@ -626,7 +634,7 @@ fn run_search(entry: &Entry, queries: Vec<String>, status: &Label, results: &GBo
     generation.set(token);
     say(status, "");
     clear(results);
-    results.append(&crate::widgets::status::loading(Some("Searching…")));
+    results.append(&searching());
     let (kind, latest, shown_status, shown_results, entry, again) = (entry.kind, Rc::clone(generation), status.clone(), results.clone(), entry.clone(), (entry.clone(), queries.clone(), Rc::clone(generation)));
     crate::background::run_async(
         async move { search_first(tracker.as_ref(), kind, &queries).await },
