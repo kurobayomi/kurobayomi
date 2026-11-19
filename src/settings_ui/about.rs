@@ -401,8 +401,13 @@ fn link_rows() -> [PreferenceItem; 2] {
     [link_row("GitHub", PROJECT_URL), link_row(&tr(MsgKey::ui_report_an_issue), ISSUES_URL)]
 }
 
-/// The typed rows of the About page, merged over the spec rows of the same titles. The links row has no spec twin and
-/// is kept at the end.
+/// Where the community scores come from: MyAnimeList's, read through Jikan, which MyAnimeList does not run.
+fn score_credit_row() -> PreferenceItem {
+    text(&tr(MsgKey::ui_community_scores), Some(&tr(MsgKey::ui_community_scores_credit)), true)
+}
+
+/// The typed rows of the About page, merged over the spec rows of the same titles. The score credit and the links have
+/// no spec twin and are kept at the end.
 pub fn page_rows() -> Vec<Preference> {
     // an AppImage that updates itself shows it all on the Version row; another build keeps the plain row and the check row
     // (the disabled twin of the check row drops the spec's row of that title)
@@ -419,6 +424,7 @@ pub fn page_rows() -> Vec<Preference> {
         .map(item)
         .chain([
         item(crate::settings_ui::maintenance::share_crash_logs_row()),
+        item(score_credit_row()),
     ])
     .chain(link_rows().map(item))
     .collect()
@@ -442,7 +448,9 @@ mod link_tests {
         let rows = page_rows();
         let titles: Vec<&str> = rows.iter().map(|r| match r { Preference::Item(i) => i.title(), Preference::Group(g) => g.title.as_str() }).collect();
         assert!(!titles.contains(&"Privacy policy"));
-        assert_eq!(titles[titles.len() - 2..], ["GitHub", "Report an issue"]);
+        assert_eq!(titles[titles.len() - 3..], ["Community scores", "GitHub", "Report an issue"]);
+        let PreferenceItem::Text { common, .. } = score_credit_row() else { panic!("a text row") };
+        assert_eq!(common.subtitle.as_deref(), Some("MyAnimeList, through Jikan (unofficial)"));
         assert!(link_rows().iter().all(|row| matches!(row, PreferenceItem::Custom { .. }) && row.enabled()), "two tappable rows");
     }
 }

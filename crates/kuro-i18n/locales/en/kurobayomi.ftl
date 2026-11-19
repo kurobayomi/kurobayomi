@@ -5297,3 +5297,9 @@ ui_no_score_for_this_title = No score for this title
 
 # source: kurobayomi
 ui_score_none_yet = No score yet
+
+# source: kurobayomi
+ui_community_scores = Community scores
+
+# source: kurobayomi
+ui_community_scores_credit = MyAnimeList, through Jikan (unofficial)
