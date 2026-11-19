@@ -127,11 +127,6 @@ impl AnimeTracker for AniList {
         self.score_format().index_to_score(index).unwrap_or(0.0)
     }
 
-    /// The stored score is on the 0 to 100 scale.
-    fn score_10(&self, t: &AnimeTrack) -> f64 {
-        t.score / 10.0
-    }
-
     fn display_score(&self, t: &AnimeTrack) -> String {
         self.score_format().display(t.score)
     }
@@ -181,11 +176,6 @@ impl MangaTracker for AniList {
 
     fn index_to_score(&self, index: usize) -> f64 {
         self.score_format().index_to_score(index).unwrap_or(0.0)
-    }
-
-    /// The stored score is on the 0 to 100 scale.
-    fn score_10(&self, t: &MangaTrack) -> f64 {
-        t.score / 10.0
     }
 
     fn display_score(&self, t: &MangaTrack) -> String {

@@ -25,6 +25,13 @@ impl TrackerId {
     pub const JELLYFIN: Self = Self(102);
 }
 
+/// A stored track score on the 10-point scale. AniList stores 0 to 100 whatever format the account shows; every other
+/// tracker stores 0 to 10. The one conversion: the trackers' `score_10` and the library's "Tracker score" sort both
+/// use it, so a mean over several trackers compares like with like.
+pub fn score_10(tracker: TrackerId, score: f64) -> f64 {
+    if tracker == TrackerId::ANILIST { score / 10.0 } else { score }
+}
+
 /// One tracker binding of an anime. `id` is `None` before the first insert.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnimeTrack {
@@ -187,6 +194,15 @@ fn row_id(id: Option<i64>, required: bool) -> Result<i64, TrackError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stored_score_reads_on_the_ten_point_scale() {
+        assert_eq!(score_10(TrackerId::ANILIST, 85.0), 8.5, "AniList stores 0 to 100");
+        for tracker in [TrackerId::MYANIMELIST, TrackerId::SHIKIMORI, TrackerId::KITSU, TrackerId::BANGUMI, TrackerId::SIMKL] {
+            assert_eq!(score_10(tracker, 8.5), 8.5, "{tracker:?} stores 0 to 10");
+        }
+        assert_eq!(score_10(TrackerId::ANILIST, 0.0), 0.0, "unscored stays unscored");
+    }
 
     fn anime() -> AnimeTrack {
         AnimeTrack {

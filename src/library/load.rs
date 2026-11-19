@@ -38,7 +38,9 @@ pub fn snapshot(db: &Arc<Db>, kind: Kind) -> Result<Snapshot, DomainError> {
         );
     }
     for t in TrackPort::all(&TrackRepo::new(db.clone()), kind)? {
-        snap.tracks.entry(t.entry_id).or_default().push((t.tracker_id, t.score));
+        // on the 10-point scale: AniList stores 0 to 100, and the sort takes a mean over an entry's trackers
+        let score = kuro_track::model::score_10(kuro_track::model::TrackerId(t.tracker_id), t.score);
+        snap.tracks.entry(t.entry_id).or_default().push((t.tracker_id, score));
     }
     Ok(snap)
 }
@@ -181,6 +183,21 @@ mod tests {
         assert_eq!(snap.details.get(&id).and_then(|d| d.author.clone()).as_deref(), Some("Someone"));
         assert!(snap.categories.iter().any(|c| c.id == a) && snap.categories.iter().any(|c| c.id == b));
         assert!(snap.tracks.is_empty());
+    }
+
+    #[test]
+    fn track_scores_are_read_on_the_ten_point_scale_whatever_the_tracker_stores() {
+        let (_dir, db) = test_db();
+        let id = EntryRepo::new(db.clone())
+            .insert(&Entry { favorite: true, source: 7, url: "u".into(), title: "Title".into(), ..Entry::create(Kind::Anime) })
+            .expect("insert");
+        let track = |tracker: i64, remote_id: i64, score: f64| kuro_data::track::Track { entry_id: id, remote_id, score, ..kuro_data::track::Track::new(Kind::Anime, tracker) };
+        // the same 8 out of 10: AniList (2) stores it as 80, MyAnimeList (1) as 8
+        TrackRepo::new(db.clone()).insert_all(&[track(2, 10, 80.0), track(1, 20, 8.0)]).expect("tracks");
+        let snap = snapshot(&db, Kind::Anime).expect("snapshot");
+        let mut scores = snap.tracks.get(&id).cloned().unwrap_or_default();
+        scores.sort_by_key(|(tracker, _)| *tracker);
+        assert_eq!(scores, [(1, 8.0), (2, 8.0)], "the sort's mean is 8, not 44");
     }
 
     #[test]

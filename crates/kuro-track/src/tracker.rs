@@ -100,7 +100,7 @@ pub trait AnimeTracker: Tracker {
         index as f64
     }
     fn score_10(&self, t: &AnimeTrack) -> f64 {
-        t.score
+        crate::model::score_10(t.tracker_id, t.score)
     }
     fn display_score(&self, t: &AnimeTrack) -> String;
 
@@ -127,7 +127,7 @@ pub trait MangaTracker: Tracker {
         index as f64
     }
     fn score_10(&self, t: &MangaTrack) -> f64 {
-        t.score
+        crate::model::score_10(t.tracker_id, t.score)
     }
     fn display_score(&self, t: &MangaTrack) -> String;
 
