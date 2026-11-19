@@ -40,7 +40,7 @@ fn request() -> Request {
 }
 
 fn snapshot(categories: Vec<Category>, rows: Vec<LibraryRow>) -> Snapshot {
-    Snapshot { categories, rows, details: HashMap::new(), tracks: BTreeMap::new() }
+    Snapshot { categories, rows, details: HashMap::new(), tracks: BTreeMap::new(), community: HashMap::new() }
 }
 
 fn ids(built: &Built) -> Vec<Vec<i64>> {
