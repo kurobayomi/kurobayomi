@@ -39,6 +39,8 @@ pub struct Snapshot {
     pub details: HashMap<i64, Details>,
     /// Every track of each entry as (tracker id, 10-point score). Logged-out trackers are dropped by the pipeline.
     pub tracks: BTreeMap<i64, Vec<(i64, f64)>>,
+    /// The community score (0 to 10) of each entry that has one (`kuro_data::community_score`).
+    pub community: HashMap<i64, f64>,
 }
 
 /// Lookups that live outside storage: the number of downloaded items of an entry, and source facts.
@@ -61,7 +63,7 @@ pub struct Request {
 }
 
 /// The pipeline output: the pages to show and the counts the toolbar and the empty states read.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Built {
     pub pages: Vec<LibraryPage>,
     /// Any filter is on, the forced downloaded-only override included (T2-PIPE-07).
@@ -70,6 +72,8 @@ pub struct Built {
     pub distinct_count: usize,
     /// Every library row, filtered or not: the selection refreshes its snapshots from these (T-37a-059).
     pub library: Vec<LibraryRow>,
+    /// The community score of each entry that has one: the star badge of its card.
+    pub community: HashMap<i64, f64>,
 }
 
 impl Built {
@@ -145,6 +149,7 @@ pub fn compute(req: &Request, snap: &Snapshot, facts: &Facts) -> Built {
         has_active_filters: req.filters.has_active() || req.filters.downloaded_only,
         distinct_count,
         library: snap.rows.clone(),
+        community: snap.community.clone(),
     }
 }
 
@@ -202,7 +207,7 @@ mod tests {
     }
 
     fn snapshot(categories: Vec<Category>, rows: Vec<LibraryRow>) -> Snapshot {
-        Snapshot { categories, rows, details: HashMap::new(), tracks: BTreeMap::new() }
+        Snapshot { categories, rows, details: HashMap::new(), tracks: BTreeMap::new(), community: HashMap::new() }
     }
 
     fn ids(built: &Built) -> Vec<Vec<i64>> {

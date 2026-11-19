@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
 use gtk::{Orientation as O, gdk, gio, glib};
+use kuro_data::community_score::CommunityScoreRepo;
 use kuro_data::entry::EntryRepo;
 use kuro_db::handle::Db;
 use kuro_db::codec::FetchType;
@@ -486,7 +487,8 @@ impl LibraryView {
     }
 
     /// Reloads the library when its rows change in the database: an entry added or removed on its details page, a
-    /// refresh, an episode watched (upstream collects the library flow). The live query runs on the tokio runtime the
+    /// refresh, an episode watched (upstream collects the library flow), and when community scores are stored, so the
+    /// star badges follow the refresh job (`crate::community`). The live queries run on the tokio runtime the
     /// GTK thread has entered; without one (some tests) only the explicit reloads run.
     fn watch_rows(&self) {
         let Ok(runtime) = tokio::runtime::Handle::try_current() else { return };
@@ -517,7 +519,8 @@ impl LibraryView {
                 }
             }
         }
-        runtime.spawn(forward(EntryRepo::new(db).subscribe_library(kind), shown_rx, changed_tx));
+        runtime.spawn(forward(EntryRepo::new(db.clone()).subscribe_library(kind), shown_rx.clone(), changed_tx.clone()));
+        runtime.spawn(forward(CommunityScoreRepo::new(db).watch_scores(kind), shown_rx, changed_tx));
         let shown_tx = Rc::new(shown_tx);
         let shown_map = shown_tx.clone();
         self.root.connect_map(move |_| {
@@ -1189,6 +1192,7 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         kind,
         season_parent: is_season_parent(&inner.borrow(), &item),
         width: kuro_domain::library::columns::column_width(inner.borrow().deps.prefs.cover_size.get()),
+        score: inner.borrow().built.as_ref().and_then(|b| b.community.get(&item.row.id).copied()),
     };
     let card = if mode == kuro_prefs::library::LibraryDisplayMode::List {
         let row_height = list_row_height(&inner.borrow());

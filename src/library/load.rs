@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
+use kuro_data::community_score::CommunityScoreRepo;
 use kuro_data::entry::EntryRepo;
 use kuro_data::track::TrackRepo;
 use kuro_db::handle::Db;
@@ -21,7 +22,7 @@ use crate::misc::diet_defaults as diet;
 
 use super::query::{Details, Request, Snapshot};
 
-/// Reads the categories, the library rows, the search fields and the tracks of one kind.
+/// Reads the categories, the library rows, the search fields, the tracks and the community scores of one kind.
 pub fn snapshot(db: &Arc<Db>, kind: Kind) -> Result<Snapshot, DomainError> {
     let categories = CategoryRepo::new(db.clone(), kind).visible()?;
     let mut snap = Snapshot { categories, ..Snapshot::default() };
@@ -42,6 +43,7 @@ pub fn snapshot(db: &Arc<Db>, kind: Kind) -> Result<Snapshot, DomainError> {
         let score = kuro_track::model::score_10(kuro_track::model::TrackerId(t.tracker_id), t.score);
         snap.tracks.entry(t.entry_id).or_default().push((t.tracker_id, score));
     }
+    snap.community = CommunityScoreRepo::new(db.clone()).scores(kind)?;
     Ok(snap)
 }
 
@@ -198,6 +200,20 @@ mod tests {
         let mut scores = snap.tracks.get(&id).cloned().unwrap_or_default();
         scores.sort_by_key(|(tracker, _)| *tracker);
         assert_eq!(scores, [(1, 8.0), (2, 8.0)], "the sort's mean is 8, not 44");
+    }
+
+    #[test]
+    fn the_community_scores_of_the_kind_are_read_and_an_entry_without_one_is_left_out() {
+        use kuro_data::community_score::{CommunityScore, MatchedBy};
+        let (_dir, db) = test_db();
+        let repo = EntryRepo::new(db.clone());
+        let add = |kind: Kind, url: &str| repo.insert(&Entry { favorite: true, source: 7, url: url.into(), title: url.into(), ..Entry::create(kind) }).expect("insert");
+        let (scored, unrated, manga) = (add(Kind::Anime, "a"), add(Kind::Anime, "b"), add(Kind::Manga, "c"));
+        let row = |entry_id: i64, score: Option<f64>| CommunityScore { entry_id, provider: "jikan".into(), remote_id: Some(entry_id), matched_title: "t".into(), matched_by: MatchedBy::Title, score, fetched_at: 1 };
+        CommunityScoreRepo::new(db.clone()).store_fetched(&[row(scored, Some(8.24)), row(unrated, None), row(manga, Some(7.0))]).expect("scores");
+        let snap = snapshot(&db, Kind::Anime).expect("snapshot");
+        assert_eq!(snap.community.len(), 1, "found without a score, and the other kind, are left out");
+        assert_eq!(snap.community.get(&scored), Some(&8.24));
     }
 
     #[test]

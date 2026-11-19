@@ -138,9 +138,22 @@ pub struct CardModel {
     /// The local badge; the language badge is dropped for local entries.
     pub local: bool,
     pub language: Option<String>,
+    /// The community score as the star badge writes it ("8.2"); None when the entry has none.
+    pub score: Option<String>,
 }
 
-pub fn card_model(item: &kuro_domain::library::page::LibraryItem, mode: LibraryDisplayMode, kind: Kind, season_parent: bool) -> CardModel {
+/// The narrowest grid card whose Local badge keeps its word beside a score badge. The cover size slider goes down to
+/// 100 px, where an unread count, a score and "Local" do not fit in one line: the Local badge is then its folder icon
+/// alone. ponytail: 140 is worked out from the badge paddings and a guess at the text widths, not measured on screen.
+pub const LOCAL_WORD_MIN_PX: i32 = 140;
+
+/// Whether the Local badge of a grid card `width` wide shows its word; without a score beside it, always.
+pub fn local_word_fits(width: i32, has_score: bool) -> bool {
+    !has_score || width >= LOCAL_WORD_MIN_PX
+}
+
+/// `score` is the entry's community score (0 to 10), when it has one.
+pub fn card_model(item: &kuro_domain::library::page::LibraryItem, mode: LibraryDisplayMode, kind: Kind, season_parent: bool, score: Option<f64>) -> CardModel {
     CardModel {
         title: item.row.title.clone(),
         title_place: title_place(mode),
@@ -150,6 +163,7 @@ pub fn card_model(item: &kuro_domain::library::page::LibraryItem, mode: LibraryD
         downloads: download_badge(item.download_count),
         local: item.is_local,
         language: if item.is_local { None } else { language_badge(&item.source_language) },
+        score: score.map(crate::community::score_text),
     }
 }
 
@@ -242,7 +256,7 @@ mod tests {
         use kuro_domain::library::page::LibraryItem;
         let row = kuro_domain::library::model::LibraryRow { title: "Core Concepts".into(), ..crate::library::fixtures::row(1, 0) };
         let local = LibraryItem { row: row.clone(), download_count: 0, unread_count: 6, is_local: true, source_language: "en".into() };
-        let model = card_model(&local, LibraryDisplayMode::ComfortableGrid, Kind::Anime, false);
+        let model = card_model(&local, LibraryDisplayMode::ComfortableGrid, Kind::Anime, false, None);
         assert_eq!(model.title, "Core Concepts");
         assert_eq!(model.title_place, TitlePlace::Below);
         assert_eq!(model.initials, "CC");
@@ -250,15 +264,26 @@ mod tests {
         assert_eq!(model.downloads, None);
         assert!(model.local);
         assert_eq!(model.language, None, "a local entry shows Local, not a language");
+        assert_eq!(model.score, None, "no community score, no star badge");
 
         let source = LibraryItem { row, download_count: 2, unread_count: 0, is_local: false, source_language: "ja".into() };
-        let model = card_model(&source, LibraryDisplayMode::CompactGrid, Kind::Manga, false);
+        let model = card_model(&source, LibraryDisplayMode::CompactGrid, Kind::Manga, false, Some(8.24));
         assert_eq!(model.title_place, TitlePlace::OnCover);
         assert_eq!(model.unread, None);
         assert_eq!(model.downloads.as_deref(), Some("2"));
         assert!(!model.local);
         assert_eq!(model.language.as_deref(), Some("JA"));
-        assert_eq!(card_model(&source, LibraryDisplayMode::CoverOnlyGrid, Kind::Anime, true).unread_tooltip, Some("unseen seasons"));
+        assert_eq!(model.score.as_deref(), Some("8.2"), "the community score, one decimal");
+        assert_eq!(card_model(&source, LibraryDisplayMode::CoverOnlyGrid, Kind::Anime, true, None).unread_tooltip, Some("unseen seasons"));
+    }
+
+    #[test]
+    fn the_local_badge_drops_its_word_only_on_a_narrow_card_that_also_shows_a_score() {
+        assert!(local_word_fits(100, false), "nothing beside it");
+        assert!(!local_word_fits(100, true));
+        assert!(!local_word_fits(LOCAL_WORD_MIN_PX - 10, true));
+        assert!(local_word_fits(LOCAL_WORD_MIN_PX, true));
+        assert!(local_word_fits(160, true), "the default cover size");
     }
 
     #[test]

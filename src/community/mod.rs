@@ -45,6 +45,11 @@ fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
+/// A score as the app writes it, with one decimal ("8.2"): the cover badge and the details page share it.
+pub fn score_text(score: f64) -> String {
+    format!("{score:.1}")
+}
+
 /// Starts the refresh task. Runs once; call from the GTK main thread inside the app's runtime.
 pub fn start() {
     if JOB.get().is_some() || !crate::data::is_installed() {
@@ -202,6 +207,13 @@ mod tests {
     use kuro_scores::provider::Outcome;
 
     use super::*;
+
+    #[test]
+    fn a_score_is_written_with_one_decimal() {
+        assert_eq!(score_text(8.24), "8.2");
+        assert_eq!(score_text(7.96), "8.0");
+        assert_eq!(score_text(9.0), "9.0");
+    }
 
     /// Scores every anime 8.5 and stops when told to; counts what it was asked.
     struct Fake {

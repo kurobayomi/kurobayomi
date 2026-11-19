@@ -1,4 +1,5 @@
-//! One library card (docs/design/main-window.md): a 2:3 cover carrying worded badges, the title under it (on it in the
+//! One library card (docs/design/main-window.md): a 2:3 cover carrying worded badges (the unread count top start; the
+//! community score with a star, then Local, top end), the title under it (on it in the
 //! compact grid, none in the cover-only grid), and the List mode row. What shows is decided by `layout::card_model`;
 //! this file only places widgets, and the click handling lives in the view.
 
@@ -26,6 +27,8 @@ pub struct Extras<'a> {
     pub season_parent: bool,
     /// The width of a grid card: the column width of the stored cover size (`columns::column_width`).
     pub width: i32,
+    /// The entry's community score (0 to 10), when it has one.
+    pub score: Option<f64>,
 }
 
 /// The cover of a card: the shared cover (`look::cover`), `width` x `height`.
@@ -55,16 +58,45 @@ fn count_badges(model: &CardModel) -> gtk::Box {
     group
 }
 
-/// Local (icon and word) or the source language, top end.
-fn origin_badge(model: &CardModel) -> gtk::Box {
+/// Local (icon, and the word when `worded`) or the source language.
+fn origin_badge(model: &CardModel, worded: bool) -> gtk::Box {
     let group = gtk::Box::new(O::Horizontal, SPACE_XS);
     if model.local {
         group.add_css_class("kb-badge");
         group.set_tooltip_text(Some(&tr(MsgKey::ui_from_a_local_folder)));
         group.append(&gtk::Image::from_icon_name("folder-symbolic"));
-        group.append(&gtk::Label::new(Some(&layout::local_badge())));
+        if worded {
+            group.append(&gtk::Label::new(Some(&layout::local_badge())));
+        }
     } else if let Some(text) = &model.language {
         group.append(&badge(text, Some(&tr(MsgKey::ui_source_language)), false));
+    }
+    group
+}
+
+/// The community score with a star, or None when the entry has none.
+fn score_badge(model: &CardModel) -> Option<gtk::Box> {
+    let text = model.score.as_deref()?;
+    let group = gtk::Box::new(O::Horizontal, SPACE_XS);
+    group.add_css_class("kb-badge");
+    group.add_css_class("kb-badge-score");
+    group.set_tooltip_text(Some(&tr(MsgKey::ui_score_on_myanimelist)));
+    group.append(&gtk::Image::from_icon_name("starred-symbolic"));
+    group.append(&gtk::Label::new(Some(text)));
+    Some(group)
+}
+
+/// The badges of the top end: the community score, then where the entry comes from. `local_worded` is whether a Local
+/// badge has room for its word.
+fn end_badges(model: &CardModel, local_worded: bool) -> gtk::Box {
+    let group = gtk::Box::new(O::Horizontal, SPACE_XS);
+    if let Some(score) = score_badge(model) {
+        group.append(&score);
+    }
+    let origin = origin_badge(model, local_worded);
+    // an empty group would still take the spacing
+    if origin.first_child().is_some() {
+        group.append(&origin);
     }
     group
 }
@@ -91,7 +123,7 @@ fn title_label(text: &str, class: &str) -> gtk::Label {
 
 /// Builds the grid card of `item`; `show_continue` adds the continue button. Its selected state is the grid cell's own.
 pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, extras: &Extras) -> Card {
-    let model = layout::card_model(item, mode, extras.kind, extras.season_parent);
+    let model = layout::card_model(item, mode, extras.kind, extras.season_parent, extras.score);
     let width = extras.width;
     let overlay = gtk::Overlay::new();
     overlay.add_css_class("kb-card-cover");
@@ -103,11 +135,11 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, 
     counts.set_valign(Align::Start);
     ui_inset(&counts);
     overlay.add_overlay(&counts);
-    let origin = origin_badge(&model);
-    origin.set_halign(Align::End);
-    origin.set_valign(Align::Start);
-    ui_inset(&origin);
-    overlay.add_overlay(&origin);
+    let end = end_badges(&model, layout::local_word_fits(width, model.score.is_some()));
+    end.set_halign(Align::End);
+    end.set_valign(Align::Start);
+    ui_inset(&end);
+    overlay.add_overlay(&end);
     if model.title_place == TitlePlace::OnCover {
         let title = title_label(&model.title, "kb-card-title-scrim");
         title.set_valign(Align::End);
@@ -135,7 +167,7 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, 
 /// Builds the List mode row of `item` (T-37a-021): a small 2:3 cover, the title, the badges, then the continue
 /// button. `row_height` comes from `layout::list_row_height`.
 pub fn build_list(item: &LibraryItem, show_continue: bool, row_height: f64, extras: &Extras) -> Card {
-    let model = layout::card_model(item, LibraryDisplayMode::List, extras.kind, extras.season_parent);
+    let model = layout::card_model(item, LibraryDisplayMode::List, extras.kind, extras.season_parent, extras.score);
     let height = (row_height.round() as i32 - 2 * SPACE_XS).max(40);
     let overlay = gtk::Overlay::new();
     overlay.add_css_class("kb-card-cover");
@@ -152,7 +184,8 @@ pub fn build_list(item: &LibraryItem, show_continue: bool, row_height: f64, extr
     title.set_hexpand(true);
     title.set_valign(Align::Center);
     root.append(&title);
-    for group in [count_badges(&model), origin_badge(&model)] {
+    // a row has the room: the Local badge always keeps its word
+    for group in [count_badges(&model), end_badges(&model, true)] {
         group.set_valign(Align::Center);
         root.append(&group);
     }
@@ -193,7 +226,7 @@ mod tests {
     #[test]
     fn a_card_without_a_cover_shows_initials_worded_badges_and_the_title_below() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX };
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
             let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &extras);
             let mut text = vec![];
             labels(&card.root, &mut text);
@@ -211,7 +244,7 @@ mod tests {
     #[test]
     fn the_cover_only_grid_has_no_title_and_the_compact_grid_puts_it_on_the_cover() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX };
+            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
             let bare = build(&local_anime(), LibraryDisplayMode::CoverOnlyGrid, true, &extras);
             let mut text = vec![];
             labels(&bare.root, &mut text);
@@ -222,6 +255,39 @@ mod tests {
             labels(&compact.root, &mut text);
             assert!(text.iter().any(|t| t == "Core Concepts"));
             assert!(text.iter().any(|t| t == "6"), "manga words");
+        });
+    }
+
+    #[test]
+    fn the_score_badge_sits_before_local_in_every_grid_mode_and_in_the_list_row() {
+        crate::testing::with_display(|| {
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: Some(8.24) };
+            for mode in [LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CompactGrid, LibraryDisplayMode::CoverOnlyGrid] {
+                let card = build(&local_anime(), mode, false, &extras);
+                let mut text = vec![];
+                labels(&card.root, &mut text);
+                let at = |word: &str| text.iter().position(|t| t == word).unwrap_or_else(|| panic!("{word} in {mode:?}: {text:?}"));
+                assert!(at("6") < at("8.2") && at("8.2") < at("Local"), "{mode:?}: {text:?}");
+            }
+            let row = build_list(&local_anime(), false, 72.0, &extras);
+            let mut text = vec![];
+            labels(&row.root, &mut text);
+            assert_eq!(text, ["CC", "Core Concepts", "6", "8.2", "Local"]);
+        });
+    }
+
+    #[test]
+    fn a_narrow_card_with_a_score_keeps_the_local_icon_and_drops_the_word() {
+        crate::testing::with_display(|| {
+            let narrow = layout::LOCAL_WORD_MIN_PX - 10;
+            let scored = Extras { art: None, kind: Kind::Anime, season_parent: false, width: narrow, score: Some(7.0) };
+            let mut text = vec![];
+            labels(&build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &scored).root, &mut text);
+            assert_eq!(text, ["CC", "6", "7.0", "Core Concepts"]);
+            let plain = Extras { score: None, ..scored };
+            let mut text = vec![];
+            labels(&build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &plain).root, &mut text);
+            assert_eq!(text, ["CC", "6", "Local", "Core Concepts"], "without a score the word stays");
         });
     }
 }

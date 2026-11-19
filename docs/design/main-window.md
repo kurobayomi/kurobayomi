@@ -60,7 +60,9 @@ the user's GTK theme (named colours `@theme_*` only, in `src/theme/style.css`), 
 - Badges say what they count:
   - top start: `6 unwatched` / `6 unread` (`kb-badge kb-badge-unread`, selected colour), `3 downloaded`
     (`kb-badge`); a season parent's tooltip says the count is seasons.
-  - top end: `Local` with a folder icon for local entries, else the source language (`EN`).
+  - top end: the community score with a star (`8.2`, `kb-badge kb-badge-score`) when the entry has one, then
+    `Local` with a folder icon for local entries, else the source language (`EN`). On a grid card narrower than
+    140 px that shows a score, the Local badge is its folder icon alone.
   - bottom end: the continue button (`circular osd`), when enabled.
 
 ### Empty state

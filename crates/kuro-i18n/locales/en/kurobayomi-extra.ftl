@@ -1087,3 +1087,6 @@ ui_search_shikimori = Search Shikimori
 
 # source: kurobayomi
 ui_open_on_shikimori = Open on Shikimori
+
+# source: kurobayomi
+ui_score_on_myanimelist = Score on MyAnimeList
