@@ -15,6 +15,7 @@ mod banner;
 mod category_picker;
 mod duplicate_dialog;
 mod cli;
+mod community;
 // the thumbnail renderer is called by the cover loader, which does not exist yet
 mod feed;
 // No WebView host shows the window yet (T-12a-017 needs WebKitGTK).
@@ -292,6 +293,8 @@ fn build_window(app: &gtk::Application) {
     startup::start_sources(base.store());
     // the library update runner behind the refresh button and the automatic schedule
     misc::start();
+    // the community scores of the library fill in and refresh in the background
+    community::start();
     // the restore banner, the Create and Restore hosts, and the close dialog of a running restore
     outer.prepend(&backup_host::attach(app, &win));
     // closing while a download runs asks first (the downloads pause)

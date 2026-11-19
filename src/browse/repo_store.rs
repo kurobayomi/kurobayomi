@@ -156,6 +156,8 @@ impl FavoriteStore for RepoStore {
         if let Some(bind) = &self.binder {
             bind(entry.id, &entry.title, entry.source);
         }
+        // the new title gets its community score without waiting for the hourly check
+        crate::community::wake();
         flags
     }
 
