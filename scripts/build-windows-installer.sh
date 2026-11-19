@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Windows installer (dist/windows/kurobayomi.iss) from a bundle of scripts/bundle-windows.sh with Inno Setup's
-# compiler. Runs in the MSYS2 shell after a release build (it takes the app icon build.rs wrote).
+# compiler. Runs in the MSYS2 shell after a release build made with KB_WINDOWS_ICON=target/kurobayomi.ico, which has
+# build.rs leave the app icon there.
 # Usage: scripts/build-windows-installer.sh <stable|nightly> <bundle folder> <output folder>
 set -euo pipefail
 
@@ -8,7 +9,11 @@ channel=$1
 bundle=$2
 out=$3
 version="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/^version = "(.*)"$/\1/')"
-icon="$(ls -t target/release/build/kurobayomi-*/out/kurobayomi.ico | head -1)"
+icon=target/kurobayomi.ico
+if [ ! -f "$icon" ]; then
+    echo "build-windows-installer: no $icon; build with KB_WINDOWS_ICON=$icon first" >&2
+    exit 1
+fi
 iscc="${ISCC:-/c/Program Files (x86)/Inno Setup 6/ISCC.exe}"
 
 mkdir -p "$out"

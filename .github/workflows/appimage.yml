@@ -166,6 +166,8 @@ jobs:
           KB_CHANNEL: nightly
           KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
           KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
+          # build.rs leaves the app icon here for the installer (scripts/build-windows-installer.sh)
+          KB_WINDOWS_ICON: target/kurobayomi.ico
           CARGO_PROFILE_RELEASE_LTO: "false"
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
         run: cargo build --release --locked

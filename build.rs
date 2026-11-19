@@ -102,6 +102,13 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").is_ok_and(|os| os == "windows") {
         let ico = out.join("kurobayomi.ico");
         windows_icon(nightly, &ico);
+        // the installer needs the same icon as a file (dist/windows/kurobayomi.iss). The packaging says where it wants a
+        // copy, relative to this folder: where cargo keeps a build script's output is not a place to read from (cargo
+        // 1.100 moved it, and the scripts that looked there found nothing)
+        println!("cargo:rerun-if-env-changed=KB_WINDOWS_ICON");
+        if let Some(copy) = std::env::var_os("KB_WINDOWS_ICON") {
+            std::fs::copy(&ico, &copy).unwrap_or_else(|e| panic!("copy the icon to KB_WINDOWS_ICON ({}): {e}", Path::new(&copy).display()));
+        }
         let script = out.join("kurobayomi.rc");
         std::fs::write(&script, format!("1 ICON \"{}\"\n", ico.display().to_string().replace('\\', "/"))).expect("write resource script");
         let object = out.join("kurobayomi-resources.o");

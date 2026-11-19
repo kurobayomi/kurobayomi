@@ -24,8 +24,8 @@ cp "$prefix/bin/ffmpeg.exe" "$prefix/bin/ffprobe.exe" "$out/bin/"
 # WebView2's loader, through which the hidden pages that pass a site's browser check start the system's Edge WebView2
 # (the hidden pages of kuro-platform). It comes from the webview2-com-sys crate, not from MSYS2, so ntldd cannot find
 # it, and the exe does not start without it. It is taken from the crate's own folder, which its build script copies it
-# from. The copy under target/ is not a safe place to read it: a build folder restored from the cache of a cancelled run
-# had none, while cargo counted the crate as built, and every nightly after it stopped here (2026-11-19)
+# from. The copy under target/ is not a place to read it from: cargo 1.100 moved where it keeps a build script's output,
+# and every nightly after that stopped here (2026-11-19)
 crate="$(cd "$root" && cargo metadata --format-version 1 --locked | tr ',' '\n' | sed -n 's/^"manifest_path":"\(.*webview2-com-sys-[^\\]*\)\\\\Cargo\.toml".*$/\1/p' | sed 's/\\\\/\//g' | tail -n 1)"
 if [ -z "$crate" ]; then
     echo "bundle-windows: cargo metadata names no webview2-com-sys crate, so WebView2Loader.dll cannot be found" >&2

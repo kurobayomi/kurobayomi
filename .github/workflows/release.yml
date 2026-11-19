@@ -183,6 +183,8 @@ jobs:
           KB_UPDATE_REPOSITORY: ${{ github.repository }}
           KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
           KB_SHIKIMORI_CLIENT_SECRET: ${{ secrets.SHIKIMORI_CLIENT_SECRET }}
+          # build.rs leaves the app icon here for the installer (scripts/build-windows-installer.sh)
+          KB_WINDOWS_ICON: target/kurobayomi.ico
         run: cargo build --release --locked --features updater
 
       - name: Bundle
