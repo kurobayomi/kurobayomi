@@ -1,5 +1,5 @@
 //! The one database file `<data_dir>/kurobayomi.db` (docs/design/unified-db.md section 4): manga and anime in
-//! the same tables, told apart by `kind`. Version 1 has no migrations; the old `manga.db` and `anime.db` are
+//! the same tables, told apart by `kind`. Version 1 is the baseline, and `MIGRATIONS` lists the steps after it; the old `manga.db` and `anime.db` are
 //! never opened, only listed by [`legacy_files`].
 
 use std::path::{Path, PathBuf};
@@ -17,8 +17,14 @@ pub const DB_FILE: &str = "kurobayomi.db";
 /// `PRAGMA application_id`: ASCII "KUR2".
 pub const APPLICATION_ID: i64 = 0x4B55_5232;
 
-/// `PRAGMA user_version` of a fresh file. There are no migrations yet; the next one is 2.
-pub const SCHEMA_VERSION: i64 = 1;
+/// The version the baseline script creates.
+pub const BASELINE_VERSION: i64 = 1;
+
+/// `PRAGMA user_version` of a fresh file and of an upgraded one: the target of the last migration.
+pub const SCHEMA_VERSION: i64 = 2;
+
+/// The steps after the baseline, each to the version it names. 2: `community_scores`.
+const MIGRATIONS: &[(i64, &str)] = &[(2, include_str!("../sql/unified/migrate_2.sql"))];
 
 /// The old per-kind files, only for [`legacy_files`].
 pub const LEGACY_FILES: [&str; 2] = ["manga.db", "anime.db"];
@@ -33,15 +39,16 @@ pub const DOWNLOAD_DDL: &str = include_str!("../sql/unified/downloads.sql");
 /// The three views.
 pub const VIEWS_SQL: &str = include_str!("../sql/unified/views.sql");
 
-/// The unified file: baseline at version 1, no migrations.
+/// The unified file: the baseline at version 1, then [`MIGRATIONS`]. A fresh file runs both, so it has the shape of an
+/// upgraded one.
 pub const UNIFIED_SCHEMA: SchemaBundle = SchemaBundle {
     baseline_sql: concat!(
         include_str!("../sql/unified/schema.sql"),
         include_str!("../sql/unified/downloads.sql"),
         include_str!("../sql/unified/views.sql"),
     ),
-    baseline_version: SCHEMA_VERSION,
-    migrations: &[],
+    baseline_version: BASELINE_VERSION,
+    migrations: MIGRATIONS,
     application_id: APPLICATION_ID,
     tables: TABLES,
     refuse_foreign: |found| DbError::ForeignFile { found },

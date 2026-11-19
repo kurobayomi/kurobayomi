@@ -448,3 +448,54 @@ impl UpdateRow {
         })
     }
 }
+
+/// A `community_scores` row. `remote_id` and `score` are `None` for an entry that was looked up and not found;
+/// `score` alone is `None` for a title the site has no score for yet. `matched_by` is `tracker`, `title` or `user`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CommunityScoreRow {
+    pub entry_id: i64,
+    pub provider: String,
+    pub remote_id: Option<i64>,
+    pub matched_title: String,
+    pub matched_by: String,
+    pub score: Option<f64>,
+    pub fetched_at: i64,
+}
+
+impl CommunityScoreRow {
+    pub fn from_row(r: &Row<'_>) -> Result<Self> {
+        Ok(Self {
+            entry_id: r.get("entry_id")?,
+            provider: r.get("provider")?,
+            remote_id: r.get("remote_id")?,
+            matched_title: r.get("matched_title")?,
+            matched_by: r.get("matched_by")?,
+            score: r.get("score")?,
+            fetched_at: r.get("fetched_at")?,
+        })
+    }
+}
+
+/// An entry with the `community_scores` row it has (left join): what the refresh job reads.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScoreCandidateRow {
+    pub entry_id: i64,
+    pub kind: Kind,
+    pub title: String,
+    pub status: i64,
+    pub score: Option<CommunityScoreRow>,
+}
+
+impl ScoreCandidateRow {
+    pub fn from_row(r: &Row<'_>) -> Result<Self> {
+        // every column of the joined row is NULL when the entry has none
+        let joined: Option<i64> = r.get("entry_id")?;
+        Ok(Self {
+            entry_id: r.get("e_id")?,
+            kind: kind_col(r, "kind")?,
+            title: r.get("title")?,
+            status: r.get("status")?,
+            score: joined.map(|_| CommunityScoreRow::from_row(r)).transpose()?,
+        })
+    }
+}

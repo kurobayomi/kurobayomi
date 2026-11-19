@@ -29,6 +29,7 @@ pub const TABLES: &[&str] = &[
     "download_pending_delete",
     "download_pending_corrupt",
     "track_retry_queue",
+    "community_scores",
 ];
 
 /// A set of tables, one bit per table in [`TABLES`] order.
@@ -50,6 +51,7 @@ impl Tables {
     pub const DOWNLOAD_PENDING_DELETE: Tables = Tables(1024);
     pub const DOWNLOAD_PENDING_CORRUPT: Tables = Tables(2048);
     pub const TRACK_RETRY_QUEUE: Tables = Tables(4096);
+    pub const COMMUNITY_SCORES: Tables = Tables(8192);
 
     /// The table names of this set, in bit order.
     pub fn names(self) -> Vec<&'static str> {
@@ -107,6 +109,7 @@ pub const TRACKS_DEPS: Tables = Tables::TRACKS;
 pub const UPDATES_DEPS: Tables = of(&[Tables::ENTRIES, Tables::ITEMS]);
 pub const STUB_SOURCES_DEPS: Tables = Tables::STUB_SOURCES;
 pub const SOURCE_COUNTS_DEPS: Tables = Tables::ENTRIES;
+pub const COMMUNITY_SCORES_DEPS: Tables = Tables::COMMUNITY_SCORES;
 
 /// What the writer's hooks collect. `open` holds the names of the write in progress; `staged` holds
 /// the names of commits whose publication is still pending.
@@ -171,10 +174,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_thirteen_bits_follow_the_table_order() {
-        assert_eq!(TABLES.len(), 13);
+    fn the_fourteen_bits_follow_the_table_order() {
+        assert_eq!(TABLES.len(), 14);
         assert_eq!(Tables::ENTRIES.0, 1);
         assert_eq!(Tables::TRACK_RETRY_QUEUE.0, 4096);
+        assert_eq!(Tables::from_name("community_scores"), Tables::COMMUNITY_SCORES);
+        assert_eq!(Tables::COMMUNITY_SCORES.0, 8192);
         assert_eq!(Tables::from_name("items"), Tables::ITEMS);
         assert_eq!(Tables::from_name("tracks"), Tables::TRACKS);
         assert_eq!(Tables::from_name("mangas"), Tables::NONE, "old table names are no bits");

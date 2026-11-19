@@ -327,10 +327,10 @@ fn opening_a_file_from_a_newer_app_through_the_handle_is_refused_and_untouched()
     let paths = TempPaths::new().unwrap();
     let file = db_path(&kuro_platform::paths::Paths::data_dir(&paths));
     drop(Db::open(&paths).unwrap());
-    Connection::open(&file).unwrap().pragma_update(None, "user_version", 2).unwrap();
+    Connection::open(&file).unwrap().pragma_update(None, "user_version", 3).unwrap();
     let before = std::fs::read(&file).unwrap();
     let err = Db::open(&paths).err().expect("refused");
-    assert!(matches!(err, DbError::TooNew { found: 2, supported: 1 }), "{err:?}");
+    assert!(matches!(err, DbError::TooNew { found: 3, supported: 2 }), "{err:?}");
     assert_eq!(std::fs::read(&file).unwrap(), before);
 }
 

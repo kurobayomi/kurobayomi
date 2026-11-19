@@ -12,6 +12,7 @@ use rusqlite::{Connection, ErrorCode};
 pub mod anime_relation;
 pub mod category;
 pub mod columns;
+pub mod community_score;
 pub mod compat;
 pub mod dropped;
 pub mod entry;

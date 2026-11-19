@@ -25,8 +25,8 @@ Decisions this design makes (the rest follows from them):
 ## 1. Schema `kurobayomi.db` v1
 
 File: `crates/kuro-db/sql/unified/schema.sql` (tables, indexes, triggers, seed rows) and
-`crates/kuro-db/sql/unified/views.sql` (three views). `SCHEMA_VERSION = 1`, `BASELINE_VERSION = 1`, no migrations
-(next one is 2). Pragmas as today (`open_connection`: WAL, foreign_keys ON, busy_timeout, `kuro_lower`).
+`crates/kuro-db/sql/unified/views.sql` (three views). `BASELINE_VERSION = 1`; `SCHEMA_VERSION = 2` since migration 2
+(`sql/unified/migrate_2.sql`, the `community_scores` cache). Pragmas as today (`open_connection`: WAL, foreign_keys ON, busy_timeout, `kuro_lower`).
 
 ```sql
 -- ===== entries: manga and anime in one table ==================================================

@@ -66,12 +66,17 @@ mod tests {
             .collect()
     }
 
-    /// The unified inventory: 13 tables and 3 views, each created by the baseline and present in a fresh file.
+    /// The unified inventory: 14 tables (13 of the baseline, 1 of the migrations) and 3 views, each present in a fresh
+    /// file.
     #[test]
     fn every_table_and_view_of_the_unified_schema_exists() {
-        let tables = names_after(UNIFIED_SCHEMA.baseline_sql, "CREATE TABLE ");
-        let views = names_after(UNIFIED_SCHEMA.baseline_sql, "CREATE VIEW ");
+        let mut tables = names_after(UNIFIED_SCHEMA.baseline_sql, "CREATE TABLE ");
         assert_eq!(tables.len(), 13, "tables in schema.sql and downloads.sql: {tables:?}");
+        for (_, sql) in UNIFIED_SCHEMA.migrations {
+            tables.extend(names_after(sql, "CREATE TABLE "));
+        }
+        let views = names_after(UNIFIED_SCHEMA.baseline_sql, "CREATE VIEW ");
+        assert_eq!(tables.len(), 14, "with community_scores of migration 2: {tables:?}");
         assert_eq!(views.len(), 3, "views in views.sql: {views:?}");
         let mut named: Vec<&str> = UNIFIED_SCHEMA.tables.to_vec();
         named.sort_unstable();

@@ -7,6 +7,7 @@ use rusqlite::types::{ToSql, Type};
 use rusqlite::{Connection, OptionalExtension, Result, Row};
 
 pub mod categories;
+pub mod community_scores;
 pub mod downloads;
 pub mod entries;
 pub mod excluded;
