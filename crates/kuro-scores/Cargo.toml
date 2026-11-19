@@ -1,0 +1,21 @@
+[package]
+name = "kuro-scores"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+kuro-data = { path = "../kuro-data" }
+kuro-platform = { path = "../kuro-platform" }
+kuro-track = { path = "../kuro-track" }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+bytes = { workspace = true }
+serde_json = "1.0.151"
+tokio = { workspace = true }
+wiremock = { workspace = true }

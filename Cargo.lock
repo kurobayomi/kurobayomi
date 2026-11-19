@@ -3760,6 +3760,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "kuro-scores"
+version = "0.3.2"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "kuro-data",
+ "kuro-platform",
+ "kuro-track",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "kuro-source"
 version = "0.3.2"
 dependencies = [
@@ -3929,6 +3946,7 @@ dependencies = [
  "kuro-platform",
  "kuro-player",
  "kuro-prefs",
+ "kuro-scores",
  "kuro-source",
  "kuro-source-scrape",
  "kuro-testkit",
