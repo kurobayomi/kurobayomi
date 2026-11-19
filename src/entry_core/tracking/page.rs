@@ -194,7 +194,7 @@ pub fn search() -> Option<Built> {
     let generation = Rc::new(Cell::new(0_u64));
     let (typed, shown_status, shown_results, typed_generation) = (entry.clone(), status.clone(), results.clone(), Rc::clone(&generation));
     field.connect_activate(move |entry_field| run_search(&typed, vec![entry_field.text().to_string()], &shown_status, &shown_results, &typed_generation));
-    run_search(&entry, title_queries(&entry.title), &status, &results, &generation);
+    run_search(&entry, kuro_track::auto_bind::title_queries(&entry.title), &status, &results, &generation);
     built(ui::scrolled(&column), vec![])
 }
 
@@ -651,22 +651,6 @@ fn run_search(entry: &Entry, queries: Vec<String>, status: &Label, results: &GBo
     );
 }
 
-/// The queries the first search of an entry tries, in order: its title as the source names it, the part before a
-/// subtitle (`: `, ` - `, ` – `), and its first three words. Sources often carry a long romaji title that the tracker
-/// lists under a shorter name. Repeats are dropped.
-fn title_queries(title: &str) -> Vec<String> {
-    let title = title.trim();
-    let main = [": ", " - ", " – "].iter().filter_map(|cut| title.split_once(cut).map(|(head, _)| head.trim())).min_by_key(|head| head.len()).unwrap_or(title);
-    let words = main.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
-    let mut queries: Vec<String> = Vec::new();
-    for query in [title, main, words.as_str()] {
-        if !query.is_empty() && !queries.iter().any(|known| known == query) {
-            queries.push(query.to_owned());
-        }
-    }
-    queries
-}
-
 /// The hits of the first of `queries` that finds any. A failed search stops there: the error is shown with its Retry.
 async fn search_first(tracker: &dyn Tracker, kind: Kind, queries: &[String]) -> Result<Vec<Found>, TrackError> {
     for query in queries {
@@ -761,17 +745,6 @@ mod tests {
         assert_eq!(status_text(Some("plan_to_read")), "Plan to read");
         assert_eq!(status_text(Some("no_such_key_here")), "no_such_key_here", "an unknown key shows as it is");
         assert_eq!(status_text(None), "");
-    }
-
-    #[test]
-    fn the_first_search_falls_back_to_the_main_title_and_its_first_words() {
-        assert_eq!(
-            title_queries("Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin"),
-            ["Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin", "Kyouran Reijou Nia Liston", "Kyouran Reijou Nia"]
-        );
-        assert_eq!(title_queries("Bungou Stray Dogs 5th Season"), ["Bungou Stray Dogs 5th Season", "Bungou Stray Dogs"]);
-        assert_eq!(title_queries("  Frieren  "), ["Frieren"], "a short title is tried once");
-        assert!(title_queries("   ").is_empty());
     }
 
     #[test]

@@ -55,6 +55,23 @@ pub fn pick<'a>(title: &str, hits: impl IntoIterator<Item = (&'a str, &'a [Strin
     found
 }
 
+/// The queries the first search of an entry tries, in order: its title as the source names it, the part before a
+/// subtitle (`: `, ` - `, ` – `), and its first three words. Sources often carry a long romaji title that the tracker
+/// lists under a shorter name. Repeats are dropped. The shorter ones only widen a search: a result still has to be
+/// [`pick`]ed by its full name.
+pub fn title_queries(title: &str) -> Vec<String> {
+    let title = title.trim();
+    let main = [": ", " - ", " – "].iter().filter_map(|cut| title.split_once(cut).map(|(head, _)| head.trim())).min_by_key(|head| head.len()).unwrap_or(title);
+    let words = main.split_whitespace().take(3).collect::<Vec<_>>().join(" ");
+    let mut queries: Vec<String> = Vec::new();
+    for query in [title, main, words.as_str()] {
+        if !query.is_empty() && !queries.iter().any(|known| known == query) {
+            queries.push(query.to_owned());
+        }
+    }
+    queries
+}
+
 /// The trackers auto-track binds on: switched on, logged in, and not self-hosted.
 fn targets(ctx: &TrackCtx) -> Vec<std::sync::Arc<dyn Tracker>> {
     if !ctx.prefs.auto_track.get() {
@@ -133,6 +150,17 @@ mod tests {
 
     fn names(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn the_first_search_falls_back_to_the_main_title_and_its_first_words() {
+        assert_eq!(
+            title_queries("Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin"),
+            ["Kyouran Reijou Nia Liston: Byoujaku Reijou ni Tensei shita Kamigoroshi no Bujin", "Kyouran Reijou Nia Liston", "Kyouran Reijou Nia"]
+        );
+        assert_eq!(title_queries("Bungou Stray Dogs 5th Season"), ["Bungou Stray Dogs 5th Season", "Bungou Stray Dogs"]);
+        assert_eq!(title_queries("  Frieren  "), ["Frieren"], "a short title is tried once");
+        assert!(title_queries("   ").is_empty());
     }
 
     #[test]
