@@ -223,6 +223,8 @@ pub enum EntryEvent {
     AddCategories { all: Vec<(i64, String)>, linked: Vec<i64> },
     /// The tracking count, read again (`EntryCmd::ReadTracking`).
     Tracking(usize),
+    /// The scores of the header, read again: the community score was stored, or the trackers were read again.
+    Scores(crate::entry_core::header::Scores),
 }
 
 /// The page's handle on the runner. Dropping it stops the runner and the subscriptions.
@@ -379,6 +381,14 @@ impl Shared {
         }
     }
 
+    /// The header's scores, read again off the GTK thread.
+    async fn emit_scores(&self, entry_id: i64) {
+        match self.blocking(move |store| store.scores(entry_id)).await {
+            Ok(scores) => self.emit(EntryEvent::Scores(scores)),
+            Err(e) => self.failed(e),
+        }
+    }
+
     /// The download count and source language of each season of the entry, read off the GTK thread. Nothing is sent
     /// for an entry with no seasons.
     async fn emit_season_facts(&self, entry_id: i64) {
@@ -492,9 +502,18 @@ impl Shared {
                 }
             }
         });
+        // the community score lands in its store when the refresh job answers (`crate::community`)
+        let mut score_sub = self.store.watch_community(entry_id);
+        let shared = Arc::clone(self);
+        let score_task = tokio::spawn(async move {
+            while score_sub.changed().await.is_some() {
+                shared.emit_scores(entry_id).await;
+            }
+        });
         let mut subs = self.subscriptions.lock().unwrap_or_else(PoisonError::into_inner);
         subs.extend(pair);
         subs.push(related_task.abort_handle());
+        subs.push(score_task.abort_handle());
         if self.store.kind().is_manga() {
             subs.extend(self.watch_scanlators(entry_id));
         }
@@ -587,7 +606,11 @@ impl Shared {
                 self.blocking(move |s| s.set_categories(entry_id, &category_ids).map(|()| true)).await
             }
             EntryCmd::ReadTracking { entry_id, source_id } => match self.blocking(move |s| s.track_summary(entry_id, source_id)).await {
-                Ok(summary) => return self.emit(EntryEvent::Tracking(summary.count as usize)),
+                Ok(summary) => {
+                    self.emit(EntryEvent::Tracking(summary.count as usize));
+                    // a bind, a score given on the tracking page or a login changes the user's own score too
+                    return self.emit_scores(entry_id).await;
+                }
                 Err(e) => Err(e),
             },
             EntryCmd::Load { .. } | EntryCmd::Refresh { .. } | EntryCmd::Shutdown => return,

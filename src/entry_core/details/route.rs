@@ -780,6 +780,8 @@ impl View {
                     // progress made in another app reaches the trackers first: pull it once per open
                     if first {
                         self.sync_tracking(m.entry.id, m.entry.source, m.entry.favorite);
+                        // a missing or old community score is looked up ahead of the library's, in or out of the library
+                        crate::community::lookup_now(m.entry.id);
                     }
                 }
                 *self.model.borrow_mut() = loaded.map(|b| *b);
@@ -851,6 +853,11 @@ impl View {
             EntryEvent::Tracking(count) => {
                 if let Some(m) = self.model.borrow_mut().as_mut() {
                     m.tracking_count = count;
+                }
+            }
+            EntryEvent::Scores(scores) => {
+                if let Some(m) = self.model.borrow_mut().as_mut() {
+                    m.scores = scores;
                 }
             }
         }
@@ -1469,6 +1476,7 @@ impl View {
         let model = header_model(&m.entry, &m.source);
         let column = if two { self.panes.width() } else { self.width.get() };
         let handlers = self.handlers();
+        self.info.set_score(crate::entry_core::header::score_line(&m.scores));
         self.info.set_header(&model, two, column, &handlers);
         self.info.set_description(&description(m.entry.description.as_deref()), &model.genres, &self.expansion, &handlers);
     }

@@ -5270,3 +5270,12 @@ ui_open_on_shikimori = Open on Shikimori
 
 # source: kurobayomi
 ui_score_on_myanimelist = Score on MyAnimeList
+
+# source: kurobayomi
+ui_score_value_on_myanimelist = { $score } on MyAnimeList
+
+# source: kurobayomi
+ui_your_score_value = Your score: { $score }
+
+# source: kurobayomi
+ui_score_matched_as = Matched on MyAnimeList as { $title }

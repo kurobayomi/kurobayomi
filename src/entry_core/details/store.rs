@@ -9,6 +9,7 @@ use kuro_data::DataResult;
 use kuro_data::anime_relation::AnimeRelationGroup;
 use kuro_data::anime_relation::AnimeRelationRepo;
 use kuro_data::category::CategoryRepo;
+use kuro_data::community_score::{CommunityScore, CommunityScoreRepo};
 use kuro_data::entry::{Entry, EntryRepo, SeasonEntry};
 use kuro_data::item::{Item, ItemRepo, ItemUpdate};
 use kuro_data::track::TrackRepo;
@@ -21,9 +22,11 @@ use kuro_prefs::store::PrefStore;
 
 use super::actions::Mark;
 use crate::entry_core::entry_ops;
+use crate::entry_core::header::Scores;
 use crate::entry_core::library_flow::LibraryRepos;
 use crate::entry_core::refresh_rules::{self, Trigger};
 use crate::entry_core::tracking::facts::Summary;
+use crate::entry_core::tracking::session;
 
 /// The scanlators of a manga's chapters: the ones the chapters have and the ones the reader excluded.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -79,6 +82,19 @@ impl EntryStore {
     /// The tracking count and the logged-in flag of the entry, through the same filter as the sheet (T-TRK-12, D-10).
     pub fn track_summary(&self, entry_id: i64, source_id: i64) -> DataResult<Summary> {
         entry_ops::track_summary(&self.tracks, self.kind, entry_id, source_id)
+    }
+
+    /// The scores of the header's score line: the stored community score with the title it was matched as, and the
+    /// user's own over the trackers logged in right now (`entry_ops::own_score`).
+    pub fn scores(&self, entry_id: i64) -> DataResult<Scores> {
+        let community = CommunityScoreRepo::new(self.db()).by_entry(entry_id)?.and_then(|row| row.score.map(|score| (score, row.matched_title)));
+        let own = entry_ops::own_score(&self.tracks, entry_id, &session::logged_in_ids())?;
+        Ok(Scores { community, own })
+    }
+
+    /// The stored community score of the entry, published again after each write to the score store.
+    pub fn watch_community(&self, entry_id: i64) -> Subscription<Option<CommunityScore>> {
+        CommunityScoreRepo::new(self.db()).watch_by_entry(entry_id)
     }
 
     /// Every category (the default row `0` included, the dialog drops it) and the ids the entry is linked to.

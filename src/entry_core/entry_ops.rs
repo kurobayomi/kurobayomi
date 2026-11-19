@@ -102,6 +102,18 @@ pub fn track_summary(tracks: &TrackRepo, kind: Kind, id: i64, source_id: i64) ->
     Ok(session::summary(kind, source_id, &bound))
 }
 
+/// The user's own score of the entry on the 10-point scale (`kuro_track::model::score_10`): the mean over its tracks on
+/// the trackers `logged_in` that carry a score, as the library's "Tracker score" sort reads it. `None` when none does.
+pub fn own_score(tracks: &TrackRepo, id: i64, logged_in: &[i64]) -> DataResult<Option<f64>> {
+    let scores: Vec<f64> = tracks
+        .by_entry(id)?
+        .iter()
+        .filter(|t| logged_in.contains(&t.tracker_id) && t.score > 0.0)
+        .map(|t| kuro_track::model::score_10(kuro_track::model::TrackerId(t.tracker_id), t.score))
+        .collect();
+    Ok((!scores.is_empty()).then(|| scores.iter().sum::<f64>() / scores.len() as f64))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -199,5 +211,19 @@ mod tests {
             assert!(items.by_entry_id(id, false).unwrap().iter().all(|i| !i.done && i.progress == 0));
             assert!(mark_done(&items, &items.by_entry_id(id, false).unwrap(), false).unwrap().is_empty());
         }
+    }
+
+    #[test]
+    fn the_own_score_is_the_mean_over_the_logged_in_trackers_that_carry_one() {
+        let (_dir, db) = db();
+        let id = entry(&EntryRepo::new(db.clone()), Kind::Anime);
+        let tracks = TrackRepo::new(db);
+        assert_eq!(own_score(&tracks, id, &[1, 2, 3]).unwrap(), None, "not tracked");
+        let track = |tracker: i64, score: f64| kuro_data::track::Track { entry_id: id, remote_id: tracker * 10, score, ..kuro_data::track::Track::new(Kind::Anime, tracker) };
+        // MyAnimeList (1) holds 9, AniList (2) the same scale times ten, Kitsu (3) no score
+        tracks.insert_all(&[track(1, 9.0), track(2, 80.0), track(3, 0.0)]).unwrap();
+        assert_eq!(own_score(&tracks, id, &[1, 2, 3]).unwrap(), Some(8.5));
+        assert_eq!(own_score(&tracks, id, &[2]).unwrap(), Some(8.0), "a logged-out tracker is left out");
+        assert_eq!(own_score(&tracks, id, &[3]).unwrap(), None, "bound, with no score given");
     }
 }

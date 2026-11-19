@@ -82,6 +82,8 @@ pub struct EntryModel {
     pub queued: HashMap<i64, (DownloadState, u8)>,
     /// How many trackers the entry is bound to, read when the page opens.
     pub tracking_count: usize,
+    /// The community score and the user's own, for the header's score line; read again on `EntryEvent::Scores`.
+    pub scores: crate::entry_core::header::Scores,
     /// The download count and source language of each season, by season id. The runner sends them after the load, so
     /// a tile shows no download or language badge until they arrive.
     pub season_extras: HashMap<i64, SeasonExtra>,
@@ -142,6 +144,7 @@ impl EntryModel {
             downloaded: HashSet::new(),
             queued: HashMap::new(),
             tracking_count,
+            scores: store.scores(entry_id)?,
             season_extras: HashMap::new(),
             scanlators: store.scanlators(entry_id)?,
             search: String::new(),

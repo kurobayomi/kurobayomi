@@ -10,8 +10,8 @@ use gtk::{Box as GBox, Orientation as O};
 
 use crate::entry_core::action_row_view::ActionRow;
 use crate::entry_core::description_view;
-use crate::entry_core::header::{GenreChip, HeaderModel};
-use crate::entry_core::header_view::{self, Handlers};
+use crate::entry_core::header::{GenreChip, HeaderModel, ScoreLine};
+use crate::entry_core::header_view::{self, Handlers, ScoreRow};
 use crate::entry_core::text::{Description, Expansion};
 use crate::theme::tokens::{SPACE_M};
 
@@ -22,6 +22,10 @@ pub struct InfoBlock {
     description: GBox,
     /// The header on screen: its model, the layout and the column it was built for.
     shown_header: RefCell<Option<(HeaderModel, bool, (i32, bool))>>,
+    /// The score line of the header on screen, and what it shows. Kept apart from the header's model: a score that
+    /// arrives changes one label, and the header with its cover is not built again.
+    score_row: RefCell<Option<ScoreRow>>,
+    score: RefCell<Option<ScoreLine>>,
     /// The description on screen with its genre chips.
     shown_description: RefCell<Option<(Description, Vec<GenreChip>)>>,
 }
@@ -34,7 +38,16 @@ impl InfoBlock {
         root.append(&header);
         root.append(&action_row.root);
         root.append(&description);
-        Self { root, header, action_row, description, shown_header: RefCell::default(), shown_description: RefCell::default() }
+        Self {
+            root,
+            header,
+            action_row,
+            description,
+            shown_header: RefCell::default(),
+            score_row: RefCell::default(),
+            score: RefCell::default(),
+            shown_description: RefCell::default(),
+        }
     }
 
     /// Draws the header for `model` in the `large` layout, `column` px wide. It is built again only when the model
@@ -50,8 +63,22 @@ impl InfoBlock {
             return;
         }
         clear(&self.header);
-        self.header.append(&header_view::build(model, large, column, handlers));
+        let built = header_view::build(model, large, column, handlers);
+        built.score.set(self.score.borrow().as_ref());
+        self.header.append(&built.root);
+        *self.score_row.borrow_mut() = Some(built.score);
         *self.shown_header.borrow_mut() = Some((model.clone(), large, at));
+    }
+
+    /// Shows `line` as the header's score line, or hides the line. The header keeps its widgets.
+    pub fn set_score(&self, line: Option<ScoreLine>) {
+        if *self.score.borrow() == line {
+            return;
+        }
+        if let Some(row) = self.score_row.borrow().as_ref() {
+            row.set(line.as_ref());
+        }
+        *self.score.borrow_mut() = line;
     }
 
     /// Draws the description and its genre chips. They are built again only when either changes.
@@ -110,6 +137,31 @@ mod tests {
             assert_eq!(info.description.first_child(), shown, "the same description keeps its widgets");
             info.set_description(&description(Some("Another story.")), &[], &expansion, &handlers);
             assert_ne!(info.description.first_child(), shown, "new text draws the description again");
+        });
+    }
+
+    #[test]
+    fn a_score_that_arrives_changes_its_line_and_keeps_the_header() {
+        crate::testing::with_display(|| {
+            let handlers = Handlers {
+                on_search: Rc::new(|_: SearchRequest| {}),
+                on_copy: Rc::new(|_: String| {}),
+            };
+            let info = InfoBlock::new(ActionRow::new(Rc::new(|| {}), None, None));
+            let model = HeaderModel::from_parts("Title", Some("Author"), None, ("document-open-recent-symbolic", "Ongoing".into()), "Source", false);
+            let shown = |info: &InfoBlock| info.score_row.borrow().as_ref().and_then(ScoreRow::shown);
+            let line = ScoreLine { text: "8.2 on MyAnimeList".into(), tooltip: None };
+
+            info.set_header(&model, false, 400, &handlers);
+            let header = info.header.first_child();
+            assert_eq!(shown(&info), None, "no score, no line");
+            info.set_score(Some(line.clone()));
+            assert_eq!(shown(&info).as_deref(), Some("8.2 on MyAnimeList"));
+            assert_eq!(info.header.first_child(), header, "the header keeps its widgets");
+            info.set_header(&model, true, 300, &handlers);
+            assert_eq!(shown(&info).as_deref(), Some("8.2 on MyAnimeList"), "a header built again shows the score it had");
+            info.set_score(None);
+            assert_eq!(shown(&info), None);
         });
     }
 }

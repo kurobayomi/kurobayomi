@@ -1,6 +1,7 @@
 //! The info header, GTK-free: the lines it shows, what a click searches, what a long press copies, and the cover size.
 //! Upstream: `MangaInfoHeader.kt:336-414` (layouts), `:424-520` (title, author, artist, source rows).
 
+use kuro_i18n::{Arg, MsgKey, trf};
 use kuro_images::art::{ArtKind, ArtRef};
 use kuro_platform::kind::Kind;
 
@@ -127,6 +128,40 @@ impl HeaderModel {
     pub fn copy(&self, field: Field) -> Option<String> {
         self.raw(field).map(str::to_owned)
     }
+}
+
+/// The scores of an entry, as its details page reads them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Scores {
+    /// The community score (0 to 10) and the title it was matched as (`kuro_data::community_score`).
+    pub community: Option<(f64, String)>,
+    /// The user's own score on the 10-point scale (`entry_ops::own_score`).
+    pub own: Option<f64>,
+}
+
+/// The score line under the source: its text, and a tooltip naming the title the community score was matched as.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScoreLine {
+    pub text: String,
+    pub tooltip: Option<String>,
+}
+
+/// The user's own score as text: whole when it is ("8"), else with one decimal ("7.5").
+fn own_text(score: f64) -> String {
+    let rounded = (score * 10.0).round() / 10.0;
+    if rounded.fract() == 0.0 { format!("{rounded:.0}") } else { format!("{rounded:.1}") }
+}
+
+/// The score line: the community score, then the user's own, each only when there is one. `None` hides the line.
+pub fn score_line(scores: &Scores) -> Option<ScoreLine> {
+    let community = scores.community.as_ref().map(|(score, _)| trf(MsgKey::ui_score_value_on_myanimelist, &[("score", Arg::Str(&crate::community::score_text(*score)))]));
+    let own = scores.own.map(|score| trf(MsgKey::ui_your_score_value, &[("score", Arg::Str(&own_text(score)))]));
+    let parts: Vec<String> = [community, own].into_iter().flatten().collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let tooltip = scores.community.as_ref().filter(|(_, title)| !title.is_empty()).map(|(_, title)| trf(MsgKey::ui_score_matched_as, &[("title", Arg::Str(title))]));
+    Some(ScoreLine { text: parts.join(" \u{b7} "), tooltip })
 }
 
 /// The cover size (width, height; 2:3) for a layout. `column_width` is the width of the column that holds it.
@@ -267,5 +302,34 @@ mod genre_tests {
         assert_eq!(chips.iter().map(|c| c.label.as_str()).collect::<Vec<_>>(), ["Action", "Drama"]);
         assert_eq!(chips[1].copy, "Drama");
         assert_eq!(chips[0].search, SearchRequest { query: "Action".into(), global: false, genre: true });
+    }
+}
+
+#[cfg(test)]
+mod score_tests {
+    use super::*;
+
+    #[test]
+    fn the_score_line_shows_the_community_score_then_the_users_own() {
+        let both = Scores { community: Some((8.24, "Frieren".into())), own: Some(8.0) };
+        let line = score_line(&both).expect("a line");
+        assert_eq!(line.text, "8.2 on MyAnimeList \u{b7} Your score: 8");
+        assert_eq!(line.tooltip.as_deref(), Some("Matched on MyAnimeList as Frieren"));
+
+        let community = score_line(&Scores { community: Some((7.0, String::new())), own: None }).expect("a line");
+        assert_eq!((community.text.as_str(), community.tooltip), ("7.0 on MyAnimeList", None), "no matched title, no tooltip");
+
+        let own = score_line(&Scores { community: None, own: Some(7.5) }).expect("a line");
+        assert_eq!((own.text.as_str(), own.tooltip), ("Your score: 7.5", None), "a mean over two trackers keeps its half");
+
+        assert_eq!(score_line(&Scores::default()), None, "nothing to show hides the line");
+    }
+
+    #[test]
+    fn the_own_score_is_whole_when_it_can_be() {
+        assert_eq!(own_text(8.0), "8");
+        assert_eq!(own_text(8.04), "8", "rounds to a whole");
+        assert_eq!(own_text(7.25), "7.3");
+        assert_eq!(own_text(10.0), "10");
     }
 }

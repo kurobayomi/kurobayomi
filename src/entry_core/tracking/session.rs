@@ -43,6 +43,11 @@ pub fn has_logged_in() -> bool {
     trackers().iter().any(|t| t.is_logged_in())
 }
 
+/// The ids of the trackers logged in right now.
+pub fn logged_in_ids() -> Vec<i64> {
+    trackers().iter().filter(|t| t.is_logged_in()).map(|t| t.id().0).collect()
+}
+
 /// The count and the logged-in flag of an entry from `source_id`, bound to the trackers `bound`, through the same filter
 /// as the sheet.
 pub fn summary(kind: Kind, source_id: i64, bound: &[i64]) -> Summary {

@@ -12,7 +12,7 @@ use kuro_i18n::{Arg, MsgKey, tr, trf};
 use crate::entry_core::action_row::{self, Tone, tone_alpha};
 use crate::entry_core::backdrop::TINT_ALPHA;
 use crate::entry_core::backdrop_view;
-use crate::entry_core::header::{Field, HeaderModel, SearchRequest, cover_size};
+use crate::entry_core::header::{Field, HeaderModel, ScoreLine, SearchRequest, cover_size};
 use crate::entry_core::cover_view::CoverView;
 use crate::widgets::context_menu;
 use crate::theme::tokens::{SPACE_L, SPACE_M, SPACE_XS};
@@ -163,10 +163,46 @@ pub const NARROW_TITLE_BELOW: i32 = 480;
 /// The title wraps to at most this many lines, then ends with an ellipsis.
 pub const TITLE_MAX_LINES: i32 = 3;
 
+/// The score line of a header: a star and the text, under the source. Hidden while there is nothing to show. It is
+/// changed in place ([`ScoreRow::set`]), so a score that arrives does not build the header again and reload its cover.
+pub struct ScoreRow {
+    row: GBox,
+    label: Label,
+}
+
+impl ScoreRow {
+    fn new(centered: bool, xalign: f32) -> Self {
+        let label = Label::builder().css_classes(["dim-label"]).xalign(xalign).build();
+        let row = icon_row("starred-symbolic", &label, centered);
+        row.set_visible(false);
+        Self { row, label }
+    }
+
+    pub fn set(&self, line: Option<&ScoreLine>) {
+        self.row.set_visible(line.is_some());
+        if let Some(line) = line {
+            self.label.set_label(&line.text);
+            self.row.set_tooltip_text(line.tooltip.as_deref());
+        }
+    }
+
+    /// The text on screen, or `None` while the line is hidden.
+    #[cfg(test)]
+    pub fn shown(&self) -> Option<String> {
+        self.row.is_visible().then(|| self.label.label().to_string())
+    }
+}
+
+/// A built header: the widget, and its score line for the owner to fill.
+pub struct Header {
+    pub root: gtk::Overlay,
+    pub score: ScoreRow,
+}
+
 /// Builds the header. The small layout puts the cover beside the text, the large layout puts a wider cover above
 /// centered text. `column_width` is the width of the column that holds the header. The header sits inside 16 px side
 /// margins, over the backdrop: the theme colour fading out and the cover blurred behind it (T-38a-014).
-pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) -> gtk::Overlay {
+pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) -> Header {
     // the cover sits inside the header's 16 px side margins
     let (w, ht) = cover_size(large, column_width - 32);
     // the open page's own cover goes first in the image queue
@@ -205,6 +241,8 @@ pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) 
         source_row.append(&gtk::Image::builder().icon_name("dialog-warning-symbolic").css_classes(["error"]).build());
     }
     info.append(&source_row);
+    let score = ScoreRow::new(large, xalign);
+    info.append(&score.row);
 
     let root = GBox::new(if large { O::Vertical } else { O::Horizontal }, 16);
     root.set_margin_start(SPACE_L);
@@ -222,7 +260,7 @@ pub fn build(model: &HeaderModel, large: bool, column_width: i32, h: &Handlers) 
     layered.add_overlay(&backdrop_view::build(model.cover.as_ref()));
     layered.add_overlay(&root);
     layered.set_measure_overlay(&root, true);
-    layered
+    Header { root: layered, score }
 }
 
 #[cfg(test)]
