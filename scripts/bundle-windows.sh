@@ -23,9 +23,15 @@ cp "$prefix/bin/gdbus.exe" "$out/bin/"
 cp "$prefix/bin/ffmpeg.exe" "$prefix/bin/ffprobe.exe" "$out/bin/"
 # WebView2's loader, through which the hidden pages that pass a site's browser check start the system's Edge WebView2
 # (the hidden pages of kuro-platform). It comes from the webview2-com-sys crate, not from MSYS2, so ntldd cannot find
-# it, and the exe does not start without it
-loader="$(ls -t "$(dirname "$exe")"/build/webview2-com-sys-*/out/x64/WebView2Loader.dll | head -1)"
-cp "$loader" "$out/bin/"
+# it, and the exe does not start without it. It is taken from the crate's own folder, which its build script copies it
+# from. The copy under target/ is not a safe place to read it: a build folder restored from the cache of a cancelled run
+# had none, while cargo counted the crate as built, and every nightly after it stopped here (2026-11-19)
+crate="$(cd "$root" && cargo metadata --format-version 1 --locked | tr ',' '\n' | sed -n 's/^"manifest_path":"\(.*webview2-com-sys-[^\\]*\)\\\\Cargo\.toml".*$/\1/p' | sed 's/\\\\/\//g' | tail -n 1)"
+if [ -z "$crate" ]; then
+    echo "bundle-windows: cargo metadata names no webview2-com-sys crate, so WebView2Loader.dll cannot be found" >&2
+    exit 1
+fi
+cp "$crate/x64/WebView2Loader.dll" "$out/bin/"
 # the image loaders (librsvg's draws the SVG icons) with their cache, whose paths are relative to the prefix
 cp -r "$prefix/lib/gdk-pixbuf-2.0" "$out/lib/"
 cp "$prefix/share/glib-2.0/schemas/gschemas.compiled" "$out/share/glib-2.0/schemas/"
