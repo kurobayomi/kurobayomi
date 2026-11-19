@@ -81,7 +81,7 @@ button.kb-spin-once image {
   color: @theme_selected_fg_color;
 }
 .kb-badge-score image {
-  color: @warning_color;
+  color: @theme_selected_bg_color;
 }
 .kb-card-title {
   font-size: 0.9em;
