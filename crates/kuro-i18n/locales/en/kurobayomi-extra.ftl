@@ -294,12 +294,6 @@ ui_use_for_all_titles = Use for all titles
 ui_download_all = Download all
 
 # source: kurobayomi
-ui_connect_anilist = Connect AniList
-
-# source: kurobayomi
-ui_tracking_keeps_your_progress_on_anilist = Tracking keeps your progress on AniList.
-
-# source: kurobayomi
 ui_stop_tracking = Stop tracking
 
 # source: kurobayomi
@@ -857,12 +851,6 @@ player_speed_menu = Speed
 player_default_quality = Default quality
 
 # source: kurobayomi
-ui_connect_myanimelist = Connect MyAnimeList
-
-# source: kurobayomi
-ui_tracking_keeps_your_progress_on_myanimelist = Tracking keeps your progress on MyAnimeList.
-
-# source: kurobayomi
 ui_search_myanimelist = Search MyAnimeList
 
 # source: kurobayomi
@@ -1077,12 +1065,6 @@ action_jump_to_unread = Jump to first unread
 action_jump_to_unseen = Jump to first unseen
 
 # source: kurobayomi
-ui_connect_shikimori = Connect Shikimori
-
-# source: kurobayomi
-ui_tracking_keeps_your_progress_on_shikimori = Tracking keeps your progress on Shikimori.
-
-# source: kurobayomi
 ui_search_shikimori = Search Shikimori
 
 # source: kurobayomi
@@ -1157,3 +1139,15 @@ ui_colours_black = Black
 
 # source: kurobayomi
 ui_colours_sand = Sand
+
+# source: kurobayomi
+ui_connect = Connect
+
+# source: kurobayomi
+ui_not_connected_to = Not connected to { $tracker }
+
+# source: kurobayomi
+ui_tracked_on = Tracked on { $tracker }
+
+# source: kurobayomi
+ui_your_score = Your score

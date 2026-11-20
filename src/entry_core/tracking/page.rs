@@ -1,12 +1,12 @@
 //! The tracking page of an entry (the `tracking_sheet` and `tracker_search` screens, E-25). Tracking keeps the progress on
-//! the switched-on trackers (`tracking::ENABLED`: AniList, MyAnimeList and Shikimori), so the page has one section per
-//! tracker: a connect button while it is not logged in, a search for the title while the entry is not tracked there,
-//! and once it is, its summary over native edit rows (status, progress, score, start and finish dates where the tracker
+//! the switched-on trackers (`tracking::ENABLED`: AniList, MyAnimeList and Shikimori), so the page has one tab per
+//! tracker (`TAB` keeps the one shown): a Connect row while it is not logged in, a search for the title while the entry
+//! is not tracked there, and once it is, the title it is tracked as over native edit rows (status, progress, score, start and finish dates where the tracker
 //! keeps them, Open on the site, Stop tracking). A tracker that cannot log in yet (`Tracker::setup_message`, such as an
-//! OAuth client missing from the build and from `config.toml`) has no section; its Settings row says why. Each edit is written to that tracker at once (`actions`),
+//! OAuth client missing from the build and from `config.toml`) has no tab; its Settings row says why. Each edit is written to that tracker at once (`actions`),
 //! and a failure shows a toast. The entry is named by [`open_sheet`] before the page is pushed, and the search page reads
 //! the same entry and the tracker its Search button named. A bind, an edit or a stop tells the details page, so its
-//! Tracking button follows. Under the trackers the page ends with the entry's community score (`community_page`).
+//! Tracking button follows. Under the tabs, whichever one is shown, the page ends with the entry's community score (`community_page`).
 
 use crate::ui::DialogOpen as _;
 use std::cell::{Cell, RefCell};
@@ -21,12 +21,12 @@ use kuro_i18n::{Arg, MsgKey, tr, trf};
 use kuro_track::bind::{bind_anime, bind_manga};
 use kuro_track::ctx::TrackCtx;
 use kuro_track::error::TrackError;
+use kuro_track::login_rows::LOGIN_ROWS;
 use kuro_track::messages::english;
 use kuro_track::model::search::{AnimeTrackSearch, MangaTrackSearch};
 use kuro_platform::kind::Kind;
 use kuro_track::model::{AnimeTrack, MangaTrack, TrackerId};
 use kuro_track::picker::{StatusRow, anime_status_rows, manga_status_rows, picker_day, picker_today, remove_offered};
-use kuro_track::sheet::{progress_text, score_text_shown};
 use kuro_track::tracker::Tracker;
 use kuro_track::write::{AnimeEdit, MangaEdit};
 use tokio::task::JoinHandle;
@@ -55,6 +55,8 @@ thread_local! {
     static ENTRY: RefCell<Option<Entry>> = const { RefCell::new(None) };
     /// What the details page runs when the binding changed: it reads its tracking count again.
     static ON_CHANGE: RefCell<Option<Rc<dyn Fn()>>> = const { RefCell::new(None) };
+    /// The tab the page shows, kept across its redraws: the one it opened on, then each one the user picks.
+    static TAB: Cell<Option<TrackerId>> = const { Cell::new(None) };
     /// The tracker the search page searches: the one whose Search button opened it.
     static SEARCH_TRACKER: Cell<TrackerId> = const { Cell::new(TrackerId::ANILIST) };
     /// The search page's "Track privately" switch: a result tapped while it is on is bound privately.
@@ -65,50 +67,33 @@ fn search_tracker() -> TrackerId {
     SEARCH_TRACKER.with(Cell::get)
 }
 
-/// The texts of one tracker's section that name the tracker.
+/// The texts of one tracker's tab that are a sentence of their own with the tracker's name in it.
 struct Texts {
-    intro: MsgKey,
-    connect: MsgKey,
     search: MsgKey,
     open: MsgKey,
 }
 
 fn texts(tracker: TrackerId) -> Texts {
     match tracker {
-        TrackerId::MYANIMELIST => Texts {
-            intro: MsgKey::ui_tracking_keeps_your_progress_on_myanimelist,
-            connect: MsgKey::ui_connect_myanimelist,
-            search: MsgKey::ui_search_myanimelist,
-            open: MsgKey::ui_open_on_myanimelist,
-        },
-        TrackerId::SHIKIMORI => Texts {
-            intro: MsgKey::ui_tracking_keeps_your_progress_on_shikimori,
-            connect: MsgKey::ui_connect_shikimori,
-            search: MsgKey::ui_search_shikimori,
-            open: MsgKey::ui_open_on_shikimori,
-        },
-        _ => Texts {
-            intro: MsgKey::ui_tracking_keeps_your_progress_on_anilist,
-            connect: MsgKey::ui_connect_anilist,
-            search: MsgKey::ui_search_anilist,
-            open: MsgKey::ui_open_on_anilist,
-        },
+        TrackerId::MYANIMELIST => Texts { search: MsgKey::ui_search_myanimelist, open: MsgKey::ui_open_on_myanimelist },
+        TrackerId::SHIKIMORI => Texts { search: MsgKey::ui_search_shikimori, open: MsgKey::ui_open_on_shikimori },
+        _ => Texts { search: MsgKey::ui_search_anilist, open: MsgKey::ui_open_on_anilist },
     }
 }
 
-/// What one tracker's section shows.
+/// What one tracker's tab shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Section {
     /// The entry's rows there.
     Track,
-    /// The connect button.
+    /// The Connect row.
     Connect,
-    /// Nothing: the tracker cannot log in yet, and its Settings row says why.
+    /// No tab: the tracker cannot log in yet, and its Settings row says why.
     Hidden,
 }
 
 /// The section of a tracker that is logged in or not, and ready to log in or not (`Tracker::setup_message`). Before the
-/// services are built every tracker counts as ready, so the page shows its connect buttons at once.
+/// services are built every tracker counts as ready, so the page shows its tabs at once.
 fn section(logged_in: bool, ready: bool) -> Section {
     match (logged_in, ready) {
         (true, _) => Section::Track,
@@ -120,6 +105,7 @@ fn section(logged_in: bool, ready: bool) -> Section {
 /// Names the entry, then pushes the tracking page for it. `on_change` runs after each bind, edit or stop.
 pub fn open_sheet(entry: Entry, on_change: impl Fn() + 'static) {
     ENTRY.with(|slot| *slot.borrow_mut() = Some(entry));
+    TAB.with(|tab| tab.set(None));
     ON_CHANGE.with(|slot| *slot.borrow_mut() = Some(Rc::new(on_change)));
     ui::open("tracking_sheet");
 }
@@ -159,7 +145,8 @@ impl Found {
     }
 }
 
-/// The tracking page: per switched-on tracker, the entry's rows there, or the connect button while it is not logged in.
+/// The tracking page: one tab per switched-on tracker, with the entry's rows there or the Connect row while it is not
+/// logged in.
 pub fn sheet() -> Option<Built> {
     let root = ui::column();
     // the services finish building after the page is shown, and a login or a bind redraws it through the same closure
@@ -224,94 +211,209 @@ pub(super) fn searching() -> gtk::Widget {
     crate::widgets::status::loading(Some("Searching…"))
 }
 
-/// One section per switched-on tracker: connect while it is logged out, the entry's rows there once it is in, nothing
-/// while it cannot log in. Then the entry's community score, which needs no login.
+/// What one tracker's tab holds before the entry's binding there is read.
+enum Body {
+    /// The entry's rows there: the tracker is logged in.
+    Track(Arc<dyn Tracker>),
+    /// The Connect row; `true` while a browser login waits for its redirect.
+    Connect(bool),
+}
+
+/// One tab of the page: a switched-on tracker that is logged in or can log in.
+struct Plan {
+    id: TrackerId,
+    name: String,
+    body: Body,
+}
+
+/// The tab of `id`, or none while the tracker cannot log in. Before the services are built there is no tracker to ask,
+/// so the name is the one of its login row.
+fn plan(host: Option<&tracker_host::Host>, id: TrackerId) -> Option<Plan> {
+    let tracker = host.and_then(|host| host.manager.get(id));
+    let logged_in = tracker.as_ref().is_some_and(|tracker| tracker.is_logged_in());
+    let ready = tracker.as_ref().is_none_or(|tracker| tracker.setup_message().is_none());
+    let name = match &tracker {
+        Some(tracker) => tracker.name().to_owned(),
+        None => LOGIN_ROWS.iter().find(|row| row.tracker == id).map(|row| row.name).unwrap_or_default().to_owned(),
+    };
+    let body = match (section(logged_in, ready), tracker) {
+        (Section::Hidden, _) => return None,
+        (Section::Track, Some(tracker)) => Body::Track(tracker),
+        _ => Body::Connect(host.is_some_and(|host| host.is_waiting(id, now_ms()))),
+    };
+    Some(Plan { id, name, body })
+}
+
+/// The entry's binding on one tracker as it was read, or why the read failed.
+type Read = (TrackerId, Result<Option<Bound>, TrackError>);
+
+/// What the choice of the tab to show knows about one tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Tab {
+    id: TrackerId,
+    /// The tracker is logged in.
+    connected: bool,
+    /// The entry is tracked there.
+    tracked: bool,
+}
+
+/// The tab the page shows: the kept one (`TAB`) while it is still there; else the first that tracks the entry, else the
+/// first that is logged in, else the first.
+fn opening_tab(tabs: &[Tab], kept: Option<TrackerId>) -> Option<TrackerId> {
+    let kept = tabs.iter().find(|tab| Some(tab.id) == kept);
+    let tracked = || tabs.iter().find(|tab| tab.tracked);
+    let connected = || tabs.iter().find(|tab| tab.connected);
+    kept.or_else(tracked).or_else(connected).or_else(|| tabs.first()).map(|tab| tab.id)
+}
+
+/// The name of a tab's page in its stack.
+fn page_name(id: TrackerId) -> String {
+    id.0.to_string()
+}
+
+/// The tab bar over one tab per switched-on tracker that can log in, then the entry's community score, which needs no
+/// login and stays under whichever tab is shown. The bindings on the logged-in trackers are read off the GTK thread in
+/// one go, so the page knows which tab to open on before it shows any.
 fn render(root: &GBox) {
     clear(root);
     let host = tracker_host::host();
-    for id in tracking::ENABLED {
-        let tracker = host.as_ref().and_then(|host| host.manager.get(id));
-        let logged_in = tracker.as_ref().is_some_and(|tracker| tracker.is_logged_in());
-        let ready = tracker.as_ref().is_none_or(|tracker| tracker.setup_message().is_none());
-        match (section(logged_in, ready), tracker, host.as_ref()) {
-            (Section::Track, Some(tracker), Some(host)) => track_section(root, &tracker, Arc::clone(&host.ctx)),
-            (Section::Hidden, _, _) => {}
-            (_, _, host) => connect_section(root, id, host.is_some_and(|host| host.is_waiting(id, now_ms()))),
-        }
-    }
-    if let Some(entry) = entry() {
-        super::community_page::section(root, &entry);
-    }
-}
-
-/// A tracker that is not logged in: one plain sentence and its connect button.
-fn connect_section(root: &GBox, tracker: TrackerId, waiting: bool) {
-    let texts = texts(tracker);
-    root.append(&Label::builder().label(&tr(texts.intro)).wrap(true).xalign(0.0).build());
-    if waiting {
-        root.append(&ui::dim(&tracking::waiting_text()));
-    }
-    let connect = Button::with_label(&tr(texts.connect));
-    connect.add_css_class("suggested-action");
-    connect.set_halign(Align::Start);
-    let changed = redraw(root);
-    connect.connect_clicked(move |_| tracking::connect(tracker, Rc::clone(&changed)));
-    root.append(&connect);
-}
-
-/// The entry's rows on one tracker. The binding is read off the GTK thread, and the rows replace the loading line when
-/// they come back.
-fn track_section(root: &GBox, tracker: &Arc<dyn Tracker>, ctx: Arc<TrackCtx>) {
-    let Some(entry) = entry() else { return };
-    let slot = GBox::new(O::Vertical, 0);
-    slot.append(&crate::widgets::status::loading(None));
+    let plans: Vec<Plan> = tracking::ENABLED.into_iter().filter_map(|id| plan(host.as_deref(), id)).collect();
+    let slot = GBox::new(O::Vertical, SPACE_M);
+    slot.set_visible(!plans.is_empty());
     root.append(&slot);
+    let entry = entry();
+    if let Some(entry) = &entry {
+        super::community_page::section(root, entry);
+    }
     let again = redraw(root);
-    let (weak, tracker, id, kind) = (slot.downgrade(), Arc::clone(tracker), entry.id, entry.kind);
-    let tracker_id = tracker.id();
+    let wanted: Vec<TrackerId> = plans.iter().filter(|plan| matches!(plan.body, Body::Track(_))).map(|plan| plan.id).collect();
+    let (Some(entry), Some(host)) = (entry, host) else {
+        // the services are not built yet, so nothing is known about the trackers: the tab shown now is not kept
+        show_tabs(&slot, None, plans, Vec::new(), again, false);
+        return;
+    };
+    if wanted.is_empty() {
+        show_tabs(&slot, Some(&entry), plans, Vec::new(), again, true);
+        return;
+    }
+    slot.append(&crate::widgets::status::loading(None));
+    let (weak, ctx, id, kind) = (slot.downgrade(), Arc::clone(&host.ctx), entry.id, entry.kind);
     crate::background::run_async(
         async move {
-            match kind {
-                Kind::Anime => ctx.anime_binding(id, tracker_id).await.map(|found| found.map(Bound::Anime)),
-                Kind::Manga => ctx.manga_binding(id, tracker_id).await.map(|found| found.map(Bound::Manga)),
+            let mut read: Vec<Read> = Vec::with_capacity(wanted.len());
+            for tracker in wanted {
+                let found = match kind {
+                    Kind::Anime => ctx.anime_binding(id, tracker).await.map(|found| found.map(Bound::Anime)),
+                    Kind::Manga => ctx.manga_binding(id, tracker).await.map(|found| found.map(Bound::Manga)),
+                };
+                read.push((tracker, found));
             }
+            read
         },
-        move |result| {
+        move |read| {
             let Some(slot) = weak.upgrade() else { return };
             clear(&slot);
-            match result {
-                Ok(bound) => slot.append(&tracker_list(&entry, tracker.as_ref(), bound, again)),
-                Err(err) => {
-                    let retry = Rc::clone(&again);
-                    let page = crate::widgets::status::error(&english(&kuro_track::dialog::failure_message(&err)), None, Some(move || retry()));
-                    page.add_css_class("compact");
-                    slot.append(&page);
-                }
-            }
+            show_tabs(&slot, Some(&entry), plans, read, again, true);
         },
     );
 }
 
-/// One tracker's rows: the summary and the edit rows when tracked, or a search button when not.
+/// Fills `slot` with the tab bar and the tabs: a tab's name is its tracker's, and a dot marks the tab of each tracker
+/// that tracks the entry. The tab shown is [`opening_tab`]'s; it is kept once the trackers are known (`settled`), and
+/// so is each tab the user picks after it, so a redraw comes back to the same tab.
+fn show_tabs(slot: &GBox, entry: Option<&Entry>, plans: Vec<Plan>, mut read: Vec<Read>, again: Rc<dyn Fn()>, settled: bool) {
+    if plans.is_empty() {
+        return;
+    }
+    let stack = gtk::Stack::new();
+    // each tab is as tall as its own rows, so the community score sits right under the one shown
+    stack.set_vhomogeneous(false);
+    let mut tabs = Vec::with_capacity(plans.len());
+    for plan in plans {
+        let body = GBox::new(O::Vertical, SPACE_M);
+        let (connected, mut tracked) = (matches!(plan.body, Body::Track(_)), false);
+        match plan.body {
+            Body::Connect(waiting) => body.append(&connect_list(plan.id, &plan.name, waiting, Rc::clone(&again))),
+            Body::Track(tracker) => {
+                let at = read.iter().position(|(id, _)| *id == plan.id);
+                let found = at.map(|at| read.swap_remove(at).1);
+                match (found, entry) {
+                    (Some(Ok(bound)), Some(entry)) => {
+                        tracked = bound.is_some();
+                        body.append(&tracker_list(entry, tracker.as_ref(), bound, Rc::clone(&again)));
+                    }
+                    (Some(Err(err)), _) => {
+                        let retry = Rc::clone(&again);
+                        let failed = crate::widgets::status::error(&english(&kuro_track::dialog::failure_message(&err)), None, Some(move || retry()));
+                        failed.add_css_class("compact");
+                        body.append(&failed);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let page = stack.add_titled(&body, Some(&page_name(plan.id)), &plan.name);
+        page.set_needs_attention(tracked);
+        tabs.push(Tab { id: plan.id, connected, tracked });
+    }
+    let shown = opening_tab(&tabs, TAB.with(Cell::get));
+    if let Some(id) = shown {
+        stack.set_visible_child_name(&page_name(id));
+        if settled {
+            TAB.with(|tab| tab.set(Some(id)));
+        }
+    }
+    // connected after the first tab is shown, so only a later switch reaches it
+    stack.connect_visible_child_name_notify(|stack| {
+        // a switch counts while the stack is on a page: one that is being dropped says nothing about the user
+        if stack.root().is_none() {
+            return;
+        }
+        if let Some(picked) = stack.visible_child_name().and_then(|name| name.parse::<i64>().ok()) {
+            TAB.with(|tab| tab.set(Some(TrackerId(picked))));
+        }
+    });
+    slot.append(&gtk::StackSwitcher::builder().stack(&stack).build());
+    slot.append(&stack);
+}
+
+/// A tracker that is not logged in: one row that says so, with a plain Connect button. While a browser login waits for
+/// its redirect, the row says that under it.
+fn connect_list(tracker: TrackerId, name: &str, waiting: bool, changed: Rc<dyn Fn()>) -> ListBox {
+    let connect = Button::with_label(&tr(MsgKey::ui_connect));
+    connect.set_valign(Align::Center);
+    connect.connect_clicked(move |_| tracking::connect(tracker, Rc::clone(&changed)));
+    let waiting = waiting.then(tracking::waiting_text);
+    let list = ui::boxed_list();
+    list.append(&ui::row(&trf(MsgKey::ui_not_connected_to, &[("tracker", Arg::Str(name))]), waiting.as_deref(), Some(connect.upcast::<gtk::Widget>())));
+    list
+}
+
+/// One tracker's rows: the title the entry is tracked as over the edit rows, or a search button while it is not tracked.
 fn tracker_list(entry: &Entry, tracker: &dyn Tracker, bound: Option<Bound>, redraw: Rc<dyn Fn()>) -> ListBox {
     let list = ui::boxed_list();
     match bound {
         Some(bound) => {
-            let text = summary(tracker, &bound);
-            list.append(&ui::row(tracker.name(), Some(text.as_str()), None));
+            let tracked_as = match &bound {
+                Bound::Anime(track) => track.title.as_str(),
+                Bound::Manga(track) => track.title.as_str(),
+            };
+            // a binding stored without its title shows the entry's own
+            let title = if tracked_as.is_empty() { entry.title.as_str() } else { tracked_as };
+            list.append(&ui::row(title, Some(&trf(MsgKey::ui_tracked_on, &[("tracker", Arg::Str(tracker.name()))])), None));
             if let Some(shown) = shown(tracker, &bound) {
                 edit_rows(&list, entry, shown, bound, redraw);
             }
         }
         None => {
-            let search = Button::with_label(&kuro_i18n::tr(kuro_i18n::MsgKey::action_search));
+            let search = Button::with_label(&tr(MsgKey::action_search));
             search.set_valign(Align::Center);
             let id = tracker.id();
             search.connect_clicked(move |_| {
                 SEARCH_TRACKER.with(|slot| slot.set(id));
                 ui::open("tracker_search");
             });
-            list.append(&ui::row(tracker.name(), Some(&tr(MsgKey::ui_not_tracked_yet)), Some(search.upcast::<gtk::Widget>())));
+            list.append(&ui::row(&tr(MsgKey::ui_not_tracked_yet), None, Some(search.upcast::<gtk::Widget>())));
         }
     }
     list
@@ -426,7 +528,7 @@ fn edit_rows(list: &ListBox, entry: &Entry, shown: Shown, bound: Bound, redraw: 
             }
         }
     });
-    list.append(&ui::row(&tr(MsgKey::score), None, Some(score.upcast())));
+    list.append(&ui::row(&tr(MsgKey::ui_your_score), None, Some(score.upcast())));
 
     if shown.dates {
         list.append(&date_row(true, shown.start, shown.finish, Rc::clone(&write)));
@@ -600,23 +702,6 @@ fn finish<T: Send + 'static, E: Send + 'static>(job: Option<JoinHandle<Result<T,
     });
 }
 
-/// The status, progress and score of a tracked entry, on one line. The score is left out while it is 0.
-fn summary(tracker: &dyn Tracker, bound: &Bound) -> String {
-    let (status, progress, score) = match bound {
-        Bound::Anime(track) => {
-            let Some(api) = tracker.as_anime() else { return String::new() };
-            let score = score_text_shown(track.score).then(|| api.display_score(track));
-            (api.status_label(track.status), progress_text(track.last_episode_seen, track.total_episodes), score)
-        }
-        Bound::Manga(track) => {
-            let Some(api) = tracker.as_manga() else { return String::new() };
-            let score = score_text_shown(track.score).then(|| api.display_score(track));
-            (api.status_label(track.status), progress_text(track.last_chapter_read, track.total_chapters), score)
-        }
-    };
-    [status.map(|key| status_text(Some(key))), Some(progress), score].into_iter().flatten().collect::<Vec<_>>().join(" · ")
-}
-
 /// Runs the search page's tracker search and shows its results: `queries` in order, until one finds something. Only the
 /// latest search may show anything.
 fn run_search(entry: &Entry, queries: Vec<String>, status: &Label, results: &GBox, generation: &Rc<Cell<u64>>) {
@@ -767,14 +852,40 @@ mod tests {
     }
 
     #[test]
-    fn shikimori_has_its_own_texts() {
+    fn each_tracker_has_its_own_texts() {
         let shikimori = texts(TrackerId::SHIKIMORI);
-        assert_eq!(tr(shikimori.intro), "Tracking keeps your progress on Shikimori.");
-        assert_eq!(tr(shikimori.connect), "Connect Shikimori");
         assert_eq!(tr(shikimori.search), "Search Shikimori");
         assert_eq!(tr(shikimori.open), "Open on Shikimori");
-        assert_eq!(tr(texts(TrackerId::MYANIMELIST).connect), "Connect MyAnimeList");
-        assert_eq!(tr(texts(TrackerId::ANILIST).connect), "Connect AniList");
+        assert_eq!(tr(texts(TrackerId::MYANIMELIST).open), "Open on MyAnimeList");
+        assert_eq!(tr(texts(TrackerId::ANILIST).search), "Search AniList");
+        let named = |key| trf(key, &[("tracker", Arg::Str("Shikimori"))]);
+        assert_eq!(named(MsgKey::ui_not_connected_to), "Not connected to Shikimori");
+        assert_eq!(named(MsgKey::ui_tracked_on), "Tracked on Shikimori");
+        assert_eq!(tr(MsgKey::ui_connect), "Connect");
+        assert_eq!(tr(MsgKey::ui_your_score), "Your score", "beside the community score under the tabs, whose score it is");
+    }
+
+    #[test]
+    fn the_page_opens_on_the_tracker_that_tracks_the_title() {
+        let (anilist, mal, shikimori) = (TrackerId::ANILIST, TrackerId::MYANIMELIST, TrackerId::SHIKIMORI);
+        let tab = |id, connected, tracked| Tab { id, connected, tracked };
+        let tabs = [tab(anilist, false, false), tab(mal, true, false), tab(shikimori, true, true)];
+        assert_eq!(opening_tab(&tabs, None), Some(shikimori), "the first that tracks the title");
+        assert_eq!(opening_tab(&tabs, Some(anilist)), Some(anilist), "the kept tab wins: a redraw stays where the user is");
+        assert_eq!(opening_tab(&tabs[..2], None), Some(mal), "nothing tracks it: the first that is logged in");
+        assert_eq!(opening_tab(&tabs[..2], Some(shikimori)), Some(mal), "a kept tab that is gone is not kept");
+        assert_eq!(opening_tab(&tabs[..1], None), Some(anilist), "nothing is logged in: the first tab");
+        assert_eq!(opening_tab(&[], Some(anilist)), None, "no tracker can log in: no tab");
+    }
+
+    #[test]
+    fn every_switched_on_tracker_has_a_name_before_the_services_are_built() {
+        for id in tracking::ENABLED {
+            let tab = plan(None, id).expect("with no tracker to ask, each one counts as ready");
+            assert!(!tab.name.is_empty(), "{id:?}");
+            assert!(matches!(tab.body, Body::Connect(false)), "{id:?}");
+            assert_eq!(page_name(id).parse::<i64>().ok().map(TrackerId), Some(id), "a tab's page names its tracker");
+        }
     }
 
     #[test]
@@ -807,16 +918,14 @@ mod tests {
     }
 
     #[test]
-    fn logged_out_the_page_explains_the_anilist_login_and_offers_connect() {
+    fn logged_out_the_page_is_a_tab_bar_over_a_plain_connect_button() {
         crate::testing::with_display(|| {
             let built = sheet().expect("the tracking page");
             let widgets = crate::screens::alone::descendants(&built.content);
-            let sentence = widgets.iter().any(|w| w.downcast_ref::<Label>().is_some_and(|l| l.text().as_str() == "Tracking keeps your progress on AniList."));
-            let connect = widgets
-                .iter()
-                .filter_map(|w| w.downcast_ref::<Button>())
-                .any(|b| b.label().as_deref() == Some("Connect AniList") && b.has_css_class("suggested-action"));
-            assert!(sentence && connect, "a logged-out page explains the login and offers Connect AniList");
+            assert_eq!(widgets.iter().filter(|w| w.is::<gtk::StackSwitcher>()).count(), 1, "one tab bar");
+            let buttons: Vec<&Button> = widgets.iter().filter_map(|w| w.downcast_ref::<Button>()).collect();
+            assert!(buttons.iter().any(|b| b.label().as_deref() == Some("Connect")), "a logged-out tab offers Connect");
+            assert!(buttons.iter().all(|b| !b.has_css_class("suggested-action")), "and no button of the page shouts");
         });
     }
 }

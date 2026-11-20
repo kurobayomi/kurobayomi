@@ -27,6 +27,10 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Changed
 
+- The Tracking page of a title has one tab per tracker, in place of one section under the other. A tab shows the
+  title as that tracker knows it over its rows, a Search button while the title is not tracked there, or a Connect
+  button while the tracker is not connected. A dot marks the tab of each tracker that tracks the title, and the page
+  opens on the first of them. The community score stays under the tabs.
 - The next-update button is no longer shown on a finished title, where it read "N/A".
 
 ### Fixed
