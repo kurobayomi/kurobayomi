@@ -196,6 +196,7 @@ impl Guest {
         Source::add_to_linker::<_, HasSelf<_>>(&mut linker, |state: &mut HostState| state)
             .map_err(|e| format!("{e:#}"))?;
         crate::bridge::link_v14(&mut linker).map_err(|e| format!("{e:#}"))?;
+        crate::bridge::link_pages(&mut linker).map_err(|e| format!("{e:#}"))?;
         let state = HostState {
             source_id,
             hosts: package.hosts.clone(),
@@ -484,7 +485,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::test_guest::{Behaviour, IMPORTS_HOST_V14, IMPORTS_HOST_V15, env, guest, guest_importing};
+    use crate::test_guest::{Behaviour, IMPORTS_HOST_V14, IMPORTS_HOST_V15, IMPORTS_PAGES, env, guest, guest_importing};
 
     /// One source of a single-guest package, built without the loader, so each test can pick the guest's answer.
     fn direct(bytes: Vec<u8>, id: i64, deadline_ticks: u64) -> WasmSource {
@@ -735,6 +736,17 @@ mod tests {
             let sources = instantiate(bytes, Vec::new(), false, host_env).await.expect("the host links the import");
             assert_eq!(sources[0].id(), 42, "{import}");
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_guest_that_reads_pages_loads_and_one_without_the_import_still_does() {
+        let (host_env, _dir) = env();
+        let with_pages = guest_importing(&format!("{IMPORTS_HOST_V15} {IMPORTS_PAGES}"), INFO_AND_LISTING);
+        let sources = instantiate(with_pages, Vec::new(), false, host_env).await.expect("the host links the pages import");
+        assert_eq!(sources[0].id(), 42);
+        let (host_env, _dir) = env();
+        let without = guest_importing(IMPORTS_HOST_V15, INFO_AND_LISTING);
+        assert_eq!(instantiate(without, Vec::new(), false, host_env).await.expect("as before")[0].id(), 42);
     }
 }
 

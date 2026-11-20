@@ -49,7 +49,7 @@ windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Globa
 # the hidden pages that pass a site's browser check (windows::hidden_pages): the system's Edge WebView2, through its COM
 # API. webview2-com speaks the `windows` crate's types, so that crate is used for those calls
 webview2-com = "0.39"
-windows = { version = "0.62", features = ["Win32_Foundation"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Com"] }
 # the window handle behind a GDK surface (window_level)
 gdk-win32 = { version = "0.11.5", package = "gdk4-win32" }
 

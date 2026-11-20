@@ -308,6 +308,10 @@ fn response_of(answer: &str) -> Option<Response> {
 
 #[async_trait]
 impl Interceptor for CloudflareInterceptor {
+    fn hidden_pages(&self) -> Option<Arc<dyn HiddenPages>> {
+        self.pages.clone()
+    }
+
     async fn intercept(&self, chain: Chain<'_>, req: Request) -> Result<Response, NetError> {
         let retry = req.clone();
         let response = chain.proceed(req).await?;

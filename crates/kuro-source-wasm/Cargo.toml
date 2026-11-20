@@ -15,6 +15,8 @@ ed25519-dalek = "3.0.0"
 futures = { workspace = true }
 http = { workspace = true }
 kuro-net = { workspace = true }
+# the hidden pages a plug-in's page read goes through, and the manifest's host rule they share with `http`
+kuro-platform = { workspace = true }
 kuro-prefs = { workspace = true }
 kuro-source = { path = "../kuro-source" }
 reqwest = { workspace = true }
@@ -31,7 +33,6 @@ zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 wasmtime = { version = "49.0.2", default-features = false, features = ["runtime", "component-model", "cranelift", "std"] }
 
 [dev-dependencies]
-kuro-platform = { workspace = true }
 tempfile = { workspace = true }
 wiremock = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time", "net"] }

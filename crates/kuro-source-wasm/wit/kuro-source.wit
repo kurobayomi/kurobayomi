@@ -17,6 +17,16 @@ interface host {
     unix-seconds: func() -> u64;
 }
 
+/// Web pages read through the app's hidden browser pages (additive to ABI 1.5; docs/source-abi.md, "Page reads"). Only
+/// a guest that needs it imports it (world `source-pages`); every other guest is unchanged.
+interface pages {
+    /// Opens an https address of a host in the manifest allow-list in a hidden page, does the request's steps there
+    /// and returns what they read. Request {"url", "steps": [Step], "timeoutMs"}; a Step is one of {"wait": selector},
+    /// {"waitGone": selector}, {"scroll": selector}, {"read": selector}. Reply {"url", "title", "reads": [html]}.
+    /// The guest passes no script. The page asks only the allow-list's hosts and loads no image, media file or font.
+    read: func(request-json: string) -> result<string, string>;
+}
+
 world source {
     import host;
     /// op is one of: "info", "create-sources", "popular", "latest", "search", "details", "chapters", "pages" (manga),
@@ -45,5 +55,12 @@ world source {
     ///               fix-up. null means show the bytes as fetched. Err("Failed to decode image") fails the page.
     ///   "cover"           args {"anime": {"url", "title"}} → string | null: the poster of one anime. A list that does not know it
     ///               yet gives the thumbnail "kb-cover:<anime url>", and the app asks this op when the card shows.
+    export invoke: func(op: string, input-json: string) -> result<string, string>;
+}
+
+/// The world of a guest that also reads web pages: `source` with the `pages` import.
+world source-pages {
+    import host;
+    import pages;
     export invoke: func(op: string, input-json: string) -> result<string, string>;
 }

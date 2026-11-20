@@ -24,6 +24,12 @@ pub use user_agent::UserAgentInterceptor;
 #[async_trait]
 pub trait Interceptor: Send + Sync {
     async fn intercept(&self, chain: Chain<'_>, req: Request) -> Result<Response, NetError>;
+
+    /// The hidden pages this step answers a site's check through, when it is the step that has them
+    /// ([`CloudflareInterceptor`]). [`NetworkClient::hidden_pages`](crate::NetworkClient::hidden_pages) asks each step.
+    fn hidden_pages(&self) -> Option<Arc<dyn kuro_platform::hidden_pages::HiddenPages>> {
+        None
+    }
 }
 
 /// The rest of the chain: the interceptors not yet run, then the transport. Copying it is cheap.

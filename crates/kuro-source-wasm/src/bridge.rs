@@ -1,4 +1,5 @@
-//! Host imports for guests: `http`, `pref-get`, `pref-set`, `log` and the allow-list check (area 18).
+//! Host imports for guests: `http`, `pref-get`, `pref-set`, `log` and the allow-list check (area 18), and the `pages`
+//! import a guest reads a web page through ([`HostState::page_read`], [`link_pages`]).
 //!
 //! The guest's `http` import is served by the app's `NetworkClient`, so cookies, user agent and rate limits are the
 //! same as for built-in sources. The import is synchronous: it runs on the blocking thread of the guest call and
@@ -15,6 +16,7 @@ use http::header::CONTENT_TYPE;
 use http::{HeaderMap, HeaderName, HeaderValue};
 use kuro_net::request::{self, Body};
 use kuro_net::{NetworkClient, Request};
+use kuro_platform::hidden_pages::{NO_READER, PageRead, host_matches};
 use kuro_prefs::store::PrefStore;
 use kuro_prefs::values::PrefValue;
 use kuro_source::prefs::preference_key;
@@ -86,14 +88,6 @@ pub fn check_host(hosts: &[String], url: &Url) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("host not allowed: {host}"))
-    }
-}
-
-fn host_matches(entry: &str, host: &str) -> bool {
-    let entry = entry.to_ascii_lowercase();
-    match entry.strip_prefix("*.") {
-        Some(suffix) => host.ends_with(&format!(".{suffix}")),
-        None => host == entry,
     }
 }
 
@@ -185,6 +179,31 @@ impl HostState {
         let task = handle.spawn(async move { send(client, request, &hosts).await });
         handle.block_on(task).map_err(|e| format!("the request did not finish: {e}"))?
     }
+
+    /// The `read` of the `pages` import (`kuro:source/pages`): has a page of the guest's site read through the app's
+    /// hidden pages and returns `{url, title, reads}`. The request is `{url, steps, timeoutMs?}`; the address must be
+    /// https and on a host of the manifest's list, which is also all the page itself may ask. The guest names steps
+    /// from a fixed set and passes no script (`kuro_platform::hidden_pages::Step`). The wait is host time, and a page
+    /// load keeps the source's request gap like any request to that host.
+    pub fn page_read(&mut self, request_json: String) -> Result<String, String> {
+        let entered = Instant::now();
+        let outcome = self.read_page(&request_json);
+        self.clock.book_host_wait(entered.elapsed());
+        outcome
+    }
+
+    fn read_page(&self, request_json: &str) -> Result<String, String> {
+        let read = PageRead::parse(request_json, &self.hosts)?;
+        let pages = self.client.hidden_pages().ok_or_else(|| NO_READER.to_owned())?;
+        let host = Url::parse(&read.url).ok().and_then(|url| url.host_str().map(str::to_owned)).unwrap_or_default();
+        let gap = self.request_gap.unwrap_or_default();
+        let wait = book_send(&mut LAST_SENT.lock().unwrap_or_else(PoisonError::into_inner), &host, gap, Instant::now());
+        if !wait.is_zero() {
+            std::thread::sleep(wait);
+        }
+        // this is the blocking thread of the guest call; the page works on a thread of the web engine
+        pages.read(&read)
+    }
 }
 
 impl Host for HostState {
@@ -243,11 +262,102 @@ pub fn link_v14(linker: &mut Linker<HostState>) -> wasmtime::Result<()> {
     Ok(())
 }
 
+/// Links the `pages` import (`kuro:source/pages@1.5.0`), which only a guest that reads web pages declares: a guest
+/// without it loads as before.
+pub fn link_pages(linker: &mut Linker<HostState>) -> wasmtime::Result<()> {
+    let mut pages = linker.instance("kuro:source/pages@1.5.0")?;
+    pages.func_wrap("read", |mut store, (request_json,): (String,)| {
+        Ok((store.data_mut().page_read(request_json),))
+    })?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use kuro_platform::hidden_pages::{HiddenPages, Step};
     use serde_json::json;
 
     use super::*;
+
+    /// Hidden pages that answer every read with a fixed text and keep what was asked.
+    #[derive(Default)]
+    struct FakePages {
+        reads: Mutex<Vec<PageRead>>,
+    }
+
+    impl HiddenPages for FakePages {
+        fn fetch(&self, _request_json: &str) -> Result<String, String> {
+            Err("not asked in these tests".to_owned())
+        }
+
+        fn read(&self, read: &PageRead) -> Result<String, String> {
+            self.reads.lock().unwrap_or_else(PoisonError::into_inner).push(read.clone());
+            Ok(r#"{"url":"https://ok.test/final","title":"A page","reads":["<li>1</li>"]}"#.to_owned())
+        }
+    }
+
+    /// A host state whose client has `pages` as its hidden pages. The directory must outlive the state.
+    fn state_with_pages(allowed: &[&str], pages: Arc<FakePages>) -> (HostState, tempfile::TempDir) {
+        let (mut host, dir) = state(1, allowed);
+        let prefs = kuro_prefs::network::NetworkPrefs::new(kuro_prefs::store::PrefStore::in_memory());
+        let (toaster, _feed) = kuro_platform::toast::toast_channel();
+        host.client = NetworkClient::with_cookies_and_pages(
+            &prefs,
+            kuro_net::CookieJar::load(dir.path().join("pages-cookies.json")),
+            Arc::new(kuro_platform::webview::NoWebView),
+            toaster,
+            Some(pages),
+        )
+        .expect("client");
+        (host, dir)
+    }
+
+    #[test]
+    fn a_page_read_goes_to_the_hidden_pages_with_the_manifest_hosts_as_its_limit() {
+        let pages = Arc::new(FakePages::default());
+        let (mut host, _dir) = state_with_pages(&["ok.test", "*.cdn.test"], Arc::clone(&pages));
+        let request = json!({ "url": "https://ok.test/title/1?page=2", "steps": [{ "wait": "li" }, { "read": "li" }], "timeoutMs": 9000 }).to_string();
+        let answer = host.page_read(request).expect("the page was read");
+        let answer: serde_json::Value = serde_json::from_str(&answer).expect("answer JSON");
+        assert_eq!(answer["reads"][0], "<li>1</li>");
+        assert_eq!(answer["url"], "https://ok.test/final");
+        let asked = pages.reads.lock().unwrap().clone();
+        assert_eq!(asked.len(), 1);
+        assert_eq!(asked[0].url, "https://ok.test/title/1?page=2");
+        assert_eq!(asked[0].hosts, hosts(&["ok.test", "*.cdn.test"]), "the page may ask what the manifest lists, nothing else");
+        assert_eq!(asked[0].steps, [Step::Wait("li".into()), Step::Read("li".into())]);
+        assert_eq!(asked[0].timeout, Duration::from_secs(9));
+    }
+
+    #[test]
+    fn a_page_read_outside_the_manifest_or_with_a_script_never_reaches_a_page() {
+        let pages = Arc::new(FakePages::default());
+        let (mut host, _dir) = state_with_pages(&["ok.test"], Arc::clone(&pages));
+        let refusal = |host: &mut HostState, request: serde_json::Value| host.page_read(request.to_string()).expect_err("refused");
+        assert_eq!(refusal(&mut host, json!({ "url": "https://evil.test/", "steps": [{ "read": "html" }] })), "host not allowed: evil.test");
+        assert_eq!(refusal(&mut host, json!({ "url": "http://ok.test/", "steps": [{ "read": "html" }] })), "only https pages can be read");
+        assert_eq!(refusal(&mut host, json!({ "url": "https://192.168.1.1/", "steps": [{ "read": "html" }] })), "host not allowed: 192.168.1.1");
+        assert!(refusal(&mut host, json!({ "url": "https://ok.test/", "steps": [{ "script": "fetch('/api')" }] })).starts_with("invalid page read"));
+        assert!(refusal(&mut host, json!({ "url": "https://ok.test/", "steps": [{ "click": "button" }] })).starts_with("invalid page read"));
+        assert!(pages.reads.lock().unwrap().is_empty(), "nothing was opened");
+    }
+
+    #[test]
+    fn a_page_read_without_hidden_pages_says_so_and_its_wait_is_host_time() {
+        let (mut host, _dir) = state(1, &["ok.test"]);
+        let request = json!({ "url": "https://ok.test/", "steps": [{ "read": "html" }] }).to_string();
+        assert_eq!(host.page_read(request).expect_err("no engine"), NO_READER);
+
+        let pages = Arc::new(FakePages::default());
+        let (mut spaced, _dir) = state_with_pages(&["gap.test"], pages);
+        spaced.request_gap = Some(Duration::from_millis(200));
+        let request = json!({ "url": "https://gap.test/", "steps": [{ "read": "html" }] }).to_string();
+        spaced.page_read(request.clone()).expect("first read");
+        spaced.page_read(request).expect("second read");
+        assert!(spaced.clock.host_wait >= Duration::from_millis(200), "a page load keeps the source's gap, and the wait is not guest run time");
+    }
 
     fn hosts(list: &[&str]) -> Vec<String> {
         list.iter().map(|h| (*h).to_owned()).collect()

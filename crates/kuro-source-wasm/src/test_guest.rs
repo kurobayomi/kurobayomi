@@ -51,6 +51,10 @@ pub const IMPORTS_HOST_V15: &str = r#"(import "kuro:source/host@1.5.0" (instance
     (export "log" (func (param "level" u8) (param "message" string)))
     (export "unix-seconds" (func (result u64)))))"#;
 
+/// The `pages` import, which a guest that reads web pages declares next to `host`.
+pub const IMPORTS_PAGES: &str = r#"(import "kuro:source/pages@1.5.0" (instance
+    (export "read" (func (param "request-json" string) (result (result string (error string)))))))"#;
+
 /// A guest that declares `import` (one of the `IMPORTS_*` texts) and answers `text` for every op, like [`guest`].
 pub fn guest_importing(import: &str, text: &str) -> Vec<u8> {
     template(text, &returns(0)).replacen("(component", &format!("(component {import}"), 1).into_bytes()

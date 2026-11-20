@@ -155,8 +155,21 @@ impl NetworkClient {
         let webview = embedded
             .filter(|view| view.available())
             .unwrap_or_else(|| Arc::new(BrowserHost::new(opener, paths.cookies_import_file())));
+        // a hidden page runs a site's own script, so its connections go through the gate, which keeps them on the internet
+        // as this client's own are kept; without a gate there are no hidden pages
+        let pages = crate::page_gate::address(|| {
+            let settings = NetworkSettings::from_prefs(prefs);
+            DohProvider::from_pref(settings.doh_provider).and_then(|provider| DohResolver::new(provider, &settings.default_user_agent).ok())
+        })
+        .and_then(|gate| kuro_platform::hidden_pages::hidden_pages(paths, Some(gate)));
         // the desktop client carries every source's requests, and anyone may write a source: internet addresses only
-        Self::built(prefs, cookies, webview, toaster, kuro_platform::hidden_pages::hidden_pages(paths), true)
+        Self::built(prefs, cookies, webview, toaster, pages, true)
+    }
+
+    /// The hidden pages of this client, when it has them: a plug-in's page reads go through them
+    /// (`kuro_platform::hidden_pages::HiddenPages::read`).
+    pub fn hidden_pages(&self) -> Option<Arc<dyn kuro_platform::hidden_pages::HiddenPages>> {
+        self.inner.chain.iter().find_map(|step| step.hidden_pages())
     }
 
     /// A copy of this client's chain, to add interceptors to. The original client is not changed.
