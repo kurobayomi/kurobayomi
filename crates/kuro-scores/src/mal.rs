@@ -17,8 +17,17 @@
 //! What the API was seen to do (real requests, 2026-11-20):
 //! - a search text must be 3 to 64 characters: 2 and 65 answer 400;
 //! - a search leaves out the titles MyAnimeList marks as adult unless `nsfw=true` is sent; by id they answer either way;
-//! - a title nobody rated has no `mean` field; a missing id answers 404.
+//! - a title nobody rated has no `mean` field; a missing id answers 404;
+//! - a season (`anime/season/{year}/{season}`) is one list of the titles on air in it, continuing ones included: 219
+//!   titles for fall 2026, with no further page;
+//! - the popularity list (`{kind}/ranking?ranking_type=bypopularity`) gives 500 titles a request, for anime and manga,
+//!   and takes an `offset`; a `limit` of 501 answers 400.
+//!
+//! The bulk lists ([`ScoreProvider::catalogue`]) are those: the season of today and the one before (anime), and the
+//! most popular titles. Of 19 titles on one page of a source's "Popular" listing, the 2,000 most popular held 10, so the
+//! lists are a first answer for a Browse page and not the whole of it.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -49,6 +58,37 @@ const SHOWN_RESULTS: &str = "15";
 /// The shortest and the longest search text the API takes, in characters.
 const QUERY_MIN: usize = 3;
 const QUERY_MAX: usize = 64;
+/// Titles asked of a list in one request: the most the API gives.
+const LIST_PAGE: usize = 500;
+/// How far down the popularity list the bulk lists go: four requests a kind.
+const POPULAR_TITLES: usize = 2000;
+
+/// The season of a month as the API names it, with its year.
+fn season_of(year: i32, month: u32) -> (i32, &'static str) {
+    let season = match month {
+        1..=3 => "winter",
+        4..=6 => "spring",
+        7..=9 => "summer",
+        _ => "fall",
+    };
+    (year, season)
+}
+
+/// The season before `season`.
+fn season_before(season: (i32, &'static str)) -> (i32, &'static str) {
+    match season {
+        (year, "winter") => (year - 1, "fall"),
+        (year, "spring") => (year, "winter"),
+        (year, "summer") => (year, "spring"),
+        (year, _) => (year, "summer"),
+    }
+}
+
+/// Adds the titles of `list` that `hits` does not hold yet: a title on air is in its season's list and may be in the
+/// popularity list too.
+fn keep_new(hits: &mut Vec<Hit>, seen: &mut HashSet<i64>, list: Vec<Hit>) {
+    hits.extend(list.into_iter().filter(|hit| seen.insert(hit.remote_id)));
+}
 
 pub struct Mal {
     client: reqwest::Client,
@@ -175,11 +215,16 @@ impl Mal {
         Ok(self.get::<Item>(&format!("{}/{id}", kind.as_str()), &[("fields", FIELDS)]).await?.map(Hit::from))
     }
 
+    /// The titles of one list answer: a search, a season or a page of the popularity list. They share one shape.
+    async fn list(&self, path: &str, query: &[(&str, &str)]) -> Result<Vec<Hit>, Stop> {
+        let found = self.get::<Many>(path, query).await?;
+        Ok(found.map(|many| many.data.into_iter().map(|result| Hit::from(result.node)).collect()).unwrap_or_default())
+    }
+
     /// The titles `text` finds. A text the API would refuse for its length is cut or not sent ([`search_text`]).
     async fn search_n(&self, kind: Kind, text: &str, results: &str) -> Result<Vec<Hit>, Stop> {
         let Some(text) = search_text(text) else { return Ok(Vec::new()) };
-        let found = self.get::<Many>(kind.as_str(), &[("q", text.as_str()), ("limit", results), ("fields", FIELDS), ("nsfw", "true")]).await?;
-        Ok(found.map(|many| many.data.into_iter().map(|result| Hit::from(result.node)).collect()).unwrap_or_default())
+        self.list(kind.as_str(), &[("q", text.as_str()), ("limit", results), ("fields", FIELDS), ("nsfw", "true")]).await
     }
 
     /// The title of `id` when its names include one of `titles`: an id that came from another site is not trusted alone.
@@ -245,6 +290,31 @@ impl ScoreProvider for Mal {
 
     async fn search(&self, kind: Kind, text: &str) -> Result<Vec<Hit>, Stop> {
         self.search_n(kind, text, SHOWN_RESULTS).await
+    }
+
+    async fn catalogue(&self, kind: Kind, today: (i32, u32)) -> Result<Vec<Hit>, Stop> {
+        let mut hits: Vec<Hit> = Vec::new();
+        let mut seen: HashSet<i64> = HashSet::new();
+        let page = LIST_PAGE.to_string();
+        if kind == Kind::Anime {
+            let this_season = season_of(today.0, today.1);
+            for (year, season) in [this_season, season_before(this_season)] {
+                let list = self.list(&format!("anime/season/{year}/{season}"), &[("limit", page.as_str()), ("fields", FIELDS), ("nsfw", "true")]).await?;
+                keep_new(&mut hits, &mut seen, list);
+            }
+        }
+        for offset in (0..POPULAR_TITLES).step_by(LIST_PAGE) {
+            let offset = offset.to_string();
+            let query = [("ranking_type", "bypopularity"), ("limit", page.as_str()), ("offset", offset.as_str()), ("fields", FIELDS), ("nsfw", "true")];
+            let list = self.list(&format!("{}/ranking", kind.as_str()), &query).await?;
+            // a page that is not full is the last one
+            let last = list.len() < LIST_PAGE;
+            keep_new(&mut hits, &mut seen, list);
+            if last {
+                break;
+            }
+        }
+        Ok(hits)
     }
 }
 
@@ -424,6 +494,62 @@ mod tests {
         assert_eq!(mal.lookup(&by_id(403)).await, Err(Stop::Unreachable), "a refused client id is refused for every title");
         assert_eq!(mal.lookup(&by_id(7)).await, Err(Stop::Unreachable));
         assert_eq!(mal.lookup(&query("Some title")).await, Ok(Outcome::NotFound));
+    }
+
+    #[test]
+    fn a_season_is_named_by_its_months_and_the_one_before_winter_is_last_years_fall() {
+        assert_eq!([season_of(2026, 1), season_of(2026, 3)], [(2026, "winter"); 2]);
+        assert_eq!([season_of(2026, 4), season_of(2026, 6)], [(2026, "spring"); 2]);
+        assert_eq!([season_of(2026, 7), season_of(2026, 9)], [(2026, "summer"); 2]);
+        assert_eq!([season_of(2026, 10), season_of(2026, 12)], [(2026, "fall"); 2]);
+        assert_eq!(season_before((2026, "fall")), (2026, "summer"));
+        assert_eq!(season_before((2026, "summer")), (2026, "spring"));
+        assert_eq!(season_before((2026, "spring")), (2026, "winter"));
+        assert_eq!(season_before((2026, "winter")), (2025, "fall"));
+    }
+
+    #[tokio::test]
+    async fn the_bulk_lists_of_anime_are_two_seasons_and_the_popular_titles_each_title_once() {
+        let server = MockServer::start().await;
+        // on air this season and still on air from the one before: in both lists
+        serve(&server, "/anime/season/2026/fall", results(vec![item(21, "One Piece", Some(8.7)), item(64084, "Sekai Saikyou no Majo, Hajimemashita", Some(7.07))])).await;
+        serve(&server, "/anime/season/2026/summer", results(vec![item(21, "One Piece", Some(8.7)), item(7, "A summer title", None)])).await;
+        let popular = |offset: &str, body: Value| {
+            Mock::given(method("GET"))
+                .and(path("/anime/ranking"))
+                .and(query_param("ranking_type", "bypopularity"))
+                .and(query_param("limit", "500"))
+                .and(query_param("offset", offset))
+                .and(header("X-MAL-CLIENT-ID", "the-client-id"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        };
+        // a full page, then a page that is not full: the last one
+        let first: Vec<Value> = (0..500).map(|i| item(1000 + i, &format!("Popular {i}"), Some(7.5))).collect();
+        popular("0", results(first)).mount(&server).await;
+        popular("500", results(vec![item(21, "One Piece", Some(8.7)), item(9000, "The last popular one", Some(6.0))])).mount(&server).await;
+        let mal = mal(&server, None).await;
+        let hits = mal.catalogue(Kind::Anime, (2026, 11)).await.expect("lists");
+        assert_eq!(hits.len(), 3 + 500 + 1, "One Piece once, though three lists hold it");
+        assert_eq!(hits.iter().filter(|hit| hit.remote_id == 21).count(), 1);
+        assert_eq!(hits[1].score, Some(7.07));
+        assert_eq!(hits[2].score, None, "listed, not rated yet");
+        assert_eq!(server.received_requests().await.expect("recorded").len(), 4, "two seasons and two pages: no third page after a short one");
+    }
+
+    #[tokio::test]
+    async fn the_bulk_lists_of_manga_have_no_season_and_a_stop_ends_them() {
+        let server = MockServer::start().await;
+        serve(&server, "/manga/ranking", results(vec![item(2, "Berserk", Some(9.46))])).await;
+        let api = mal(&server, None).await;
+        let hits = api.catalogue(Kind::Manga, (2026, 11)).await.expect("lists");
+        assert_eq!(hits.iter().map(|hit| hit.remote_id).collect::<Vec<_>>(), [2]);
+        assert_eq!(server.received_requests().await.expect("recorded").len(), 1, "no season is asked for manga");
+        // the site asks to slow down in the middle of the lists: nothing is returned, the caller tries again later
+        let busy = MockServer::start().await;
+        serve(&busy, "/anime/season/2026/fall", results(vec![item(21, "One Piece", Some(8.7))])).await;
+        Mock::given(method("GET")).and(path("/anime/season/2026/summer")).respond_with(ResponseTemplate::new(429)).mount(&busy).await;
+        let api = mal(&busy, None).await;
+        assert_eq!(api.catalogue(Kind::Anime, (2026, 11)).await, Err(Stop::RateLimited { retry_after: None }));
     }
 
     #[test]

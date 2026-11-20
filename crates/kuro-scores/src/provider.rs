@@ -1,4 +1,5 @@
-//! What a source of community scores answers: one title at a time, by an id it knows or by name.
+//! What a source of community scores answers: one title at a time, by an id it knows or by name, and the titles it can
+//! list in bulk.
 
 use std::time::Duration;
 
@@ -6,6 +7,7 @@ use async_trait::async_trait;
 use kuro_data::community_score::MatchedBy;
 use kuro_platform::kind::Kind;
 use kuro_track::model::TrackerId;
+use serde::{Deserialize, Serialize};
 
 /// A tracker binding of the entry: its id on that tracker and the title the tracker gives it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -27,8 +29,8 @@ pub struct Query {
     pub tracks: Vec<TrackRef>,
 }
 
-/// A title of the provider's catalogue.
-#[derive(Clone, Debug, PartialEq)]
+/// A title of the provider's catalogue. It is written to and read from the cache file of the bulk lists.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Hit {
     pub remote_id: i64,
     pub title: String,
@@ -62,4 +64,10 @@ pub trait ScoreProvider: Send + Sync {
     async fn lookup(&self, query: &Query) -> Result<Outcome, Stop>;
     /// The titles a text finds, for the user to pick the right one.
     async fn search(&self, kind: Kind, text: &str) -> Result<Vec<Hit>, Stop>;
+    /// The titles the provider can list in bulk, with their scores: what a title is matched against by name, without
+    /// a request of its own (`catalogue::Catalogue`). `today` is the year and the month, for a provider that lists by
+    /// season. The default lists none.
+    async fn catalogue(&self, _kind: Kind, _today: (i32, u32)) -> Result<Vec<Hit>, Stop> {
+        Ok(Vec::new())
+    }
 }

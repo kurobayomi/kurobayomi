@@ -7,6 +7,7 @@
 //! module that implements the trait; the store, the expiry rules ([`policy`]) and the refresh of a batch ([`refresh`])
 //! stay as they are.
 
+pub mod catalogue;
 pub mod mal;
 pub mod policy;
 pub mod provider;
