@@ -1139,3 +1139,21 @@ ui_cover_colours_on_a_titles_page = Cover colours on a title's page
 
 # source: kurobayomi
 ui_app_colours = Colours
+
+# source: kurobayomi
+ui_colours_desktop = Desktop
+
+# source: kurobayomi
+ui_colours_tokyo_night = Tokyo Night
+
+# source: kurobayomi
+ui_colours_rose = Rose
+
+# source: kurobayomi
+ui_colours_forest = Forest
+
+# source: kurobayomi
+ui_colours_black = Black
+
+# source: kurobayomi
+ui_colours_sand = Sand

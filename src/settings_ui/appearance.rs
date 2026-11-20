@@ -30,7 +30,10 @@ pub fn theme_mode_row(prefs: &Prefs) -> PreferenceItem {
 /// The colours of the whole app: the desktop's own, or one of a short list (`theme::colours`). The choice is applied
 /// at once, from the stored value (`theme::follow_colours`), in the light and in the dark style.
 pub fn colours_row(prefs: &Prefs) -> PreferenceItem {
-    enum_choice(&tr(MsgKey::ui_app_colours), &prefs.ui.colours, &crate::theme::colours::CHOICES, true)
+    use crate::theme::colours;
+    let named = colours::ORDER.map(|choice| (choice, colours::name(choice)));
+    let options: Vec<_> = named.iter().map(|(choice, name)| (*choice, name.as_str())).collect();
+    enum_choice(&tr(MsgKey::ui_app_colours), &prefs.ui.colours, &options, true)
 }
 
 /// The switch of the colour a title's page takes from its cover (`theme::tint`). Turning it off takes the colour off

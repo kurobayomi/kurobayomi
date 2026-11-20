@@ -11,6 +11,7 @@
 //! far from their text in lightness, and the accent is made readable on the surface it reads worst on
 //! (`palette::readable`).
 
+use kuro_i18n::{MsgKey, tr};
 use kuro_prefs::ui::AppColours;
 
 use super::palette::{self, Rgb};
@@ -39,15 +40,22 @@ pub fn scheme(colours: AppColours) -> Option<Scheme> {
     })
 }
 
-/// The choices in the order the Colours row lists them, with their names.
-pub const CHOICES: [(AppColours, &str); 6] = [
-    (AppColours::DESKTOP, "Desktop"),
-    (AppColours::TOKYO_NIGHT, "Tokyo Night"),
-    (AppColours::ROSE, "Rose"),
-    (AppColours::FOREST, "Forest"),
-    (AppColours::BLACK, "Black"),
-    (AppColours::SAND, "Sand"),
-];
+/// The choices in the order the Colours row lists them: the desktop's own first, as it is what the app had.
+pub const ORDER: [AppColours; 6] =
+    [AppColours::DESKTOP, AppColours::TOKYO_NIGHT, AppColours::ROSE, AppColours::FOREST, AppColours::BLACK, AppColours::SAND];
+
+/// The name of a choice as the Colours row shows it, from the string table like every word of the interface
+/// (`i18n_guard`).
+pub fn name(colours: AppColours) -> String {
+    tr(match colours {
+        AppColours::DESKTOP => MsgKey::ui_colours_desktop,
+        AppColours::TOKYO_NIGHT => MsgKey::ui_colours_tokyo_night,
+        AppColours::ROSE => MsgKey::ui_colours_rose,
+        AppColours::FOREST => MsgKey::ui_colours_forest,
+        AppColours::BLACK => MsgKey::ui_colours_black,
+        AppColours::SAND => MsgKey::ui_colours_sand,
+    })
+}
 
 /// The colours of one scheme in one style: each surface with what is written on it, and the accent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,7 +73,8 @@ pub struct Colours {
 }
 
 impl Colours {
-    /// Every surface with its text, by name.
+    /// Every surface with its text, by name: what the readability test walks.
+    #[cfg(test)]
     pub fn surfaces(&self) -> [(&'static str, (Rgb, Rgb)); 7] {
         [
             ("window", self.window),
@@ -165,21 +174,22 @@ mod tests {
     #[test]
     fn the_desktop_redeclares_nothing_and_every_other_choice_has_a_scheme_and_a_name() {
         assert_eq!(scheme(AppColours::DESKTOP), None);
-        assert_eq!(CHOICES[0].0, AppColours::DESKTOP, "the desktop's colours come first: they are what the app had");
+        assert_eq!(ORDER[0], AppColours::DESKTOP, "the desktop's colours come first: they are what the app had");
         for colours in AppColours::ALL {
-            assert_eq!(CHOICES.iter().filter(|(choice, _)| choice == colours).count(), 1, "{colours:?} is listed once");
+            assert_eq!(ORDER.iter().filter(|choice| *choice == colours).count(), 1, "{colours:?} is listed once");
             assert_eq!(scheme(*colours).is_none(), *colours == AppColours::DESKTOP, "{colours:?}");
         }
-        assert_eq!(CHOICES.len(), AppColours::ALL.len());
-        assert!(CHOICES.iter().all(|(_, name)| !name.is_empty()));
+        assert_eq!(ORDER.len(), AppColours::ALL.len());
+        assert_eq!(ORDER.map(name), ["Desktop", "Tokyo Night", "Rose", "Forest", "Black", "Sand"]);
     }
 
     /// The check that stands in for looking at every screen: whatever the choice and the style, text reads on every
     /// surface, the accent reads on every surface, and what is written on the accent reads on it.
     #[test]
     fn text_and_the_accent_read_on_every_surface_of_every_choice_in_both_styles() {
-        for (choice, name) in CHOICES {
+        for choice in ORDER {
             let Some(scheme) = scheme(choice) else { continue };
+            let name = name(choice);
             for dark in [true, false] {
                 let c = colours(&scheme, dark);
                 for (surface, (background, text)) in c.surfaces() {
@@ -193,8 +203,9 @@ mod tests {
 
     #[test]
     fn a_style_is_dark_or_light_as_asked_and_black_starts_at_black() {
-        for (choice, name) in CHOICES {
+        for choice in ORDER {
             let Some(scheme) = scheme(choice) else { continue };
+            let name = name(choice);
             let (dark, light) = (colours(&scheme, true), colours(&scheme, false));
             assert!(dark.window.0.luminance() < 0.05 && dark.window.1.luminance() > 0.6, "{name}: light text on a dark window");
             assert!(light.window.0.luminance() > 0.8 && light.window.1.luminance() < 0.1, "{name}: dark text on a light window");
