@@ -4,20 +4,27 @@
 //! palette name there has no effect and the mode is whatever `pref_theme_mode_key` holds.
 
 use kuro_prefs::store::PrefStore;
-use kuro_prefs::ui::ThemeMode;
+use kuro_prefs::ui::{AppColours, ThemeMode};
 use kuro_prefs::values::PrefValue;
 
 use super::{AppTheme, ThemeSettings};
 
 pub const KEY_THEME_MODE: &str = "pref_theme_mode_key";
+/// The colours of the app (`UiPrefs::colours`). Not Aniyomi's `pref_app_theme`, which stays unread.
+pub const KEY_COLOURS: &str = "app_colours";
 
-/// Reads the theme settings: the stored mode, System when unset or unknown.
+/// Reads the theme settings: the stored mode, System when unset or unknown, and the stored colours, the desktop's when
+/// unset or unknown.
 pub fn read_settings(store: &PrefStore) -> ThemeSettings {
     let mode = match store.get_raw(KEY_THEME_MODE) {
         Some(PrefValue::Str(raw)) => AppTheme::from_stored(&raw).mode(),
         _ => ThemeMode::SYSTEM,
     };
-    ThemeSettings { mode }
+    let colours = match store.get_raw(KEY_COLOURS) {
+        Some(PrefValue::Str(raw)) => AppColours::from_name(&raw).unwrap_or(AppColours::DESKTOP),
+        _ => AppColours::DESKTOP,
+    };
+    ThemeSettings { mode, colours }
 }
 
 #[cfg(test)]
@@ -48,6 +55,17 @@ mod tests {
             write_mode(&store, mode);
             assert_eq!(read_settings(&store).mode, mode);
         }
+    }
+
+    #[test]
+    fn the_stored_colours_are_read_and_anything_else_is_the_desktops() {
+        let store = PrefStore::in_memory();
+        assert_eq!(read_settings(&store).colours, AppColours::DESKTOP, "unset");
+        store.set_raw(KEY_COLOURS, PrefValue::Str("TOKYO_NIGHT".to_string()));
+        assert_eq!(read_settings(&store).colours, AppColours::TOKYO_NIGHT);
+        store.set_raw(KEY_COLOURS, PrefValue::Str("MOCHA".to_string()));
+        assert_eq!(read_settings(&store).colours, AppColours::DESKTOP, "a name that is none of ours");
+        assert_eq!(kuro_prefs::ui::UiPrefs::new(store).colours.key(), KEY_COLOURS, "the key the Colours row writes");
     }
 
     #[test]

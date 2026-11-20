@@ -21,6 +21,13 @@ pref_enum! {
     }
 }
 
+pref_enum! {
+    /// `app_colours`: the colours of the whole app, Kurobayomi's own short list (the Colours row of the Appearance
+    /// page). `DESKTOP` leaves them to the desktop, as before there was a choice. Aniyomi's palettes (`AppTheme`) are
+    /// not these: their key stays a dropped one.
+    pub enum AppColours { DESKTOP, TOKYO_NIGHT, ROSE, FOREST, BLACK, SAND }
+}
+
 impl AppTheme {
     /// The string-resource key of the picker title, or `None` for a deprecated theme.
     pub fn title_key(self) -> Option<&'static str> {
@@ -104,6 +111,7 @@ define_prefs! {
         theme_mode: ThemeMode = "pref_theme_mode_key" => ThemeMode::SYSTEM;
         start_screen: StartScreen = "start_screen" => StartScreen::ANIME;
         cover_colours: bool = "entry_cover_colours" => true;
+        colours: AppColours = "app_colours" => AppColours::DESKTOP;
     }
 }
 
@@ -126,6 +134,7 @@ mod tests {
                 ("theme_mode", "pref_theme_mode_key"),
                 ("start_screen", "start_screen"),
                 ("cover_colours", "entry_cover_colours"),
+                ("colours", "app_colours"),
             ]
         );
         assert_eq!(UiPrefs::TABLE, "ui");
@@ -143,6 +152,9 @@ mod tests {
         assert_eq!(ui.theme_mode.get(), ThemeMode::SYSTEM);
         assert_eq!(ui.start_screen.get(), StartScreen::ANIME);
         assert!(ui.cover_colours.get(), "a title's page takes its cover's colour unless it is turned off");
+        assert_eq!(ui.colours.get(), AppColours::DESKTOP, "the desktop's colours until another choice is made");
+        assert_eq!(AppColours::TOKYO_NIGHT.name(), "TOKYO_NIGHT");
+        assert_eq!(AppColours::from_name("SAND"), Some(AppColours::SAND));
     }
 
     #[test]

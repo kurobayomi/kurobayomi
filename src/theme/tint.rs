@@ -5,7 +5,8 @@
 //!
 //! The rules name every selector by hand: the app runs on GTK 4.14, where a redeclared colour applies to the whole
 //! window (colour variables a widget can carry came with 4.16). The colour is made readable against the window's
-//! background of the moment (`palette::readable`), and made again when the app goes from light to dark.
+//! background of the moment (`palette::readable`), and made again when that background changes: the app goes from
+//! light to dark, or other colours are chosen for it (`apply` calls [`refresh`]).
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -53,7 +54,6 @@ thread_local! {
     /// The tinted pages by their class.
     static PAGES: RefCell<HashMap<String, Tinted>> = RefCell::default();
     static NEXT: Cell<u32> = const { Cell::new(0) };
-    static WATCHING: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Whether a title's page takes its cover's colour: the switch of the Appearance page (`entry_cover_colours`), on
@@ -62,9 +62,9 @@ fn enabled() -> bool {
     !crate::data::is_installed() || kuro_prefs::ui::UiPrefs::new(crate::data::app().base.store().clone()).cover_colours.get()
 }
 
-/// The window's background now: libadwaita's dark one in the dark style, its light one otherwise.
+/// The window's background now: the chosen colours', or libadwaita's own for the desktop's colours.
 fn background() -> Rgb {
-    if adw::is_initialized() && adw::StyleManager::default().is_dark() { DARK_WINDOW } else { LIGHT_WINDOW }
+    super::apply::window_background()
 }
 
 fn class_of(page: &gtk::Widget) -> Option<String> {
@@ -78,7 +78,6 @@ pub fn apply(page: &impl IsA<gtk::Widget>, seed: Rgb) {
     if !enabled() {
         return clear(page);
     }
-    follow_the_mode();
     if let Some(class) = class_of(page) {
         let retinted = PAGES.with(|pages| match pages.borrow_mut().get_mut(&class) {
             Some(tinted) => {
@@ -131,18 +130,14 @@ fn forget(class: &str) {
     }
 }
 
-/// Makes the rules of every tinted page again when the app goes from light to dark or back. Connected once.
-fn follow_the_mode() {
-    if !adw::is_initialized() || WATCHING.with(|watching| watching.replace(true)) {
-        return;
-    }
-    adw::StyleManager::default().connect_dark_notify(|_| {
-        let background = background();
-        PAGES.with(|pages| {
-            for (class, tinted) in pages.borrow().iter() {
-                tinted.provider.load_from_string(&rules(class, tinted.seed, background));
-            }
-        });
+/// Makes the rules of every tinted page again: the window's background changed (light to dark, or other colours for
+/// the app), and each page's colour must read on the new one.
+pub fn refresh() {
+    let background = background();
+    PAGES.with(|pages| {
+        for (class, tinted) in pages.borrow().iter() {
+            tinted.provider.load_from_string(&rules(class, tinted.seed, background));
+        }
     });
 }
 

@@ -1,17 +1,82 @@
 //! Installs the base stylesheet (`style.css`) on the default display once, at APPLICATION priority (T-49ba-001), and sets
 //! libadwaita's colour scheme from the stored mode. libadwaita follows the desktop's light or dark choice itself.
+//!
+//! The chosen colours of the app (`colours`) are one more sheet, loaded for a choice other than the desktop's and made
+//! again when the app goes from light to dark: a sheet holds the colours of one style.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use gtk::{gdk, CssProvider};
 
-use kuro_prefs::ui::ThemeMode;
+use kuro_prefs::ui::{AppColours, ThemeMode};
 
-use super::{style, ThemeSettings};
+use super::palette::Rgb;
+use super::{colours, style, tint, ThemeSettings};
 
 thread_local! {
     /// The display and settings last applied, so a later change can update them.
     static CURRENT: RefCell<Option<(gdk::Display, ThemeSettings)>> = const { RefCell::new(None) };
+    /// The sheet of the chosen colours; none for the desktop's own.
+    static COLOURS: RefCell<Option<CssProvider>> = const { RefCell::new(None) };
+    static FOLLOWING_STYLE: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Whether the app draws in its dark style now.
+fn is_dark() -> bool {
+    adw::is_initialized() && adw::StyleManager::default().is_dark()
+}
+
+/// The background of the window now: the chosen colours' in the style of the moment, or libadwaita's own for the
+/// desktop's colours. What a title's page, coloured from its cover, must read on (`tint`).
+pub fn window_background() -> Rgb {
+    let dark = is_dark();
+    let chosen = CURRENT.with(|c| c.borrow().as_ref().map(|(_, settings)| settings.colours));
+    match chosen.and_then(colours::scheme) {
+        Some(scheme) => colours::colours(&scheme, dark).window.0,
+        None if dark => tint::DARK_WINDOW,
+        None => tint::LIGHT_WINDOW,
+    }
+}
+
+/// Loads the sheet of `chosen` for the style of the moment, or takes the sheet away for the desktop's own colours. Then
+/// the pages coloured from their covers are made readable on the new background.
+fn sync_colours(display: &gdk::Display, chosen: AppColours) {
+    follow_the_style();
+    let sheet = colours::scheme(chosen).map(|scheme| colours::sheet(&scheme, is_dark()));
+    let loaded = COLOURS.with(|slot| slot.borrow_mut().take());
+    let kept = match (sheet, loaded) {
+        (Some(sheet), Some(provider)) => {
+            provider.load_from_string(&sheet);
+            Some(provider)
+        }
+        (Some(sheet), None) => {
+            let provider = CssProvider::new();
+            connect_parse_log(&provider);
+            provider.load_from_string(&sheet);
+            // the application's priority, like the base sheet: above libadwaita's own colours, below the user's file
+            gtk::style_context_add_provider_for_display(display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+            Some(provider)
+        }
+        (None, Some(provider)) => {
+            gtk::style_context_remove_provider_for_display(display, &provider);
+            None
+        }
+        (None, None) => None,
+    };
+    COLOURS.with(|slot| *slot.borrow_mut() = kept);
+    tint::refresh();
+}
+
+/// Makes the sheet of the chosen colours again when the app goes from light to dark or back. Connected once.
+fn follow_the_style() {
+    if !adw::is_initialized() || FOLLOWING_STYLE.with(|following| following.replace(true)) {
+        return;
+    }
+    adw::StyleManager::default().connect_dark_notify(|_| {
+        if let Some((display, settings)) = CURRENT.with(|c| c.borrow().clone()) {
+            sync_colours(&display, settings.colours);
+        }
+    });
 }
 
 /// Installs the base stylesheet and applies `settings`, once, before the first window is presented (T-49ba-001).
@@ -51,6 +116,7 @@ pub fn sync_color_scheme(mode: ThemeMode) {
 pub fn set_settings(display: &gdk::Display, settings: ThemeSettings) -> bool {
     CURRENT.with(|c| *c.borrow_mut() = Some((display.clone(), settings)));
     sync_color_scheme(settings.mode);
+    sync_colours(display, settings.colours);
     true
 }
 

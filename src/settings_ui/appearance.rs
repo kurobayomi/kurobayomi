@@ -27,6 +27,12 @@ pub fn theme_mode_row(prefs: &Prefs) -> PreferenceItem {
     }
 }
 
+/// The colours of the whole app: the desktop's own, or one of a short list (`theme::colours`). The choice is applied
+/// at once, from the stored value (`theme::follow_colours`), in the light and in the dark style.
+pub fn colours_row(prefs: &Prefs) -> PreferenceItem {
+    enum_choice(&tr(MsgKey::ui_app_colours), &prefs.ui.colours, &crate::theme::colours::CHOICES, true)
+}
+
 /// The switch of the colour a title's page takes from its cover (`theme::tint`). Turning it off takes the colour off
 /// the pages that are open; turned on, a page is coloured the next time it is drawn.
 pub fn cover_colours_row(prefs: &Prefs) -> PreferenceItem {
@@ -83,7 +89,7 @@ pub fn open_start_tab(tabs: &adw::ViewStack, prefs: &Prefs) {
 /// app lock group. The rest of the page stays as the spec builds it.
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     vec![
-        group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs), cover_colours_row(prefs)]),
+        group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs), colours_row(prefs), cover_colours_row(prefs)]),
         group(&tr(MsgKey::pref_category_display), vec![start_screen_row(prefs)]),
     ]
 }
@@ -101,9 +107,12 @@ mod tests {
     }
 
     #[test]
-    fn the_theme_group_holds_the_mode_and_the_cover_colours_switch() {
+    fn the_theme_group_holds_the_mode_the_colours_and_the_cover_colours_switch() {
         let prefs = Prefs::in_memory();
-        assert_eq!(titles_of(&page_rows(&prefs), "Theme"), ["Theme mode", "Cover colours on a title's page"]);
+        assert_eq!(titles_of(&page_rows(&prefs), "Theme"), ["Theme mode", "Colours", "Cover colours on a title's page"]);
+        let PreferenceItem::BasicList { value, entries, .. } = colours_row(&prefs) else { panic!("a list") };
+        assert_eq!(value, "DESKTOP", "the desktop's colours until another choice is made");
+        assert_eq!(entries.iter().map(|(_, label)| label.as_str()).collect::<Vec<_>>(), ["Desktop", "Tokyo Night", "Rose", "Forest", "Black", "Sand"]);
         let PreferenceItem::Switch { pref, .. } = cover_colours_row(&prefs) else { panic!("a switch") };
         assert!(pref.get(), "on unless it is turned off");
     }
@@ -125,7 +134,7 @@ mod tests {
             &[],
             crate::settings_ui::browse::RepoCounts::default(),
         );
-        assert_eq!(titles_of(&tree, "Theme"), ["Theme mode", "Cover colours on a title's page"]);
+        assert_eq!(titles_of(&tree, "Theme"), ["Theme mode", "Colours", "Cover colours on a title's page"]);
     }
 
     #[test]

@@ -25,6 +25,7 @@
 
 pub mod app_theme;
 pub mod apply;
+pub mod colours;
 pub mod icons;
 pub mod palette;
 pub mod prefs;
@@ -32,19 +33,21 @@ pub mod style;
 pub mod tint;
 pub mod tokens;
 
-use kuro_prefs::ui::ThemeMode;
+use kuro_prefs::ui::{AppColours, ThemeMode};
 
 pub use app_theme::AppTheme;
 
-/// Persisted theme inputs. There is no palette choice: the colours are libadwaita's own, so the only choice is the mode.
+/// Persisted theme inputs: the mode, and the colours of the app. The desktop's colours (the default) are libadwaita's
+/// own and what the desktop adds; any other choice redeclares them (`colours`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ThemeSettings {
     pub mode: ThemeMode,
+    pub colours: AppColours,
 }
 
 impl Default for ThemeSettings {
     fn default() -> Self {
-        ThemeSettings { mode: ThemeMode::SYSTEM }
+        ThemeSettings { mode: ThemeMode::SYSTEM, colours: AppColours::DESKTOP }
     }
 }
 
@@ -57,7 +60,16 @@ pub fn startup() {
     icons::register(&display);
     let store = crate::data::app().base.store().clone();
     apply::install(&display, prefs::read_settings(&store));
-    follow_mode(&kuro_prefs::ui::UiPrefs::new(store).theme_mode);
+    let ui = kuro_prefs::ui::UiPrefs::new(store);
+    follow_mode(&ui.theme_mode);
+    follow_colours(&ui.colours);
+}
+
+/// Applies the chosen colours again on every change of `pref`, from anywhere: the Appearance page, a backup import.
+fn follow_colours(pref: &kuro_prefs::pref::Pref<AppColours>) {
+    crate::pref_model::bind::follow(pref, || true, |colours: AppColours| {
+        apply::update_settings(|settings| settings.colours = colours);
+    });
 }
 
 /// Applies the theme mode again on every change of `pref`, from anywhere (a backup import, a second window), not

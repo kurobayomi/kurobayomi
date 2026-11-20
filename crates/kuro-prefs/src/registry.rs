@@ -220,6 +220,7 @@ define_prefs! {
     "pref_theme_mode_key", Normal, Str, "SYSTEM", "ui", "theme_mode";
     "start_screen", Normal, Str, "ANIME", "ui", "start_screen";
     "entry_cover_colours", Normal, Bool, true, "ui", "cover_colours";
+    "app_colours", Normal, Str, "DESKTOP", "ui", "colours";
     "pref_display_mode_catalogue", Normal, Str, "COMPACT_GRID", "sources", "display_mode";
     "source_languages", Normal, Set, &["all", "en"], "sources", "enabled_languages";
     "show_nsfw_source", Normal, Bool, false, "sources", "show_nsfw_source";
