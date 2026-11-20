@@ -86,11 +86,13 @@ impl BrowseShell {
         let on_refresh = Rc::clone(&inner.deps.on_refresh);
         let refresh = crate::ui::refresh_button(&tr(MsgKey::browse_check_sources));
         refresh.connect_clicked(move |button| on_refresh(button));
-        // search, Refresh, then the page's own buttons, as on every page (user, 2026-10-25): Repositories first of them
+        // the add button first (user, 2026-11-20), then search, Refresh and the page's own buttons, as on every page
+        // (user, 2026-10-25)
         let end = crate::ui::HeaderActions {
+            add: Some(inner.add_button().upcast()),
             search: Some(inner.search.clone()),
             refresh: Some(refresh.clone().upcast()),
-            extra: vec![inner.repos_button().upcast(), gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
+            extra: vec![gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
             options: Some(options),
             ..Default::default()
         }
@@ -223,13 +225,14 @@ impl Inner {
         });
         self.options.widget.add_controller(opening);
 
-        // no "more" menu: the search button is the global search, and Repositories is a button of its own
+        // no "more" menu: the search button is the global search, and adding sources is a button of its own
         self.options.widget.clone().upcast()
     }
 
-    /// The Repositories button, after Refresh: opens the repository list for the visible kind.
-    fn repos_button(self: &Rc<Self>) -> gtk::Button {
-        let button = crate::ui::icon_button("package-x-generic-symbolic", &tr(MsgKey::label_extension_repos));
+    /// The add button, a plus, first of the header's actions: opens the repositories of the visible kind, which is where
+    /// sources are added.
+    fn add_button(self: &Rc<Self>) -> gtk::Button {
+        let button = crate::ui::icon_button("list-add-symbolic", &tr(MsgKey::ui_add_sources));
         let weak = Rc::downgrade(self);
         button.connect_clicked(move |_| {
             if let Some(inner) = weak.upgrade() {
@@ -349,9 +352,9 @@ pub(crate) mod tests {
         assert_eq!(*log.left.borrow(), 1, "the second Escape leaves");
     }
 
-    /// No "more" menu (the search button is the global search), and the Repositories button just after Refresh opens
-    /// the repositories of the visible kind.
-    fn the_repositories_button_follows_refresh_and_the_visible_kind() {
+    /// No "more" menu (the search button is the global search), and the add button, a plus before search and Refresh,
+    /// opens the repositories of the visible kind.
+    fn the_add_button_comes_first_and_follows_the_visible_kind() {
         let (shell, log) = shell();
         let mut all = Vec::new();
         walk(shell.root.upcast_ref(), &mut all);
@@ -360,10 +363,13 @@ pub(crate) mod tests {
         let repos = all
             .iter()
             .filter_map(|w| w.downcast_ref::<gtk::Button>().cloned())
-            .find(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::label_extension_repos).as_str()))
-            .expect("the Repositories button");
-        let refresh = repos.prev_sibling().and_downcast::<gtk::Button>().expect("Refresh comes before it");
-        assert_eq!(refresh.tooltip_text().as_deref(), Some(tr(MsgKey::browse_check_sources).as_str()));
+            .find(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::ui_add_sources).as_str()))
+            .expect("the add button");
+        assert_eq!(repos.icon_name().as_deref(), Some("list-add-symbolic"), "a plus");
+        let after: Vec<gtk::Widget> = std::iter::successors(repos.next_sibling(), |w| w.next_sibling()).collect();
+        let is_refresh = |w: &gtk::Widget| w.downcast_ref::<gtk::Button>().is_some_and(|b| b.tooltip_text().as_deref() == Some(tr(MsgKey::browse_check_sources).as_str()));
+        assert!(after.iter().any(is_refresh), "Refresh comes after it");
+        assert!(std::iter::successors(repos.prev_sibling(), |w| w.prev_sibling()).all(|w| !w.is::<gtk::Button>()), "no button of the page comes before it");
         shell.inner.select(BrowsePage::MangaSources);
         repos.emit_clicked();
         shell.inner.select(BrowsePage::AnimeSources);

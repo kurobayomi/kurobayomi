@@ -423,6 +423,7 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
     // the row in the phone layout (`search_follows_width`)
     let search = bar.as_ref().map(|_| end.remove(0));
     let menu = end.iter().position(|w| w.has_css_class(MORE_MENU)).map(|i| end.remove(i));
+    let add = end.iter().position(|w| w.has_css_class(ADD_ACTION)).map(|i| end.remove(i));
     let lead = (search.is_some() || menu.is_some()).then(|| pack_lead(&header, menu.as_ref()));
     let (switches, end): (Vec<gtk::Widget>, Vec<gtk::Widget>) = end.into_iter().partition(|w| w.is::<gtk::StackSwitcher>());
     let mut narrow_rows = Vec::new();
@@ -439,6 +440,10 @@ pub fn page(title: &str, content: &impl IsA<gtk::Widget>, end: Vec<gtk::Widget>,
         let slot = GBox::new(O::Horizontal, 0);
         header.pack_end(&slot);
         search_follows_width(&header, search, lead, &slot);
+    }
+    // packed last, so it is the first of the actions from the left, before search
+    if let Some(add) = &add {
+        header.pack_end(add);
     }
     no_sticky_focus(&header);
     b.append(&header);
@@ -913,6 +918,8 @@ const SPIN_MS: u64 = 700;
 
 /// The css class of a page's ⋮ menu ([`menu_button`]), so a pushed page can lead its header with it.
 pub const MORE_MENU: &str = "kb-more";
+/// The css class of a page's add button ([`HeaderActions::add`]), so [`page`] can put it before search.
+pub const ADD_ACTION: &str = "kb-add";
 /// The box at the start of a page's header: the search toggle in the phone layout, then a pushed page's ⋮ menu.
 pub const LEAD: &str = "kb-lead";
 
@@ -964,11 +971,14 @@ pub fn search_follows_width(header: &adw::HeaderBar, toggle: &gtk::Widget, lead:
     });
 }
 
-/// What a main page puts in its header, left to right: search, refresh, the page's own buttons, sort/filter, and the
-/// "more" menu last. Every page builds its row here, so the order and the buttons mean the same everywhere and only the
-/// contents differ.
+/// What a main page puts in its header, left to right: its add button when it has one, search, refresh, the page's own
+/// buttons, sort/filter, and the "more" menu last. Every page builds its row here, so the order and the buttons mean
+/// the same everywhere and only the contents differ.
 #[derive(Default)]
 pub struct HeaderActions {
+    /// The page's add button, a plus: what brings new things onto the page (Browse's sources). It comes first, before
+    /// search: the others change what the page shows, this one what it has (user, 2026-11-20).
+    pub add: Option<gtk::Widget>,
     /// The page's search entry; `ui::page` turns it into the shared search toggle.
     pub search: Option<gtk::SearchEntry>,
     /// Updates what the page shows (the whole library, the way it is meant everywhere).
@@ -990,6 +1000,11 @@ impl HeaderActions {
         row.extend(self.extra);
         row.extend(self.options);
         row.extend(menu_button(self.menu).map(|m| m.upcast()));
+        // after the others: `page` takes the search entry from the front of the row, and finds this one by its class
+        if let Some(add) = self.add {
+            add.add_css_class(ADD_ACTION);
+            row.push(add);
+        }
         row
     }
 }

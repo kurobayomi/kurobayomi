@@ -1157,3 +1157,6 @@ ui_colours_gruvbox = Gruvbox
 
 # source: kurobayomi
 ui_colours_rose_pine = Rosé Pine
+
+# source: kurobayomi
+ui_add_sources = Add sources

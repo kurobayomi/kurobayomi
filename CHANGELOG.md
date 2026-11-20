@@ -32,6 +32,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   title as that tracker knows it over its rows, a Search button while the title is not tracked there, or a Connect
   button while the tracker is not connected. A dot marks the tab of each tracker that tracks the title, and the page
   opens on the first of them. The community score stays under the tabs.
+- On Browse, the button that opens the repositories is a plus, "Add sources", and comes first of the buttons at the
+  top, before search.
 - The next-update button is no longer shown on a finished title, where it read "N/A".
 
 ### Fixed
