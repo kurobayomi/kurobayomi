@@ -398,6 +398,6 @@ pub(crate) mod tests {
         enter_runs_a_global_search_of_the_visible_kind();
         the_switch_follows_the_page_and_ctrl_digits_pick_only_the_two_pages();
         escape_closes_the_search_then_leaves();
-        the_repositories_button_follows_refresh_and_the_visible_kind();
+        the_add_button_comes_first_and_follows_the_visible_kind();
     }
 }
