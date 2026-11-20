@@ -18,6 +18,9 @@
 //! - a search text must be 3 to 64 characters: 2 and 65 answer 400;
 //! - a search leaves out the titles MyAnimeList marks as adult unless `nsfw=true` is sent; by id they answer either way;
 //! - a title nobody rated has no `mean` field; a missing id answers 404;
+//! - an anime has a `status` (`currently_airing`, `finished_airing`, `not_yet_aired`) and, most of those on air, a
+//!   `broadcast` with a weekday (`monday` to `sunday`, or `other`) and a `start_time` in Japan's time. That is all the
+//!   site says of when a title airs: "One Piece" on a break of six weeks still read `currently_airing`, `sunday`;
 //! - a season (`anime/season/{year}/{season}`) is one list of the titles on air in it, continuing ones included: 219
 //!   titles for fall 2026, with no further page;
 //! - the popularity list (`{kind}/ranking?ranking_type=bypopularity`) gives 500 titles a request, for anime and manga,
@@ -41,7 +44,7 @@ use kuro_track::tracker::anilist::api::{RateLimiter, Transport, anilist_to_mal_i
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
-use crate::provider::{Hit, Outcome, Query, ScoreProvider, Stop};
+use crate::provider::{AirSlot, Hit, Outcome, Query, ScoreProvider, Stop};
 
 /// The name stored with a score from here.
 pub const ID: &str = "myanimelist";
@@ -49,8 +52,11 @@ pub const ID: &str = "myanimelist";
 pub const PACE: Duration = Duration::from_millis(1500);
 /// The header that carries the client id.
 const CLIENT_ID_HEADER: &str = "X-MAL-CLIENT-ID";
-/// The fields asked of a title: its score and its other names. Its id and title always come.
-const FIELDS: &str = "mean,alternative_titles";
+/// The fields asked of a title: its score, its other names, and whether and when it is on air. Its id and title
+/// always come.
+const FIELDS: &str = "mean,alternative_titles,status,broadcast";
+/// The `status` of an anime that is on air.
+const ON_AIR: &str = "currently_airing";
 /// Results asked of a search by name: enough to see two titles of one name, which is then no match.
 const MATCH_RESULTS: &str = "5";
 /// Results asked of a search the user reads.
@@ -120,6 +126,36 @@ struct Item {
     mean: Option<f64>,
     #[serde(default)]
     alternative_titles: Option<OtherNames>,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    broadcast: Option<Broadcast>,
+}
+
+#[derive(Deserialize)]
+struct Broadcast {
+    #[serde(default)]
+    day_of_the_week: Option<String>,
+    #[serde(default)]
+    start_time: Option<String>,
+}
+
+/// The weekly slot a `broadcast` names: a weekday the week has (the site also says `other`) and a time of day as
+/// `HH:MM`. `None` when either is missing or is not one.
+fn air_slot(broadcast: &Broadcast) -> Option<AirSlot> {
+    let weekday = match broadcast.day_of_the_week.as_deref()? {
+        "monday" => 0,
+        "tuesday" => 1,
+        "wednesday" => 2,
+        "thursday" => 3,
+        "friday" => 4,
+        "saturday" => 5,
+        "sunday" => 6,
+        _ => return None,
+    };
+    let (hours, minutes) = broadcast.start_time.as_deref()?.split_once(':')?;
+    let (hours, minutes) = (hours.trim().parse::<u16>().ok()?, minutes.trim().parse::<u16>().ok()?);
+    (hours < 24 && minutes < 60).then_some(AirSlot { weekday, minute: hours * 60 + minutes })
 }
 
 #[derive(Deserialize)]
@@ -147,7 +183,9 @@ impl From<Item> for Hit {
             }
         }
         let title = if names.is_empty() { String::new() } else { names.remove(0) };
-        Hit { remote_id: item.id, title, alt_titles: names, score: item.mean.filter(|mean| *mean > 0.0) }
+        // a slot counts only while the title is on air: a finished one keeps its old slot on the site
+        let slot = item.broadcast.as_ref().filter(|_| item.status.as_deref() == Some(ON_AIR)).and_then(air_slot);
+        Hit { remote_id: item.id, title, alt_titles: names, score: item.mean.filter(|mean| *mean > 0.0), slot }
     }
 }
 
@@ -398,7 +436,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/anime/5"))
             .and(header("X-MAL-CLIENT-ID", "the-client-id"))
-            .and(query_param("fields", "mean,alternative_titles"))
+            .and(query_param("fields", "mean,alternative_titles,status,broadcast"))
             .respond_with(ResponseTemplate::new(200).set_body_json(item(5, "Kimetsu no Yaiba", Some(8.4))))
             .mount(&server)
             .await;
@@ -494,6 +532,23 @@ mod tests {
         assert_eq!(mal.lookup(&by_id(403)).await, Err(Stop::Unreachable), "a refused client id is refused for every title");
         assert_eq!(mal.lookup(&by_id(7)).await, Err(Stop::Unreachable));
         assert_eq!(mal.lookup(&query("Some title")).await, Ok(Outcome::NotFound));
+    }
+
+    #[test]
+    fn a_title_on_air_carries_its_weekly_slot_and_no_other_does() {
+        let slot_of = |value: Value| Hit::from(serde_json::from_value::<Item>(value).expect("item")).slot;
+        let on_air = |broadcast: Value| json!({ "id": 1, "title": "T", "status": "currently_airing", "broadcast": broadcast });
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "wednesday", "start_time": "22:00" }))), Some(AirSlot { weekday: 2, minute: 22 * 60 }));
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "sunday", "start_time": "23:15" }))), Some(AirSlot { weekday: 6, minute: 23 * 60 + 15 }));
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "monday", "start_time": "00:00" }))), Some(AirSlot { weekday: 0, minute: 0 }));
+        // what the site also answers: a day that is none, a slot with no time, a time that is none
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "other", "start_time": "12:00" }))), None);
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "friday" }))), None);
+        assert_eq!(slot_of(on_air(json!({ "day_of_the_week": "friday", "start_time": "25:00" }))), None);
+        assert_eq!(slot_of(json!({ "id": 1, "title": "T", "status": "currently_airing" })), None, "on air, no slot listed");
+        // a finished title keeps its old slot on the site, and a manga has none
+        assert_eq!(slot_of(json!({ "id": 1, "title": "T", "status": "finished_airing", "broadcast": { "day_of_the_week": "sunday", "start_time": "23:15" } })), None);
+        assert_eq!(slot_of(json!({ "id": 2, "title": "Berserk", "status": "currently_publishing" })), None);
     }
 
     #[test]

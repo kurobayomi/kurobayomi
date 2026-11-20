@@ -96,7 +96,7 @@ mod tests {
     }
 
     fn found(id: i64, score: f64) -> Outcome {
-        Outcome::Found { hit: Hit { remote_id: id, title: format!("Site {id}"), alt_titles: Vec::new(), score: Some(score) }, by: MatchedBy::Title }
+        Outcome::Found { hit: Hit { remote_id: id, title: format!("Site {id}"), alt_titles: Vec::new(), score: Some(score), slot: None }, by: MatchedBy::Title }
     }
 
     fn stored(entry_id: i64, remote_id: Option<i64>, by: MatchedBy) -> CommunityScore {

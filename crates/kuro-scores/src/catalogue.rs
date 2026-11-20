@@ -15,6 +15,7 @@ pub struct Catalogue {
     hits: Vec<Hit>,
     /// The titles of each name, by the name as the match compares it ([`normalize`]): a title's own name and its others.
     by_name: HashMap<String, Vec<usize>>,
+    by_id: HashMap<i64, usize>,
 }
 
 impl Catalogue {
@@ -32,7 +33,13 @@ impl Catalogue {
                 }
             }
         }
-        Self { hits, by_name }
+        let by_id = hits.iter().enumerate().map(|(index, hit)| (hit.remote_id, index)).collect();
+        Self { hits, by_name, by_id }
+    }
+
+    /// The listed title of this id on the site.
+    pub fn by_id(&self, remote_id: i64) -> Option<&Hit> {
+        self.hits.get(*self.by_id.get(&remote_id)?)
     }
 
     pub fn len(&self) -> usize {
@@ -63,7 +70,7 @@ mod tests {
     use super::*;
 
     fn hit(id: i64, title: &str, others: &[&str], score: Option<f64>) -> Hit {
-        Hit { remote_id: id, title: title.into(), alt_titles: others.iter().map(|name| (*name).to_owned()).collect(), score }
+        Hit { remote_id: id, title: title.into(), alt_titles: others.iter().map(|name| (*name).to_owned()).collect(), score, slot: None }
     }
 
     #[test]
@@ -74,6 +81,8 @@ mod tests {
             hit(1, "Cowboy Bebop", &["カウボーイビバップ"], Some(8.75)),
         ]);
         assert_eq!(catalogue.len(), 3);
+        assert_eq!(catalogue.by_id(55791).map(|hit| hit.title.as_str()), Some("[Oshi no Ko] 2nd Season"));
+        assert_eq!(catalogue.by_id(2).map(|hit| hit.remote_id), None, "an id the lists do not hold");
         assert_eq!(catalogue.find("\"Oshi no Ko\"").map(|hit| hit.remote_id), Some(52034), "the punctuation of a source's name does not count");
         assert_eq!(catalogue.find("Oshi no Ko Season 2").map(|hit| hit.remote_id), Some(55791), "\"2nd Season\" reads as \"Season 2\"");
         assert_eq!(catalogue.find("my star").map(|hit| hit.remote_id), Some(52034));

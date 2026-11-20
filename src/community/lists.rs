@@ -114,7 +114,7 @@ mod tests {
     use super::*;
 
     fn hit(id: i64, title: &str, score: Option<f64>) -> Hit {
-        Hit { remote_id: id, title: title.into(), alt_titles: vec!["Another name".into()], score }
+        Hit { remote_id: id, title: title.into(), alt_titles: vec!["Another name".into()], score, slot: None }
     }
 
     fn row(remote_id: Option<i64>, by: MatchedBy, fetched_at: i64) -> CommunityScore {

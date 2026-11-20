@@ -536,7 +536,7 @@ mod tests {
                 return Err(Stop::Unreachable);
             }
             asked.push(query.entry_id);
-            Ok(Outcome::Found { hit: Hit { remote_id: query.entry_id * 10, title: query.title.clone(), alt_titles: Vec::new(), score: Some(8.5) }, by: MatchedBy::Title })
+            Ok(Outcome::Found { hit: Hit { remote_id: query.entry_id * 10, title: query.title.clone(), alt_titles: Vec::new(), score: Some(8.5), slot: None }, by: MatchedBy::Title })
         }
         async fn search(&self, _kind: Kind, _text: &str) -> Result<Vec<Hit>, Stop> {
             Ok(Vec::new())
@@ -560,7 +560,7 @@ mod tests {
         let unlisted = entry(&db, Kind::Anime, "/unlisted", false);
         let manga = entry(&db, Kind::Manga, "/m", false);
         let (job, fake) = job(&db, usize::MAX);
-        let hit = |id: i64, title: &str, score: f64| Hit { remote_id: id, title: title.into(), alt_titles: Vec::new(), score: Some(score) };
+        let hit = |id: i64, title: &str, score: f64| Hit { remote_id: id, title: title.into(), alt_titles: Vec::new(), score: Some(score), slot: None };
         let shown = |kind: Kind, entry_id: i64, title: &str| Browsed { kind, entry_id, title: title.into() };
         job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.1)], 500);
         let page = vec![shown(Kind::Anime, listed, "title: /LISTED"), shown(Kind::Anime, unlisted, "Title /unlisted"), shown(Kind::Manga, manga, "Title /m")];
