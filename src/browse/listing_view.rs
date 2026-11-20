@@ -622,6 +622,15 @@ impl Inner {
             });
             item.set_child(Some(&holder));
         });
+        // a cover that leaves the screen stops waiting for a community score of its own (`community::on_screen`)
+        factory.connect_unbind(|_, object| {
+            let Some(row) = object.downcast_ref::<gtk::ListItem>() else { return };
+            let Some(boxed) = row.item().and_downcast::<glib::BoxedAnyObject>() else { return };
+            let id = boxed.borrow::<Option<ListItem>>().as_ref().map(|item| item.id);
+            if let Some(id) = id {
+                crate::community::on_screen(id, false);
+            }
+        });
         let page = Rc::downgrade(self);
         // a rebound cell gets a new cover widget; the old one's load stops when it is removed (edge R10)
         factory.connect_bind({
@@ -642,8 +651,11 @@ impl Inner {
                     let score = inner.scores.borrow().get(&item.id).copied();
                     score
                 });
-                if let Some(score) = score {
-                    super::view::show_score(&cell, mode, score);
+                match (score, shown.as_ref()) {
+                    (Some(score), _) => super::view::show_score(&cell, mode, score),
+                    // no score yet: it is on screen, so a title the bulk lists do not hold is looked up now
+                    (None, Some(item)) => crate::community::on_screen(item.id, true),
+                    (None, None) => {}
                 }
                 while let Some(old) = holder.first_child() {
                     holder.remove(&old);

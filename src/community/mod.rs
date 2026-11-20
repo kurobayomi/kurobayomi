@@ -14,7 +14,8 @@
 //!
 //! Beside the lookups it keeps the score site's bulk lists ([`lists`]): a few requests a day for the titles on air and
 //! the most popular ones, with their scores. A title Browse shows ([`browsed`]) is found in them by name and gets its
-//! score at once, without a request of its own.
+//! score at once, without a request of its own. A title the lists do not hold is looked up like a library title, but
+//! only while its cover is on screen ([`on_screen`]): what scrolled by is not asked for.
 
 mod lists;
 
@@ -44,6 +45,10 @@ const BACKOFF: Duration = Duration::from_secs(10 * 60);
 const BROWSED_GATHER: Duration = Duration::from_millis(200);
 /// The browsed titles kept while the lists of their kind are not there yet (the first start, before they are fetched).
 const BROWSED_KEPT: usize = 2000;
+/// The browsed titles the lists do not hold, kept for when their cover is on screen. The oldest go first.
+const MISSED_KEPT: usize = 400;
+/// The covers counted as on screen. A view tells when a cover leaves; this bounds what a view that did not would leave.
+const ON_SCREEN_KEPT: usize = 600;
 
 /// A title Browse showed: its entry row and its name in the source.
 struct Browsed {
@@ -63,6 +68,10 @@ struct Job {
     /// The titles Browse showed that are not matched against the lists yet.
     browsed: Mutex<Vec<Browsed>>,
     browsed_wake: Notify,
+    /// The browsed entries the lists do not hold: each is looked up once its cover is on screen.
+    missed: Mutex<VecDeque<i64>>,
+    /// The entries whose Browse cover is on screen now.
+    on_screen: Mutex<HashSet<i64>>,
 }
 
 static JOB: OnceLock<Arc<Job>> = OnceLock::new();
@@ -147,6 +156,29 @@ pub fn follow_scores(kind: Kind) -> Option<tokio::sync::watch::Receiver<HashMap<
     Some(rx)
 }
 
+/// A Browse cover came on screen (`shown`) or left it. A title the bulk lists do not hold is looked up while its cover
+/// is on screen, after the titles a page asked for and before the library's. Cheap, and safe from any thread.
+pub fn on_screen(entry_id: i64, shown: bool) {
+    let Some(job) = JOB.get() else { return };
+    if entry_id <= 0 {
+        return;
+    }
+    {
+        let mut covers = job.on_screen.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !shown {
+            covers.remove(&entry_id);
+            return;
+        }
+        if covers.len() >= ON_SCREEN_KEPT {
+            covers.clear();
+        }
+        covers.insert(entry_id);
+    }
+    if job.wants(entry_id) {
+        job.wake.notify_one();
+    }
+}
+
 /// The year and the month of today (UTC), for a provider that lists by season.
 fn today() -> (i32, u32) {
     use chrono::Datelike;
@@ -202,7 +234,39 @@ impl Job {
             lists,
             browsed: Mutex::default(),
             browsed_wake: Notify::new(),
+            missed: Mutex::default(),
+            on_screen: Mutex::default(),
         }
+    }
+
+    /// Whether `entry_id` waits for a lookup of its own: the lists do not hold it.
+    fn wants(&self, entry_id: i64) -> bool {
+        self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).contains(&entry_id)
+    }
+
+    /// The entries the lists do not hold whose cover is on screen, at most `most`, taken out of the wait: they are
+    /// asked now. The ones off screen keep waiting.
+    fn take_wanted(&self, most: usize) -> Vec<i64> {
+        let shown = self.on_screen.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+        let mut missed = self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut taken: Vec<i64> = Vec::new();
+        missed.retain(|id| {
+            let take = taken.len() < most && shown.contains(id);
+            if take {
+                taken.push(*id);
+            }
+            !take
+        });
+        taken
+    }
+
+    /// Whether something goes before the library's entries: a title's page asked, or a cover on screen waits.
+    fn has_work_ahead(&self) -> bool {
+        if !self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_empty() {
+            return true;
+        }
+        let shown = self.on_screen.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+        self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().any(|id| shown.contains(id))
     }
 
     /// Keeps the bulk lists: the cached ones at once, fresh ones when there are none or they are a day old. It runs
@@ -266,6 +330,8 @@ impl Job {
         let mut waiting: Vec<Browsed> = Vec::new();
         let mut rows: Vec<CommunityScore> = Vec::new();
         let mut seen: HashSet<i64> = HashSet::new();
+        // the entries the lists do not hold: each gets a lookup of its own while its cover is on screen
+        let mut missed: Vec<i64> = Vec::new();
         for browsed in entries {
             let Some(held) = self.lists.get(browsed.kind) else {
                 waiting.push(browsed);
@@ -274,7 +340,10 @@ impl Job {
             if !seen.insert(browsed.entry_id) {
                 continue;
             }
-            let Some(hit) = held.catalogue.find(&browsed.title) else { continue };
+            let Some(hit) = held.catalogue.find(&browsed.title) else {
+                missed.push(browsed.entry_id);
+                continue;
+            };
             let stored = match self.scores.by_entry(browsed.entry_id) {
                 Ok(stored) => stored,
                 Err(error) => {
@@ -297,6 +366,22 @@ impl Job {
         if !rows.is_empty() {
             if let Err(error) = self.scores.store_fetched(&rows) {
                 tracing::warn!(%error, "community scores: the scores of browsed titles could not be stored");
+            }
+        }
+        if !missed.is_empty() {
+            {
+                let mut waits = self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                for id in missed {
+                    if !waits.contains(&id) {
+                        waits.push_back(id);
+                    }
+                }
+                while waits.len() > MISSED_KEPT {
+                    waits.pop_front();
+                }
+            }
+            if self.has_work_ahead() {
+                self.wake.notify_one();
             }
         }
         waiting
@@ -349,8 +434,9 @@ impl Job {
                 }
             };
             for (index, pair) in batch.iter().enumerate() {
-                // a title's page asked meanwhile: it goes first, so the rest of this batch waits for the next one
-                if index > 0 && !self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_empty() {
+                // a title's page asked meanwhile, or a cover came on screen: they go first, so the rest of this batch
+                // waits for the next one
+                if index > 0 && self.has_work_ahead() {
                     break;
                 }
                 asked.insert(pair.0.entry_id);
@@ -369,7 +455,8 @@ impl Job {
         }
     }
 
-    /// The next entries to ask: the ones a details page asked for, then the library's, each only when due.
+    /// The next entries to ask: the ones a details page asked for, then the covers on screen that the lists do not
+    /// hold, then the library's, each only when due.
     fn next_batch(&self, asked: &HashSet<i64>) -> Result<Vec<(ScoreCandidate, Query)>, String> {
         let text = |e: kuro_data::DataError| e.to_string();
         let mut tracks: HashMap<i64, Vec<TrackRef>> = HashMap::new();
@@ -381,6 +468,9 @@ impl Job {
         let urgent: Vec<i64> = self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).drain(..).collect();
         let mut candidates: Vec<ScoreCandidate> = Vec::new();
         for id in urgent {
+            candidates.extend(self.scores.candidate(id).map_err(text)?);
+        }
+        for id in self.take_wanted(BATCH) {
             candidates.extend(self.scores.candidate(id).map_err(text)?);
         }
         candidates.extend(self.scores.candidates().map_err(text)?);
@@ -485,6 +575,19 @@ mod tests {
         job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.3)], 900);
         assert!(job.match_browsed(vec![shown(Kind::Anime, listed, "Title /listed")]).is_empty());
         assert_eq!(job.scores.by_entry(listed).expect("read").map(|s| (s.score, s.fetched_at)), Some((Some(8.3), 900)));
+        // a title the lists do not hold waits for a lookup of its own, and gets it once its cover is on screen
+        assert!(job.wants(unlisted) && !job.wants(listed));
+        assert!(!job.has_work_ahead(), "its cover is not on screen");
+        assert_eq!(job.pass().await, None);
+        assert!(fake.asked.lock().expect("asked").is_empty(), "off screen: not asked");
+        job.on_screen.lock().expect("covers").insert(unlisted);
+        assert!(job.has_work_ahead());
+        assert_eq!(job.pass().await, None);
+        assert_eq!(*fake.asked.lock().expect("asked"), [unlisted], "on screen: asked, once");
+        assert_eq!(job.scores.by_entry(unlisted).expect("read").and_then(|s| s.score), Some(8.5));
+        assert!(!job.wants(unlisted) && !job.has_work_ahead(), "it waits no more");
+        assert_eq!(job.pass().await, None);
+        assert_eq!(fake.asked.lock().expect("asked").len(), 1, "and is not asked again");
         // the title the user chose stays, whatever the lists say
         job.scores.set_user_match(listed, "fake", Some((9, "Chosen".into(), Some(5.0))), 950).expect("choose");
         job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.6)], 1_200);
