@@ -50,7 +50,7 @@ mod tests {
     }
 
     fn row(remote_id: Option<i64>, by: MatchedBy, fetched_at: i64) -> CommunityScore {
-        CommunityScore { entry_id: 1, provider: "jikan".into(), remote_id, matched_title: String::new(), matched_by: by, score: remote_id.map(|_| 8.0), fetched_at }
+        CommunityScore { entry_id: 1, provider: "myanimelist".into(), remote_id, matched_title: String::new(), matched_by: by, score: remote_id.map(|_| 8.0), fetched_at }
     }
 
     #[test]

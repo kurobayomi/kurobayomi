@@ -171,7 +171,7 @@ every open window as a PNG; used for the guide's screenshots).
 | `crates/kuro-extensions`, `kuro-source*`, `kuro-net` | repositories, the recipe engine, the WASM plug-in host, HTTP |
 | `crates/kuro-player`, `kuro-downloads`, `kuro-images`, `kuro-local`, `kuro-archive` | mpv player, downloads, images, local files, CBZ |
 | `crates/kuro-backup`, `kuro-track` | backups (Aniyomi compatible), AniList, MyAnimeList and Shikimori tracking |
-| `crates/kuro-scores` | community scores (the MyAnimeList score through Jikan), with sources as plug-ins |
+| `crates/kuro-scores` | community scores (the MyAnimeList score, from MyAnimeList's API), with sources as plug-ins |
 | `docs/` | the user guide, design notes and audits |
 
 ## Licence

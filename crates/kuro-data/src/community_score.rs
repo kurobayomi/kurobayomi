@@ -1,4 +1,4 @@
-//! The community score of an entry: the public score of a catalogue site (MyAnimeList through Jikan today), one row per
+//! The community score of an entry: the public score of a catalogue site (MyAnimeList today), one row per
 //! entry at most, on a 0 to 10 scale. This is the one store of it: the library, the details page and the refresh job
 //! all go through [`CommunityScoreRepo`], and nothing else asks a site for a score. The rows are a cache, so they are
 //! not part of a backup.
@@ -52,7 +52,7 @@ impl MatchedBy {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CommunityScore {
     pub entry_id: i64,
-    /// The provider that answered, `jikan` today.
+    /// The provider that answered, `myanimelist` today.
     pub provider: String,
     pub remote_id: Option<i64>,
     /// The title the site gives it, shown so a wrong match is seen.
@@ -193,7 +193,7 @@ mod tests {
     use crate::support::{insert_anime, insert_manga, test_db};
 
     fn fetched(entry_id: i64, remote_id: Option<i64>, by: MatchedBy, score: Option<f64>, at: i64) -> CommunityScore {
-        CommunityScore { entry_id, provider: "jikan".into(), remote_id, matched_title: remote_id.map_or(String::new(), |id| format!("Title {id}")), matched_by: by, score, fetched_at: at }
+        CommunityScore { entry_id, provider: "myanimelist".into(), remote_id, matched_title: remote_id.map_or(String::new(), |id| format!("Title {id}")), matched_by: by, score, fetched_at: at }
     }
 
     #[test]
@@ -231,7 +231,7 @@ mod tests {
         let id = insert_manga(&db, "/m", true);
         let repo = CommunityScoreRepo::new(db);
         repo.store_fetched(&[fetched(id, Some(1), MatchedBy::Title, Some(6.0), 10)]).expect("store");
-        repo.set_user_match(id, "jikan", Some((2, "The right one".into(), Some(9.0))), 20).expect("choose");
+        repo.set_user_match(id, "myanimelist", Some((2, "The right one".into(), Some(9.0))), 20).expect("choose");
         // a lookup that started before the choice comes back with the old match
         repo.store_fetched(&[fetched(id, Some(1), MatchedBy::Title, Some(6.1), 30)]).expect("store");
         let kept = repo.by_entry(id).expect("read").expect("row");
@@ -240,11 +240,11 @@ mod tests {
         repo.store_fetched(&[CommunityScore { matched_title: "The right one".into(), ..fetched(id, Some(2), MatchedBy::User, Some(9.1), 40) }]).expect("store");
         assert_eq!(repo.by_entry(id).expect("read").map(|s| (s.score, s.fetched_at)), Some((Some(9.1), 40)));
         // a refresh of a title the user has since replaced changes nothing
-        repo.set_user_match(id, "jikan", Some((3, "Another".into(), None)), 50).expect("choose again");
+        repo.set_user_match(id, "myanimelist", Some((3, "Another".into(), None)), 50).expect("choose again");
         repo.store_fetched(&[fetched(id, Some(2), MatchedBy::User, Some(9.9), 60)]).expect("store");
         assert_eq!(repo.by_entry(id).expect("read").map(|s| (s.remote_id, s.score)), Some((Some(3), None)));
         // "no score for this title" is a choice too
-        repo.set_user_match(id, "jikan", None, 70).expect("no score");
+        repo.set_user_match(id, "myanimelist", None, 70).expect("no score");
         let none = repo.by_entry(id).expect("read").expect("row");
         assert_eq!((none.remote_id, none.matched_by, none.score), (None, MatchedBy::User, None));
     }

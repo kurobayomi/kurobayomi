@@ -5302,7 +5302,7 @@ ui_score_none_yet = No score yet
 ui_community_scores = Community scores
 
 # source: kurobayomi
-ui_community_scores_credit = MyAnimeList, through Jikan (unofficial)
+ui_community_scores_credit = From MyAnimeList
 
 # source: kurobayomi
 library_updates_failed =

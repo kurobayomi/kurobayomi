@@ -154,7 +154,7 @@ mod tests {
     use super::*;
 
     fn row(remote_id: Option<i64>, by: MatchedBy, score: Option<f64>, title: &str) -> CommunityScore {
-        CommunityScore { entry_id: 1, provider: "jikan".into(), remote_id, matched_title: title.into(), matched_by: by, score, fetched_at: 0 }
+        CommunityScore { entry_id: 1, provider: "myanimelist".into(), remote_id, matched_title: title.into(), matched_by: by, score, fetched_at: 0 }
     }
 
     #[test]

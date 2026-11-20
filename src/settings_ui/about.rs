@@ -401,7 +401,7 @@ fn link_rows() -> [PreferenceItem; 2] {
     [link_row("GitHub", PROJECT_URL), link_row(&tr(MsgKey::ui_report_an_issue), ISSUES_URL)]
 }
 
-/// Where the community scores come from: MyAnimeList's, read through Jikan, which MyAnimeList does not run.
+/// Where the community scores come from: MyAnimeList, through its own API.
 fn score_credit_row() -> PreferenceItem {
     text(&tr(MsgKey::ui_community_scores), Some(&tr(MsgKey::ui_community_scores_credit)), true)
 }
@@ -450,7 +450,7 @@ mod link_tests {
         assert!(!titles.contains(&"Privacy policy"));
         assert_eq!(titles[titles.len() - 3..], ["Community scores", "GitHub", "Report an issue"]);
         let PreferenceItem::Text { common, .. } = score_credit_row() else { panic!("a text row") };
-        assert_eq!(common.subtitle.as_deref(), Some("MyAnimeList, through Jikan (unofficial)"));
+        assert_eq!(common.subtitle.as_deref(), Some("From MyAnimeList"));
         assert!(link_rows().iter().all(|row| matches!(row, PreferenceItem::Custom { .. }) && row.enabled()), "two tappable rows");
     }
 }

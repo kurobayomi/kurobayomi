@@ -521,7 +521,7 @@ mod tests {
         let kept: String = c.query_row("SELECT title FROM entries", [], |r| r.get(0)).unwrap();
         assert_eq!(kept, "Kept");
         let id: i64 = c.query_row("SELECT _id FROM entries", [], |r| r.get(0)).unwrap();
-        c.execute("INSERT INTO community_scores(entry_id, provider, remote_id, matched_title, matched_by, score, fetched_at) VALUES (?1, 'jikan', 5, 'Kept', 'title', 8.2, 1)", [id]).unwrap();
+        c.execute("INSERT INTO community_scores(entry_id, provider, remote_id, matched_title, matched_by, score, fetched_at) VALUES (?1, 'myanimelist', 5, 'Kept', 'title', 8.2, 1)", [id]).unwrap();
         // the score goes with its entry
         c.execute("DELETE FROM entries WHERE _id = ?1", [id]).unwrap();
         let left: i64 = c.query_row("SELECT count(*) FROM community_scores", [], |r| r.get(0)).unwrap();

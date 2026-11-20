@@ -209,7 +209,7 @@ mod tests {
         let repo = EntryRepo::new(db.clone());
         let add = |kind: Kind, url: &str| repo.insert(&Entry { favorite: true, source: 7, url: url.into(), title: url.into(), ..Entry::create(kind) }).expect("insert");
         let (scored, unrated, manga) = (add(Kind::Anime, "a"), add(Kind::Anime, "b"), add(Kind::Manga, "c"));
-        let row = |entry_id: i64, score: Option<f64>| CommunityScore { entry_id, provider: "jikan".into(), remote_id: Some(entry_id), matched_title: "t".into(), matched_by: MatchedBy::Title, score, fetched_at: 1 };
+        let row = |entry_id: i64, score: Option<f64>| CommunityScore { entry_id, provider: "myanimelist".into(), remote_id: Some(entry_id), matched_title: "t".into(), matched_by: MatchedBy::Title, score, fetched_at: 1 };
         CommunityScoreRepo::new(db.clone()).store_fetched(&[row(scored, Some(8.24)), row(unrated, None), row(manga, Some(7.0))]).expect("scores");
         let snap = snapshot(&db, Kind::Anime).expect("snapshot");
         assert_eq!(snap.community.len(), 1, "found without a score, and the other kind, are left out");
