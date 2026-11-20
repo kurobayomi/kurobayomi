@@ -143,12 +143,12 @@ pub fn follow_scores(kind: Kind) -> Option<tokio::sync::watch::Receiver<HashMap<
         return None;
     }
     let mut subscription = CommunityScoreRepo::new(crate::data::app().db.clone()).watch_scores(kind);
-    let initial: HashMap<i64, f64> = subscription.current().and_then(|published| published.ok()).map(|rows| rows.into_iter().collect()).unwrap_or_default();
+    let initial: HashMap<i64, f64> = subscription.current().and_then(|published| published.ok()).map(|rows| rows.iter().copied().collect()).unwrap_or_default();
     let (tx, rx) = tokio::sync::watch::channel(initial);
     tokio::spawn(async move {
         while let Some(published) = subscription.changed().await {
             let Ok(rows) = published else { continue };
-            if tx.send(rows.into_iter().collect()).is_err() {
+            if tx.send(rows.iter().copied().collect()).is_err() {
                 break;
             }
         }
