@@ -28,7 +28,7 @@ use kuro_data::track::TrackRepo;
 use kuro_db::handle::Db;
 use kuro_platform::kind::Kind;
 use kuro_platform::paths::Paths;
-use kuro_scores::provider::{Hit, Query, ScoreProvider, Stop, TrackRef};
+use kuro_scores::provider::{AirSlot, Hit, Query, ScoreProvider, Stop, TrackRef};
 use kuro_scores::{policy, refresh};
 use tokio::sync::Notify;
 
@@ -237,6 +237,15 @@ impl Job {
             missed: Mutex::default(),
             on_screen: Mutex::default(),
         }
+    }
+
+    fn air_slot(&self, kind: Kind, entry_id: i64) -> Option<AirSlot> {
+        if kind != Kind::Anime {
+            return None;
+        }
+        let held = self.lists.get(Kind::Anime)?;
+        let remote_id = self.scores.by_entry(entry_id).ok().flatten()?.remote_id?;
+        held.catalogue.by_id(remote_id)?.slot
     }
 
     /// Whether `entry_id` waits for a lookup of its own: the lists do not hold it.
@@ -492,6 +501,13 @@ impl Job {
     }
 }
 
+/// The weekly slot of an anime the score site lists as on air: the entry's stored match, found in the bulk lists. `None`
+/// for a manga (its ids are another catalogue's), an entry with no match, a title that is not on air, and before the
+/// lists are there. No request: the lists are in memory.
+pub fn air_slot(kind: Kind, entry_id: i64) -> Option<AirSlot> {
+    JOB.get()?.air_slot(kind, entry_id)
+}
+
 /// The stored score of an entry, for a page that shows it. `None` before the app data exists.
 pub fn stored(entry_id: i64) -> Option<CommunityScore> {
     if !crate::data::is_installed() {
@@ -575,6 +591,13 @@ mod tests {
         job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.3)], 900);
         assert!(job.match_browsed(vec![shown(Kind::Anime, listed, "Title /listed")]).is_empty());
         assert_eq!(job.scores.by_entry(listed).expect("read").map(|s| (s.score, s.fetched_at)), Some((Some(8.3), 900)));
+        // an anime on air has its weekly slot, read from the lists by the id of its stored match
+        assert_eq!(job.air_slot(Kind::Anime, listed), None, "the lists hold no slot for it");
+        let on_air = Hit { slot: Some(AirSlot { weekday: 2, minute: 22 * 60 }), ..hit(7, "Title /listed", 8.3) };
+        job.lists.set(Kind::Anime, vec![on_air], 900);
+        assert_eq!(job.air_slot(Kind::Anime, listed), Some(AirSlot { weekday: 2, minute: 22 * 60 }));
+        assert_eq!(job.air_slot(Kind::Manga, listed), None, "a manga's id is not an anime's");
+        assert_eq!(job.air_slot(Kind::Anime, unlisted), None, "no stored match");
         // a title the lists do not hold waits for a lookup of its own, and gets it once its cover is on screen
         assert!(job.wants(unlisted) && !job.wants(listed));
         assert!(!job.has_work_ahead(), "its cover is not on screen");

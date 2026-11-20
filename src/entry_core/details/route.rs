@@ -953,6 +953,8 @@ impl View {
             m.entry.fetch_interval,
             m.tracking_count as i64,
             self.env.backend.is_http_source(m.entry.source),
+            // the weekly time of an anime the score site lists as on air, in place of the estimate
+            crate::community::air_slot(self.env.kind, m.entry.id).map(crate::entry_core::action_row_view::local_air_time),
         ));
         self.sync_actions();
         // the button stays while nothing is selected, and is disabled when no episode is unseen (T-EPS-NEXT-1)

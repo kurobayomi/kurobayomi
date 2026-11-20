@@ -95,9 +95,41 @@ pub fn tracking_tone(count: i64) -> Tone {
 
 /// Whether the row shows the next-update button. A finished title has no next update, so it has no button: it read
 /// "N/A" and said nothing (user, 2026-11-20). A title still coming out shows it when there is an estimate, and also
-/// when there is none but the title is in the library, where the button opens the dialog that sets the interval.
-pub fn interval_visible(next: NextUpdate, favorite: bool, completed: bool) -> bool {
-    !completed && (next != NextUpdate::NotApplicable || favorite)
+/// when there is none but the title is in the library, where the button opens the dialog that sets the interval. An
+/// anime the score site lists as on air (`on_air`) shows its weekly time whatever the source says of it.
+pub fn interval_visible(next: NextUpdate, favorite: bool, completed: bool, on_air: bool) -> bool {
+    on_air || (!completed && (next != NextUpdate::NotApplicable || favorite))
+}
+
+/// When an anime on air is broadcast each week, on the clock of the user: the weekday and the minute of the day.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AirTime {
+    pub weekday: chrono::Weekday,
+    pub minute: u32,
+}
+
+const DAY_MINUTES: i32 = 24 * 60;
+
+/// The weekly slot `utc_week_minute` (minutes after Monday 00:00 UTC, `kuro_scores::provider::AirSlot`) on a clock
+/// `offset_minutes` east of UTC. The day may be the one before or after the UTC day.
+pub fn air_time(utc_week_minute: u32, offset_minutes: i32) -> AirTime {
+    let local = (utc_week_minute as i32 + offset_minutes).rem_euclid(7 * DAY_MINUTES);
+    let weekday = match local / DAY_MINUTES {
+        0 => chrono::Weekday::Mon,
+        1 => chrono::Weekday::Tue,
+        2 => chrono::Weekday::Wed,
+        3 => chrono::Weekday::Thu,
+        4 => chrono::Weekday::Fri,
+        5 => chrono::Weekday::Sat,
+        _ => chrono::Weekday::Sun,
+    };
+    AirTime { weekday, minute: (local % DAY_MINUTES) as u32 }
+}
+
+/// The weekly time as the button writes it: "Wed 14:00". The weekday is chrono's short name, as on the Upcoming
+/// calendar. It is the slot of every week and not a countdown: the site does not say when a title is on a break.
+pub fn air_text(air: AirTime) -> String {
+    format!("{} {:02}:{:02}", air.weekday, air.minute / 60, air.minute % 60)
 }
 
 /// Whether the row shows the tracking button at all. Anime shows it only when a tracking callback exists; manga always has one.
@@ -176,12 +208,31 @@ mod tests {
 
     #[test]
     fn the_next_update_button_is_shown_only_when_it_has_something_to_say_or_to_set() {
-        assert!(!interval_visible(NextUpdate::NotApplicable, true, true), "finished: no next update, in the library or not");
-        assert!(!interval_visible(NextUpdate::Days(3), false, true), "a finished title has none, whatever was estimated");
-        assert!(interval_visible(NextUpdate::Days(3), false, false));
-        assert!(interval_visible(NextUpdate::Soon, false, false));
-        assert!(interval_visible(NextUpdate::NotApplicable, true, false), "no estimate yet: the library title can still set one");
-        assert!(!interval_visible(NextUpdate::NotApplicable, false, false), "nothing to say and nothing to set");
+        assert!(!interval_visible(NextUpdate::NotApplicable, true, true, false), "finished: no next update, in the library or not");
+        assert!(!interval_visible(NextUpdate::Days(3), false, true, false), "a finished title has none, whatever was estimated");
+        assert!(interval_visible(NextUpdate::Days(3), false, false, false));
+        assert!(interval_visible(NextUpdate::Soon, false, false, false));
+        assert!(interval_visible(NextUpdate::NotApplicable, true, false, false), "no estimate yet: the library title can still set one");
+        assert!(!interval_visible(NextUpdate::NotApplicable, false, false, false), "nothing to say and nothing to set");
+        assert!(interval_visible(NextUpdate::NotApplicable, false, true, true), "on air on the score site: its weekly time is shown");
+    }
+
+    #[test]
+    fn a_weekly_slot_is_written_on_the_users_clock_and_the_day_follows() {
+        use chrono::Weekday;
+        // Wednesday 13:00 UTC (22:00 in Japan)
+        let slot = 2 * 24 * 60 + 13 * 60;
+        assert_eq!(air_time(slot, 0), AirTime { weekday: Weekday::Wed, minute: 13 * 60 });
+        assert_eq!(air_text(air_time(slot, 60)), "Wed 14:00", "an hour east of UTC");
+        assert_eq!(air_text(air_time(slot, 9 * 60)), "Wed 22:00", "in Japan");
+        assert_eq!(air_text(air_time(slot, -8 * 60)), "Wed 05:00");
+        assert_eq!(air_text(air_time(slot, 12 * 60)), "Thu 01:00", "far east: the next day");
+        // Monday 01:30 UTC, seen from the west, is still Sunday: the week wraps
+        assert_eq!(air_text(air_time(90, -5 * 60)), "Sun 20:30");
+        // Sunday 23:00 UTC, seen from the east, is Monday already
+        assert_eq!(air_text(air_time(6 * 24 * 60 + 23 * 60, 2 * 60)), "Mon 01:00");
+        // a zone of a half hour
+        assert_eq!(air_text(air_time(slot, 5 * 60 + 30)), "Wed 18:30");
     }
 
     #[test]

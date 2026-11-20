@@ -5310,3 +5310,6 @@ library_updates_failed =
         [one] 1 update failed
        *[other] { NUMBER($count, useGrouping: "false") } updates failed
     }
+
+# source: kurobayomi
+ui_airs_weekly_on_myanimelist = Airs every week at this time, on your clock (MyAnimeList)
