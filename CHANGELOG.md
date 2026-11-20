@@ -8,11 +8,20 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Added
 
-- Community scores: a library entry shows its MyAnimeList score with a star on its cover and its
-  list row, and the details page shows it beside your own tracker score. The scores fill in by themselves in the
-  background and refresh over time.
+- Community scores: a title shows its MyAnimeList score with a star on its cover and its list row, in the library and
+  on Browse, and the details page shows it beside your own tracker score. The scores fill in by themselves in the
+  background, starting a few seconds after the app, and refresh over time.
+- On Browse, the titles on air and the most popular ones get their score at once, from lists the app fetches once a
+  day; the others get theirs while their cover is on screen.
 - The Tracking page ends with the community score and the title it was matched as. Change picks the right title, or
   turns the score off for that entry.
+- On the page of an anime that is on air, the next-update button shows when it is broadcast each week, on your own
+  clock ("Wed 14:00"), as MyAnimeList lists it. It is the weekly time, not a countdown: a break is not known. Other
+  titles keep the estimate.
+
+### Changed
+
+- The next-update button is no longer shown on a finished title, where it read "N/A".
 
 ### Fixed
 
