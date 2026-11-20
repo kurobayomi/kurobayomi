@@ -17,6 +17,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 ### Fixed
 
 - The library's "Tracker score" sort reads AniList scores on the same 10-point scale as the other trackers.
+- The "Updating library" notification no longer shows a percent stuck at 0% and the first title that was checked. It
+  is posted once per update, so it now says only "Updating library", with its Cancel button.
 
 ## [0.3.2] - 2026-11-05
 

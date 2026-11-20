@@ -45,8 +45,8 @@ pub trait Host: Send + Sync {
     fn set_last_update_ms(&self, now_ms: i64);
     /// Adds to `library_unread_updates_count` (manga) or `library_unseen_updates_count` (anime).
     fn add_new_updates(&self, kind: Kind, count: usize);
-    /// The progress notification; `body` is `None` when content is hidden.
-    fn show_progress(&self, kind: Kind, title: &str, body: Option<&str>);
+    /// The pass has entries to check: its progress notification goes up, once, and stays until `cancel_progress`.
+    fn show_progress(&self, kind: Kind);
     fn cancel_progress(&self, kind: Kind);
     /// The summary and per-entry notifications for the entries with new items.
     fn show_summary(&self, kind: Kind, updates: &[EntryUpdate], hide_content: bool);
@@ -254,30 +254,13 @@ pub(crate) fn group_by_source(entries: Vec<LibraryEntry>) -> Vec<Vec<LibraryEntr
 
 /// The state shared by the entry tasks of one pass.
 struct Shared {
-    total: usize,
-    progress: Mutex<Progress>,
+    /// The entries finished so far. Its lock is held while the event of a finished entry is pushed, so `done` only
+    /// grows in the events.
+    completed: Mutex<usize>,
     updates: Mutex<Vec<EntryUpdate>>,
     failures: Mutex<Vec<Failure>>,
     events: Mutex<Vec<PassEvent>>,
     queued: AtomicUsize,
-}
-
-#[derive(Default)]
-struct Progress {
-    completed: usize,
-    running: Vec<(i64, String)>,
-}
-
-impl Shared {
-    fn publish<H: Host>(&self, host: &H, kind: Kind, hide_content: bool) {
-        let (completed, titles) = {
-            let progress = self.progress.lock().unwrap_or_else(|p| p.into_inner());
-            (progress.completed, progress.running.iter().map(|(_, title)| title.clone()).collect::<Vec<_>>())
-        };
-        let title = text::progress_title(completed as u64, self.total as u64);
-        let body = (!hide_content).then(|| text::progress_body(&titles));
-        host.show_progress(kind, &title, body.as_deref());
-    }
 }
 
 pub struct PassRunner<R, S, Y, H> {
@@ -408,14 +391,16 @@ where
 
         let total = queue.entries.len();
         let shared = Arc::new(Shared {
-            total,
-            progress: Mutex::new(Progress::default()),
+            completed: Mutex::new(0),
             updates: Mutex::new(Vec::new()),
             failures: Mutex::new(Vec::new()),
             events: Mutex::new(vec![PassEvent::Started { total }]),
             queued: AtomicUsize::new(0),
         });
         progress::publish(kind, PassEvent::Started { total });
+        if total > 0 {
+            deps.host.show_progress(kind);
+        }
         let settings = Arc::new(settings);
         let permits = Arc::new(Semaphore::new(MAX_SOURCES_IN_PARALLEL));
         let mut tasks = JoinSet::new();
@@ -431,12 +416,7 @@ where
                     if cancel.load(Ordering::SeqCst) {
                         break;
                     }
-                    {
-                        let mut progress = shared.progress.lock().unwrap_or_else(|p| p.into_inner());
-                        progress.running.push((entry.id, entry.title.clone()));
-                        shared.events.lock().unwrap_or_else(|p| p.into_inner()).push(PassEvent::EntryStarted { entry_id: entry.id });
-                    }
-                    shared.publish(&deps.host, kind, settings.hide_content);
+                    shared.events.lock().unwrap_or_else(|p| p.into_inner()).push(PassEvent::EntryStarted { entry_id: entry.id });
 
                     let cx = EntryContext { settings: &settings, window, now_ms, cancel: &cancel };
                     // The source's process-wide permit: no second request to it from the other kind's pass (T-26a-022).
@@ -446,14 +426,12 @@ where
                     };
                     record_entry(&deps.host, kind, &shared, &entry, result);
                     {
-                        let mut progress = shared.progress.lock().unwrap_or_else(|p| p.into_inner());
-                        progress.running.retain(|(id, _)| *id != entry.id);
-                        progress.completed += 1;
-                        let done = progress.completed;
+                        let mut completed = shared.completed.lock().unwrap_or_else(|p| p.into_inner());
+                        *completed += 1;
+                        let done = *completed;
                         shared.events.lock().unwrap_or_else(|p| p.into_inner()).push(PassEvent::EntryFinished { entry_id: entry.id, done });
                         progress::publish(kind, PassEvent::EntryFinished { entry_id: entry.id, done });
                     }
-                    shared.publish(&deps.host, kind, settings.hide_content);
                 }
             });
         }
@@ -555,6 +533,19 @@ mod tests {
         assert_eq!(runner.deps.host.last_timestamp.load(Ordering::SeqCst), 4242);
         assert_eq!(runner.deps.host.cancelled_progress.load(Ordering::SeqCst), 1);
         assert!(outcome.updates.is_empty() && outcome.failures.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_progress_notice_goes_up_once_per_pass_and_not_for_an_empty_queue() {
+        let empty = runner(FakeStore::default(), FakeRegistry::default());
+        empty.run(settings(), Trigger::Manual).await;
+        assert_eq!(empty.deps.host.progress_updates.load(Ordering::SeqCst), 0, "nothing to check, nothing to show");
+        let mut registry = FakeRegistry::default();
+        registry.sources.insert(1, FakeSource::ok(vec![item(1.0, 0)]));
+        let full = runner(FakeStore::with(vec![entry(1, 1, "Alpha"), entry(2, 1, "Beta")]), registry);
+        full.run(settings(), Trigger::Manual).await;
+        assert_eq!(full.deps.host.progress_updates.load(Ordering::SeqCst), 1, "one notice, however many entries");
+        assert_eq!(full.deps.host.cancelled_progress.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

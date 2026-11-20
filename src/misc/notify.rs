@@ -175,9 +175,10 @@ pub fn error_post(kind: Kind, failed: usize, log: Option<&Path>) -> Option<Post>
     })
 }
 
-/// The progress notice of an update pass: low priority, and one Cancel button that stops that pass and withdraws it
-/// (T-35a-021, T-26a-054).
-pub fn progress_post(kind: Kind, title: &str, body: Option<&str>) -> Post {
+/// The progress notice of an update pass: "Updating library" and nothing that changes while the pass runs
+/// (`text::progress_title`), low priority, and one Cancel button that stops that pass and withdraws it (T-35a-021,
+/// T-26a-054).
+pub fn progress_post(kind: Kind) -> Post {
     let id = ids::library_progress(kind);
     let cancel = match kind {
         Kind::Manga => AppAction::CancelLibraryUpdate { notice: Some(id.clone()) },
@@ -185,8 +186,8 @@ pub fn progress_post(kind: Kind, title: &str, body: Option<&str>) -> Post {
     };
     Post {
         id,
-        title: title.to_owned(),
-        body: body.map(str::to_owned),
+        title: text::progress_title(),
+        body: None,
         low_priority: true,
         timeout: None,
         tap: None,
@@ -679,15 +680,15 @@ mod tests {
     #[test]
     fn the_progress_notice_has_its_own_slot_per_kind_and_a_cancel_that_stops_that_kind() {
         // T-26a-054 / T-35a-021: the cancel names the pass of the notice's own kind
-        let manga = progress_post(Kind::Manga, "Updating library", Some("Checking 1/3"));
+        let manga = progress_post(Kind::Manga);
         assert_eq!(manga.id, ids::library_progress(Kind::Manga));
-        assert_eq!(manga.body.as_deref(), Some("Checking 1/3"));
+        assert_eq!((manga.title.as_str(), manga.body.as_deref()), ("Updating library", None), "posted once: nothing in it goes stale");
         assert!(manga.low_priority);
         assert_eq!(
             manga.buttons,
             vec![("Cancel".to_owned(), Target::Action(AppAction::CancelLibraryUpdate { notice: Some(manga.id.clone()) }))]
         );
-        let anime = progress_post(Kind::Anime, "Updating library", None);
+        let anime = progress_post(Kind::Anime);
         assert_ne!(anime.id, manga.id);
         assert_eq!(anime.buttons[0].1, Target::Action(AppAction::CancelAnimeLibraryUpdate { notice: Some(anime.id.clone()) }));
         assert!(rules::prepare(anime).is_ok());

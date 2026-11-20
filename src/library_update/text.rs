@@ -1,10 +1,9 @@
 //! Notification texts of a library pass (behaviour 8.3, 8.5, 8.6, 8.7). Pure string builders; the notifier
 //! only posts them.
 
-use kuro_i18n::{Arg, MsgKey, tr, trf};
+use kuro_i18n::{MsgKey, tr};
 use kuro_platform::kind::Kind;
 
-pub const PROGRESS_TITLE_CHOP: usize = 40;
 pub const SUMMARY_TITLE_CHOP: usize = 45;
 /// Chapter or episode numbers listed in a description before "and N more".
 pub const MAX_LISTED_NUMBERS: usize = 5;
@@ -39,22 +38,11 @@ pub fn chop(text: &str, count: usize) -> String {
     }
 }
 
-/// Floor percent of `current / total`, `0` when `total` is zero.
-pub fn percent(current: u64, total: u64) -> u32 {
-    if total == 0 {
-        return 0;
-    }
-    (current.min(total) * 100 / total) as u32
-}
-
-/// "Updating library… (N%)".
-pub fn progress_title(current: u64, total: u64) -> String {
-    trf(MsgKey::notification_updating_progress, &[("arg1", Arg::Str(&format!("{}%", percent(current, total))))])
-}
-
-/// The in-progress titles, one per line, each chopped to 40 characters.
-pub fn progress_body(titles: &[String]) -> String {
-    titles.iter().map(|t| chop(t, PROGRESS_TITLE_CHOP)).collect::<Vec<_>>().join("\n")
+/// The progress notice, all of it: "Updating library". The notice is posted once per pass and stays as it is until the
+/// pass ends, so it says nothing that changes while the pass runs: a percent stayed at 0% and the title under it was
+/// the first one checked (user, 2026-11-20).
+pub fn progress_title() -> String {
+    tr(MsgKey::updating_library)
 }
 
 /// Title and body of the summary notification of one kind.
@@ -149,11 +137,8 @@ mod tests {
     }
 
     #[test]
-    fn progress_percent_rounds_down_and_guards_zero() {
-        assert_eq!(percent(0, 0), 0); // N-10
-        assert_eq!(percent(1, 3), 33); // N-11
-        assert_eq!(percent(2, 3), 66); // N-12
-        assert_eq!(progress_title(1, 3), "Updating library… (33%)");
+    fn the_progress_notice_names_no_percent_and_no_title() {
+        assert_eq!(progress_title(), "Updating library");
     }
 
     #[test]
@@ -166,14 +151,6 @@ mod tests {
         let cut = chop(&japanese, 45);
         assert_eq!(cut.chars().count(), 45); // N-15: counts characters, not bytes
         assert!(cut.ends_with('…'));
-    }
-
-    #[test]
-    fn progress_body_lists_chopped_titles_by_line() {
-        let body = progress_body(&["Short".into(), "b".repeat(50)]);
-        let lines: Vec<&str> = body.split('\n').collect();
-        assert_eq!(lines[0], "Short");
-        assert_eq!(lines[1].chars().count(), 40);
     }
 
     #[test]

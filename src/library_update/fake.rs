@@ -122,8 +122,8 @@ impl ItemSync for FakeSync {
 pub struct FakeHost {
     pub last_timestamp: AtomicI64,
     pub added: AtomicUsize,
+    /// How often the progress notice was asked for.
     pub progress_updates: AtomicUsize,
-    pub progress_bodies: Mutex<Vec<Option<String>>>,
     pub cancelled_progress: AtomicUsize,
     pub summaries: Mutex<Vec<Vec<EntryUpdate>>>,
     pub hidden_flags: Mutex<Vec<bool>>,
@@ -146,9 +146,8 @@ impl Host for FakeHost {
         self.added.fetch_add(count, Ordering::SeqCst);
     }
 
-    fn show_progress(&self, _kind: Kind, _title: &str, body: Option<&str>) {
+    fn show_progress(&self, _kind: Kind) {
         self.progress_updates.fetch_add(1, Ordering::SeqCst);
-        self.progress_bodies.lock().unwrap().push(body.map(str::to_owned));
     }
 
     fn cancel_progress(&self, _kind: Kind) {

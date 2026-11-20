@@ -60,8 +60,8 @@ impl<H: Host> Host for PrefsHost<H> {
         self.inner.add_new_updates(kind, count);
     }
 
-    fn show_progress(&self, kind: Kind, title: &str, body: Option<&str>) {
-        self.inner.show_progress(kind, title, body);
+    fn show_progress(&self, kind: Kind) {
+        self.inner.show_progress(kind);
     }
 
     fn cancel_progress(&self, kind: Kind) {

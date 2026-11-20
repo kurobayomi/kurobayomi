@@ -85,8 +85,8 @@ impl Host for ToastHost {
 
     fn add_new_updates(&self, _kind: Kind, _count: usize) {}
 
-    fn show_progress(&self, kind: Kind, title: &str, body: Option<&str>) {
-        show_progress_once(kind, title, body);
+    fn show_progress(&self, kind: Kind) {
+        show_progress_once(kind);
     }
 
     fn cancel_progress(&self, kind: Kind) {
@@ -303,8 +303,8 @@ pub fn stop(kind: Kind) -> bool {
 struct MetadataNotices;
 
 impl MetadataProgress for MetadataNotices {
-    fn show(&self, kind: Kind, title: &str) {
-        show_progress_once(kind, title, None);
+    fn show(&self, kind: Kind) {
+        show_progress_once(kind);
     }
 
     fn done(&self, kind: Kind) {
@@ -319,11 +319,12 @@ fn progress_shown(kind: Kind) -> &'static AtomicBool {
     &PROGRESS_SHOWN[usize::from(kind == Kind::Anime)]
 }
 
-/// The progress notice is posted once per pass, not on every finished entry: the desktop cannot replace a notice whose
-/// first send is still in flight, so quick updates piled up as one notice each. It keeps its Cancel button.
-fn show_progress_once(kind: Kind, title: &str, body: Option<&str>) {
+/// The progress notice of a kind is posted once and stays as it is until [`withdraw_progress`]: the desktop cannot
+/// replace a notice whose first send is still in flight, so a notice updated on every finished entry piled up as one
+/// notice each. An update pass and a metadata pass of one kind share the slot, so the second to start posts nothing.
+fn show_progress_once(kind: Kind) {
     if !progress_shown(kind).swap(true, Ordering::Relaxed) {
-        notify::post(notify::progress_post(kind, title, body));
+        notify::post(notify::progress_post(kind));
     }
 }
 
