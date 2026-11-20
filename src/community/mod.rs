@@ -5,7 +5,7 @@
 //!
 //! It runs a little after the start, when an entry joins the library, when a details page opens on an entry with no
 //! fresh score ([`lookup_now`], also for a title that is not in the library), and every hour. The provider keeps the
-//! pace (`kuro_scores::jikan::PACE`), so a large library fills in over a while. A site that asks to slow down, or does
+//! pace (`kuro_scores::mal::PACE`), so a large library fills in over a while. A site that asks to slow down, or does
 //! not answer, ends the pass: the scores shown stay, and the next pass comes after a pause. Incognito does not stop it:
 //! Incognito keeps what the user watches and reads out of the history and off the trackers, and a lookup records
 //! neither (it needs no login, and Browse sends titles to sites in Incognito too). It says nothing to the user: it
@@ -19,6 +19,7 @@ use kuro_data::community_score::{CommunityScore, CommunityScoreRepo, ScoreCandid
 use kuro_data::track::TrackRepo;
 use kuro_db::handle::Db;
 use kuro_platform::kind::Kind;
+use kuro_platform::paths::Paths;
 use kuro_scores::provider::{Hit, Query, ScoreProvider, Stop, TrackRef};
 use kuro_scores::{policy, refresh};
 use tokio::sync::Notify;
@@ -64,7 +65,15 @@ pub fn start() {
         Ok(transport) => Arc::new(transport),
         Err(error) => return tracing::warn!(%error, "community scores: no HTTP client; the scores are not refreshed"),
     };
-    let provider = match kuro_scores::jikan::Jikan::new(transport) {
+    // the client id of the MyAnimeList tracker: the scores come from the same API, without a login
+    let client_id = kuro_platform::system_paths::SystemPaths::system()
+        .map_err(|error| error.to_string())
+        .and_then(|paths| kuro_track::mal::store::configured_client_id(&paths.config_dir()).map_err(|error| error.to_string()));
+    let client_id = match client_id {
+        Ok(client_id) => client_id,
+        Err(error) => return tracing::warn!(%error, "community scores: no MyAnimeList client id; the scores are not refreshed"),
+    };
+    let provider = match kuro_scores::mal::Mal::new(&client_id, transport) {
         Ok(provider) => Arc::new(provider),
         Err(error) => return tracing::warn!(%error, "community scores: no HTTP client; the scores are not refreshed"),
     };
@@ -110,6 +119,8 @@ impl Job {
 
     async fn run(self: Arc<Self>) {
         tokio::time::sleep(START_DELAY).await;
+        // whether the pass before this one stopped too: the first stop of a run of them is a warning, the rest are not
+        let mut stopped_before = false;
         loop {
             match self.pass().await {
                 // the site said when, or said nothing: no pass before the pause is over, whatever wakes it
@@ -118,10 +129,18 @@ impl Job {
                         Stop::RateLimited { retry_after } => retry_after.unwrap_or_default().max(BACKOFF),
                         Stop::Unreachable => BACKOFF,
                     };
-                    tracing::info!(?stop, pause_s = pause.as_secs(), "community scores: the pass stopped; pausing");
+                    // the log file keeps warnings only, and it is where "why is there no score" gets answered (a site
+                    // that was gone for good once left no trace there)
+                    if stopped_before {
+                        tracing::debug!(?stop, pause_s = pause.as_secs(), "community scores: the pass stopped again; pausing");
+                    } else {
+                        tracing::warn!(?stop, pause_s = pause.as_secs(), "community scores: the score site did not answer or asked to slow down; no score arrives until it does, the next try is after the pause");
+                    }
+                    stopped_before = true;
                     tokio::time::sleep(pause).await;
                 }
                 None => {
+                    stopped_before = false;
                     tokio::select! {
                         () = tokio::time::sleep(TICK) => {}
                         () = self.wake.notified() => {}

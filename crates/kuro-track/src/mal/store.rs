@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use kuro_platform::secrets::SecretStore;
 use serde::{Deserialize, Serialize};
 
+use super::consts::BUILT_IN_CLIENT_ID;
 use super::error::MalError;
 use super::token::MalToken;
 
@@ -94,6 +95,15 @@ pub fn resolve_client_id(from_file: Option<&str>, from_env: Option<&str>) -> Opt
         .map(str::trim)
         .find(|id| !id.is_empty())
         .map(str::to_owned)
+}
+
+/// The client id every request to MyAnimeList carries: the environment's ([`CLIENT_ID_ENV`]), else the config file's,
+/// else the app's built-in one. The tracker reads it here, and so do the community scores (`kuro-scores`), which ask
+/// MyAnimeList's API without a login.
+pub fn configured_client_id(config_dir: &Path) -> Result<String, MalError> {
+    let file_id = MalSettings::open(config_dir)?.client_id();
+    let env_id = std::env::var(CLIENT_ID_ENV).ok();
+    Ok(resolve_client_id(file_id.as_deref(), env_id.as_deref()).unwrap_or_else(|| BUILT_IN_CLIENT_ID.to_owned()))
 }
 
 /// The MAL settings file, `tracking/myanimelist.toml` under the config directory.

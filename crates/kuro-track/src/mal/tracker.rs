@@ -10,7 +10,7 @@ use url::Url;
 
 use super::api::MalApi;
 use super::auth::MalAuth;
-use super::consts::{API_BASE, BUILT_IN_CLIENT_ID, OAUTH_BASE};
+use super::consts::{API_BASE, OAUTH_BASE};
 use super::dates::{now_ms, to_mal_date};
 use super::dto::{AnimeListStatus, MangaListStatus};
 use super::error::MalError;
@@ -19,7 +19,7 @@ use super::redirect::CodeOutcome;
 use super::score::{SCORE_LIST, score_from_label, wire_score};
 use super::search::remote_date;
 use super::status::{anime_wire, from_wire, manga_wire};
-use super::store::{CLIENT_ID_ENV, MalSettings, TokenStore, resolve_client_id};
+use super::store::{MalSettings, TokenStore, configured_client_id};
 use crate::keyed_lock::KeyedLocks;
 use crate::messages::MsgKey;
 use crate::model::{AnimeTrack, MangaTrack};
@@ -57,10 +57,8 @@ impl MalTracker {
     /// The tracker with the real endpoints and the client id from `KUROBAYOMI_MAL_CLIENT_ID` or the config file
     /// (T-29a-040), else the app's built-in one.
     pub fn from_config(config_dir: &Path, tokens: Arc<dyn TokenStore>) -> Result<Self, MalError> {
-        let file_id = MalSettings::open(config_dir)?.client_id();
-        let env_id = std::env::var(CLIENT_ID_ENV).ok();
-        let client_id = resolve_client_id(file_id.as_deref(), env_id.as_deref()).or_else(|| Some(BUILT_IN_CLIENT_ID.to_owned()));
-        Self::new(config_dir, tokens, client_id)
+        let client_id = configured_client_id(config_dir)?;
+        Self::new(config_dir, tokens, Some(client_id))
     }
 
     /// The tracker with the real endpoints and the given client id (`None` refuses login).
