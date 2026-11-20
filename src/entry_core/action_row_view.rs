@@ -8,9 +8,11 @@ use gtk::prelude::*;
 use gtk::{Align, Box as GBox, Button, Label, Orientation as O};
 use kuro_i18n::{MsgKey, tr, tr_plural};
 
+use chrono::{Datelike, Timelike};
+
 use crate::entry_core::action_row::{
-    AirTime, NextUpdate, Tone, TrackingLabel, air_text, air_time, interval_click_opens_dialog, interval_tone, next_update, tracking_label, tracking_tone,
-    interval_visible, tracking_visible, webview_visible,
+    AirTime, NextUpdate, Tone, TrackingLabel, air_text, air_time, interval_click_opens_dialog, interval_tone, next_air, next_update, tracking_label,
+    tracking_tone, interval_visible, tracking_visible, webview_visible,
 };
 use crate::entry_core::header_view::{LibraryButton, apply_tone};
 use crate::theme::tokens::{SPACE_L, SPACE_S};
@@ -22,8 +24,8 @@ pub struct RowState {
     /// The source says the title is finished: it has no next update.
     pub completed: bool,
     pub next: NextUpdate,
-    /// The weekly time of an anime the score site lists as on air, on the user's clock. It is shown in place of the
-    /// estimate.
+    /// The weekly time of an anime the score site lists as on air, on the user's clock. `next` then counts the days to
+    /// it, and the time itself is written under the count.
     pub air: Option<AirTime>,
     /// The entry has its own fetch interval (`fetch_interval < 0`).
     pub user_interval: bool,
@@ -39,10 +41,18 @@ impl RowState {
     /// `air` is the weekly slot of an anime on air ([`local_air_time`]), when the score site lists one.
     pub fn of_entry(favorite: bool, next_update_ms: i64, status: i64, fetch_interval: i32, tracking_count: i64, http_source: bool, air: Option<AirTime>) -> Self {
         let completed = status == kuro_domain::entries::flags::STATUS_COMPLETED;
+        let next = match air {
+            // an anime on air counts the days to its next weekly broadcast; every other title counts to the estimate
+            Some(air) => {
+                let now = chrono::Local::now();
+                next_air(air, now.weekday(), now.hour() * 60 + now.minute())
+            }
+            None => next_update(Some(next_update_ms), chrono::Utc::now().timestamp_millis(), completed),
+        };
         Self {
             favorite,
             completed,
-            next: next_update(Some(next_update_ms), chrono::Utc::now().timestamp_millis(), completed),
+            next,
             air,
             user_interval: fetch_interval < 0,
             tracking_count,
@@ -63,6 +73,8 @@ pub fn local_air_time(slot: kuro_scores::provider::AirSlot) -> AirTime {
 struct Slot {
     button: Button,
     label: Label,
+    /// A second, smaller line under the label, shown only when there is something to add ([`Slot::detail`]).
+    detail: Label,
     content: GBox,
 }
 
@@ -74,8 +86,17 @@ impl Slot {
         child.set_halign(Align::Center);
         child.append(&icon_widget);
         child.append(&label);
+        let detail = Label::builder().ellipsize(gtk::pango::EllipsizeMode::End).max_width_chars(12).css_classes(["caption"]).visible(false).build();
+        child.append(&detail);
         let button = Button::builder().child(&child).css_classes(["flat"]).hexpand(true).focus_on_click(false).build();
-        Self { button, label, content: child }
+        Self { button, label, detail, content: child }
+    }
+
+    /// The second line: `text` under the label, or no second line. The buttons of the row keep their icons and labels
+    /// in line, since each packs them from the top.
+    fn detail(&self, text: Option<&str>) {
+        self.detail.set_visible(text.is_some());
+        self.detail.set_label(text.unwrap_or_default());
     }
 
     fn text(&self, text: &str, tone: Tone) {
@@ -136,14 +157,14 @@ impl ActionRow {
     pub fn apply(&self, state: &RowState) {
         self.library.set(state.favorite);
 
-        let next = match (state.air, state.next) {
-            // the real weekly time of an anime on air goes before the estimate
-            (Some(air), _) => air_text(air),
-            (None, NextUpdate::NotApplicable) => tr(MsgKey::not_applicable),
-            (None, NextUpdate::Soon) => tr(MsgKey::manga_interval_expected_update_soon),
-            (None, NextUpdate::Days(days)) => tr_plural(MsgKey::day, days, &[]),
+        // the same words for every title; an anime on air adds its weekly time under them
+        let next = match state.next {
+            NextUpdate::NotApplicable => tr(MsgKey::not_applicable),
+            NextUpdate::Soon => tr(MsgKey::manga_interval_expected_update_soon),
+            NextUpdate::Days(days) => tr_plural(MsgKey::day, days, &[]),
         };
         self.interval.text(&next, interval_tone(state.user_interval));
+        self.interval.detail(state.air.map(air_text).as_deref());
         let about_air = state.air.map(|_| tr(MsgKey::ui_airs_weekly_on_myanimelist));
         self.interval.button.set_tooltip_text(about_air.as_deref());
         self.interval.button.set_sensitive(interval_click_opens_dialog(state.favorite));

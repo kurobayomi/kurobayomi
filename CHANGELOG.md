@@ -15,9 +15,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   day; the others get theirs while their cover is on screen.
 - The Tracking page ends with the community score and the title it was matched as. Change picks the right title, or
   turns the score off for that entry.
-- On the page of an anime that is on air, the next-update button shows when it is broadcast each week, on your own
-  clock ("Wed 14:00"), as MyAnimeList lists it. It is the weekly time, not a countdown: a break is not known. Other
-  titles keep the estimate.
+- On the page of an anime that is on air, the next-update button counts the days to its next weekly broadcast and
+  shows the day and time under the count, on your own clock ("5 days", "Wed 14:00"), as MyAnimeList lists it. A break
+  is not known to MyAnimeList, so the count is to the weekly slot. Other titles keep the estimate.
 
 ### Changed
 

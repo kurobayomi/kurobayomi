@@ -126,10 +126,23 @@ pub fn air_time(utc_week_minute: u32, offset_minutes: i32) -> AirTime {
     AirTime { weekday, minute: (local % DAY_MINUTES) as u32 }
 }
 
-/// The weekly time as the button writes it: "Wed 14:00". The weekday is chrono's short name, as on the Upcoming
-/// calendar. It is the slot of every week and not a countdown: the site does not say when a title is on a break.
+/// The weekly time as the button writes it under its count: "Wed 14:00". The weekday is chrono's short name, as on the
+/// Upcoming calendar.
 pub fn air_text(air: AirTime) -> String {
     format!("{} {:02}:{:02}", air.weekday, air.minute / 60, air.minute % 60)
+}
+
+/// The days to the next weekly broadcast, in the words the button uses for every title ("Soon", "N days"): an anime
+/// and a manga read alike (user, 2026-11-20). `now_weekday` and `now_minute` are the weekday and the minute of the day
+/// on the clock `air` is on. Whole days, cut like the estimate: within a day is "Soon", and a slot that has just
+/// passed counts to next week's. The site does not say when a title is on a break, so the count is to the slot.
+pub fn next_air(air: AirTime, now_weekday: chrono::Weekday, now_minute: u32) -> NextUpdate {
+    let slot = air.weekday.num_days_from_monday() as i32 * DAY_MINUTES + air.minute as i32;
+    let now = now_weekday.num_days_from_monday() as i32 * DAY_MINUTES + now_minute as i32;
+    match (slot - now).rem_euclid(7 * DAY_MINUTES) / DAY_MINUTES {
+        0 => NextUpdate::Soon,
+        days => NextUpdate::Days(i64::from(days)),
+    }
 }
 
 /// Whether the row shows the tracking button at all. Anime shows it only when a tracking callback exists; manga always has one.
@@ -233,6 +246,22 @@ mod tests {
         assert_eq!(air_text(air_time(6 * 24 * 60 + 23 * 60, 2 * 60)), "Mon 01:00");
         // a zone of a half hour
         assert_eq!(air_text(air_time(slot, 5 * 60 + 30)), "Wed 18:30");
+    }
+
+    #[test]
+    fn the_days_to_the_weekly_slot_are_counted_like_the_estimate() {
+        use chrono::Weekday;
+        let wednesday_two_pm = AirTime { weekday: Weekday::Wed, minute: 14 * 60 };
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Fri, 10 * 60), NextUpdate::Days(5), "Friday morning: next Wednesday");
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Tue, 13 * 60), NextUpdate::Days(1), "+25 h");
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Tue, 15 * 60), NextUpdate::Soon, "+23 h");
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Wed, 13 * 60), NextUpdate::Soon, "in an hour");
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Wed, 14 * 60), NextUpdate::Soon, "now");
+        assert_eq!(next_air(wednesday_two_pm, Weekday::Wed, 14 * 60 + 1), NextUpdate::Days(6), "a minute ago: next week's");
+        // across the end of the week
+        let monday_one_am = AirTime { weekday: Weekday::Mon, minute: 60 };
+        assert_eq!(next_air(monday_one_am, Weekday::Sun, 23 * 60), NextUpdate::Soon, "in two hours");
+        assert_eq!(next_air(monday_one_am, Weekday::Sat, 0), NextUpdate::Days(2));
     }
 
     #[test]
