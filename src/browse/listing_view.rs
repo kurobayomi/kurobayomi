@@ -11,7 +11,7 @@
 //! on screen are not rebuilt. The 2,000-item scroll check is manual.
 
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
@@ -91,6 +91,8 @@ struct Inner {
     /// The covers picked for a bulk action (issue #7): Ctrl+click, Shift+click, press and hold, Ctrl+A or a drag, by the
     /// Library's rules (`library::select`). A new listing starts with none.
     selection: RefCell<SelectionOf<ListItem>>,
+    /// The community scores by entry row (`follow_scores`): a cover that has one shows its star.
+    scores: RefCell<HashMap<i64, f64>>,
     /// GTK's selection of the grid and the list: the covers picked, so libadwaita draws the selected fill.
     selection_mirror: Rc<SelectionMirror>,
     /// Runs after every change of the selection (the page's selection bar).
@@ -227,6 +229,7 @@ impl ListingView {
             list,
             scroller,
             selection: RefCell::new(SelectionOf::default()),
+            scores: RefCell::new(HashMap::new()),
             selection_mirror,
             on_selection: RefCell::new(None),
         });
@@ -262,6 +265,19 @@ impl ListingView {
     /// arrive after this call are not kept.
     pub fn set_hide_in_library(&self, hide: bool) {
         self.inner.listing.borrow_mut().set_hide_in_library(hide);
+    }
+
+    /// The community scores by entry row, published again on every change: a cover shows its star as soon as its
+    /// score is stored, and loses it with the score.
+    pub fn follow_scores(&self, scores: watch::Receiver<HashMap<i64, f64>>) {
+        let weak = Rc::downgrade(&self.inner);
+        follow_changes(scores, move |scores| match weak.upgrade() {
+            Some(inner) => {
+                inner.apply_scores(scores);
+                true
+            }
+            None => false,
+        });
     }
 
     #[cfg(test)]
@@ -486,6 +502,19 @@ impl Inner {
         }
     }
 
+    /// Takes the scores and draws again the covers whose score changed: the same item is put back in its place, which
+    /// binds its row anew, and a bound row reads its score.
+    fn apply_scores(&self, scores: HashMap<i64, f64>) {
+        let before = self.scores.replace(scores);
+        for index in 0..self.store.n_items() {
+            let Some(item) = self.item_at(index) else { continue };
+            let now = self.scores.borrow().get(&item.id).copied();
+            if before.get(&item.id).copied() != now {
+                self.store.splice(index, 1, &[glib::BoxedAnyObject::new(Some(item))]);
+            }
+        }
+    }
+
     /// Every loaded item shows the flag the library holds for its url.
     fn apply_favorite_urls(&self, urls: &BTreeSet<String>) {
         for favorite in [true, false] {
@@ -608,6 +637,14 @@ impl Inner {
                 };
                 let shown = (*slot).clone();
                 drop(slot);
+                let score = shown.as_ref().and_then(|item| {
+                    let inner = page.upgrade()?;
+                    let score = inner.scores.borrow().get(&item.id).copied();
+                    score
+                });
+                if let Some(score) = score {
+                    super::view::show_score(&cell, mode, score);
+                }
                 while let Some(old) = holder.first_child() {
                     holder.remove(&old);
                 }

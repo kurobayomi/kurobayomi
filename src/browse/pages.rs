@@ -251,6 +251,10 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
     let start_filters = if matches!(initial_query, BrowseQuery::Search(_)) { filters.for_search(false) } else { FilterList::default() };
     let listing_view = ListingView::with_filters(listing, initial_query.clone(), start_filters);
     listing_view.set_hide_in_library(hide_in_library);
+    // the community scores of the page's kind: a cover shows its star as soon as its score is stored
+    if let Some(scores) = favorites.as_ref().and_then(|f| crate::community::follow_scores(f.kind)) {
+        listing_view.follow_scores(scores);
+    }
 
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some(&tr(MsgKey::action_search_hint)));

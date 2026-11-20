@@ -127,6 +127,26 @@ pub fn browsed(kind: Kind, entry_id: i64, title: &str) {
     job.browsed_wake.notify_one();
 }
 
+/// The scores of a kind by entry row, published again after each write to the store: the Browse covers follow it.
+/// `None` before the app data exists. Needs a tokio runtime: the task that republishes the subscription runs on it.
+pub fn follow_scores(kind: Kind) -> Option<tokio::sync::watch::Receiver<HashMap<i64, f64>>> {
+    if !crate::data::is_installed() {
+        return None;
+    }
+    let mut subscription = CommunityScoreRepo::new(crate::data::app().db.clone()).watch_scores(kind);
+    let initial: HashMap<i64, f64> = subscription.current().and_then(|published| published.ok()).map(|rows| rows.into_iter().collect()).unwrap_or_default();
+    let (tx, rx) = tokio::sync::watch::channel(initial);
+    tokio::spawn(async move {
+        while let Some(published) = subscription.changed().await {
+            let Ok(rows) = published else { continue };
+            if tx.send(rows.into_iter().collect()).is_err() {
+                break;
+            }
+        }
+    });
+    Some(rx)
+}
+
 /// The year and the month of today (UTC), for a provider that lists by season.
 fn today() -> (i32, u32) {
     use chrono::Datelike;

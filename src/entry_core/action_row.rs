@@ -93,6 +93,13 @@ pub fn tracking_tone(count: i64) -> Tone {
     if count == 0 { Tone::Inactive } else { Tone::Primary }
 }
 
+/// Whether the row shows the next-update button. A finished title has no next update, so it has no button: it read
+/// "N/A" and said nothing (user, 2026-11-20). A title still coming out shows it when there is an estimate, and also
+/// when there is none but the title is in the library, where the button opens the dialog that sets the interval.
+pub fn interval_visible(next: NextUpdate, favorite: bool, completed: bool) -> bool {
+    !completed && (next != NextUpdate::NotApplicable || favorite)
+}
+
 /// Whether the row shows the tracking button at all. Anime shows it only when a tracking callback exists; manga always has one.
 pub fn tracking_visible(has_callback: bool) -> bool {
     has_callback
@@ -165,6 +172,16 @@ mod tests {
         assert_eq!(tracking_label(2), TrackingLabel::Trackers(2));
         assert_eq!(tracking_tone(0), Tone::Inactive);
         assert_eq!(tracking_tone(1), Tone::Primary);
+    }
+
+    #[test]
+    fn the_next_update_button_is_shown_only_when_it_has_something_to_say_or_to_set() {
+        assert!(!interval_visible(NextUpdate::NotApplicable, true, true), "finished: no next update, in the library or not");
+        assert!(!interval_visible(NextUpdate::Days(3), false, true), "a finished title has none, whatever was estimated");
+        assert!(interval_visible(NextUpdate::Days(3), false, false));
+        assert!(interval_visible(NextUpdate::Soon, false, false));
+        assert!(interval_visible(NextUpdate::NotApplicable, true, false), "no estimate yet: the library title can still set one");
+        assert!(!interval_visible(NextUpdate::NotApplicable, false, false), "nothing to say and nothing to set");
     }
 
     #[test]

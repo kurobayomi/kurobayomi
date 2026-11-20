@@ -19,6 +19,18 @@ pub fn badge(text: &str, accent: bool) -> gtk::Label {
     label
 }
 
+/// The community score with its star: the badge of a library cover and of a Browse cover. `text` is the score as the
+/// app writes it (`community::score_text`).
+pub fn score_badge(text: &str) -> gtk::Box {
+    let group = gtk::Box::new(O::Horizontal, crate::theme::tokens::SPACE_XS);
+    group.add_css_class("kb-badge");
+    group.add_css_class("kb-badge-score");
+    group.set_tooltip_text(Some(&kuro_i18n::tr(kuro_i18n::MsgKey::ui_score_on_myanimelist)));
+    group.append(&gtk::Image::from_icon_name("starred-symbolic"));
+    group.append(&gtk::Label::new(Some(text)));
+    group
+}
+
 /// The cover sizes of a list row, width x height (2:3 like the cards): [`SMALL`] in the Updates feed and the Browse
 /// lists, [`MEDIUM`] in History and Upcoming, [`BOOK`] for a row that leads with its cover.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

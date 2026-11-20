@@ -76,14 +76,7 @@ fn origin_badge(model: &CardModel, worded: bool) -> gtk::Box {
 
 /// The community score with a star, or None when the entry has none.
 fn score_badge(model: &CardModel) -> Option<gtk::Box> {
-    let text = model.score.as_deref()?;
-    let group = gtk::Box::new(O::Horizontal, SPACE_XS);
-    group.add_css_class("kb-badge");
-    group.add_css_class("kb-badge-score");
-    group.set_tooltip_text(Some(&tr(MsgKey::ui_score_on_myanimelist)));
-    group.append(&gtk::Image::from_icon_name("starred-symbolic"));
-    group.append(&gtk::Label::new(Some(text)));
-    Some(group)
+    model.score.as_deref().map(crate::browse::look::score_badge)
 }
 
 /// The badges of the top end: the community score, then where the entry comes from. `local_worded` is whether a Local

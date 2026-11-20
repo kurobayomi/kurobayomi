@@ -283,6 +283,25 @@ pub fn list_cell(item: Option<&ListItem>, load: &CoverLoader) -> GBox {
     line
 }
 
+/// Puts the community score on a cell [`grid_cell`] or [`list_cell`] built: the star badge at the top end of the cover
+/// ("In library" has the top start), or at the end of a list row. It is added to a built cell, so a cover without a
+/// score is built as it always was.
+pub fn show_score(cell: &GBox, mode: LibraryDisplayMode, score: f64) {
+    let badge = super::look::score_badge(&crate::community::score_text(score));
+    if mode == LibraryDisplayMode::List {
+        badge.set_valign(Align::Center);
+        cell.append(&badge);
+        return;
+    }
+    // the cover's stage is the first child of a grid cell, in every grid mode
+    let Some(stage) = cell.first_child().and_downcast::<gtk::Overlay>() else { return };
+    badge.set_halign(Align::End);
+    badge.set_valign(Align::Start);
+    badge.set_margin_end(SPACE_XS);
+    badge.set_margin_top(SPACE_XS);
+    stage.add_overlay(&badge);
+}
+
 /// Makes `row` (a [`super::look::list_row`] or a source row) a row of a list of pages: activating it (a click, Enter or
 /// Space, through `widgets::row_activate`) runs `on_primary`; a right-click, the Menu key or Shift+F10 (and a long press
 /// on a touch screen) opens the menu of the items `menu` returns (`widgets::context_menu`). The menu gestures never
