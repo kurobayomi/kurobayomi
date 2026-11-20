@@ -6,8 +6,10 @@
 //! It runs a little after the start, when an entry joins the library, when a details page opens on an entry with no
 //! fresh score ([`lookup_now`], also for a title that is not in the library), and every hour. The provider keeps the
 //! pace (`kuro_scores::jikan::PACE`), so a large library fills in over a while. A site that asks to slow down, or does
-//! not answer, ends the pass: the scores shown stay, and the next pass comes after a pause. In Incognito nothing is
-//! looked up, since a lookup by name sends the title to the site. It says nothing to the user; it logs.
+//! not answer, ends the pass: the scores shown stay, and the next pass comes after a pause. Incognito does not stop it:
+//! Incognito keeps what the user watches and reads out of the history and off the trackers, and a lookup records
+//! neither (it needs no login, and Browse sends titles to sites in Incognito too). It says nothing to the user: it
+//! logs.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -131,9 +133,6 @@ impl Job {
 
     /// Looks up everything that is due, a batch at a time. Returns why it stopped early, if it did.
     async fn pass(&self) -> Option<Stop> {
-        if crate::incognito::is_on() {
-            return None;
-        }
         // an entry is asked once per pass, whatever its answer leaves in the store
         let mut asked: HashSet<i64> = HashSet::new();
         loop {
@@ -184,7 +183,7 @@ impl Job {
             if asked.contains(&id) || batch.iter().any(|(c, _)| c.entry_id == id) || !policy::due(&candidate, &of_entry, now) {
                 continue;
             }
-            let query = refresh::query_of(&candidate, of_entry, true);
+            let query = refresh::query_of(&candidate, of_entry);
             batch.push((candidate, query));
         }
         Ok(batch)

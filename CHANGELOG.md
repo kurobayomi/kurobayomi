@@ -10,7 +10,7 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 - Community scores: a library entry shows its MyAnimeList score (read through Jikan) with a star on its cover and its
   list row, and the details page shows it beside your own tracker score. The scores fill in by themselves in the
-  background and refresh over time; nothing is looked up in Incognito.
+  background and refresh over time.
 - The Tracking page ends with the community score and the title it was matched as. Change picks the right title, or
   turns the score off for that entry.
 

@@ -13,10 +13,10 @@ pub fn track_refs(tracks: &[Track]) -> Vec<TrackRef> {
     tracks.iter().map(|t| TrackRef { tracker: TrackerId(t.tracker_id), remote_id: t.remote_id, title: t.title.clone() }).collect()
 }
 
-/// The query of one entry. `search_by_name` is off while nothing may be sent by name (Incognito).
-pub fn query_of(candidate: &ScoreCandidate, tracks: Vec<TrackRef>, search_by_name: bool) -> Query {
+/// The query of one entry.
+pub fn query_of(candidate: &ScoreCandidate, tracks: Vec<TrackRef>) -> Query {
     let known = candidate.current.as_ref().and_then(|current| current.remote_id.map(|id| (id, current.matched_by)));
-    Query { entry_id: candidate.entry_id, kind: candidate.kind, title: candidate.title.clone(), known, tracks, search_by_name }
+    Query { entry_id: candidate.entry_id, kind: candidate.kind, title: candidate.title.clone(), known, tracks }
 }
 
 /// The row to store for `candidate` after `outcome`. A title that is not found now but had a match keeps that match
@@ -106,10 +106,10 @@ mod tests {
     #[test]
     fn the_stored_match_is_what_a_query_asks_by() {
         let tracks = vec![Track { entry_id: 3, remote_id: 44, title: "On tracker".into(), ..Track::new(Kind::Anime, 1) }];
-        let query = query_of(&candidate(3, Kind::Anime, Some(stored(3, Some(9), MatchedBy::User))), track_refs(&tracks), true);
+        let query = query_of(&candidate(3, Kind::Anime, Some(stored(3, Some(9), MatchedBy::User))), track_refs(&tracks));
         assert_eq!(query.known, Some((9, MatchedBy::User)));
         assert_eq!(query.tracks, [TrackRef { tracker: TrackerId::MYANIMELIST, remote_id: 44, title: "On tracker".into() }]);
-        assert_eq!(query_of(&candidate(3, Kind::Anime, Some(stored(3, None, MatchedBy::Title))), Vec::new(), false).known, None, "a miss has no id");
+        assert_eq!(query_of(&candidate(3, Kind::Anime, Some(stored(3, None, MatchedBy::Title))), Vec::new()).known, None, "a miss has no id");
     }
 
     #[test]
@@ -130,7 +130,7 @@ mod tests {
             .into_iter()
             .map(|(id, kind)| {
                 let candidate = candidate(id, kind, None);
-                let query = query_of(&candidate, Vec::new(), true);
+                let query = query_of(&candidate, Vec::new());
                 (candidate, query)
             })
             .collect();

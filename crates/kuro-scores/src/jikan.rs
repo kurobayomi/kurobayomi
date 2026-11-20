@@ -193,13 +193,11 @@ impl ScoreProvider for Jikan {
                 return found(hit, MatchedBy::Tracker);
             }
         }
-        if query.search_by_name {
-            for text in title_queries(&query.title) {
-                let mut hits = self.search_n(kind, &text, MATCH_RESULTS).await?;
-                let one = pick(&query.title, hits.iter().map(|hit| (hit.title.as_str(), hit.alt_titles.as_slice())));
-                if let Some(index) = one {
-                    return found(hits.swap_remove(index), MatchedBy::Title);
-                }
+        for text in title_queries(&query.title) {
+            let mut hits = self.search_n(kind, &text, MATCH_RESULTS).await?;
+            let one = pick(&query.title, hits.iter().map(|hit| (hit.title.as_str(), hit.alt_titles.as_slice())));
+            if let Some(index) = one {
+                return found(hits.swap_remove(index), MatchedBy::Title);
             }
         }
         Ok(Outcome::NotFound)
@@ -243,7 +241,7 @@ mod tests {
     }
 
     fn query(title: &str) -> Query {
-        Query { entry_id: 1, kind: Kind::Anime, title: title.into(), known: None, tracks: Vec::new(), search_by_name: true }
+        Query { entry_id: 1, kind: Kind::Anime, title: title.into(), known: None, tracks: Vec::new() }
     }
 
     fn track(tracker: TrackerId, remote_id: i64, title: &str) -> TrackRef {
@@ -288,7 +286,6 @@ mod tests {
             .await;
         let jikan = jikan(&server, None).await;
         assert_eq!(score_of(&jikan.lookup(&query(long)).await.expect("answer")), Some((52991, Some(9.3), MatchedBy::Title)), "the shorter query widens the search, the full name still decides");
-        assert_eq!(jikan.lookup(&Query { search_by_name: false, ..query(long) }).await, Ok(Outcome::NotFound), "no search without leave to send the name");
     }
 
     #[tokio::test]

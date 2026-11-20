@@ -25,8 +25,6 @@ pub struct Query {
     /// and nothing else.
     pub known: Option<(i64, MatchedBy)>,
     pub tracks: Vec<TrackRef>,
-    /// Whether the title may be sent as a search (off in Incognito: only ids are asked then).
-    pub search_by_name: bool,
 }
 
 /// A title of the provider's catalogue.
