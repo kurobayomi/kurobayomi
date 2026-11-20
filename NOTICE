@@ -11,4 +11,12 @@ Tachiyomi https://github.com/tachiyomiorg/tachiyomi Apache License 2.0
 The app's icons (src/theme/icons/scalable/actions) are Material Design icons by Google, recoloured for GTK:
 Material Design Icons https://github.com/google/material-design-icons Apache License 2.0
 
+The colour choices of the Appearance page (src/theme/colours.rs) use the colours of these palettes:
+Tokyo Night https://github.com/tokyo-night/tokyo-night-vscode-theme MIT License
+Catppuccin  https://github.com/catppuccin/palette                   MIT License
+Dracula     https://github.com/dracula/dracula-theme                MIT License
+Nord        https://github.com/nordtheme/nord                       MIT License
+Gruvbox     https://github.com/morhetz/gruvbox                      MIT/X11 License
+Rosé Pine   https://github.com/rose-pine/neovim                     MIT License
+
 The full licence text is in LICENSE.

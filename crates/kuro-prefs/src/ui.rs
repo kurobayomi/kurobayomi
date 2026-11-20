@@ -22,10 +22,11 @@ pref_enum! {
 }
 
 pref_enum! {
-    /// `app_colours`: the colours of the whole app, Kurobayomi's own short list (the Colours row of the Appearance
-    /// page). `DESKTOP` leaves them to the desktop, as before there was a choice. Aniyomi's palettes (`AppTheme`) are
-    /// not these: their key stays a dropped one.
-    pub enum AppColours { DESKTOP, TOKYO_NIGHT, ROSE, FOREST, BLACK, SAND }
+    /// `app_colours`: the colours of the whole app, a short list of palettes people know and one of Kurobayomi's own,
+    /// `BLACK` (the Colours row of the Appearance page). `DESKTOP` leaves them to the desktop, as before there was a
+    /// choice. Aniyomi's palettes (`AppTheme`) are not these: their key stays a dropped one. A stored name that is no
+    /// longer a choice reads as `DESKTOP`.
+    pub enum AppColours { DESKTOP, TOKYO_NIGHT, CATPPUCCIN, DRACULA, NORD, GRUVBOX, ROSE_PINE, BLACK }
 }
 
 impl AppTheme {
@@ -154,7 +155,8 @@ mod tests {
         assert!(ui.cover_colours.get(), "a title's page takes its cover's colour unless it is turned off");
         assert_eq!(ui.colours.get(), AppColours::DESKTOP, "the desktop's colours until another choice is made");
         assert_eq!(AppColours::TOKYO_NIGHT.name(), "TOKYO_NIGHT");
-        assert_eq!(AppColours::from_name("SAND"), Some(AppColours::SAND));
+        assert_eq!(AppColours::from_name("ROSE_PINE"), Some(AppColours::ROSE_PINE));
+        assert_eq!(AppColours::from_name("SAND"), None, "a choice of the first list, which a nightly offered for a day");
     }
 
     #[test]

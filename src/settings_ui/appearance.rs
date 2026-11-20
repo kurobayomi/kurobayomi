@@ -115,7 +115,7 @@ mod tests {
         assert_eq!(titles_of(&page_rows(&prefs), "Theme"), ["Theme mode", "Colours", "Cover colours on a title's page"]);
         let PreferenceItem::BasicList { value, entries, .. } = colours_row(&prefs) else { panic!("a list") };
         assert_eq!(value, "DESKTOP", "the desktop's colours until another choice is made");
-        assert_eq!(entries.iter().map(|(_, label)| label.as_str()).collect::<Vec<_>>(), ["Desktop", "Tokyo Night", "Rose", "Forest", "Black", "Sand"]);
+        assert_eq!(entries.iter().map(|(_, label)| label.as_str()).collect::<Vec<_>>(), ["Desktop", "Tokyo Night", "Catppuccin", "Dracula", "Nord", "Gruvbox", "Rosé Pine", "Black"]);
         let PreferenceItem::Switch { pref, .. } = cover_colours_row(&prefs) else { panic!("a switch") };
         assert!(pref.get(), "on unless it is turned off");
     }

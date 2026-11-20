@@ -5309,16 +5309,7 @@ ui_colours_desktop = Desktop
 ui_colours_tokyo_night = Tokyo Night
 
 # source: kurobayomi
-ui_colours_rose = Rose
-
-# source: kurobayomi
-ui_colours_forest = Forest
-
-# source: kurobayomi
 ui_colours_black = Black
-
-# source: kurobayomi
-ui_colours_sand = Sand
 
 # source: kurobayomi
 ui_connect = Connect
@@ -5331,3 +5322,18 @@ ui_tracked_on = Tracked on { $tracker }
 
 # source: kurobayomi
 ui_your_score = Your score
+
+# source: kurobayomi
+ui_colours_catppuccin = Catppuccin
+
+# source: kurobayomi
+ui_colours_dracula = Dracula
+
+# source: kurobayomi
+ui_colours_nord = Nord
+
+# source: kurobayomi
+ui_colours_gruvbox = Gruvbox
+
+# source: kurobayomi
+ui_colours_rose_pine = Rosé Pine

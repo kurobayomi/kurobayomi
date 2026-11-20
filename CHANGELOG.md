@@ -20,7 +20,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   is not known to MyAnimeList, so the count is to the weekly slot. Other titles keep the estimate.
 
 - Colours for the whole app, in Settings, Appearance: the desktop's own (as before, and the default), or Tokyo Night,
-  Rose, Forest, Black or Sand. Each works in light and in dark.
+  Catppuccin, Dracula, Nord, Gruvbox or Rosé Pine, each with the colours its own project publishes, or Black. Each
+  works in light and in dark.
 - A title's page takes the colour of its cover: the buttons under the cover, the unread dots, the Resume button and
   the links. Only that page changes, and the colour is adjusted so it stays readable in light and in dark. A switch in
   Settings, Appearance turns it off.
