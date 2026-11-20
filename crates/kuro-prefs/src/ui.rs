@@ -98,10 +98,12 @@ pub fn apply_theme(mode: ThemeMode) -> ThemeChoice {
 }
 
 define_prefs! {
-    /// `[ui]` section: the seven keys of Aniyomi `UiPreferences` that a desktop has.
+    /// `[ui]` section: the seven keys of Aniyomi `UiPreferences` that a desktop has, and Kurobayomi's own switch for the
+    /// colour a title's page takes from its cover (`entry_cover_colours`).
     pub struct UiPrefs in "ui" {
         theme_mode: ThemeMode = "pref_theme_mode_key" => ThemeMode::SYSTEM;
         start_screen: StartScreen = "start_screen" => StartScreen::ANIME;
+        cover_colours: bool = "entry_cover_colours" => true;
     }
 }
 
@@ -123,6 +125,7 @@ mod tests {
             &[
                 ("theme_mode", "pref_theme_mode_key"),
                 ("start_screen", "start_screen"),
+                ("cover_colours", "entry_cover_colours"),
             ]
         );
         assert_eq!(UiPrefs::TABLE, "ui");
@@ -139,6 +142,7 @@ mod tests {
         let ui = UiPrefs::new(PrefStore::in_memory());
         assert_eq!(ui.theme_mode.get(), ThemeMode::SYSTEM);
         assert_eq!(ui.start_screen.get(), StartScreen::ANIME);
+        assert!(ui.cover_colours.get(), "a title's page takes its cover's colour unless it is turned off");
     }
 
     #[test]

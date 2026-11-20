@@ -5313,3 +5313,6 @@ library_updates_failed =
 
 # source: kurobayomi
 ui_airs_weekly_on_myanimelist = Airs every week at this time, on your clock (MyAnimeList)
+
+# source: kurobayomi
+ui_cover_colours_on_a_titles_page = Cover colours on a title's page

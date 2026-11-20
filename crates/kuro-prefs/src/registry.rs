@@ -219,6 +219,7 @@ define_prefs! {
     "__APP_STATE_incognito_mode", AppState, Bool, false, "base", "incognito_mode";
     "pref_theme_mode_key", Normal, Str, "SYSTEM", "ui", "theme_mode";
     "start_screen", Normal, Str, "ANIME", "ui", "start_screen";
+    "entry_cover_colours", Normal, Bool, true, "ui", "cover_colours";
     "pref_display_mode_catalogue", Normal, Str, "COMPACT_GRID", "sources", "display_mode";
     "source_languages", Normal, Set, &["all", "en"], "sources", "enabled_languages";
     "show_nsfw_source", Normal, Bool, false, "sources", "show_nsfw_source";

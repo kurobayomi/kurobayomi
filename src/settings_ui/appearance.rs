@@ -1,5 +1,5 @@
-//! Theme mode (task T-47a-011) and the start screen (T-48a-005). The App theme strip and the app lock are cut (settings
-//! diet).
+//! Theme mode (task T-47a-011), the cover colours of a title's page, and the start screen (T-48a-005). The App theme
+//! strip and the app lock are cut (settings diet).
 //!
 //! Theme mode changes the look through one path, `theme::apply` (`update_settings`): the
 //! window marks and the GTK dark preference are set together, with no restart.
@@ -12,7 +12,7 @@ use kuro_prefs::ui::StartScreen;
 
 use crate::pref_model::model::{Preference, PreferenceItem};
 use crate::pref_model::widgets::theme_mode;
-use crate::settings_ui::rows::{enum_choice, group, requires_restart};
+use crate::settings_ui::rows::{enum_choice, group, requires_restart, switch_with};
 
 /// The Theme mode row: System, Light and Dark as linked toggle buttons (`widgets::theme_mode`). A click stores the
 /// mode and applies it through `theme::apply`; a click on the selected segment writes nothing.
@@ -25,6 +25,18 @@ pub fn theme_mode_row(prefs: &Prefs) -> PreferenceItem {
             built.upcast()
         }),
     }
+}
+
+/// The switch of the colour a title's page takes from its cover (`theme::tint`). Turning it off takes the colour off
+/// the pages that are open; turned on, a page is coloured the next time it is drawn.
+pub fn cover_colours_row(prefs: &Prefs) -> PreferenceItem {
+    let on_change = crate::pref_model::bind::veto(|on: bool| async move {
+        if !on {
+            crate::theme::tint::clear_all();
+        }
+        Ok(true)
+    });
+    switch_with(&tr(MsgKey::ui_cover_colours_on_a_titles_page), None, &prefs.ui.cover_colours, true, on_change)
 }
 
 /// The five start screens in list order, with their titles.
@@ -71,7 +83,7 @@ pub fn open_start_tab(tabs: &adw::ViewStack, prefs: &Prefs) {
 /// app lock group. The rest of the page stays as the spec builds it.
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     vec![
-        group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs)]),
+        group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs), cover_colours_row(prefs)]),
         group(&tr(MsgKey::pref_category_display), vec![start_screen_row(prefs)]),
     ]
 }
@@ -89,9 +101,11 @@ mod tests {
     }
 
     #[test]
-    fn the_theme_group_holds_only_the_mode() {
+    fn the_theme_group_holds_the_mode_and_the_cover_colours_switch() {
         let prefs = Prefs::in_memory();
-        assert_eq!(titles_of(&page_rows(&prefs), "Theme"), ["Theme mode"]);
+        assert_eq!(titles_of(&page_rows(&prefs), "Theme"), ["Theme mode", "Cover colours on a title's page"]);
+        let PreferenceItem::Switch { pref, .. } = cover_colours_row(&prefs) else { panic!("a switch") };
+        assert!(pref.get(), "on unless it is turned off");
     }
 
     #[test]
@@ -111,7 +125,7 @@ mod tests {
             &[],
             crate::settings_ui::browse::RepoCounts::default(),
         );
-        assert_eq!(titles_of(&tree, "Theme"), ["Theme mode"]);
+        assert_eq!(titles_of(&tree, "Theme"), ["Theme mode", "Cover colours on a title's page"]);
     }
 
     #[test]

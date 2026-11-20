@@ -19,6 +19,10 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   shows the day and time under the count, on your own clock ("5 days", "Wed 14:00"), as MyAnimeList lists it. A break
   is not known to MyAnimeList, so the count is to the weekly slot. Other titles keep the estimate.
 
+- A title's page takes the colour of its cover: the buttons under the cover, the unread dots, the Resume button and
+  the links. Only that page changes, and the colour is adjusted so it stays readable in light and in dark. A switch in
+  Settings, Appearance turns it off.
+
 ### Changed
 
 - The next-update button is no longer shown on a finished title, where it read "N/A".

@@ -26,8 +26,10 @@
 pub mod app_theme;
 pub mod apply;
 pub mod icons;
+pub mod palette;
 pub mod prefs;
 pub mod style;
+pub mod tint;
 pub mod tokens;
 
 use kuro_prefs::ui::ThemeMode;

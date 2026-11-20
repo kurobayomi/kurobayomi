@@ -14,15 +14,34 @@ use kuro_images::options::{LoadOptions, Priority};
 use tokio_util::sync::CancellationToken;
 
 use super::backdrop::{BACKDROP_ALPHA, FADE_CLASS, cache_key, prepare};
+use crate::theme::palette::Rgb;
 use super::cover_view;
 
 thread_local! {
-    static CACHE: RefCell<HashMap<String, gdk::Texture>> = RefCell::default();
+    /// The blurred picture of a cover and the cover's own colour, made together.
+    static CACHE: RefCell<HashMap<String, (gdk::Texture, Option<Rgb>)>> = RefCell::default();
 }
 
-/// The blurred picture of a cover already made, if any.
-fn cached(key: &str) -> Option<gdk::Texture> {
+/// The blurred picture of a cover already made, with the cover's colour, if any.
+fn cached(key: &str) -> Option<(gdk::Texture, Option<Rgb>)> {
     CACHE.with(|c| c.borrow().get(key).cloned())
+}
+
+/// Gives the page the backdrop is on the colour of its cover (`theme::tint`), or takes the tint off for a cover that
+/// has none. The backdrop may be made before it is put in its page, so this waits until it is shown.
+fn tint(picture: &gtk::Picture, colour: Option<Rgb>) {
+    let apply = move |picture: &gtk::Picture| {
+        let Some(page) = picture.ancestor(adw::NavigationPage::static_type()) else { return };
+        match colour {
+            Some(seed) => crate::theme::tint::apply(&page, seed),
+            None => crate::theme::tint::clear(&page),
+        }
+    };
+    if picture.is_mapped() {
+        apply(picture);
+    } else {
+        picture.connect_map(apply);
+    }
 }
 
 /// The bytes of the cover: the custom file when there is one, else what the image service fetches (its disk cache
@@ -63,8 +82,9 @@ pub fn build(art: Option<&ArtRef>) -> gtk::Overlay {
 
 fn load(art: ArtRef, picture: &gtk::Picture) {
     let key = cache_key(art.url.as_deref().unwrap_or_default(), art.last_modified);
-    if let Some(texture) = cached(&key) {
+    if let Some((texture, colour)) = cached(&key) {
         show(picture, &texture);
+        tint(picture, colour);
         return;
     }
     let Some(service) = cover_view::service() else { return };
@@ -76,12 +96,13 @@ fn load(art: ArtRef, picture: &gtk::Picture) {
             prepare(&bytes)
         },
         move |prepared| {
-        let Some((w, h, rgba)) = prepared else { return };
+        let Some((w, h, rgba, colour)) = prepared else { return };
         let bytes = glib::Bytes::from_owned(rgba);
         let texture: gdk::Texture = gdk::MemoryTexture::new(w as i32, h as i32, gdk::MemoryFormat::R8g8b8a8, &bytes, (w * 4) as usize).upcast();
-        CACHE.with(|c| c.borrow_mut().insert(key, texture.clone()));
+        CACHE.with(|c| c.borrow_mut().insert(key, (texture.clone(), colour)));
         if let Some(picture) = picture.upgrade() {
             show(&picture, &texture);
+            tint(&picture, colour);
         }
         },
     );

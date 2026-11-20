@@ -4,6 +4,8 @@
 
 use image::RgbaImage;
 
+use crate::theme::palette::{self, Rgb};
+
 /// The alpha of the blurred cover behind the header: strong enough to colour the whole header, the fade keeps the text
 /// readable.
 pub const BACKDROP_ALPHA: f64 = 0.85;
@@ -23,12 +25,15 @@ pub const FADE_CLASS: &str = "kuro-backdrop-fade";
 /// stretches it over the header.
 pub const BLUR_MAX_SIDE: u32 = 96;
 
-/// Decodes a cover, shrinks it to `BLUR_MAX_SIDE` and blurs it: `(width, height, rgba)`. `None` for bytes that are not a
+/// Decodes a cover, shrinks it to `BLUR_MAX_SIDE` and blurs it: `(width, height, rgba, colour)`. The colour is the
+/// cover's own (`palette::dominant`), read from the shrunk picture before the blur mixes its colours; `None` for a
+/// cover with no colour to speak of. The title's page takes it (`theme::tint`). `None` for bytes that are not a
 /// picture. Runs off the GTK thread.
-pub fn prepare(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
+pub fn prepare(bytes: &[u8]) -> Option<(u32, u32, Vec<u8>, Option<Rgb>)> {
     let small = image::load_from_memory(bytes).ok()?.thumbnail(BLUR_MAX_SIDE, BLUR_MAX_SIDE).to_rgba8();
     let (w, h) = small.dimensions();
-    Some((w, h, blur_rgba(w, h, small.into_raw())?))
+    let colour = palette::dominant(small.as_raw());
+    Some((w, h, blur_rgba(w, h, small.into_raw())?, colour))
 }
 
 /// The cache key of a blurred cover. A new modification time gives a new key.
@@ -84,9 +89,21 @@ mod tests {
         let mut png = Vec::new();
         let picture = image::RgbaImage::from_pixel(300, 400, image::Rgba([10, 20, 30, 255]));
         picture.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
-        let (w, h, rgba) = prepare(&png).expect("a picture");
+        let (w, h, rgba, _) = prepare(&png).expect("a picture");
         assert!(w.max(h) <= BLUR_MAX_SIDE && w < h, "{w}x{h}");
         assert_eq!(rgba.len(), (w * h * 4) as usize);
         assert!(prepare(b"not a picture").is_none());
+    }
+
+    #[test]
+    fn prepare_reads_the_covers_own_colour_and_none_from_a_grey_cover() {
+        let png = |pixel: [u8; 4]| {
+            let mut out = Vec::new();
+            image::RgbaImage::from_pixel(60, 90, image::Rgba(pixel)).write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).unwrap();
+            out
+        };
+        let colour = prepare(&png([47, 95, 208, 255])).expect("a picture").3.expect("a blue cover has a colour");
+        assert!(colour.r.abs_diff(47) <= 2 && colour.g.abs_diff(95) <= 2 && colour.b.abs_diff(208) <= 2, "{colour:?}");
+        assert_eq!(prepare(&png([120, 120, 120, 255])).expect("a picture").3, None);
     }
 }
