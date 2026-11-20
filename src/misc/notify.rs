@@ -1,5 +1,5 @@
 //! The one desktop notifier of the app. Every notice goes out here as a [`Post`]: the update passes' notices built below
-//! (the large-queue warning, the per-entry "new chapters / episodes" notice, the "N update(s) failed" notice, the summary
+//! (the large-queue warning, the per-entry "new chapters / episodes" notice, the "N updates failed" notice, the summary
 //! and the progress), the app update's, the reader's saved and shared pictures, and every notice the library crates send
 //! through the platform `Notifier` (downloads, backup and restore), which `gio_notifier` turns into a `Post`.
 //!
@@ -159,7 +159,7 @@ pub fn entry_post(kind: Kind, update: &EntryUpdate, hide_content: bool) -> Optio
     })
 }
 
-/// The "N update(s) failed" notice: low urgency, shown only when something failed (T-26a-035). With a `log` file its
+/// The "N updates failed" notice: low urgency, shown only when something failed (T-26a-035). With a `log` file its
 /// tap opens the file and its body says so (T-26a-096); without one it has neither.
 pub fn error_post(kind: Kind, failed: usize, log: Option<&Path>) -> Option<Post> {
     let error = notice::error_notice(failed, log.is_some())?;
@@ -609,7 +609,7 @@ mod tests {
         // T-26a-035
         assert!(error_post(Kind::Manga, 0, None).is_none());
         let post = error_post(Kind::Manga, 3, None).expect("shown");
-        assert_eq!(post.title, "3 update(s) failed");
+        assert_eq!(post.title, "3 updates failed");
         assert!(post.low_priority);
         assert_eq!(post.body, None, "no log file, so no tap line");
         assert_eq!(post.tap, None);

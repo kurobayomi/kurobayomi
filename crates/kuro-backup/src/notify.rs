@@ -175,9 +175,10 @@ pub fn restore_failed(reason: &str) -> Notice {
     Notice::new(ID_RESTORE_RESULT, "Restoring backup failed", Some(reason.to_owned()), Urgency::High)
 }
 
-/// Canceled restore: the failure title with "Canceled restore". No summary is shown.
+/// Canceled restore: "Restore canceled", on its own. The user stopped it, so it is not called a failure (it used to
+/// read "Restoring backup failed" over "Canceled restore"; user, 2026-11-20). No summary is shown.
 pub fn restore_canceled() -> Notice {
-    Notice::new(ID_RESTORE_RESULT, "Restoring backup failed", Some("Canceled restore".into()), Urgency::Normal)
+    Notice::new(ID_RESTORE_RESULT, "Restore canceled", None, Urgency::Normal)
 }
 
 /// The completion notice for a finished run: the summary when it completed, the canceled notice otherwise.
@@ -355,9 +356,10 @@ mod tests {
     }
 
     #[test]
-    fn canceled_restore_uses_the_failure_title_and_text() {
+    fn a_canceled_restore_is_not_called_a_failure() {
         let n = restore_canceled();
-        assert_eq!((n.id, n.title.as_str(), n.body.as_deref()), (ID_RESTORE_RESULT, "Restoring backup failed", Some("Canceled restore")));
+        assert_eq!((n.id, n.title.as_str(), n.body.as_deref()), (ID_RESTORE_RESULT, "Restore canceled", None));
+        assert_ne!(n.title, restore_failed("x").title);
         assert_eq!(n.action, None);
     }
 
@@ -369,7 +371,7 @@ mod tests {
         assert_eq!(done.body.as_deref(), Some("Done in 01 min, 05 sec with 1 error"));
         assert_eq!(done.action, Some(Action::OpenErrorLog(log)));
         let canceled = restore_end(&RestoreEnd::Canceled { error_log: None });
-        assert_eq!(canceled.title, "Restoring backup failed");
+        assert_eq!(canceled.title, "Restore canceled");
     }
 
     #[test]

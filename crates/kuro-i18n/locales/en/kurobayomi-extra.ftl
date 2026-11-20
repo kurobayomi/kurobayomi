@@ -1123,3 +1123,10 @@ ui_community_scores = Community scores
 
 # source: kurobayomi
 ui_community_scores_credit = MyAnimeList, through Jikan (unofficial)
+
+# source: kurobayomi
+library_updates_failed =
+    { $count ->
+        [one] 1 update failed
+       *[other] { NUMBER($count, useGrouping: "false") } updates failed
+    }

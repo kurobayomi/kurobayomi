@@ -5,7 +5,7 @@
 //! between the two kinds. Here an entry id is FNV-1a over the kind and the entry id, and each kind has its own pass
 //! ids (progress, error, warning). Documented deviation: the shared ids of Kotlin are split per kind.
 
-use kuro_i18n::{MsgKey, tr};
+use kuro_i18n::{MsgKey, tr, tr_plural};
 use kuro_platform::kind::Kind;
 
 use crate::library_update::pass::EntryUpdate;
@@ -28,7 +28,7 @@ pub const ERROR_CHANNEL: &str = "error";
 #[cfg(test)]
 pub const WARNING_CHANNEL: &str = "warning";
 
-/// The "N update(s) failed" notification text and its tap line.
+/// The tap line of the failure notification ("1 update failed", "3 updates failed").
 pub fn error_text() -> String {
     tr(MsgKey::action_show_errors)
 }
@@ -130,7 +130,7 @@ pub struct ErrorNotice {
 }
 
 pub fn error_notice(failed: usize, log_exists: bool) -> Option<ErrorNotice> {
-    (failed > 0).then(|| ErrorNotice { title: format!("{failed} update(s) failed"), text: error_text(), opens_log: log_exists })
+    (failed > 0).then(|| ErrorNotice { title: tr_plural(MsgKey::library_updates_failed, failed as i64, &[]), text: error_text(), opens_log: log_exists })
 }
 
 #[cfg(test)]
@@ -208,9 +208,11 @@ mod tests {
         // P-16
         assert!(error_notice(0, true).is_none());
         let with_log = error_notice(3, true).expect("shown");
-        assert_eq!(with_log.title, "3 update(s) failed");
+        assert_eq!(with_log.title, "3 updates failed");
         assert_eq!(with_log.text, "Click to see details");
         assert!(with_log.opens_log);
-        assert!(!error_notice(1, false).expect("shown").opens_log);
+        let one = error_notice(1, false).expect("shown");
+        assert_eq!(one.title, "1 update failed", "a count of one reads as one");
+        assert!(!one.opens_log);
     }
 }
