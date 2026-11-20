@@ -11,12 +11,18 @@
 //! Incognito keeps what the user watches and reads out of the history and off the trackers, and a lookup records
 //! neither (it needs no login, and Browse sends titles to sites in Incognito too). It says nothing to the user: it
 //! logs.
+//!
+//! Beside the lookups it keeps the score site's bulk lists ([`lists`]): a few requests a day for the titles on air and
+//! the most popular ones, with their scores. A title Browse shows ([`browsed`]) is found in them by name and gets its
+//! score at once, without a request of its own.
+
+mod lists;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use kuro_data::community_score::{CommunityScore, CommunityScoreRepo, ScoreCandidate};
+use kuro_data::community_score::{CommunityScore, CommunityScoreRepo, MatchedBy, ScoreCandidate};
 use kuro_data::track::TrackRepo;
 use kuro_db::handle::Db;
 use kuro_platform::kind::Kind;
@@ -34,6 +40,17 @@ const START_DELAY: Duration = Duration::from_secs(5);
 const TICK: Duration = Duration::from_secs(60 * 60);
 /// The shortest pause after a site asked to slow down or did not answer.
 const BACKOFF: Duration = Duration::from_secs(10 * 60);
+/// A Browse page stores its entries one by one: they are matched together after this long, with one write.
+const BROWSED_GATHER: Duration = Duration::from_millis(200);
+/// The browsed titles kept while the lists of their kind are not there yet (the first start, before they are fetched).
+const BROWSED_KEPT: usize = 2000;
+
+/// A title Browse showed: its entry row and its name in the source.
+struct Browsed {
+    kind: Kind,
+    entry_id: i64,
+    title: String,
+}
 
 struct Job {
     scores: CommunityScoreRepo,
@@ -42,6 +59,10 @@ struct Job {
     wake: Notify,
     /// Entries a details page asked for, looked up before the library's.
     urgent: Mutex<VecDeque<i64>>,
+    lists: lists::Lists,
+    /// The titles Browse showed that are not matched against the lists yet.
+    browsed: Mutex<Vec<Browsed>>,
+    browsed_wake: Notify,
 }
 
 static JOB: OnceLock<Arc<Job>> = OnceLock::new();
@@ -67,11 +88,12 @@ pub fn start() {
         Ok(transport) => Arc::new(transport),
         Err(error) => return tracing::warn!(%error, "community scores: no HTTP client; the scores are not refreshed"),
     };
+    let paths = match kuro_platform::system_paths::SystemPaths::system() {
+        Ok(paths) => paths,
+        Err(error) => return tracing::warn!(%error, "community scores: the app folders do not resolve; the scores are not refreshed"),
+    };
     // the client id of the MyAnimeList tracker: the scores come from the same API, without a login
-    let client_id = kuro_platform::system_paths::SystemPaths::system()
-        .map_err(|error| error.to_string())
-        .and_then(|paths| kuro_track::mal::store::configured_client_id(&paths.config_dir()).map_err(|error| error.to_string()));
-    let client_id = match client_id {
+    let client_id = match kuro_track::mal::store::configured_client_id(&paths.config_dir()) {
         Ok(client_id) => client_id,
         Err(error) => return tracing::warn!(%error, "community scores: no MyAnimeList client id; the scores are not refreshed"),
     };
@@ -79,9 +101,44 @@ pub fn start() {
         Ok(provider) => Arc::new(provider),
         Err(error) => return tracing::warn!(%error, "community scores: no HTTP client; the scores are not refreshed"),
     };
-    let job = Arc::new(Job::new(crate::data::app().db.clone(), provider));
+    let files = [paths.score_lists_file(Kind::Manga), paths.score_lists_file(Kind::Anime)];
+    let job = Arc::new(Job::new(crate::data::app().db.clone(), provider, lists::Lists::new(Some(files))));
     if JOB.set(Arc::clone(&job)).is_ok() {
+        runtime.spawn(Arc::clone(&job).keep_lists());
+        runtime.spawn(Arc::clone(&job).match_as_browsed());
         runtime.spawn(job.run());
+    }
+}
+
+/// A title Browse showed, with its entry row and its name in the source: it gets its score from the bulk lists when
+/// they hold a title of that name, without a request. Cheap, and safe from any thread.
+pub fn browsed(kind: Kind, entry_id: i64, title: &str) {
+    let Some(job) = JOB.get() else { return };
+    if entry_id <= 0 {
+        return;
+    }
+    {
+        let mut queue = job.browsed.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if queue.len() >= BROWSED_KEPT {
+            queue.remove(0);
+        }
+        queue.push(Browsed { kind, entry_id, title: title.to_owned() });
+    }
+    job.browsed_wake.notify_one();
+}
+
+/// The year and the month of today (UTC), for a provider that lists by season.
+fn today() -> (i32, u32) {
+    use chrono::Datelike;
+    let now = chrono::Utc::now();
+    (now.year(), now.month())
+}
+
+/// How long nothing is asked after a stop: as long as the site said, and never less than [`BACKOFF`].
+fn pause_after(stop: Stop) -> Duration {
+    match stop {
+        Stop::RateLimited { retry_after } => retry_after.unwrap_or_default().max(BACKOFF),
+        Stop::Unreachable => BACKOFF,
     }
 }
 
@@ -115,8 +172,114 @@ pub fn set_match(entry_id: i64, chosen: Option<Hit>) -> Result<(), String> {
 }
 
 impl Job {
-    fn new(db: Arc<Db>, provider: Arc<dyn ScoreProvider>) -> Self {
-        Self { scores: CommunityScoreRepo::new(Arc::clone(&db)), tracks: TrackRepo::new(db), provider, wake: Notify::new(), urgent: Mutex::default() }
+    fn new(db: Arc<Db>, provider: Arc<dyn ScoreProvider>, lists: lists::Lists) -> Self {
+        Self {
+            scores: CommunityScoreRepo::new(Arc::clone(&db)),
+            tracks: TrackRepo::new(db),
+            provider,
+            wake: Notify::new(),
+            urgent: Mutex::default(),
+            lists,
+            browsed: Mutex::default(),
+            browsed_wake: Notify::new(),
+        }
+    }
+
+    /// Keeps the bulk lists: the cached ones at once, fresh ones when there are none or they are a day old. It runs
+    /// beside the lookups and shares their pace, so neither waits for the other to end.
+    async fn keep_lists(self: Arc<Self>) {
+        self.lists.load_files();
+        // what Browse showed before the files were read
+        self.browsed_wake.notify_one();
+        tokio::time::sleep(START_DELAY).await;
+        loop {
+            let mut stopped = None;
+            for kind in [Kind::Anime, Kind::Manga] {
+                if !self.provider.supports(kind) || !self.lists.due(kind, now_ms()) {
+                    continue;
+                }
+                match self.provider.catalogue(kind, today()).await {
+                    // a provider with no lists, or a site that answered with none: asked again at the next round
+                    Ok(hits) if hits.is_empty() => {}
+                    Ok(hits) => {
+                        tracing::debug!(?kind, titles = hits.len(), "community scores: the lists were fetched");
+                        self.lists.set(kind, hits, now_ms());
+                        self.browsed_wake.notify_one();
+                    }
+                    Err(stop) => {
+                        stopped = Some(stop);
+                        break;
+                    }
+                }
+            }
+            // the lookups warn when the site stops answering; the lists, which fail with them, only note it
+            let pause = match stopped {
+                Some(stop) => {
+                    tracing::debug!(?stop, "community scores: the lists were not fetched; trying again after the pause");
+                    pause_after(stop)
+                }
+                None => TICK,
+            };
+            tokio::time::sleep(pause).await;
+        }
+    }
+
+    /// Matches the titles Browse showed against the lists, a page at a time.
+    async fn match_as_browsed(self: Arc<Self>) {
+        loop {
+            self.browsed_wake.notified().await;
+            tokio::time::sleep(BROWSED_GATHER).await;
+            let entries = std::mem::take(&mut *self.browsed.lock().unwrap_or_else(std::sync::PoisonError::into_inner));
+            let waiting = self.match_browsed(entries);
+            if !waiting.is_empty() {
+                // their kind has no lists yet: they are matched when the lists arrive
+                let mut queue = self.browsed.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                let room = BROWSED_KEPT.saturating_sub(queue.len());
+                queue.extend(waiting.into_iter().take(room));
+            }
+        }
+    }
+
+    /// Stores the score of each browsed entry the lists hold a title for, in one write. Returns the entries whose kind
+    /// has no lists yet. An entry the lists do not hold is left alone: its own page looks it up.
+    fn match_browsed(&self, entries: Vec<Browsed>) -> Vec<Browsed> {
+        let mut waiting: Vec<Browsed> = Vec::new();
+        let mut rows: Vec<CommunityScore> = Vec::new();
+        let mut seen: HashSet<i64> = HashSet::new();
+        for browsed in entries {
+            let Some(held) = self.lists.get(browsed.kind) else {
+                waiting.push(browsed);
+                continue;
+            };
+            if !seen.insert(browsed.entry_id) {
+                continue;
+            }
+            let Some(hit) = held.catalogue.find(&browsed.title) else { continue };
+            let stored = match self.scores.by_entry(browsed.entry_id) {
+                Ok(stored) => stored,
+                Err(error) => {
+                    tracing::warn!(%error, "community scores: a browsed entry could not be read");
+                    continue;
+                }
+            };
+            if lists::takes(stored.as_ref(), hit.remote_id, held.fetched_at) {
+                rows.push(CommunityScore {
+                    entry_id: browsed.entry_id,
+                    provider: self.provider.id().to_owned(),
+                    remote_id: Some(hit.remote_id),
+                    matched_title: hit.title.clone(),
+                    matched_by: MatchedBy::Title,
+                    score: hit.score,
+                    fetched_at: held.fetched_at,
+                });
+            }
+        }
+        if !rows.is_empty() {
+            if let Err(error) = self.scores.store_fetched(&rows) {
+                tracing::warn!(%error, "community scores: the scores of browsed titles could not be stored");
+            }
+        }
+        waiting
     }
 
     async fn run(self: Arc<Self>) {
@@ -130,10 +293,7 @@ impl Job {
             match self.pass().await {
                 // the site said when, or said nothing: no pass before the pause is over, whatever wakes it
                 Some(stop) => {
-                    let pause = match stop {
-                        Stop::RateLimited { retry_after } => retry_after.unwrap_or_default().max(BACKOFF),
-                        Stop::Unreachable => BACKOFF,
-                    };
+                    let pause = pause_after(stop);
                     // the log file keeps warnings only, and it is where "why is there no score" gets answered (a site
                     // that was gone for good once left no trace there)
                     if stopped_before {
@@ -279,7 +439,37 @@ mod tests {
 
     fn job(db: &Arc<Db>, stop_after: usize) -> (Job, Arc<Fake>) {
         let fake = Arc::new(Fake { asked: Mutex::default(), stop_after });
-        (Job::new(Arc::clone(db), fake.clone()), fake)
+        (Job::new(Arc::clone(db), fake.clone(), lists::Lists::new(None)), fake)
+    }
+
+    #[tokio::test]
+    async fn a_browsed_title_gets_its_score_from_the_lists_without_a_request() {
+        let dir = kuro_testkit::TempDir::new().unwrap();
+        let db = kuro_testkit::TestDb::handle(&dir);
+        let listed = entry(&db, Kind::Anime, "/listed", false);
+        let unlisted = entry(&db, Kind::Anime, "/unlisted", false);
+        let manga = entry(&db, Kind::Manga, "/m", false);
+        let (job, fake) = job(&db, usize::MAX);
+        let hit = |id: i64, title: &str, score: f64| Hit { remote_id: id, title: title.into(), alt_titles: Vec::new(), score: Some(score) };
+        let shown = |kind: Kind, entry_id: i64, title: &str| Browsed { kind, entry_id, title: title.into() };
+        job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.1)], 500);
+        let page = vec![shown(Kind::Anime, listed, "title: /LISTED"), shown(Kind::Anime, unlisted, "Title /unlisted"), shown(Kind::Manga, manga, "Title /m")];
+        let waiting = job.match_browsed(page);
+        assert_eq!(waiting.iter().map(|browsed| browsed.entry_id).collect::<Vec<_>>(), [manga], "no manga lists yet: it waits for them");
+        let stored = job.scores.by_entry(listed).expect("read").expect("a row");
+        assert_eq!((stored.remote_id, stored.score, stored.matched_by, stored.fetched_at), (Some(7), Some(8.1), MatchedBy::Title, 500));
+        assert_eq!(stored.matched_title, "Title /listed");
+        assert_eq!(job.scores.by_entry(unlisted).expect("read"), None, "not in the lists: left to its own page");
+        assert!(fake.asked.lock().expect("asked").is_empty(), "nothing was asked of the site");
+        // newer lists refresh a score that came from the lists
+        job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.3)], 900);
+        assert!(job.match_browsed(vec![shown(Kind::Anime, listed, "Title /listed")]).is_empty());
+        assert_eq!(job.scores.by_entry(listed).expect("read").map(|s| (s.score, s.fetched_at)), Some((Some(8.3), 900)));
+        // the title the user chose stays, whatever the lists say
+        job.scores.set_user_match(listed, "fake", Some((9, "Chosen".into(), Some(5.0))), 950).expect("choose");
+        job.lists.set(Kind::Anime, vec![hit(7, "Title /listed", 8.6)], 1_200);
+        job.match_browsed(vec![shown(Kind::Anime, listed, "Title /listed")]);
+        assert_eq!(job.scores.by_entry(listed).expect("read").map(|s| (s.remote_id, s.score)), Some((Some(9), Some(5.0))));
     }
 
     #[tokio::test]

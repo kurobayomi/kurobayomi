@@ -99,6 +99,8 @@ impl FavoriteStore for RepoStore {
             ..Entry::create(self.kind)
         };
         let local = network_to_local(&self.entries, &listed).map_err(text)?;
+        // a title Browse shows gets its community score from the score site's bulk lists, when they hold it
+        crate::community::browsed(self.kind, local.id, title);
         Ok(LocalEntry { id: local.id, favorite: local.favorite, title: local.title })
     }
 
