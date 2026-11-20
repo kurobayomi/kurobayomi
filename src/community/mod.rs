@@ -253,29 +253,28 @@ impl Job {
         self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).contains(&entry_id)
     }
 
-    /// The entries the lists do not hold whose cover is on screen, at most `most`, taken out of the wait: they are
-    /// asked now. The ones off screen keep waiting.
-    fn take_wanted(&self, most: usize) -> Vec<i64> {
+    /// The entries that go before the library's, in the order they are asked: the ones a title's page asked for, then
+    /// the ones the lists do not hold whose cover is on screen. An entry stays among them until it is [`settled`]: it
+    /// is read here, never taken, so one that a batch did not get to is not lost (covers once stayed without a score
+    /// because the rest of a batch was dropped when another cover came on screen; user, 2026-11-20).
+    ///
+    /// [`settled`]: Job::settled
+    fn ahead(&self) -> Vec<i64> {
+        let mut ids: Vec<i64> = self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().copied().collect();
         let shown = self.on_screen.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
-        let mut missed = self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-        let mut taken: Vec<i64> = Vec::new();
-        missed.retain(|id| {
-            let take = taken.len() < most && shown.contains(id);
-            if take {
-                taken.push(*id);
-            }
-            !take
-        });
-        taken
+        ids.extend(self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().copied().filter(|id| shown.contains(id)));
+        ids
     }
 
-    /// Whether something goes before the library's entries: a title's page asked, or a cover on screen waits.
+    /// Whether an entry goes before the library's entries: a title's page asked, or a cover on screen waits.
     fn has_work_ahead(&self) -> bool {
-        if !self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_empty() {
-            return true;
-        }
-        let shown = self.on_screen.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
-        self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).iter().any(|id| shown.contains(id))
+        !self.ahead().is_empty()
+    }
+
+    /// `entry_id` waits no more: it was answered, or it needs no asking (its score is fresh, or the entry is gone).
+    fn settled(&self, entry_id: i64) {
+        self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).retain(|id| *id != entry_id);
+        self.missed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).retain(|id| *id != entry_id);
     }
 
     /// Keeps the bulk lists: the cached ones at once, fresh ones when there are none or they are a day old. It runs
@@ -442,13 +441,16 @@ impl Job {
                     return None;
                 }
             };
+            // the entries that went first when this batch was made
+            let known: HashSet<i64> = self.ahead().into_iter().collect();
             for (index, pair) in batch.iter().enumerate() {
-                // a title's page asked meanwhile, or a cover came on screen: they go first, so the rest of this batch
-                // waits for the next one
-                if index > 0 && self.has_work_ahead() {
+                // a title's page asked meanwhile, or another cover came on screen: it goes first, so a new batch is
+                // made. The entries of this one that were not asked still wait where they waited.
+                if index > 0 && self.ahead().iter().any(|id| !known.contains(id)) {
                     break;
                 }
-                asked.insert(pair.0.entry_id);
+                let id = pair.0.entry_id;
+                asked.insert(id);
                 let (rows, stopped) = refresh::run_batch(self.provider.as_ref(), std::slice::from_ref(pair), now_ms).await;
                 // a kind the provider does not score answers with no row: nothing to write, nobody to wake
                 if !rows.is_empty() {
@@ -457,9 +459,11 @@ impl Job {
                         return None;
                     }
                 }
+                // not answered: it keeps waiting, and is asked again after the pause
                 if stopped.is_some() {
                     return stopped;
                 }
+                self.settled(id);
             }
         }
     }
@@ -474,13 +478,15 @@ impl Job {
                 tracks.entry(track.entry_id).or_default().extend(refresh::track_refs(std::slice::from_ref(&track)));
             }
         }
-        let urgent: Vec<i64> = self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).drain(..).collect();
+        // more than two batches of them are not read at once; the rest are read by the batches that follow
+        let ahead: Vec<i64> = self.ahead().into_iter().take(2 * BATCH).collect();
         let mut candidates: Vec<ScoreCandidate> = Vec::new();
-        for id in urgent {
-            candidates.extend(self.scores.candidate(id).map_err(text)?);
-        }
-        for id in self.take_wanted(BATCH) {
-            candidates.extend(self.scores.candidate(id).map_err(text)?);
+        for id in &ahead {
+            match self.scores.candidate(*id).map_err(text)? {
+                Some(candidate) => candidates.push(candidate),
+                // the entry is gone
+                None => self.settled(*id),
+            }
         }
         candidates.extend(self.scores.candidates().map_err(text)?);
         let now = now_ms();
@@ -491,7 +497,14 @@ impl Job {
             }
             let id = candidate.entry_id;
             let of_entry = tracks.get(&id).cloned().unwrap_or_default();
-            if asked.contains(&id) || batch.iter().any(|(c, _)| c.entry_id == id) || !policy::due(&candidate, &of_entry, now) {
+            if batch.iter().any(|(c, _)| c.entry_id == id) {
+                continue;
+            }
+            if asked.contains(&id) || !policy::due(&candidate, &of_entry, now) {
+                // asked in this pass already, or its score is fresh: an entry that waited for a lookup needs none
+                if ahead.contains(&id) {
+                    self.settled(id);
+                }
                 continue;
             }
             let query = refresh::query_of(&candidate, of_entry);
@@ -640,6 +653,35 @@ mod tests {
         job.urgent.lock().expect("urgent").push_back(browsed);
         assert_eq!(job.pass().await, None);
         assert_eq!(job.scores.by_entry(browsed).expect("read").and_then(|s| s.score), Some(8.5));
+    }
+
+    #[tokio::test]
+    async fn an_entry_that_goes_first_waits_until_it_is_answered() {
+        let dir = kuro_testkit::TempDir::new().unwrap();
+        let db = kuro_testkit::TestDb::handle(&dir);
+        let first = entry(&db, Kind::Anime, "/first", false);
+        let second = entry(&db, Kind::Anime, "/second", false);
+        let paged = entry(&db, Kind::Anime, "/paged", false);
+        // the site answers one lookup and then stops answering
+        let (stopping, fake) = job(&db, 1);
+        stopping.missed.lock().expect("missed").extend([first, second]);
+        stopping.on_screen.lock().expect("covers").extend([first, second]);
+        stopping.urgent.lock().expect("urgent").push_back(paged);
+        assert_eq!(stopping.ahead(), [paged, first, second], "a title's page, then the covers on screen");
+        assert_eq!(stopping.pass().await, Some(Stop::Unreachable));
+        assert_eq!(*fake.asked.lock().expect("asked"), [paged], "the page's title was answered");
+        assert_eq!(stopping.ahead(), [first, second], "the covers were not answered: they still wait, none is lost");
+        // a cover that left the screen is not asked, and waits for when it is back
+        stopping.on_screen.lock().expect("covers").remove(&second);
+        assert_eq!(stopping.ahead(), [first]);
+        assert!(stopping.wants(second));
+        // an entry whose score is fresh needs no lookup: it stops waiting without one
+        let (answering, again) = job(&db, usize::MAX);
+        answering.urgent.lock().expect("urgent").push_back(paged);
+        assert_eq!(answering.ahead(), [paged]);
+        assert_eq!(answering.pass().await, None);
+        assert!(again.asked.lock().expect("asked").is_empty(), "its score was stored a moment ago");
+        assert!(answering.ahead().is_empty(), "so it stops waiting");
     }
 
     #[tokio::test]
