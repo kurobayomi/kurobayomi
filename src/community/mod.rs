@@ -3,8 +3,9 @@
 //! stores the answers in the one score store (`kuro_data::community_score`). The library and the details page read
 //! that store and follow its changes; nothing in the UI asks a site.
 //!
-//! It runs a little after the start, when an entry joins the library, when a details page opens on an entry with no
-//! fresh score ([`lookup_now`], also for a title that is not in the library), and every hour. The provider keeps the
+//! It runs a few seconds after the start, when an entry joins the library, when a details page opens on an entry with
+//! no fresh score ([`lookup_now`], also for a title that is not in the library; it goes before the library's and does
+//! not wait for the start), and every hour. Each answer is stored as it arrives, so the stars appear one by one. The provider keeps the
 //! pace (`kuro_scores::mal::PACE`), so a large library fills in over a while. A site that asks to slow down, or does
 //! not answer, ends the pass: the scores shown stay, and the next pass comes after a pause. Incognito does not stop it:
 //! Incognito keeps what the user watches and reads out of the history and off the trackers, and a lookup records
@@ -24,10 +25,11 @@ use kuro_scores::provider::{Hit, Query, ScoreProvider, Stop, TrackRef};
 use kuro_scores::{policy, refresh};
 use tokio::sync::Notify;
 
-/// Entries asked between two writes to the store: the library reloads once per batch.
+/// Entries read from the store at a time. Each one's answer is stored as it arrives.
 const BATCH: usize = 20;
-/// The wait after the start, so the first minutes of the app are not spent on this.
-const START_DELAY: Duration = Duration::from_secs(30);
+/// The wait after the start, so the window is up and drawn first. It was 30 seconds, and a first score took 42 on a
+/// library of four titles (user, 2026-11-20). A title's page that opens, or a title that joins the library, ends it.
+const START_DELAY: Duration = Duration::from_secs(5);
 /// How often the library is checked for scores that came due while the app stayed open.
 const TICK: Duration = Duration::from_secs(60 * 60);
 /// The shortest pause after a site asked to slow down or did not answer.
@@ -118,7 +120,10 @@ impl Job {
     }
 
     async fn run(self: Arc<Self>) {
-        tokio::time::sleep(START_DELAY).await;
+        tokio::select! {
+            () = tokio::time::sleep(START_DELAY) => {}
+            () = self.wake.notified() => {}
+        }
         // whether the pass before this one stopped too: the first stop of a run of them is a warning, the rest are not
         let mut stopped_before = false;
         loop {
@@ -163,15 +168,23 @@ impl Job {
                     return None;
                 }
             };
-            asked.extend(batch.iter().map(|(candidate, _)| candidate.entry_id));
-            let (rows, stopped) = refresh::run_batch(self.provider.as_ref(), &batch, now_ms).await;
-            tracing::debug!(asked = batch.len(), answered = rows.len(), "community scores: a batch");
-            if let Err(error) = self.scores.store_fetched(&rows) {
-                tracing::warn!(%error, "community scores: the answers could not be stored");
-                return None;
-            }
-            if stopped.is_some() {
-                return stopped;
+            for (index, pair) in batch.iter().enumerate() {
+                // a title's page asked meanwhile: it goes first, so the rest of this batch waits for the next one
+                if index > 0 && !self.urgent.lock().unwrap_or_else(std::sync::PoisonError::into_inner).is_empty() {
+                    break;
+                }
+                asked.insert(pair.0.entry_id);
+                let (rows, stopped) = refresh::run_batch(self.provider.as_ref(), std::slice::from_ref(pair), now_ms).await;
+                // a kind the provider does not score answers with no row: nothing to write, nobody to wake
+                if !rows.is_empty() {
+                    if let Err(error) = self.scores.store_fetched(&rows) {
+                        tracing::warn!(%error, "community scores: the answer could not be stored");
+                        return None;
+                    }
+                }
+                if stopped.is_some() {
+                    return stopped;
+                }
             }
         }
     }
