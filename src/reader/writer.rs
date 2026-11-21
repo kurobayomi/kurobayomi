@@ -25,7 +25,8 @@ use super::session::ReaderStore;
 /// One write the reader asks for.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Command {
-    Progress { chapter_id: i64, last_page_read: i64, read: bool },
+    /// The last page read, the chapter's page count (as the reader loaded it) and the read flag.
+    Progress { chapter_id: i64, last_page_read: i64, page_count: i64, read: bool },
     Bookmark { chapter_id: i64, bookmark: bool },
     ViewerBits { manga_id: i64, value: i64, mask: i64 },
     /// Marks a chapter read without touching its last page (the duplicate rule, T-43a-031).
@@ -98,8 +99,8 @@ impl WriterHandle {
 }
 
 impl ReaderStore for WriterHandle {
-    fn save_progress(&self, chapter_id: i64, last_page_read: i64, read: bool) {
-        self.send(Command::Progress { chapter_id, last_page_read, read });
+    fn save_progress(&self, chapter_id: i64, last_page_read: i64, page_count: i64, read: bool) {
+        self.send(Command::Progress { chapter_id, last_page_read, page_count, read });
     }
 
     /// Waits for the writer's answer, so a failed bookmark write can revert the flag (T-43a-035). A writer that does
@@ -170,10 +171,12 @@ fn split(batch: Vec<Msg>) -> Split {
 /// Runs one write through its repository.
 fn execute(items: &ItemRepo, histories: &HistoryRepo, entries: &EntryRepo, command: &Command) -> Result<(), String> {
     let result = match command {
-        Command::Progress { chapter_id, last_page_read, read } => {
+        Command::Progress { chapter_id, last_page_read, page_count, read } => {
             let mut update = ItemUpdate::new(*chapter_id);
             update.done = Some(*read);
             update.progress = Some(*last_page_read);
+            // a chapter always has a page when the reader saves one; a count of 0 would mean nothing is known
+            update.page_count = (*page_count > 0).then_some(*page_count);
             items.update(&update).map_err(|e| e.to_string())
         }
         Command::Bookmark { chapter_id, bookmark } => {
@@ -230,15 +233,15 @@ mod tests {
     #[test]
     fn progress_is_coalesced_per_chapter_to_the_last_write() {
         let out = coalesce(vec![
-            Command::Progress { chapter_id: 1, last_page_read: 0, read: false },
-            Command::Progress { chapter_id: 2, last_page_read: 4, read: false },
-            Command::Progress { chapter_id: 1, last_page_read: 3, read: true },
+            Command::Progress { chapter_id: 1, last_page_read: 0, page_count: 10, read: false },
+            Command::Progress { chapter_id: 2, last_page_read: 4, page_count: 10, read: false },
+            Command::Progress { chapter_id: 1, last_page_read: 3, page_count: 10, read: true },
         ]);
         assert_eq!(
             out,
             vec![
-                Command::Progress { chapter_id: 1, last_page_read: 3, read: true },
-                Command::Progress { chapter_id: 2, last_page_read: 4, read: false },
+                Command::Progress { chapter_id: 1, last_page_read: 3, page_count: 10, read: true },
+                Command::Progress { chapter_id: 2, last_page_read: 4, page_count: 10, read: false },
             ]
         );
     }
@@ -283,10 +286,10 @@ mod tests {
         let chapter_id = ItemRepo::new(Arc::clone(&db)).add_all(&[chapter]).unwrap()[0].id;
 
         let handle = WriterHandle::spawn(Arc::clone(&db));
-        handle.save_progress(chapter_id, 4, true);
+        handle.save_progress(chapter_id, 4, 20, true);
         handle.flush();
         let stored = ItemRepo::new(db).by_id(chapter_id).unwrap().unwrap();
-        assert_eq!((stored.progress, stored.done), (4, true));
+        assert_eq!((stored.progress, stored.done, stored.page_count), (4, true, Some(20)), "the page count goes with the page");
     }
 
     #[test]
@@ -295,7 +298,7 @@ mod tests {
         let at = |page_index| SavedSession { manga_id: 1, chapter_id: 2, page_index, saved_at: 5 };
         let out = coalesce(vec![
             Command::Restore { file: file.clone(), session: at(1) },
-            Command::Progress { chapter_id: 2, last_page_read: 1, read: false },
+            Command::Progress { chapter_id: 2, last_page_read: 1, page_count: 10, read: false },
             Command::Restore { file: file.clone(), session: at(4) },
         ]);
         assert_eq!(out.len(), 2);
@@ -325,7 +328,7 @@ mod tests {
     fn viewer_bit_writes_keep_their_order_and_run_before_progress() {
         let out = coalesce(vec![
             Command::ViewerBits { manga_id: 9, value: 2, mask: 0x7 },
-            Command::Progress { chapter_id: 1, last_page_read: 1, read: false },
+            Command::Progress { chapter_id: 1, last_page_read: 1, page_count: 10, read: false },
             Command::ViewerBits { manga_id: 9, value: 0x10, mask: 0x38 },
         ]);
         assert_eq!(out[0], Command::ViewerBits { manga_id: 9, value: 2, mask: 0x7 });

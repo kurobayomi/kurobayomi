@@ -86,6 +86,7 @@ fn item_of(b: &BackupChapter) -> Item {
         date_fetch: b.date_fetch,
         date_upload: b.date_upload,
         version: b.version,
+        page_count: b.page_count,
         ..Item::create(Kind::Manga)
     }
 }

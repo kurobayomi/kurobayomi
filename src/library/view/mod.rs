@@ -1199,6 +1199,7 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
         season_parent: is_season_parent(&inner.borrow(), &item),
         width: kuro_domain::library::columns::column_width(inner.borrow().deps.prefs.cover_size.get()),
         score: inner.borrow().built.as_ref().and_then(|b| b.community.get(&item.row.id).copied()),
+        progress: None,
     };
     let card = if mode == kuro_prefs::library::LibraryDisplayMode::List {
         let row_height = list_row_height(&inner.borrow());

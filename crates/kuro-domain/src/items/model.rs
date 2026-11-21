@@ -78,6 +78,7 @@ impl ItemExt for Item {
             preview_url: self.preview_url.clone(),
             version: Some(self.version),
             memo: self.memo.clone(),
+            page_count: self.page_count,
         }
     }
 }

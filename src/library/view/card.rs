@@ -29,6 +29,15 @@ pub struct Extras<'a> {
     pub width: i32,
     /// The entry's community score (0 to 10), when it has one.
     pub score: Option<f64>,
+    /// How far into the unit a click opens (0 to 1), when that is known: a thin line on the cover's bottom edge
+    /// ([`progress_line`]). Every page that shows the card draws it the same way.
+    pub progress: Option<f64>,
+}
+
+/// How far a title is: a 3 px line on the bottom edge of its cover (`kb-cover-progress` in the stylesheet), the accent
+/// over a faint track.
+fn progress_line(fraction: f64) -> gtk::ProgressBar {
+    gtk::ProgressBar::builder().fraction(fraction.clamp(0.0, 1.0)).valign(Align::End).halign(Align::Fill).can_target(false).css_classes(["kb-cover-progress"]).build()
 }
 
 /// The cover of a card: the shared cover (`look::cover`), `width` x `height`.
@@ -142,6 +151,9 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, 
         title.set_valign(Align::End);
         overlay.add_overlay(&title);
     }
+    if let Some(fraction) = extras.progress {
+        overlay.add_overlay(&progress_line(fraction));
+    }
     let continue_button = show_continue.then(|| {
         let button = continue_button(mode);
         button.set_halign(Align::End);
@@ -171,6 +183,9 @@ pub fn build_list(item: &LibraryItem, show_continue: bool, row_height: f64, extr
     overlay.set_overflow(gtk::Overflow::Hidden);
     overlay.set_valign(Align::Center);
     overlay.set_child(Some(&cover(&model, extras.art, height * 2 / 3, height)));
+    if let Some(fraction) = extras.progress {
+        overlay.add_overlay(&progress_line(fraction));
+    }
 
     let root = gtk::Box::new(O::Horizontal, layout::SPACE_M);
     root.set_size_request(-1, row_height.round() as i32);
@@ -223,7 +238,7 @@ mod tests {
     #[test]
     fn a_card_without_a_cover_shows_initials_worded_badges_and_the_title_below() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: None, progress: None };
             let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &extras);
             let mut text = vec![];
             labels(&card.root, &mut text);
@@ -239,9 +254,34 @@ mod tests {
     }
 
     #[test]
+    fn a_known_progress_draws_the_line_on_the_cover_of_a_card_and_of_a_list_row() {
+        crate::testing::with_display(|| {
+            let line_of = |root: &gtk::Widget| {
+                let overlay = root.first_child().and_downcast::<gtk::Overlay>().expect("the cover");
+                let mut child = overlay.first_child();
+                let mut found = None;
+                while let Some(w) = child {
+                    if let Some(bar) = w.downcast_ref::<gtk::ProgressBar>() {
+                        found = Some(bar.fraction());
+                    }
+                    child = w.next_sibling();
+                }
+                found
+            };
+            let with = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None, progress: Some(0.4) };
+            let card = build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &with);
+            assert_eq!(line_of(&card.root), Some(0.4));
+            let row = build_list(&local_anime(), false, 76.0, &with);
+            assert_eq!(line_of(&row.root), Some(0.4), "the list row draws the same line");
+            let without = Extras { progress: None, ..with };
+            assert_eq!(line_of(&build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &without).root), None);
+        });
+    }
+
+    #[test]
     fn a_long_title_never_makes_a_card_wider_than_its_cover() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
+            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None, progress: None };
             let row = kuro_domain::library::model::LibraryRow { title: "Mabeop Hakgyo Apjeommyeol Cheonjae-ga Doeeotda ".repeat(3), ..local_anime().row };
             let item = LibraryItem { row, ..local_anime() };
             for mode in [LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CompactGrid] {
@@ -255,7 +295,7 @@ mod tests {
     #[test]
     fn the_cover_only_grid_has_no_title_and_the_compact_grid_puts_it_on_the_cover() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
+            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None, progress: None };
             let bare = build(&local_anime(), LibraryDisplayMode::CoverOnlyGrid, true, &extras);
             let mut text = vec![];
             labels(&bare.root, &mut text);
@@ -272,7 +312,7 @@ mod tests {
     #[test]
     fn the_score_badge_sits_before_local_in_every_grid_mode_and_in_the_list_row() {
         crate::testing::with_display(|| {
-            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: Some(8.24) };
+            let extras = Extras { art: None, kind: Kind::Anime, season_parent: false, width: COLUMN_WIDTH_PX, score: Some(8.24), progress: None };
             for mode in [LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CompactGrid, LibraryDisplayMode::CoverOnlyGrid] {
                 let card = build(&local_anime(), mode, false, &extras);
                 let mut text = vec![];
@@ -291,7 +331,7 @@ mod tests {
     fn a_narrow_card_with_a_score_keeps_the_local_icon_and_drops_the_word() {
         crate::testing::with_display(|| {
             let narrow = layout::LOCAL_WORD_MIN_PX - 10;
-            let scored = Extras { art: None, kind: Kind::Anime, season_parent: false, width: narrow, score: Some(7.0) };
+            let scored = Extras { art: None, kind: Kind::Anime, season_parent: false, width: narrow, score: Some(7.0), progress: None };
             let mut text = vec![];
             labels(&build(&local_anime(), LibraryDisplayMode::ComfortableGrid, false, &scored).root, &mut text);
             assert_eq!(text, ["CC", "6", "7.0", "Core Concepts"]);

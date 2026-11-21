@@ -182,6 +182,8 @@ fn restore_items(tx: &Transaction<'_>, entry_id: i64, backup: &[Item]) -> DbResu
                         total_seconds: row.total_seconds,
                         version: Some(row.version),
                         memo: row.memo.clone(),
+                        // a backup without it (Aniyomi's) keeps the stored count
+                        page_count: row.page_count,
                         ..Default::default()
                     },
                 )?;
@@ -191,7 +193,8 @@ fn restore_items(tx: &Transaction<'_>, entry_id: i64, backup: &[Item]) -> DbResu
     Ok(())
 }
 
-/// `forComparison`: every field but the ids, the fetch and upload dates, `lastModifiedAt` and `version`.
+/// `forComparison`: every field but the ids, the fetch and upload dates, `lastModifiedAt` and `version`, and the page
+/// count, which is no reading state (the reader writes it): a backup without it (Aniyomi's) is not a change.
 fn same_item_state(a: &ItemRow, d: &ItemRow) -> bool {
     ItemRow {
         id: d.id,
@@ -200,6 +203,7 @@ fn same_item_state(a: &ItemRow, d: &ItemRow) -> bool {
         date_upload: d.date_upload,
         last_modified_at: d.last_modified_at,
         version: d.version,
+        page_count: d.page_count,
         ..a.clone()
     } == *d
 }

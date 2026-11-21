@@ -400,6 +400,9 @@ pub struct BackupChapter {
     pub source_order: i64,
     pub last_modified_at: i64,
     pub version: i64,
+    /// Field 500, Kurobayomi-only: how many pages the chapter has, when the reader stored it. Aniyomi never writes it
+    /// and skips it on read; an older backup reads it as `None`.
+    pub page_count: Option<i64>,
 }
 
 impl Message for BackupChapter {
@@ -416,6 +419,9 @@ impl Message for BackupChapter {
         w.int64(10, self.source_order);
         w.int64(11, self.last_modified_at);
         w.int64(12, self.version);
+        if let Some(pages) = self.page_count {
+            w.int64(500, pages);
+        }
         Ok(())
     }
 
@@ -436,6 +442,7 @@ impl Message for BackupChapter {
                 10 => m.source_order = r.int64(f, wt)?,
                 11 => m.last_modified_at = r.int64(f, wt)?,
                 12 => m.version = r.int64(f, wt)?,
+                500 => m.page_count = Some(r.int64(f, wt)?),
                 _ => r.skip(wt)?,
             }
         }
@@ -1486,6 +1493,18 @@ mod tests {
     }
 
     #[test]
+    fn a_chapter_page_count_is_field_500_and_absent_when_unknown() {
+        let known = BackupChapter { url: "/c/1".into(), name: "Ch 1".into(), page_count: Some(18), ..Default::default() };
+        let bytes = known.to_bytes().unwrap();
+        assert!(fields_of(&bytes).contains(&500));
+        assert_eq!(BackupChapter::from_bytes(&bytes).unwrap().page_count, Some(18));
+        let unknown = BackupChapter { page_count: None, ..known };
+        let bytes = unknown.to_bytes().unwrap();
+        assert!(!fields_of(&bytes).contains(&500), "an Aniyomi-shaped chapter when the count is not known");
+        assert_eq!(BackupChapter::from_bytes(&bytes).unwrap().page_count, None);
+    }
+
+    #[test]
     fn anime_season_number_is_fixed64() {
         let a = BackupAnime { source: 1, url: "u".into(), season_number: 2.0, ..Default::default() };
         let bytes = a.to_bytes().unwrap();
@@ -1607,6 +1626,7 @@ mod tests {
         let chapter = BackupChapter {
             url: "/c/1".into(), name: "Ch 1".into(), scanlator: Some("grp".into()), read: true, bookmark: true, last_page_read: 9,
             date_fetch: 10, date_upload: 11, chapter_number: 1.5, source_order: 3, last_modified_at: 12, version: 13,
+            page_count: Some(24),
         };
         let history = BackupHistory { url: "/c/1".into(), last_read: 5, read_duration: 6 };
         let tracking = BackupTracking {

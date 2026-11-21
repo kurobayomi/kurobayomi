@@ -26,7 +26,9 @@ use super::restore::SavedSession;
 
 /// The writes a session makes. The production implementation is the writer thread (`writer::WriterHandle`).
 pub trait ReaderStore {
-    fn save_progress(&self, chapter_id: i64, last_page_read: i64, read: bool);
+    /// The last page read of a chapter, how many pages it has (stored with it, so Home can show how far through the
+    /// chapter one is) and whether it is read.
+    fn save_progress(&self, chapter_id: i64, last_page_read: i64, page_count: i64, read: bool);
     /// Writes the bookmark and reports whether it was stored. `Err` makes the session revert the flag (T-43a-035).
     fn set_bookmark(&self, chapter_id: i64, bookmark: bool) -> Result<(), String>;
     /// Marks a chapter read without moving its last page (the duplicate rule, T-43a-031).
@@ -327,7 +329,7 @@ impl ReaderSession {
                     self.mark_duplicates_read_of(chapter_index);
                 }
             }
-            self.store.save_progress(chapter.chapter.id, index, chapter.read.get());
+            self.store.save_progress(chapter.chapter.id, index, pages_len, chapter.read.get());
             self.store.save_restore(SavedSession {
                 manga_id: self.manga_id,
                 chapter_id: chapter.chapter.id,
@@ -525,6 +527,8 @@ mod tests {
     #[derive(Default)]
     struct Recorder {
         progress: RefCell<Vec<(i64, i64, bool)>>,
+        /// (chapter id, page count) of each progress write.
+        page_counts: RefCell<Vec<(i64, i64)>>,
         order: RefCell<Vec<&'static str>>,
         flags: RefCell<Vec<(i64, i64, i64)>>,
         bookmarks: RefCell<Vec<(i64, bool)>>,
@@ -535,8 +539,9 @@ mod tests {
     }
 
     impl ReaderStore for Recorder {
-        fn save_progress(&self, chapter_id: i64, last_page_read: i64, read: bool) {
+        fn save_progress(&self, chapter_id: i64, last_page_read: i64, page_count: i64, read: bool) {
             self.progress.borrow_mut().push((chapter_id, last_page_read, read));
+            self.page_counts.borrow_mut().push((chapter_id, page_count));
         }
         fn mark_read(&self, chapter_id: i64) {
             self.read_marks.borrow_mut().push(chapter_id);
@@ -692,6 +697,8 @@ mod tests {
         assert!(ch.read.get());
         s.record_page(0, &page(&ch, 2));
         assert_eq!(rec.progress.borrow().as_slice(), [(1, 1, false), (1, 2, true), (1, 2, true)]);
+        // page 2 is the last: the chapter has three pages, and each write says so
+        assert_eq!(rec.page_counts.borrow().as_slice(), [(1, 3), (1, 3), (1, 3)], "the page count goes with each page");
     }
 
     #[test]

@@ -65,7 +65,7 @@ macro_rules! item_cols {
     () => {
         "i._id, i.entry_id, e.kind, i.url, i.name, i.scanlator, i.done, i.bookmark, i.fillermark, i.progress, i.number, \
          i.source_order, i.date_fetch, i.date_upload, i.last_modified_at, i.version, i.total_seconds, i.summary, \
-         i.preview_url, i.memo"
+         i.preview_url, i.memo, i.page_count"
     };
 }
 pub(crate) use item_cols;

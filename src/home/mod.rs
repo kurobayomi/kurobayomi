@@ -491,7 +491,8 @@ impl Home {
             .filter_map(|(kind, row)| {
                 let Resume::Open(unit) = history_data::resume_row(&db, kind, row.entry_id, row.item_id) else { return None };
                 let stored = item_repo.by_id(unit.id).ok().flatten();
-                let (progress, total) = stored.as_ref().map_or((0, None), |item| (item.progress, item.total_seconds));
+                // an episode's length, a chapter's page count: the size the progress is measured against
+                let (progress, total) = stored.as_ref().map_or((0, None), |item| (item.progress, if kind.is_anime() { item.total_seconds } else { item.page_count }));
                 let spot = data::spot(kind, unit.id == row.item_id, progress, total);
                 let (item, in_library) = items.get(kind, row.entry_id, None)?;
                 let art = look::cover_art(kind, row.cover.entry_id, row.cover.source_id, row.cover.url.clone(), row.cover.favorite, row.cover.cover_last_modified);
@@ -644,12 +645,12 @@ fn spot_line(unit: &str, spot: Spot) -> String {
     match spot {
         Spot::Start => unit.to_owned(),
         Spot::Watched { seconds, total } => format!("{unit} · {}", trf(MsgKey::home_minutes_left, &[("count", Arg::Int(data::minutes_left(seconds, total)))])),
-        Spot::Page { last_read } => format!("{unit} · {}", trf(MsgKey::home_page, &[("page", Arg::Int(last_read + 1))])),
+        Spot::Page { last_read, .. } => format!("{unit} · {}", trf(MsgKey::home_page, &[("page", Arg::Int(last_read + 1))])),
     }
 }
 
-/// A cover: the Library's card for the stored cover size and look, the theme's progress bar at the foot of the cover
-/// for an episode under way, Home's line under the card, and the Library's right-click menu.
+/// A cover: the Library's card for the stored cover size and look, with its line of how far the title is (the card's
+/// own, `card::Extras::progress`), Home's line under the card, and the Library's right-click menu.
 fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Widget {
     let cover_size = crate::data::app().library.cover_size.get();
     let extras = crate::library::view::card::Extras {
@@ -658,9 +659,9 @@ fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Wi
         season_parent: false,
         width: cover_grid::cover_width(cover_size),
         score: cover.score,
+        progress: cover.progress,
     };
     let built = crate::library::view::card::build(&cover.item, mode, false, &extras);
-    add_progress(&built.root, cover.progress);
     if let Some(root) = built.root.downcast_ref::<GBox>() {
         let line = gtk::Label::builder().label(&cover.line).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).max_width_chars(1).css_classes(["dim-label", "caption"]).build();
         line.set_margin_top(-SPACE_XS);
@@ -674,14 +675,6 @@ fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Wi
     built.root
 }
 
-/// The thin line of how far a title is (`kb-cover-progress`), on the bottom edge of the cover that leads `root`.
-fn add_progress(root: &gtk::Widget, progress: Option<f64>) {
-    let Some(fraction) = progress else { return };
-    let Some(overlay) = root.first_child().and_downcast::<gtk::Overlay>() else { return };
-    let bar = gtk::ProgressBar::builder().fraction(fraction).valign(Align::End).halign(Align::Fill).can_target(false).css_classes(["kb-cover-progress"]).build();
-    overlay.add_overlay(&bar);
-}
-
 /// A title as the Library's List mode row (`card::build_list`, its row height), with Home's line at its end and the
 /// Library's right-click menu.
 fn list_row(cover: &Cover) -> gtk::Widget {
@@ -691,11 +684,11 @@ fn list_row(cover: &Cover) -> gtk::Widget {
         season_parent: false,
         width: 0,
         score: cover.score,
+        progress: cover.progress,
     };
     let window = crate::ui::window();
     let row_height = crate::library::layout::page_list_row_height(window.width(), f64::from(window.height()));
     let built = crate::library::view::card::build_list(&cover.item, false, row_height, &extras);
-    add_progress(&built.root, cover.progress);
     if let Some(root) = built.root.downcast_ref::<GBox>() {
         let line = gtk::Label::builder().label(&cover.line).xalign(1.0).valign(Align::Center).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
         root.append(&line);

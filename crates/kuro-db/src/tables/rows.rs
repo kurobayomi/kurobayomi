@@ -143,6 +143,9 @@ pub struct ItemRow {
     pub summary: Option<String>,
     pub preview_url: Option<String>,
     pub memo: Option<Memo>,
+    /// How many pages a chapter has, as the reader last saw it; `None` for an episode and a chapter not read since
+    /// the column came (version 3).
+    pub page_count: Option<i64>,
 }
 
 impl ItemRow {
@@ -168,6 +171,7 @@ impl ItemRow {
             summary: r.get("summary")?,
             preview_url: r.get("preview_url")?,
             memo: r.get("memo")?,
+            page_count: r.get("page_count")?,
         })
     }
 }
@@ -192,6 +196,7 @@ pub struct ItemPatch {
     pub summary: Option<String>,
     pub preview_url: Option<String>,
     pub memo: Option<Memo>,
+    pub page_count: Option<i64>,
 }
 
 /// A `history` row. `last_at` 0 means reset.

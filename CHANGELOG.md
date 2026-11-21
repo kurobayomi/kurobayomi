@@ -21,6 +21,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Reviews on a title's page: the Reviews button lists AniList's most helpful reviews, each opening its whole text.
 - Home has the Library's view options (View, Grid style, Cover size), shared with the Library; in List view its
   sections show the Library's list rows.
+- Manga chapters on Home's Continue row show how far through you are, like episodes: the reader now keeps each
+  chapter's page count (a chapter shows it once you've opened it again).
 - Show anime and manga, anime only or manga only (Settings > Appearance). With one kind, the pages show only it, without
   the Anime | Manga switch, and Home and the badges count only it. Nothing is deleted: switching back brings everything
   back.

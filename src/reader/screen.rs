@@ -1779,7 +1779,7 @@ mod tests {
     struct NoStore;
 
     impl ReaderStore for NoStore {
-        fn save_progress(&self, _: i64, _: i64, _: bool) {}
+        fn save_progress(&self, _: i64, _: i64, _: i64, _: bool) {}
         fn set_bookmark(&self, _: i64, _: bool) -> Result<(), String> {
             Ok(())
         }

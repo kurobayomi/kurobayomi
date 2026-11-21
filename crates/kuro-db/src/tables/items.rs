@@ -17,8 +17,8 @@ const BY_URL: &str = concat!("SELECT ", item_cols!(), " FROM items i JOIN entrie
 /// Lowest id first: with a duplicate url the first row wins, for both kinds.
 const BY_URL_AND_ENTRY: &str =
     concat!("SELECT ", item_cols!(), " FROM items i JOIN entries e ON e._id = i.entry_id WHERE i.url = :url AND i.entry_id = :entryId ORDER BY i._id");
-const INSERT: &str = "INSERT INTO items(entry_id, url, name, scanlator, done, bookmark, progress, total_seconds, number, source_order, date_fetch, date_upload, last_modified_at, version, summary, preview_url, fillermark, memo)
-VALUES (:entryId, :url, :name, :scanlator, :done, :bookmark, :progress, :totalSeconds, :number, :sourceOrder, :dateFetch, :dateUpload, 0, :version, :summary, :previewUrl, :fillermark, :memo)";
+const INSERT: &str = "INSERT INTO items(entry_id, url, name, scanlator, done, bookmark, progress, total_seconds, number, source_order, date_fetch, date_upload, last_modified_at, version, summary, preview_url, fillermark, memo, page_count)
+VALUES (:entryId, :url, :name, :scanlator, :done, :bookmark, :progress, :totalSeconds, :number, :sourceOrder, :dateFetch, :dateUpload, 0, :version, :summary, :previewUrl, :fillermark, :memo, :pageCount)";
 const UPDATE: &str = "UPDATE items SET
     entry_id = coalesce(:entryId, entry_id), url = coalesce(:url, url), name = coalesce(:name, name),
     scanlator = coalesce(:scanlator, scanlator), done = coalesce(:done, done), bookmark = coalesce(:bookmark, bookmark),
@@ -27,7 +27,7 @@ const UPDATE: &str = "UPDATE items SET
     date_fetch = coalesce(:dateFetch, date_fetch), date_upload = coalesce(:dateUpload, date_upload),
     version = coalesce(:version, version), summary = coalesce(:summary, summary),
     preview_url = coalesce(:previewUrl, preview_url), fillermark = coalesce(:fillermark, fillermark),
-    memo = coalesce(:memo, memo)
+    memo = coalesce(:memo, memo), page_count = coalesce(:pageCount, page_count)
 WHERE _id = :id";
 
 pub fn by_id(c: &Connection, id: i64) -> DbResult<ItemRow> {
@@ -84,6 +84,7 @@ pub fn insert(c: &Connection, r: &ItemRow) -> Result<i64> {
             (":previewUrl", &r.preview_url),
             (":fillermark", &r.fillermark),
             (":memo", &r.memo),
+            (":pageCount", &r.page_count),
         ],
     )?;
     Ok(c.last_insert_rowid())
@@ -118,6 +119,7 @@ pub fn update(c: &Connection, p: &ItemPatch) -> Result<usize> {
             (":previewUrl", &p.preview_url),
             (":fillermark", &p.fillermark),
             (":memo", &p.memo),
+            (":pageCount", &p.page_count),
             (":id", &p.id),
         ],
     )

@@ -22,8 +22,9 @@ The page has the usual top bar (window buttons, draggable; top bar rule in `CLAU
   of both kinds, one per title.
 - A title counts only while something is left: a finished last episode or last chapter drops it from the row.
 - Each card shows the cover, a small kind tag (Anime or Manga), the title and one line: "Episode 7 · 14 min left" or
-  "Chapter 12 · page 8". Anime also gets a progress bar. A chapter's page count is not stored, so manga shows the page
-  only (no "of 22", no bar).
+  "Chapter 12 · page 8". Both get the card's progress line: an episode by its seconds, a chapter by the pages read of
+  its page count, which the reader stores when it saves the page (`items.page_count`, 2026-11-21); a chapter not read
+  since then shows the page only, with no line, until it is opened once.
 - A click resumes exactly as a History row does (same code: `updates::history_screen`'s resume, with
   `updates::history_data::ordered_units` and `updates::history::next_units_from`), straight into the player or the
   reader. A click on the title opens the title's page.
@@ -128,7 +129,9 @@ Home drew its own cards instead of the Library's, and it shows.
    See all for the rest; the continue button rule is the Library's.
 3. **Home's own line under the card**, kept short: "Episode 1 · 25 min left", "Chapter 1199 · page 9", or the oldest new
    unit for New for you, with the count of new units as the unread badge. How far a title is shows as a 3 px accent
-   line on the cover's bottom edge (`kb-cover-progress`, user 2026-11-21: the theme's thick bar looked bad).
+   line on the cover's bottom edge (`kb-cover-progress`, user 2026-11-21: the theme's thick bar looked bad). The line is
+   the shared card's own (`card::Extras::progress`), in the grid and in the list row, so every page that shows the card
+   draws it the same way.
 4. **Responsive like the Library:** each row is a flow box whose minimum width is one card, cells of the Library's
    column width and margins (`cover_grid`), and as many covers as fit the row's own width (the Library's column rule,
    shared from `cover_grid`, so both count alike). No sideways scrolling, nothing clipped. A card asks for no more width

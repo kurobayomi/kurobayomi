@@ -327,10 +327,12 @@ fn opening_a_file_from_a_newer_app_through_the_handle_is_refused_and_untouched()
     let paths = TempPaths::new().unwrap();
     let file = db_path(&kuro_platform::paths::Paths::data_dir(&paths));
     drop(Db::open(&paths).unwrap());
-    Connection::open(&file).unwrap().pragma_update(None, "user_version", 3).unwrap();
+    // one version past what this app knows, whatever that is now
+    let newer = crate::schema_unified::SCHEMA_VERSION + 1;
+    Connection::open(&file).unwrap().pragma_update(None, "user_version", newer).unwrap();
     let before = std::fs::read(&file).unwrap();
     let err = Db::open(&paths).err().expect("refused");
-    assert!(matches!(err, DbError::TooNew { found: 3, supported: 2 }), "{err:?}");
+    assert!(matches!(err, DbError::TooNew { found, supported } if found == newer && supported == crate::schema_unified::SCHEMA_VERSION), "{err:?}");
     assert_eq!(std::fs::read(&file).unwrap(), before);
 }
 

@@ -21,10 +21,10 @@ pub const APPLICATION_ID: i64 = 0x4B55_5232;
 pub const BASELINE_VERSION: i64 = 1;
 
 /// `PRAGMA user_version` of a fresh file and of an upgraded one: the target of the last migration.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
-/// The steps after the baseline, each to the version it names. 2: `community_scores`.
-const MIGRATIONS: &[(i64, &str)] = &[(2, include_str!("../sql/unified/migrate_2.sql"))];
+/// The steps after the baseline, each to the version it names. 2: `community_scores`. 3: `items.page_count`.
+const MIGRATIONS: &[(i64, &str)] = &[(2, include_str!("../sql/unified/migrate_2.sql")), (3, include_str!("../sql/unified/migrate_3.sql"))];
 
 /// The old per-kind files, only for [`legacy_files`].
 pub const LEGACY_FILES: [&str; 2] = ["manga.db", "anime.db"];

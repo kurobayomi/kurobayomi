@@ -84,23 +84,24 @@ pub enum Spot {
     Start,
     /// Anime: seconds watched of a known length.
     Watched { seconds: i64, total: i64 },
-    /// Manga: the last page read, counted from 0 as the database stores it. The page count is not stored.
-    Page { last_read: i64 },
+    /// Manga: the last page read, counted from 0 as the database stores it, and the chapter's page count when the
+    /// reader stored it (`items.page_count`).
+    Page { last_read: i64, pages: Option<i64> },
 }
 
 /// The spot in the unit a resume opens. `same_unit` is whether that unit is the one the history row names: only then is
-/// the stored progress about it. `progress` is the unit's stored progress (seconds or last page), `total_seconds` an
-/// episode's length when known.
-pub fn spot(kind: Kind, same_unit: bool, progress: i64, total_seconds: Option<i64>) -> Spot {
+/// the stored progress about it. `progress` is the unit's stored progress (seconds or last page), `total` its size when
+/// known: an episode's length in seconds, a chapter's page count.
+pub fn spot(kind: Kind, same_unit: bool, progress: i64, total: Option<i64>) -> Spot {
     if !same_unit || progress <= 0 {
         return Spot::Start;
     }
     match kind {
-        Kind::Anime => match total_seconds {
+        Kind::Anime => match total {
             Some(total) if total > progress => Spot::Watched { seconds: progress, total },
             _ => Spot::Start,
         },
-        Kind::Manga => Spot::Page { last_read: progress },
+        Kind::Manga => Spot::Page { last_read: progress, pages: total.filter(|pages| *pages > 0) },
     }
 }
 
@@ -109,10 +110,12 @@ pub fn minutes_left(seconds: i64, total: i64) -> i64 {
     ((total - seconds).max(0) + 59).div_euclid(60).max(1)
 }
 
-/// How much of an episode is watched, 0 to 1; `None` for a spot with no known length.
+/// How much of a unit is done, 0 to 1: the seconds watched of an episode, the pages read of a chapter (the page shown
+/// counts, so page 9 of 20 is 9/20); `None` when the size is not known.
 pub fn fraction(spot: Spot) -> Option<f64> {
     match spot {
         Spot::Watched { seconds, total } if total > 0 => Some((seconds as f64 / total as f64).clamp(0.0, 1.0)),
+        Spot::Page { last_read, pages: Some(pages) } if pages > 0 => Some(((last_read + 1) as f64 / pages as f64).clamp(0.0, 1.0)),
         _ => None,
     }
 }
@@ -216,7 +219,9 @@ mod tests {
         assert_eq!(spot(Kind::Anime, false, 600, Some(1440)), Spot::Start, "a resume that moved on starts the next unit");
         assert_eq!(spot(Kind::Anime, true, 600, None), Spot::Start, "no length, no time left");
         assert_eq!(spot(Kind::Anime, true, 1440, Some(1440)), Spot::Start);
-        assert_eq!(spot(Kind::Manga, true, 7, None), Spot::Page { last_read: 7 });
+        assert_eq!(spot(Kind::Manga, true, 7, None), Spot::Page { last_read: 7, pages: None }, "a chapter not read since the count is stored");
+        assert_eq!(spot(Kind::Manga, true, 7, Some(20)), Spot::Page { last_read: 7, pages: Some(20) });
+        assert_eq!(spot(Kind::Manga, true, 7, Some(0)), Spot::Page { last_read: 7, pages: None }, "no pages is no count");
         assert_eq!(spot(Kind::Manga, true, 0, None), Spot::Start);
     }
 
@@ -225,7 +230,9 @@ mod tests {
         assert_eq!(minutes_left(600, 1440), 14);
         assert_eq!(minutes_left(1430, 1440), 1, "a few seconds left is one minute");
         assert_eq!(fraction(Spot::Watched { seconds: 360, total: 1440 }), Some(0.25));
-        assert_eq!(fraction(Spot::Page { last_read: 3 }), None);
+        assert_eq!(fraction(Spot::Page { last_read: 3, pages: None }), None, "no page count, no line");
+        assert_eq!(fraction(Spot::Page { last_read: 8, pages: Some(20) }), Some(0.45), "page 9 of 20");
+        assert_eq!(fraction(Spot::Page { last_read: 19, pages: Some(20) }), Some(1.0));
     }
 
     #[test]

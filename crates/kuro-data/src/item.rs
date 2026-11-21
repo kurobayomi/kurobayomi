@@ -45,6 +45,9 @@ pub struct Item {
     pub summary: Option<String>,
     pub preview_url: Option<String>,
     pub memo: Option<Memo>,
+    /// How many pages a chapter has, as the reader last saw it; `None` for an episode and a chapter not read since the
+    /// app stores it. With `progress` (the last page read) it says how far through the chapter one is.
+    pub page_count: Option<i64>,
 }
 
 impl Item {
@@ -73,6 +76,7 @@ impl Item {
             summary: None,
             preview_url: None,
             memo: anime.then(Memo::default),
+            page_count: None,
         }
     }
 
@@ -110,6 +114,7 @@ impl From<ItemRow> for Item {
             summary: r.summary,
             preview_url: r.preview_url,
             memo: r.memo,
+            page_count: r.page_count,
         }
     }
 }
@@ -138,6 +143,7 @@ impl From<&Item> for ItemRow {
             summary: i.summary.clone(),
             preview_url: i.preview_url.clone(),
             memo: i.memo.clone(),
+            page_count: i.page_count,
         }
     }
 }
@@ -163,6 +169,7 @@ pub struct ItemUpdate {
     pub preview_url: Option<String>,
     pub version: Option<i64>,
     pub memo: Option<Memo>,
+    pub page_count: Option<i64>,
 }
 
 impl ItemUpdate {
@@ -192,6 +199,7 @@ impl From<&ItemUpdate> for ItemPatch {
             summary: u.summary.clone(),
             preview_url: u.preview_url.clone(),
             memo: u.memo.clone(),
+            page_count: u.page_count,
         }
     }
 }

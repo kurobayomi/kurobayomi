@@ -532,8 +532,30 @@ mod tests {
         assert_eq!(pragma_i64(&fresh, "user_version"), SCHEMA_VERSION);
         let table: i64 = fresh.query_row("SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'community_scores'", [], |r| r.get(0)).unwrap();
         assert_eq!(table, 1);
+        let page_count: i64 = fresh.query_row("SELECT count(*) FROM pragma_table_info('items') WHERE name = 'page_count'", [], |r| r.get(0)).unwrap();
+        assert_eq!(page_count, 1, "a fresh file has the column a migration adds");
         assert!(crate::migrate::is_contiguous(UNIFIED_SCHEMA.baseline_version, UNIFIED_SCHEMA.migrations));
         assert_eq!(crate::migrate::latest_version(UNIFIED_SCHEMA.baseline_version, UNIFIED_SCHEMA.migrations), SCHEMA_VERSION);
+    }
+
+    /// Version 3: an older file's chapters get `page_count`, unknown (NULL) until the reader writes it.
+    #[test]
+    fn a_version_2_file_gets_the_page_count_of_its_items_and_keeps_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = kur_file(dir.path());
+        {
+            let c = Connection::open(&p).unwrap();
+            for (version, sql) in UNIFIED_SCHEMA.migrations.iter().filter(|(v, _)| *v == 2) {
+                c.execute_batch(sql).unwrap();
+                c.pragma_update(None, "user_version", version).unwrap();
+            }
+            c.execute("INSERT INTO entries(kind, source, url, title, status, favorite, initialized, viewer, item_flags, cover_last_modified, date_added) VALUES ('manga', 1, 'u', 'Kept', 0, 1, 0, 0, 0, 0, 0)", []).unwrap();
+            c.execute("INSERT INTO items(entry_id, url, name, done, bookmark, progress, number, source_order, date_fetch, date_upload) SELECT _id, '/c1', 'Chapter 1', 0, 0, 8, 1, 0, 0, 0 FROM entries", []).unwrap();
+        }
+        let c = open_and_migrate(&p, &UNIFIED_SCHEMA).unwrap();
+        assert_eq!(pragma_i64(&c, "user_version"), crate::schema_unified::SCHEMA_VERSION);
+        let (progress, pages): (i64, Option<i64>) = c.query_row("SELECT progress, page_count FROM items", [], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        assert_eq!((progress, pages), (8, None), "the page read stays; the count is not known yet");
     }
 
     #[test]

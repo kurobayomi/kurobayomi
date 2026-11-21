@@ -107,6 +107,7 @@ pub fn manga_entry(e: &EntryData, opts: &BackupOptions) -> Result<BackupManga, B
                 source_order: c.source_order,
                 last_modified_at: c.last_modified_at,
                 version: c.version,
+                page_count: c.page_count,
             })
             .collect();
     }

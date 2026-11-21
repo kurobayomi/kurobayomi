@@ -67,5 +67,6 @@ pub fn item_row(entry_id: i64, kind: Kind, url: &str, n: f64) -> ItemRow {
         summary: anime.then(|| "s".to_owned()),
         preview_url: anime.then(|| "p".to_owned()),
         memo: anime.then(|| Memo(serde_json::from_str(r#"{"m":true}"#).unwrap())),
+        page_count: (!anime).then_some(20),
     }
 }
