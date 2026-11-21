@@ -60,6 +60,11 @@ pub trait MangaSource: Send + Sync {
 pub trait CatalogueSource: MangaSource {
     /// Whether the source has a "latest" listing. Every source states it; there is no default.
     fn supports_latest(&self) -> bool;
+    /// Whether the source has a "popular" listing. Most do; a site that only lists its newest titles says `false`, and
+    /// Browse then opens on Latest and offers no Popular.
+    fn supports_popular(&self) -> bool {
+        true
+    }
     /// The filters for a fresh browse screen. A new list on every call.
     fn filter_list(&self) -> FilterList;
     async fn popular(&self, page: i32) -> Result<MangasPage, SourceError>;

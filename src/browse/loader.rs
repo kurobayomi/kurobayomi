@@ -50,6 +50,13 @@ impl Catalogue {
         }
     }
 
+    pub fn supports_popular(&self) -> bool {
+        match self {
+            Self::Manga(source) => source.supports_popular(),
+            Self::Anime(source) => source.supports_popular(),
+        }
+    }
+
     /// The filters a fresh browse page starts from.
     pub fn filter_list(&self) -> FilterList {
         match self {

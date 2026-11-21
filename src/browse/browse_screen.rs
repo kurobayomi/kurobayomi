@@ -90,6 +90,7 @@ pub fn source_page(env: &BrowseEnv, source_id: i64, query: BrowseQuery) -> Sourc
     };
     let page = browse_source(BrowseSourceDeps {
         supports_latest: source.supports_latest,
+        supports_popular: source.supports_popular,
         configurable: env.directory.preferences(source_id).is_some(),
         prefs: Rc::clone(&env.prefs),
         listing: ListingDeps {
@@ -158,7 +159,7 @@ pub fn register_page(shown: &super::pages::BrowseSourcePage, filters: Rc<SourceF
         listing: shown.listing.downgrade(),
         filters,
         search: shown.search.downgrade(),
-        chips: [Some(shown.popular.downgrade()), shown.latest.as_ref().map(|chip| chip.downgrade())],
+        chips: [shown.popular.as_ref().map(|chip| chip.downgrade()), shown.latest.as_ref().map(|chip| chip.downgrade())],
     });
 }
 
@@ -369,7 +370,7 @@ pub(crate) mod tests {
         assert!(pump_until(|| !rig.asked.lock().expect("lock").is_empty()));
         assert_eq!(rig.asked.lock().expect("lock")[0], BrowseQuery::Search("one piece".into()), "the first load is the search, not Popular");
         assert_eq!(shown.search.text().as_str(), "one piece");
-        assert!(!shown.popular.is_active(), "no chip claims a search");
+        assert!(!shown.popular.as_ref().expect("Popular").is_active(), "no chip claims a search");
     }
 
     fn a_genre_search_reaches_the_open_page_and_restarts_its_listing_at_once() {
@@ -377,10 +378,10 @@ pub(crate) mod tests {
         let page = source_page(&rig.env, 1, BrowseQuery::Popular);
         let shown = browse(&page);
         assert!(pump_until(|| !rig.asked.lock().expect("lock").is_empty()));
-        assert!(shown.popular.is_active());
+        assert!(shown.popular.as_ref().expect("Popular").is_active());
         assert!(search_open("Drama"), "the open page takes the search");
         assert_eq!(shown.listing.query(), BrowseQuery::Search("Drama".into()), "no group holds the genre: its name is the text");
-        assert!(!shown.popular.is_active(), "Popular no longer applies");
+        assert!(!shown.popular.as_ref().expect("Popular").is_active(), "Popular no longer applies");
         assert_eq!(shown.search.text().as_str(), "Drama");
         assert!(pump_until(|| rig.asked.lock().expect("lock").contains(&BrowseQuery::Search("Drama".into()))), "the listing loads the search");
         drop(page);

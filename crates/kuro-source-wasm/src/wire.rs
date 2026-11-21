@@ -13,10 +13,18 @@ pub struct SourceDescriptor {
     pub lang: String,
     #[serde(default)]
     pub supports_latest: bool,
+    /// Whether the source has a popular listing. Absent means yes (every guest before this field had one). A guest
+    /// that says `false` still answers `popular` for apps that do not read the field; this app then shows Latest only.
+    #[serde(default = "yes")]
+    pub supports_popular: bool,
     /// The least gap, in milliseconds, between two requests the host sends to one host for this source (ABI 1.5).
     /// Absent means no spacing.
     #[serde(default)]
     pub request_gap_ms: Option<u64>,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl SourceDescriptor {
@@ -226,6 +234,15 @@ mod tests {
         assert_eq!(ok.id, 9_007_199_254_740_993, "ids are exact integers, not floats");
         assert!(!ok.supports_latest);
         assert!(serde_json::from_str::<SourceDescriptor>(r#"{"name":"A","lang":"en"}"#).is_err());
+    }
+
+    #[test]
+    fn a_descriptor_has_a_popular_listing_unless_it_says_it_has_none() {
+        let before: SourceDescriptor = serde_json::from_str(r#"{"id":1,"name":"A","lang":"en"}"#).expect("valid");
+        assert!(before.supports_popular, "a guest written before the field has a popular listing");
+        let none: SourceDescriptor =
+            serde_json::from_str(r#"{"id":1,"name":"A","lang":"en","supportsLatest":true,"supportsPopular":false}"#).expect("valid");
+        assert!(!none.supports_popular && none.supports_latest);
     }
 
     #[test]

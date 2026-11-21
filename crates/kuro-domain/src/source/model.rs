@@ -29,6 +29,8 @@ pub struct Source {
     pub lang: String,
     pub name: String,
     pub supports_latest: bool,
+    /// `false` for a source with no popular listing: Browse opens it on Latest.
+    pub supports_popular: bool,
     pub is_stub: bool,
     pub is_used_last: bool,
 }
@@ -41,6 +43,7 @@ impl Source {
             lang: lang.to_owned(),
             name: name.to_owned(),
             supports_latest: false,
+            supports_popular: true,
             is_stub: false,
             is_used_last: false,
         }

@@ -92,6 +92,11 @@ send, and sleeps until then. No guest sleep or clock is needed. The bookings are
 {"id": 2131019126180322627, "name": "Weeb Central", "lang": "en", "supportsLatest": true, "requestGapMs": 2000}
 ```
 
+The `info` object may also carry `"supportsPopular": false` for a site that has no popular list of its own (it only
+lists its newest titles). Absent means `true`. Browse then offers Latest only for that source and opens it on Latest,
+so such a guest also states `"supportsLatest": true`. Apps that do not read the field (0.4.0 and older) still show
+Popular and call `popular`, so the guest keeps answering `popular`, with the same list as `latest`.
+
 ### 5. Host clock (`unix-seconds`)
 
 No JSON: `unix-seconds() -> u64`, seconds since 1970-01-01 UTC. It answers 0 only when the system clock is before 1970.

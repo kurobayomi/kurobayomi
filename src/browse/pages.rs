@@ -146,6 +146,8 @@ pub struct FavoritesDeps {
 
 pub struct BrowseSourceDeps {
     pub supports_latest: bool,
+    /// `false` for a source with no popular listing: the page offers Latest only and opens on it.
+    pub supports_popular: bool,
     pub configurable: bool,
     pub prefs: Rc<super::prefs::BrowsePrefs>,
     /// The source's id, name, language and stub flag are read from here. `menu` and `favorite_urls` are filled
@@ -190,7 +192,8 @@ pub struct BrowseSourcePage {
     pub header: SourceHeader,
     pub listing: ListingView,
     pub search: gtk::SearchEntry,
-    pub popular: gtk::ToggleButton,
+    /// `None` for a source without a popular listing.
+    pub popular: Option<gtk::ToggleButton>,
     pub latest: Option<gtk::ToggleButton>,
     /// The Filter menu button; its popover is the filter sheet.
     pub filter: Option<gtk::MenuButton>,
@@ -224,8 +227,29 @@ fn stub_page(listing: &ListingDeps, on_back: Rc<dyn Fn()>) -> gtk::Box {
     root
 }
 
+/// The listings a source page offers as pills, in order: Popular when the source has it, then Latest when it has that.
+/// A source that states neither still gets Popular, the listing every source answered before the flags existed.
+fn listing_tabs(supports_popular: bool, supports_latest: bool) -> Vec<BrowseQuery> {
+    let mut tabs = Vec::new();
+    if supports_popular || !supports_latest {
+        tabs.push(BrowseQuery::Popular);
+    }
+    if supports_latest {
+        tabs.push(BrowseQuery::Latest);
+    }
+    tabs
+}
+
+/// What a source page opens on: the route's query, except Popular on a source without it, which opens on Latest.
+fn opening_query(asked: BrowseQuery, supports_popular: bool, supports_latest: bool) -> BrowseQuery {
+    match asked {
+        BrowseQuery::Popular if !supports_popular && supports_latest => BrowseQuery::Latest,
+        other => other,
+    }
+}
+
 pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
-    let BrowseSourceDeps { supports_latest, configurable, prefs, mut listing, filters, favorites, hide_in_library, initial_query, on_back, on_overflow, open_url, home_url } = deps;
+    let BrowseSourceDeps { supports_latest, supports_popular, configurable, prefs, mut listing, filters, favorites, hide_in_library, initial_query, on_back, on_overflow, open_url, home_url } = deps;
     if listing.stub {
         return SourcePage::Stub(stub_page(&listing, on_back));
     }
@@ -248,6 +272,7 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
     });
     listing.favorite_urls = favorites.as_ref().map(|f| f.store.favorite_urls(source_id));
     // a page opened on a search starts from the source's defaults, like a search made from Popular
+    let initial_query = opening_query(initial_query, supports_popular, supports_latest);
     let start_filters = if matches!(initial_query, BrowseQuery::Search(_)) { filters.for_search(false) } else { FilterList::default() };
     let listing_view = ListingView::with_filters(listing, initial_query.clone(), start_filters);
     listing_view.set_hide_in_library(hide_in_library);
@@ -314,18 +339,12 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
     let chips = crate::ui::pill_row();
     chips.set_margin_start(SPACE_L);
     chips.set_margin_end(SPACE_L);
-    let mut labels = vec![tr(MsgKey::popular)];
-    if supports_latest {
-        labels.push(tr(MsgKey::latest));
-    }
+    let tabs = listing_tabs(supports_popular, supports_latest);
+    let labels: Vec<String> = tabs.iter().map(|tab| tr(if *tab == BrowseQuery::Popular { MsgKey::popular } else { MsgKey::latest })).collect();
     // a page that opens on a search has neither pressed (`usize::MAX` matches no index)
-    let active = match initial_query {
-        BrowseQuery::Popular => 0,
-        BrowseQuery::Latest if supports_latest => 1,
-        _ => usize::MAX,
-    };
+    let active = tabs.iter().position(|tab| *tab == initial_query).unwrap_or(usize::MAX);
     let mut pills = crate::ui::choice_pills(&chips, &labels, active).into_iter();
-    let popular = pills.next().expect("the Popular pill");
+    let popular = if supports_popular { pills.next() } else { None };
     let mut latest_chip = None;
     if let Some(latest) = pills.next() {
         let (view, seed) = (listing_view.clone(), Rc::clone(&filters));
@@ -336,12 +355,14 @@ pub fn browse_source(deps: BrowseSourceDeps) -> SourcePage {
         });
         latest_chip = Some(latest);
     }
-    let (view, seed) = (listing_view.clone(), Rc::clone(&filters));
-    popular.connect_toggled(move |button| {
-        if button.is_active() {
-            view.restart_with(BrowseQuery::Popular, seed.for_search(false));
-        }
-    });
+    if let Some(popular) = &popular {
+        let (view, seed) = (listing_view.clone(), Rc::clone(&filters));
+        popular.connect_toggled(move |button| {
+            if button.is_active() {
+                view.restart_with(BrowseQuery::Popular, seed.for_search(false));
+            }
+        });
+    }
     let mut filter_chip = None;
     if filters.has_filters() {
         // the filter sheet is the popover of this button (no separate window)
@@ -862,6 +883,20 @@ pub(crate) mod tests {
 
     use super::*;
 
+    #[test]
+    fn a_source_without_a_popular_listing_offers_latest_only_and_opens_on_it() {
+        assert_eq!(listing_tabs(true, true), [BrowseQuery::Popular, BrowseQuery::Latest]);
+        assert_eq!(listing_tabs(true, false), [BrowseQuery::Popular]);
+        assert_eq!(listing_tabs(false, true), [BrowseQuery::Latest]);
+        // a source that states neither keeps Popular, the listing every source answered before the flags
+        assert_eq!(listing_tabs(false, false), [BrowseQuery::Popular]);
+        assert_eq!(opening_query(BrowseQuery::Popular, false, true), BrowseQuery::Latest);
+        assert_eq!(opening_query(BrowseQuery::Popular, true, true), BrowseQuery::Popular);
+        assert_eq!(opening_query(BrowseQuery::Popular, false, false), BrowseQuery::Popular);
+        let search = BrowseQuery::Search("x".into());
+        assert_eq!(opening_query(search.clone(), false, true), search);
+    }
+
     fn labels(root: &gtk::Widget, out: &mut Vec<String>) {
         if let Some(label) = root.downcast_ref::<gtk::Label>() {
             out.push(label.label().to_string());
@@ -1135,6 +1170,10 @@ pub(crate) mod tests {
     }
 
     fn source_rig_hiding(stub: bool, filters: FilterList, results: Vec<Result<ListedPage, String>>, hide: bool) -> Rig {
+        source_rig_with(stub, filters, results, hide, true)
+    }
+
+    fn source_rig_with(stub: bool, filters: FilterList, results: Vec<Result<ListedPage, String>>, hide: bool, supports_popular: bool) -> Rig {
         let rt: &'static tokio::runtime::Runtime =
             Box::leak(Box::new(tokio::runtime::Builder::new_multi_thread().worker_threads(1).enable_time().build().expect("runtime")));
         let entered = rt.enter();
@@ -1146,6 +1185,7 @@ pub(crate) mod tests {
         std::mem::forget(_tx);
         let page = browse_source(BrowseSourceDeps {
             supports_latest: true,
+            supports_popular,
             configurable: false,
             prefs: Rc::clone(&prefs),
             listing: ListingDeps {
@@ -1251,6 +1291,17 @@ pub(crate) mod tests {
         assert_eq!(*rig.log.borrow(), ["back"], "the second Back leaves");
     }
 
+    fn a_source_without_a_popular_listing_shows_latest_alone_and_loads_it_first() {
+        let rig = source_rig_with(false, defaults(), vec![], false, false);
+        let SourcePage::Browse(page) = &rig.page else { panic!("browse page") };
+        assert!(page.popular.is_none(), "no Popular chip");
+        let latest = page.latest.as_ref().expect("the Latest chip");
+        assert!(latest.is_active(), "the page opens on Latest");
+        assert!(!all_labels(&page.root).iter().any(|label| *label == tr(MsgKey::popular)), "Popular is named nowhere");
+        assert!(pump_until(|| !rig.script.requests.lock().expect("lock").is_empty()));
+        assert_eq!(rig.script.requests.lock().expect("lock")[0].0, BrowseQuery::Latest, "the first load is Latest");
+    }
+
     fn popular_latest_and_a_search_from_them_start_from_fresh_defaults() {
         let rig = source_rig(false, defaults(), vec![]);
         let SourcePage::Browse(page) = &rig.page else { panic!("browse page") };
@@ -1320,7 +1371,7 @@ pub(crate) mod tests {
         };
         let rig = source_rig(false, FilterList::default(), vec![Ok(found)]);
         let SourcePage::Browse(page) = &rig.page else { panic!("browse page") };
-        let chips = page.popular.parent().expect("the chip row");
+        let chips = page.popular.as_ref().expect("the Popular chip").parent().expect("the chip row");
         assert!(pump_until(|| {
             page.listing.select_all();
             page.listing.has_selection()
@@ -1365,6 +1416,7 @@ pub(crate) mod tests {
         a_stub_source_shows_only_its_title_back_and_the_missing_message();
         back_clears_the_search_text_first_and_then_leaves();
         popular_latest_and_a_search_from_them_start_from_fresh_defaults();
+        a_source_without_a_popular_listing_shows_latest_alone_and_loads_it_first();
         the_apply_button_of_the_sheet_searches_with_the_sheet_values();
         the_error_state_has_only_retry_and_retry_asks_again();
         no_sample_rows_in_an_empty_snapshot();

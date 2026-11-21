@@ -73,6 +73,7 @@ impl Catalogues {
             .into_iter()
             .map(|(catalogue, mut row)| {
                 row.source.supports_latest = catalogue.supports_latest();
+                row.source.supports_popular = catalogue.supports_popular();
                 (catalogue, row)
             })
             .collect();
@@ -175,6 +176,7 @@ fn local(kind: Kind) -> (Catalogue, DirectorySource) {
     };
     let mut source = Source::new(kuro_local::LOCAL_SOURCE_ID, name, "other");
     source.supports_latest = catalogue.supports_latest();
+    source.supports_popular = catalogue.supports_popular();
     (catalogue, DirectorySource { source, package: "local".to_owned(), home_url: None })
 }
 

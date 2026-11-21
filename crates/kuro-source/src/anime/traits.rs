@@ -28,6 +28,11 @@ pub trait AnimeSource: Send + Sync {
     }
     /// Whether a "latest" listing exists. Every source states it; there is no default (`AnimeSource.kt`).
     fn supports_latest(&self) -> bool;
+    /// Whether a "popular" listing exists. Most sources have one; a site that only lists its newest titles says
+    /// `false`, and Browse then opens on Latest and offers no Popular.
+    fn supports_popular(&self) -> bool {
+        true
+    }
     /// `false` means the details call is never made, so a source without details cannot fail a combined update (E-27).
     fn supports_details(&self) -> bool {
         true

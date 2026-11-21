@@ -36,6 +36,7 @@ impl SourceIdentity {
             id: source.id(),
             source: Source {
                 supports_latest: source.supports_latest(),
+                supports_popular: source.supports_popular(),
                 ..Source::new(source.id(), source.name(), source.lang())
             },
             http,

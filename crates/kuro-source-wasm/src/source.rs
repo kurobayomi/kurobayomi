@@ -340,6 +340,10 @@ impl AnimeSource for WasmAnimeSource {
         self.0.info.supports_latest
     }
 
+    fn supports_popular(&self) -> bool {
+        self.0.info.supports_popular
+    }
+
     /// The package has no `details` or `seasons` op, so a combined update must not call them.
     /// The `details` op is optional: a plug-in without it keeps what the listing gave (see `anime_details`).
     fn supports_details(&self) -> bool {
@@ -460,6 +464,10 @@ impl CatalogueSource for WasmSource {
         self.info.supports_latest
     }
 
+    fn supports_popular(&self) -> bool {
+        self.info.supports_popular
+    }
+
     /// Empty: no ABI version has a filter op, so a guest declares no filters. A search sends the filters it is given.
     fn filter_list(&self) -> FilterList {
         FilterList::default()
@@ -499,6 +507,7 @@ mod tests {
             deadline_ticks,
         });
         let info = SourceDescriptor {
+            supports_popular: true,
             id,
             name: "Fixture".into(),
             lang: "en".into(),
@@ -781,6 +790,7 @@ mod anime_tests {
         });
         WasmAnimeSource(WasmSource {
             info: SourceDescriptor {
+                supports_popular: true,
                 id: 42,
                 name: "Fixture".into(),
                 lang: "en".into(),
