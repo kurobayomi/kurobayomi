@@ -211,7 +211,8 @@ impl Inner {
     }
 }
 
-/// The dot of a repo source's status: green when it works, orange when its site blocks the app for now, red when broken.
+/// A repo source's status, written out with its dot on the right: green when it works, orange when its site blocks the
+/// app for now, red when broken. The text says it, so a colour alone never has to.
 fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
     use kuro_extensions::repo::Status;
     let (class, text) = match status {
@@ -219,9 +220,12 @@ fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
         Status::Blocked => ("warning", tr(MsgKey::source_status_blocked)),
         Status::Broken => ("error", tr(MsgKey::source_status_broken)),
     };
-    let dot = gtk::Box::builder().valign(gtk::Align::Center).margin_end(SPACE_S).css_classes(["kb-status", class]).tooltip_text(&text).build();
-    dot.update_property(&[gtk::accessible::Property::Label(&text)]);
-    dot
+    let label = gtk::Label::builder().label(&text).valign(gtk::Align::Center).css_classes(["caption", class]).build();
+    let dot = gtk::Box::builder().valign(gtk::Align::Center).css_classes(["kb-status", class]).build();
+    let status = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(SPACE_XS).margin_end(SPACE_S).build();
+    status.append(&label);
+    status.append(&dot);
+    status
 }
 
 /// The loading state of a Sources tab: the page spinner with its "Loading sources…" line under it.

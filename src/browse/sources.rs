@@ -40,7 +40,7 @@ pub struct ListInput<'a> {
     pub last_used: i64,
 }
 
-/// Section order: last used, then language codes in UTF-16 order with `""` last.
+/// Section order: last used, then language codes in UTF-16 order, then `"other"` (the local source), then `""`.
 pub fn section_cmp(a: &Section, b: &Section) -> Ordering {
     fn rank(section: &Section) -> u8 {
         match section {
@@ -48,12 +48,17 @@ pub fn section_cmp(a: &Section, b: &Section) -> Ordering {
             Section::Language(_) => 1,
         }
     }
+    /// Where a language group sits: real languages first, then "other" (the local source), then an unknown language,
+    /// so the groups titled "Other" end the list whatever the languages above them.
+    fn tail(lang: &str) -> u8 {
+        match lang {
+            "" => 2,
+            "other" => 1,
+            _ => 0,
+        }
+    }
     match (a, b) {
-        (Section::Language(x), Section::Language(y)) => match (x.is_empty(), y.is_empty()) {
-            (true, false) => Ordering::Greater,
-            (false, true) => Ordering::Less,
-            _ => x.encode_utf16().cmp(y.encode_utf16()),
-        },
+        (Section::Language(x), Section::Language(y)) => tail(x).cmp(&tail(y)).then_with(|| x.encode_utf16().cmp(y.encode_utf16())),
         _ => rank(a).cmp(&rank(b)),
     }
 }
@@ -199,6 +204,19 @@ mod tests {
                 Section::Language("other".into()),
                 Section::Language(String::new()),
             ]
+        );
+    }
+
+    #[test]
+    fn the_local_sources_other_group_comes_after_every_language() {
+        // "ru" sorts after "other" as a code; the Other group still ends the list
+        let mut all = fixture();
+        all.push(src(8, "InkStory", "ru", false));
+        let enabled = ids(&["en", "ru", "other", ""]);
+        let rows = source_list(&ListInput { sources: &all, enabled_languages: &enabled, disabled: &ids(&[]), last_used: -1 });
+        assert_eq!(
+            headers(&rows),
+            vec![Section::Language("en".into()), Section::Language("ru".into()), Section::Language("other".into()), Section::Language(String::new())]
         );
     }
 

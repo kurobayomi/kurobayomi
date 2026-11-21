@@ -15,6 +15,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Changed
 
+- A repository source's status is written next to its dot in Browse → Sources ("Working", "Temporarily blocked by the
+  site", "Broken: waiting for a fix"), so the colour is not the only sign.
+- The "Other" group (the local source) always comes last in Browse → Sources, for anime and manga, after every language.
 - Create backup is one button: the backup always holds your library, its history and tracking, your categories, your
   repositories and your settings, and the only choice left is whether to include tracker logins.
 

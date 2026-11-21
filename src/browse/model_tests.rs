@@ -511,7 +511,7 @@ mod props {
     fn section() -> impl Strategy<Value = Section> {
         prop_oneof![
             Just(Section::LastUsed),
-            proptest::sample::select(vec!["", "en", "ja", "de", "pt-BR", "zh-CN", "all", "\u{1F600}", "\u{FF21}"]).prop_map(|lang| Section::Language(lang.to_owned())),
+            proptest::sample::select(vec!["", "other", "en", "ja", "de", "pt-BR", "zh-CN", "all", "\u{1F600}", "\u{FF21}"]).prop_map(|lang| Section::Language(lang.to_owned())),
             proptest::collection::vec(any::<char>(), 0..4).prop_map(|chars| Section::Language(chars.into_iter().collect())),
         ]
     }
