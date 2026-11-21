@@ -655,7 +655,7 @@ spec_anime_title = Anime title
 spec_auto_play = Auto-play
 
 # source: kurobayomi
-spec_automatic_and_manual_backups_maintenance = Automatic and manual backups, maintenance
+spec_create_and_restore_backups_maintenance = Create and restore backups, maintenance
 
 # source: kurobayomi
 spec_backup_file_schema = Backup file schema

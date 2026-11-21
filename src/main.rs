@@ -8,7 +8,6 @@ mod whats_new;
 mod appimage_integrate;
 mod backup_host;
 mod backup_run;
-mod backup_schedule;
 mod bind;
 mod cache_limit;
 mod banner;
@@ -85,10 +84,6 @@ fn main() -> glib::ExitCode {
         if cli::wants_updates_json(&args) {
             return glib::ExitCode::from(cli::run(&args));
         }
-    }
-    // `--run-backup`: one automatic backup, no window and no GTK
-    if std::env::args().skip(1).any(|a| a == "--run-backup") {
-        return glib::ExitCode::from(backup_run::run_backup_cli());
     }
     // `--library-update=auto|manual`: the timer's headless pass, or a request handed to the running app; no window
     {
@@ -299,8 +294,6 @@ fn build_window(app: &gtk::Application) {
     outer.prepend(&backup_host::attach(app, &win));
     // closing while a download runs asks first (the downloads pause)
     shell::Shell::guard_close(&win);
-    // the automatic backup schedule follows the interval setting (T-02a-024)
-    backup_schedule::start(app);
     open_link::register(app, &win);
 
     // reader/player are immersive: no sidebar or tab bar while they're on screen

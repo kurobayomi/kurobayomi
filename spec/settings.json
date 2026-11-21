@@ -39,7 +39,7 @@
   {
    "id": "settings_data_storage",
    "title": "Backup and restore",
-   "subtitle": "Automatic and manual backups, maintenance",
+   "subtitle": "Create and restore backups, maintenance",
    "icon": "drive-harddisk-symbolic"
   },
   {
@@ -589,21 +589,8 @@
        "title": "Restore backup"
       },
       {
-       "type": "list",
-       "title": "Automatic backup frequency",
-       "options": [
-        "Off",
-        "Every 6 hours",
-        "Every 12 hours",
-        "Daily",
-        "Every 2 days",
-        "Weekly"
-       ],
-       "default": "Every 12 hours"
-      },
-      {
        "type": "info",
-       "title": "You should keep copies of backups in other places as well. Backups may contain sensitive data including any stored passwords; be careful if sharing.\n\nLast automatically backed up: Today"
+       "title": "You should keep copies of backups in other places as well. Backups may contain sensitive data including any stored passwords; be careful if sharing."
       }
      ]
     },

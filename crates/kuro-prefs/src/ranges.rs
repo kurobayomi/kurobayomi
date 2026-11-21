@@ -50,7 +50,6 @@ impl Constraint {
 
 pub const DOWNLOAD_SLOTS: Constraint = Constraint::Range { min: 1, max: 5 };
 pub const REMOVE_AFTER_READ_SLOTS: Constraint = Constraint::Choices(&[-1, 0, 1, 2, 3, 4]);
-pub const BACKUP_INTERVAL: Constraint = Constraint::Choices(&[0, 6, 12, 24, 48, 168]);
 /// The cache size limit in megabytes.
 pub const CACHE_SIZE_MB: Constraint = Constraint::Choices(&[100, 250, 500, 1000, 2000, 5000]);
 
@@ -58,7 +57,6 @@ pub const CACHE_SIZE_MB: Constraint = Constraint::Choices(&[100, 250, 500, 1000,
 const CONSTRAINED: &[(&str, Constraint)] = &[
     ("download_slots", DOWNLOAD_SLOTS),
     ("remove_after_read_slots", REMOVE_AFTER_READ_SLOTS),
-    ("backup_interval", BACKUP_INTERVAL),
     ("cache_size_mb", CACHE_SIZE_MB),
 ];
 
@@ -89,7 +87,7 @@ mod tests {
     #[test]
     fn choices_clamp_to_the_nearest_value_and_ties_go_low() {
         assert_eq!(REMOVE_AFTER_READ_SLOTS.clamped(-7), -1);
-        assert_eq!(BACKUP_INTERVAL.clamped(168), 168);
+        assert_eq!(CACHE_SIZE_MB.clamped(5000), 5000);
     }
 
     #[test]
@@ -106,13 +104,13 @@ mod tests {
 
     #[test]
     fn bounds_give_the_slider_ends_of_a_range_only() {
-        assert_eq!(BACKUP_INTERVAL.bounds(), None);
+        assert_eq!(CACHE_SIZE_MB.bounds(), None);
     }
 
     #[test]
     fn values_list_a_range_in_full_and_the_choices_in_order() {
         assert_eq!(DOWNLOAD_SLOTS.values(), [1, 2, 3, 4, 5]);
-        assert_eq!(BACKUP_INTERVAL.values(), [0, 6, 12, 24, 48, 168]);
+        assert_eq!(CACHE_SIZE_MB.values(), [100, 250, 500, 1000, 2000, 5000]);
     }
 
     #[test]

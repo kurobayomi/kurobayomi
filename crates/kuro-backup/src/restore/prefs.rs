@@ -1,5 +1,5 @@
 //! Preference restore (area 22, T-22a-009 and T-22a-010). The write rules live in `kuro_prefs::import`; this module
-//! converts the backup values, maps the category ids, and re-arms the backup scheduler after an app-preference section.
+//! converts the backup values and maps the category ids.
 
 use std::collections::{BTreeMap, HashMap};
 
@@ -15,36 +15,6 @@ use kuro_db::DbResult;
 use rusqlite::Connection;
 
 use crate::schema::{BackupCategory, BackupPreference, BackupSourcePreferences, PrefValue};
-
-/// The scheduler re-arm after app preferences change. Implemented by the owning areas.
-pub trait Scheduler {
-    /// Reads `backup_interval`. 0 disables the automatic backup.
-    fn rearm_auto_backup(&self);
-}
-
-/// Reads the backup interval after a restore and hands the timer its state: `None` disables it (interval 0),
-/// `Some(hours)` enables it with the restored value (T-22a-010). The callback belongs to the owning area; passing
-/// `&|_| {}` makes this a no-op until it lands.
-pub struct IntervalScheduler<'a> {
-    pub store: &'a PrefStore,
-    pub backup_timer: &'a dyn Fn(Option<u32>),
-}
-
-impl IntervalScheduler<'_> {
-    fn hours(&self, key: &str, default: i32) -> Option<u32> {
-        let n = match self.store.get_raw(key) {
-            Some(Value::Int(n)) => n,
-            _ => default,
-        };
-        u32::try_from(n).ok().filter(|h| *h > 0)
-    }
-}
-
-impl Scheduler for IntervalScheduler<'_> {
-    fn rearm_auto_backup(&self) {
-        (self.backup_timer)(self.hours("backup_interval", 12));
-    }
-}
 
 fn convert(v: &PrefValue) -> Value {
     match v {
@@ -144,14 +114,13 @@ pub struct AppPrefsRestore {
     pub skipped: usize,
 }
 
-/// Restores the app preferences (T-22a-009), writes `categorized_display` when the categories section computed it,
-/// then re-arms the backup scheduler once (T-22a-010, X-57). Keys the allowlist refuses are skipped and counted.
+/// Restores the app preferences (T-22a-009), writes `categorized_display` when the categories section computed it.
+/// Keys the allowlist refuses are skipped and counted.
 pub fn restore_app_prefs(
     store: &PrefStore,
     prefs: &[BackupPreference],
     maps: &CategoryMaps,
     categorized_display: Option<bool>,
-    scheduler: &dyn Scheduler,
 ) -> AppPrefsRestore {
     let allowed: Vec<BackupPreference> = prefs.iter().filter(|p| is_restorable(&p.key)).cloned().collect();
     let skipped = prefs.len() - allowed.len();
@@ -161,7 +130,6 @@ pub fn restore_app_prefs(
     if let Some(flag) = categorized_display {
         store.set_raw("categorized_display", Value::Bool(flag));
     }
-    scheduler.rearm_auto_backup();
     AppPrefsRestore { report, skipped }
 }
 
@@ -204,21 +172,9 @@ pub fn category_maps(c: &Connection, backup: &[BackupCategory]) -> DbResult<Cate
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
     use std::collections::BTreeSet;
 
     use super::*;
-
-    #[derive(Default)]
-    struct Count {
-        backup: Cell<u32>,
-    }
-
-    impl Scheduler for Count {
-        fn rearm_auto_backup(&self) {
-            self.backup.set(self.backup.get() + 1);
-        }
-    }
 
     fn pref(key: &str, value: PrefValue) -> BackupPreference {
         BackupPreference { key: key.into(), value }
@@ -236,9 +192,8 @@ mod tests {
     fn stored_type_mismatch_is_skipped_and_absent_key_is_written() {
         let store = PrefStore::in_memory();
         store.set_raw("show_nsfw_source", Value::Bool(false));
-        let sched = Count::default();
         let prefs = vec![pref("show_nsfw_source", PrefValue::String("yes".into()))];
-        restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &sched);
+        restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None);
         assert_eq!(store.get_raw("show_nsfw_source"), Some(Value::Bool(false)));
     }
 
@@ -250,7 +205,7 @@ mod tests {
             pref("not_in_registry", PrefValue::String("x".into())),
             pref("other_unknown", PrefValue::String("y".into())),
         ];
-        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &Count::default());
+        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None);
         assert_eq!(store.get_raw("not_in_registry"), Some(Value::Bool(true)));
         assert_eq!(store.get_raw("other_unknown"), None, "an unknown key is never written");
         assert_eq!(outcome.skipped, 2);
@@ -265,7 +220,7 @@ mod tests {
             pref("extension_installer", PrefValue::String("SHIZUKU".into())),
             pref("show_nsfw_source", PrefValue::Boolean(true)),
         ];
-        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &Count::default());
+        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None);
         assert_eq!(outcome.skipped, 3);
         assert_eq!(outcome.report.unknown_kept, 0, "nothing unknown reaches the write");
         assert_eq!(store.get_raw("extension_installer"), None, "the removed installer preference is ignored, with no error");
@@ -288,9 +243,19 @@ mod tests {
             pref("pref_app_theme", PrefValue::String("MONET".into())),
             pref("show_nsfw_source", PrefValue::Boolean(true)),
         ];
-        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None, &Count::default());
+        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None);
         assert_eq!(outcome.skipped, 10, "the ten dropped keys, the old app theme among them");
         assert_eq!(store.all().len(), 1, "only the flag is written");
+        assert_eq!(store.get_raw("show_nsfw_source"), Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn the_cut_automatic_backup_frequency_of_an_older_backup_is_skipped_without_error() {
+        let store = PrefStore::in_memory();
+        let prefs = vec![pref("backup_interval", PrefValue::Int(6)), pref("show_nsfw_source", PrefValue::Boolean(true))];
+        let outcome = restore_app_prefs(&store, &prefs, &CategoryMaps::default(), None);
+        assert_eq!(outcome.skipped, 1);
+        assert_eq!(store.get_raw("backup_interval"), None);
         assert_eq!(store.get_raw("show_nsfw_source"), Some(Value::Bool(true)));
     }
 
@@ -302,7 +267,6 @@ mod tests {
             &[pref("show_nsfw_source", PrefValue::Boolean(true))],
             &CategoryMaps::default(),
             None,
-            &Count::default(),
         );
         assert_eq!(outcome.skipped, 0);
         assert_eq!(store.get_raw("show_nsfw_source"), Some(Value::Bool(true)));
@@ -316,7 +280,6 @@ mod tests {
             &[pref("extension_repos", set(&["https://r/one"]))],
             &CategoryMaps::default(),
             None,
-            &Count::default(),
         );
         assert_eq!(outcome.skipped, 0);
         assert!(!outcome.report.conversions.is_empty(), "the repository set is handed on, not dropped");
@@ -330,7 +293,6 @@ mod tests {
             &[pref("show_nsfw_source", PrefValue::Boolean(true))],
             &CategoryMaps::default(),
             None,
-            &Count::default(),
         );
         assert_eq!(store.get_raw("show_nsfw_source"), Some(Value::Bool(true)));
     }
@@ -339,12 +301,11 @@ mod tests {
     fn default_category_is_remapped_and_unmapped_or_minus_one_keeps_the_setting() {
         let store = PrefStore::in_memory();
         store.set_raw("default_category", Value::Int(3));
-        let sched = Count::default();
-        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(5))], &maps(), None, &sched);
+        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(5))], &maps(), None);
         assert_eq!(store.get_raw("default_category"), Some(Value::Int(9)));
 
-        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(-1))], &maps(), None, &sched);
-        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(77))], &maps(), None, &sched);
+        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(-1))], &maps(), None);
+        restore_app_prefs(&store, &[pref("default_category", PrefValue::Int(77))], &maps(), None);
         assert_eq!(store.get_raw("default_category"), Some(Value::Int(9)));
     }
 
@@ -356,7 +317,6 @@ mod tests {
             &[pref("default_anime_category", PrefValue::Int(5))],
             &maps(),
             None,
-            &Count::default(),
         );
         assert_eq!(store.get_raw("default_anime_category"), Some(Value::Int(20)));
     }
@@ -370,44 +330,15 @@ mod tests {
             &[pref("library_update_categories", set(&["5", "6"]))],
             &maps(),
             None,
-            &Count::default(),
         );
         assert_eq!(outcome.skipped, 1);
         assert_eq!(store.get_raw("library_update_categories"), Some(Value::Set(BTreeSet::from(["1".to_string()]))));
     }
 
     #[test]
-    fn the_backup_scheduler_is_rearmed_exactly_once_per_app_section() {
-        let store = PrefStore::in_memory();
-        let sched = Count::default();
-        restore_app_prefs(&store, &[], &CategoryMaps::default(), None, &sched);
-        assert_eq!(sched.backup.get(), 1);
-    }
-
-    #[test]
-    fn interval_zero_disables_the_timer_and_non_zero_enables_it() {
-        let store = PrefStore::in_memory();
-        let calls = std::cell::RefCell::new(Vec::new());
-        let backup = |h: Option<u32>| calls.borrow_mut().push(h);
-        let sched = IntervalScheduler { store: &store, backup_timer: &backup };
-        restore_app_prefs(&store, &[pref("backup_interval", PrefValue::Int(0))], &CategoryMaps::default(), None, &sched);
-        restore_app_prefs(&store, &[pref("backup_interval", PrefValue::Int(6))], &CategoryMaps::default(), None, &sched);
-        assert_eq!(calls.into_inner(), vec![None, Some(6)]);
-    }
-
-    #[test]
-    fn absent_backup_interval_uses_the_default_of_twelve_hours() {
-        let store = PrefStore::in_memory();
-        let got = std::cell::Cell::new(None);
-        let backup = |h: Option<u32>| got.set(h);
-        IntervalScheduler { store: &store, backup_timer: &backup }.rearm_auto_backup();
-        assert_eq!(got.get(), Some(12));
-    }
-
-    #[test]
     fn categorized_display_is_written_only_when_computed() {
         let store = PrefStore::in_memory();
-        restore_app_prefs(&store, &[], &CategoryMaps::default(), Some(true), &Count::default());
+        restore_app_prefs(&store, &[], &CategoryMaps::default(), Some(true));
         assert_eq!(store.get_raw("categorized_display"), Some(Value::Bool(true)));
     }
 

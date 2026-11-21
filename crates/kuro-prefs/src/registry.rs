@@ -257,8 +257,6 @@ define_prefs! {
     "download_new", Normal, Bool, false, "downloads", "download_new_chapters";
     "download_new_episode", Normal, Bool, false, "downloads", "download_new_episodes";
     "download_slots", Normal, Int, 3, "downloads", "number_of_downloads";
-    "backup_interval", Normal, Int, 12, "backup", "backup_interval";
-    "__APP_STATE_last_auto_backup_timestamp", AppState, Long, 0, "backup", "last_auto_backup_timestamp";
     "__APP_STATE_storage_dir", AppState, Str, "", "storage", "base_storage_directory";
     "pref_torrserver_enable", Normal, Bool, false, "torrent", "torr_server_enable";
     "pref_torrserver_shownotice", Normal, Bool, false, "torrent", "torr_server_shown_notice";
@@ -310,7 +308,7 @@ define_prefs! {
 /// The registry holds no row for them, a restore skips them ([`is_dropped`]) and nothing reads them, so an old
 /// `config.toml` or an Aniyomi backup that still carries one loads and restores without it. Each key and its reason
 /// is recorded in `docs/drop-decisions.md`.
-pub const DROPPED_KEYS: [&str; 278] = [
+pub const DROPPED_KEYS: [&str; 281] = [
     "extension_installer",
     "pref_hardware_bitmap_threshold",
     "eh_enable_source_blacklist",
@@ -592,6 +590,10 @@ pub const DROPPED_KEYS: [&str; 278] = [
     "pinned_catalogues",
     // the automatic library update interval, cut: a pass runs at every launch (2026-11-02)
     "pref_library_update_interval_key",
+    // automatic backups, cut: a backup is made by hand from Settings (2026-11-21)
+    "backup_interval",
+    "__APP_STATE_last_auto_backup_timestamp",
+    "__APP_STATE_backup_enabled_at",
 ];
 
 /// Whether `key` (as stored, without the backup prefix) belongs to a dropped feature.

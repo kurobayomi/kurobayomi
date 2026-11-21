@@ -27,7 +27,6 @@ pub const ANIME_CATEGORY_KEYS: [&str; 6] = crate::category::category_keys(kuro_p
 pub enum Schedule {
     MangaLibraryUpdate,
     AnimeLibraryUpdate,
-    AutoBackup,
 }
 
 /// What the import did. The restore dialog shows these counts.
@@ -140,7 +139,7 @@ pub fn import_preferences(
     }
     report.written = writes.len();
     store.replace_many(writes);
-    report.schedules = vec![Schedule::MangaLibraryUpdate, Schedule::AnimeLibraryUpdate, Schedule::AutoBackup];
+    report.schedules = vec![Schedule::MangaLibraryUpdate, Schedule::AnimeLibraryUpdate];
     Ok(report)
 }
 
@@ -299,7 +298,7 @@ mod tests {
         let report = run(&store, vec![]);
         assert_eq!(
             report.schedules,
-            [Schedule::MangaLibraryUpdate, Schedule::AnimeLibraryUpdate, Schedule::AutoBackup]
+            [Schedule::MangaLibraryUpdate, Schedule::AnimeLibraryUpdate]
         );
     }
 

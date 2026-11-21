@@ -53,6 +53,6 @@ when it is turned on and refreshed by the daily update check. A source that is o
 ## Rarely
 
 - Downloads: the user taps download on a few items to read or watch offline.
-- Backup: automatic backup plus restore. Aniyomi backup import is key for switching.
+- Backup: create and restore by hand (automatic backups cut by the user, 2026-11-21). Aniyomi backup import is key for switching.
 
 That is the whole app. Next step: decide which settings survive (`docs/design/settings-diet.md`).

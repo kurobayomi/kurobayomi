@@ -5,4 +5,4 @@ pub mod flags;
 pub mod prefs;
 
 pub use flags::{BackupFlag, BackupFlags};
-pub use prefs::{BackupPrefs, DEFAULT_INTERVAL_HOURS, elapsed_ms, enable_auto_backup, interval_hours};
+pub use prefs::BackupPrefs;

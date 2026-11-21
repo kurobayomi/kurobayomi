@@ -1,5 +1,5 @@
 //! The GTK-free half of the backup host: the adapters that create and restore a backup over the app's databases and
-//! preferences, and the `kurobayomi --run-backup` entry point (T-21a-041, T-22a-041). The GUI half is `backup_host`.
+//! preferences (T-22a-041). The GUI half is `backup_host`.
 
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::Local;
-use kuro_backup::auto::{AutoConfig, AutoHost, OnceOutcome, PowerState, run_once};
 use kuro_backup::creator::db::{DbLibrary, DirArtifacts, StorePrefs};
 use kuro_backup::creator::{CreateInputs, SourceRegistry};
 use kuro_backup::error::BackupError;
@@ -17,7 +16,6 @@ use kuro_backup::restore::driver::Targets;
 use kuro_backup::restore::job::{RestoreEnd, run_backup};
 use kuro_backup::restore::options::RestoreOptions;
 use kuro_backup::restore::progress::ProgressEvent;
-use kuro_backup::restore::prefs::IntervalScheduler;
 use kuro_backup::restore::screen::StopFlag;
 use kuro_backup::restore::extensions::legacy_repo_urls;
 use kuro_backup::schema::Backup;
@@ -30,11 +28,6 @@ use kuro_prefs::pref::Pref;
 use kuro_prefs::store::PrefStore;
 
 use crate::pref_model::stores_backend::{Ops as _, RepoOps};
-
-/// `backup_interval` (hours, default 12) and the two app-state stamps of the automatic backup.
-pub(crate) const INTERVAL_KEY: &str = "backup_interval";
-const LAST_AUTO_KEY: &str = "__APP_STATE_last_auto_backup_timestamp";
-pub(crate) const ENABLED_AT_KEY: &str = "__APP_STATE_backup_enabled_at";
 
 /// No tracker is signed in until the tracker area registers its own, so a check lists every tracker of a file as missing.
 /// Its source side is not used by the app: backups and checks read sources through `LiveRegistry`.
@@ -88,153 +81,13 @@ impl Library {
     }
 }
 
-/// Opens the preference store and the database without GTK, for `--run-backup`.
+/// Opens the preference store and the database without GTK, for a headless run.
 pub fn open_headless(paths: &dyn Paths) -> Result<Library, String> {
     let prefs = kuro_prefs::settings_load::open(paths).map_err(|e| e.to_string())?;
     let data = paths.data_dir();
     let path = schema_unified::db_path(&data);
     let db = Arc::new(Db::new(&path, schema_unified::open_file(&path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?);
     Ok(Library { prefs, db, extensions_dir: data.join("extensions") })
-}
-
-/// The battery state from `/sys/class/power_supply`: on battery when a battery reports `Discharging`, with the level of
-/// the first battery. A machine without a battery is on AC power.
-pub fn power_state() -> PowerState {
-    power_from(Path::new("/sys/class/power_supply"))
-}
-
-fn power_from(root: &Path) -> PowerState {
-    let mut batteries: Vec<PathBuf> = std::fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| std::fs::read_to_string(p.join("type")).is_ok_and(|t| t.trim() == "Battery"))
-        .collect();
-    batteries.sort();
-    let read = |dir: &Path, file: &str| std::fs::read_to_string(dir.join(file)).ok().map(|s| s.trim().to_owned());
-    let on_battery = batteries.iter().any(|b| read(b, "status").as_deref() == Some("Discharging"));
-    let percent = batteries.first().and_then(|b| read(b, "capacity")).and_then(|c| c.parse::<u8>().ok());
-    PowerState { on_battery, percent }
-}
-
-/// [`AutoHost`] for one `--run-backup` invocation: the settings, the databases and the automatic folder.
-pub struct CliHost {
-    pub library: Library,
-    pub auto_dir: PathBuf,
-    pub now_ms: Box<dyn Fn() -> i64 + Send + Sync>,
-    pub power: PowerState,
-}
-
-impl CliHost {
-    fn stamp(&self, key: &str) -> i64 {
-        self.library.prefs.pref(key.to_owned(), 0_i64).get()
-    }
-
-    /// The scheduler settings. The first run counts one interval from the first time the entry point sees the setting
-    /// (E-08), so that moment is stored when there is none yet.
-    pub fn config(&self) -> AutoConfig {
-        let interval = self.library.prefs.pref(INTERVAL_KEY.to_owned(), 12_i32).get();
-        let mut enabled_at = self.stamp(ENABLED_AT_KEY);
-        if enabled_at == 0 {
-            enabled_at = (self.now_ms)();
-            if let Err(e) = self.library.prefs.pref(ENABLED_AT_KEY.to_owned(), 0_i64).set(enabled_at) {
-                tracing::warn!("could not store when the automatic backup was first seen: {e}");
-            }
-        }
-        AutoConfig {
-            interval_hours: kuro_backup::settings::normalize_interval(i64::from(interval)),
-            last_auto_epoch_ms: self.stamp(LAST_AUTO_KEY),
-            enabled_at_epoch_ms: enabled_at,
-            min_battery_percent: kuro_backup::auto::DEFAULT_MIN_BATTERY_PERCENT,
-        }
-    }
-}
-
-impl AutoHost for CliHost {
-    fn now_ms(&self) -> i64 {
-        (self.now_ms)()
-    }
-
-    fn last_auto_ms(&self) -> i64 {
-        self.stamp(LAST_AUTO_KEY)
-    }
-
-    fn restore_running(&self) -> bool {
-        // a restore runs inside the GUI process, which holds the settings lock, so this process never starts beside it
-        false
-    }
-
-    fn power(&self) -> PowerState {
-        self.power
-    }
-
-    fn run_backup(&self) -> Result<PathBuf, BackupError> {
-        let target = Target::Automatic { dir: self.auto_dir.clone(), now: Local::now() };
-        self.library.create(&BackupOptions::default(), &target).map(|(path, _skipped)| path)
-    }
-
-    fn save_last_auto_ms(&self, ms: i64) {
-        if let Err(e) = self.library.prefs.pref(LAST_AUTO_KEY.to_owned(), 0_i64).set(ms) {
-            tracing::warn!("could not store the last automatic backup time: {e}");
-        }
-    }
-
-    fn report_failure(&self, streak: u32) {
-        eprintln!("kurobayomi: the automatic backup failed ({streak} in a row)");
-    }
-}
-
-/// Exit status of `--run-backup`: 0 when a backup was written or none was due, 1 when the run failed.
-pub fn exit_status(outcome: &OnceOutcome) -> u8 {
-    match outcome {
-        OnceOutcome::Ran(_) | OnceOutcome::Skipped => 0,
-        OnceOutcome::Failed(_) => 1,
-    }
-}
-
-/// `kurobayomi --run-backup`: at most one automatic run, then the exit status (T-21a-041).
-pub fn run_backup_cli() -> u8 {
-    let paths = match kuro_platform::system_paths::SystemPaths::system() {
-        Ok(paths) => paths,
-        Err(e) => {
-            eprintln!("kurobayomi: {e}");
-            return 1;
-        }
-    };
-    let library = match open_headless(&paths) {
-        Ok(library) => library,
-        Err(e) if e.to_lowercase().contains("lock") => {
-            // the GUI owns the settings and runs its own schedule
-            eprintln!("kurobayomi: the app is open, so no automatic backup runs from here");
-            return 0;
-        }
-        Err(e) => {
-            eprintln!("kurobayomi: cannot open the library: {e}");
-            return 1;
-        }
-    };
-    let auto_dir = match crate::settings_ui::storage::manager(&library.prefs).map(|storage| storage.backups_dir()) {
-        Some(Ok(dir)) => dir,
-        Some(Err(e)) => {
-            eprintln!("kurobayomi: the backups folder is not available: {e}");
-            return 1;
-        }
-        None => {
-            eprintln!("kurobayomi: the storage folder could not be resolved");
-            return 1;
-        }
-    };
-    let host = CliHost {
-        library,
-        auto_dir: auto_dir.clone(),
-        now_ms: Box::new(|| Local::now().timestamp_millis()),
-        power: power_state(),
-    };
-    let outcome = run_once(&host.config(), &host, &auto_dir);
-    if let OnceOutcome::Failed(e) = &outcome {
-        eprintln!("kurobayomi: automatic backup failed: {e}");
-    }
-    exit_status(&outcome)
 }
 
 /// What a finished restore also imports: the old repo addresses of the backup, as repository links, after the user
@@ -276,12 +129,11 @@ pub fn run_restore(
             })
             .clone()
     };
-    let scheduler = IntervalScheduler { store: &library.prefs, backup_timer: &|_| {} };
     let end = run_backup(
         backup,
         opts,
         Local::now(),
-        Targets { db: &mut conn, app_prefs: &library.prefs, source_prefs: &source_prefs, scheduler: &scheduler },
+        Targets { db: &mut conn, app_prefs: &library.prefs, source_prefs: &source_prefs },
         &|| stop.requested(),
         emit,
         log_dir,
@@ -332,69 +184,6 @@ mod tests {
         let path = schema_unified::db_path(dir);
         let db = Arc::new(Db::new(&path, schema_unified::open_file(&path).unwrap()).unwrap());
         Library { prefs: PrefStore::in_memory(), db, extensions_dir: dir.join("extensions") }
-    }
-
-    fn host(dir: &Path, now: i64) -> CliHost {
-        CliHost {
-            library: library(dir),
-            auto_dir: dir.join("autobackup"),
-            now_ms: Box::new(move || now),
-            power: PowerState { on_battery: false, percent: None },
-        }
-    }
-
-    fn files(dir: &Path) -> usize {
-        std::fs::read_dir(dir).map(|d| d.filter_map(|e| e.ok()).filter(|e| e.file_name().to_string_lossy().ends_with(".tachibk")).count()).unwrap_or(0)
-    }
-
-    /// T-21a-041: past the due time the entry point writes exactly one file and exits 0; the next call is not due.
-    #[test]
-    fn run_backup_writes_one_file_when_due_and_none_straight_after() {
-        let dir = tempfile::tempdir().unwrap();
-        let host = host(dir.path(), 1_000_000_000_000);
-        // seed one library entry so the backup is not empty
-        let mut m = kuro_data::entry::Entry::create(kuro_platform::kind::Kind::Manga);
-        m.source = 1;
-        m.url = "/m".into();
-        m.title = "T".into();
-        m.favorite = true;
-        kuro_data::entry::EntryRepo::new(host.library.db.clone()).insert(&m).unwrap();
-        host.library.prefs.pref("__APP_STATE_backup_enabled_at".to_owned(), 0_i64).set(1).unwrap();
-        let first = run_once(&host.config(), &host, &host.auto_dir);
-        assert!(matches!(first, OnceOutcome::Ran(_)), "{first:?}");
-        assert_eq!(exit_status(&first), 0);
-        assert_eq!(files(&host.auto_dir), 1);
-        assert_eq!(host.last_auto_ms(), 1_000_000_000_000, "the run is recorded");
-        let second = run_once(&host.config(), &host, &host.auto_dir);
-        assert!(matches!(second, OnceOutcome::Skipped));
-        assert_eq!(exit_status(&second), 0);
-        assert_eq!(files(&host.auto_dir), 1, "at most one run");
-    }
-
-    #[test]
-    fn a_failed_run_exits_1_and_the_first_sight_of_the_setting_is_not_due() {
-        assert_eq!(exit_status(&OnceOutcome::Failed(BackupError::CreateFile)), 1);
-        let dir = tempfile::tempdir().unwrap();
-        let host = host(dir.path(), 5_000_000);
-        let config = host.config();
-        assert_eq!(config.enabled_at_epoch_ms, 5_000_000, "stored on first sight");
-        assert!(matches!(run_once(&config, &host, &host.auto_dir), OnceOutcome::Skipped), "one interval from now");
-        assert_eq!(files(&host.auto_dir), 0);
-    }
-
-    #[test]
-    fn the_battery_is_read_from_the_power_supply_folder() {
-        let root = tempfile::tempdir().unwrap();
-        assert_eq!(power_from(root.path()), PowerState { on_battery: false, percent: None }, "no battery means AC");
-        let bat = root.path().join("BAT0");
-        std::fs::create_dir_all(&bat).unwrap();
-        std::fs::write(bat.join("type"), "Battery\n").unwrap();
-        std::fs::write(bat.join("status"), "Discharging\n").unwrap();
-        std::fs::write(bat.join("capacity"), "42\n").unwrap();
-        let mains = root.path().join("AC");
-        std::fs::create_dir_all(&mains).unwrap();
-        std::fs::write(mains.join("type"), "Mains\n").unwrap();
-        assert_eq!(power_from(root.path()), PowerState { on_battery: true, percent: Some(42) });
     }
 
     struct NoNet;

@@ -150,7 +150,7 @@ mod tests {
         let settings = InMemorySettings::new();
         let domain = Domain::new(deps(&dir, &settings));
         assert!(domain.source_prefs().enabled_languages.get().contains("en"));
-        assert_eq!(domain.backup_prefs().interval.get(), 12);
+        assert_eq!(domain.backup_prefs().flags.get(), crate::backup::BackupFlags::default());
         let clone = domain.clone();
         assert!(Arc::ptr_eq(&domain.storage(), &clone.storage()), "clones share the storage manager");
         assert!(Arc::ptr_eq(&domain.source_toggles(), &clone.source_toggles()));
@@ -194,8 +194,8 @@ mod tests {
         let dir = TempDir::new().expect("temp dir");
         let settings = InMemorySettings::new();
         let domain = Domain::new(deps(&dir, &settings));
-        let _ = domain.backup_prefs().interval.set(0);
-        assert_eq!(settings.get_raw("backup_interval"), Some(kuro_prefs::values::PrefValue::Int(0)));
+        let _ = domain.download_prefs().number_of_downloads_pref.set(2);
+        assert_eq!(settings.get_raw("download_slots"), Some(kuro_prefs::values::PrefValue::Int(2)));
         // The default base is created on first use, so the user is never asked for a folder.
         assert_eq!(domain.storage().base().unwrap(), dir.path().join("no-such-base"));
     }

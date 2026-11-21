@@ -1,7 +1,7 @@
 //! The preference aggregate: every section built once over one shared store.
 //!
 //! Built in the application context at startup, before any widget is created. Sections that are
-//! not in this file yet (tracking, downloads, backup, storage, the subtitle, audio and
+//! not in this file yet (tracking, downloads, storage, the subtitle, audio and
 //! advanced player sections) are added with their own tasks.
 
 use std::sync::Arc;
@@ -10,7 +10,7 @@ use kuro_platform::paths::Paths;
 use kuro_platform::secrets::SecretStore;
 
 use crate::PrefError;
-use crate::backup::{BackupPrefs, StoragePrefs};
+use crate::backup::StoragePrefs;
 use crate::base::BasePrefs;
 use crate::library::LibraryPrefs;
 use crate::migrate::{self, Migration};
@@ -34,8 +34,6 @@ pub struct Prefs {
     pub player: PlayerPrefs,
     /// `[torrent]`: the embedded torrent server settings (T-02a-021).
     pub torrent: TorrentPrefs,
-    /// `[backup]`: the automatic backup interval and its app state (T-02a-024).
-    pub backup: BackupPrefs,
     /// `[storage]`: the chosen base storage folder (T-02a-024).
     pub storage: StoragePrefs,
     /// Credential storage for tracker secrets (area 02, part 2 reads through it).
@@ -76,7 +74,6 @@ impl Prefs {
             reader: ReaderPrefs::new(store.clone()),
             player: PlayerPrefs::new(store.clone()),
             torrent: TorrentPrefs::new(store.clone()),
-            backup: BackupPrefs::new(store.clone()),
             storage: StoragePrefs::new(store.clone()),
             secrets,
             store,
@@ -104,7 +101,6 @@ impl Prefs {
         self.reader.repair()?;
         self.player.repair()?;
         self.torrent.repair()?;
-        self.backup.repair()?;
         self.storage.repair()
     }
 }

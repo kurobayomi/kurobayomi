@@ -18,7 +18,7 @@ use super::categories::{CategoryRestore, restore_categories};
 use super::manga::{existing_pairs as manga_pairs, restore_manga_entry, sort_manga};
 use super::merge::RunClock;
 use super::options::RestoreOptions;
-use super::prefs::{Scheduler, category_maps, restore_app_prefs, restore_source_prefs};
+use super::prefs::{category_maps, restore_app_prefs, restore_source_prefs};
 use super::progress::{Progress, ProgressEvent, amount};
 use super::sections::{Counts, Item, Restorer, Run, Section, plan, run_sections};
 use crate::text;
@@ -31,7 +31,6 @@ pub struct Targets<'a> {
     pub app_prefs: &'a PrefStore,
     /// Returns the store for a name such as `source_1234`.
     pub source_prefs: &'a dyn Fn(&str) -> PrefStore,
-    pub scheduler: &'a dyn Scheduler,
 }
 
 /// Item counts of a decoded backup. Seasons are rows of `anime`, so they are already in the entry count.
@@ -181,7 +180,7 @@ impl DbRestorer<'_> {
                 .map(|a| CategoryMaps { manga: m.manga, anime: a.anime })
         });
         let result = maps.map_err(|e| e.to_string()).map(|maps| {
-            let outcome = restore_app_prefs(self.t.app_prefs, &self.backup.preferences, &maps, self.display, self.t.scheduler);
+            let outcome = restore_app_prefs(self.t.app_prefs, &self.backup.preferences, &maps, self.display);
             self.skipped_settings = outcome.skipped;
         });
         done(text::APP_SETTINGS.english.into(), result)
@@ -293,7 +292,6 @@ mod tests {
     use kuro_prefs::values::PrefValue as Value;
 
     use super::*;
-    use super::super::prefs::IntervalScheduler;
     use crate::schema::{
         BackupCategory, BackupChapter, BackupExtensionRepos, BackupExtensionStore, BackupPreference, BackupSource,
         BackupSourcePreferences, PrefValue,
@@ -304,13 +302,12 @@ mod tests {
         db: Connection,
         app: PrefStore,
         sources: RefCell<HashMap<String, PrefStore>>,
-        timers: RefCell<Vec<(&'static str, Option<u32>)>>,
     }
 
     fn env() -> Env {
         let dir = tempfile::tempdir().unwrap();
         let db = schema_unified::open_file(&dir.path().join("kurobayomi.db")).unwrap();
-        Env { _dir: dir, db, app: PrefStore::in_memory(), sources: RefCell::default(), timers: RefCell::default() }
+        Env { _dir: dir, db, app: PrefStore::in_memory(), sources: RefCell::default() }
     }
 
     fn now() -> DateTime<Local> {
@@ -375,10 +372,8 @@ mod tests {
     }
 
     fn run(e: &mut Env, backup: Backup, opts: RestoreOptions, cancel: &dyn Fn() -> bool) -> (Run, Vec<ProgressEvent>) {
-        let backup_timer = |h: Option<u32>| e.timers.borrow_mut().push(("backup", h));
-        let sched = IntervalScheduler { store: &e.app, backup_timer: &backup_timer };
         let open = |name: &str| e.sources.borrow_mut().entry(name.to_owned()).or_insert_with(PrefStore::in_memory).clone();
-        let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
+        let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open };
         let mut events = Vec::new();
         let result = restore_backup(backup, opts, now(), targets, cancel, &mut |ev| events.push(ev));
         (result, events)
@@ -412,10 +407,10 @@ mod tests {
         assert_eq!(season.parent_id, Some(root.id));
         assert_eq!(categories::by_entry(&e.db, Kind::Anime, season.id).unwrap().len(), 1);
 
-        // preferences: the default category is remapped, the backup scheduler saw the restored interval once
+        // preferences: the default category is remapped, and the cut automatic backup frequency is ignored
         let later = categories::all(&e.db, Kind::Manga).unwrap().into_iter().find(|c| c.name == "Later").unwrap().id;
         assert_eq!(e.app.get_raw("default_category"), Some(Value::Int(later as i32)));
-        assert_eq!(e.timers.borrow().as_slice(), [("backup", None)]);
+        assert_eq!(e.app.get_raw("backup_interval"), None);
         assert_eq!(e.sources.borrow()["source_1234"].get_raw("show_nsfw_source"), Some(Value::Bool(true)));
     }
 
@@ -472,10 +467,8 @@ mod tests {
             let backup = Backup { manga: vec![manga("a", vec![]), manga("b", vec![]), manga("c", vec![])], ..Default::default() };
             let opts = RestoreOptions::from_bits([true, false, false, false, false, false, false]);
             let mut events = Vec::new();
-            let off = |_: Option<u32>| {};
-            let sched = IntervalScheduler { store: &e.app, backup_timer: &off };
             let open = |_: &str| PrefStore::in_memory();
-            let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
+            let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open };
             let cancel = || {
                 seen.set(seen.get() + 1);
                 seen.get() >= n
@@ -537,10 +530,8 @@ mod tests {
         };
         let backup = Backup { manga: vec![manga("a", vec![]), manga("b", vec![])], ..Default::default() };
         let opts = RestoreOptions { categories: false, app_settings: false, source_settings: false, ..all_but_extensions() };
-        let off = |_: Option<u32>| {};
-        let sched = IntervalScheduler { store: &e.app, backup_timer: &off };
         let open = |_: &str| PrefStore::in_memory();
-        let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open, scheduler: &sched };
+        let targets = Targets { db: &mut e.db, app_prefs: &e.app, source_prefs: &open };
         let run = restore_backup(backup, opts, now(), targets, &cancel, &mut |_| items_done.set(items_done.get() + 1));
         assert_eq!(run.stop, Some(RestoreError::Cancelled));
         assert!(run.errors.is_empty(), "a cancel is not an error line");

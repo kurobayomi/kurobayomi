@@ -3,7 +3,6 @@
 //! Modules are added by the backup areas (21 and 22).
 //! GTK-free: notices and dialogs are data here, shown by the binary crate.
 
-pub mod auto;
 pub mod creator;
 pub mod error;
 pub mod file;
@@ -17,7 +16,6 @@ pub mod restore;
 pub mod schema;
 pub mod schema_text;
 pub mod screen;
-pub mod settings;
 pub mod storage_info;
 pub mod text;
 pub mod validate;

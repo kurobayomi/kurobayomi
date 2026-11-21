@@ -106,7 +106,7 @@ impl StorageManager {
         Ok(path)
     }
 
-    /// The backups folder, where the automatic backups go.
+    /// The backups folder under the base, created if missing.
     pub fn backups_dir(&self) -> Result<PathBuf, DomainError> {
         self.dir(&[BACKUPS_PATH])
     }

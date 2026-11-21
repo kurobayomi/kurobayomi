@@ -35,7 +35,7 @@ Key-backed visible settings: **38**. Add the action rows that are not preference
 | 4. Player | `pref_subtitle_lang`, `pref_audio_lang`, `player_volume_value`, `pref_auto_play_enabled` | - | Preferred subtitle languages, Preferred audio languages, Default volume, Autoplay next episode. The hoster and quality pickers stay in the player (no key). The mpv.conf and input.conf FILES in the mpv-config folder are the one advanced item, no UI. The Torrent sub-page stays as it is (KEEP-LATER keys, not counted). |
 | 5. Downloads and storage | `__APP_STATE_storage_dir`, `download_slots`, `download_new`, `download_new_episode`, `remove_after_read_slots` | - | Download location, Maximum downloads, Download new chapters, Download new episodes, Delete after reading/watching, plus the Clear chapter and episode cache action. |
 | 6. Sources and tracking | `source_languages`, `show_nsfw_source`, `anime_extension_repos`, `extension_repos`, `__PRIVATE_track_token_{id}`, `pref_auto_update_manga_sync_key` | `hidden_anime_catalogues`, `hidden_catalogues`, `pinned_anime_catalogues`, `pinned_catalogues`, `__APP_STATE_trusted_extensions`, `anime_ext_last_check`, `anilist_score_type` | Source languages, Show NSFW sources, Anime extension repos, Manga extension repos, AniList (login), Update progress after reading/watching. Revoke trusted extensions moves here as an action. |
-| 7. Backup and restore | `backup_interval` | `__APP_STATE_last_auto_backup_timestamp` | Automatic backup frequency, Create backup, Restore backup (both actions, no include/exclude dialogs). |
+| 7. Backup and restore | - | - | Create backup, Restore backup (both actions, no include/exclude dialogs). Automatic backups and their frequency (`backup_interval`, with `__APP_STATE_last_auto_backup_timestamp`) were cut by the user on 2026-11-21. |
 | 8. About | - | - | Version and Check for updates, What is new, Open source licenses, Share crash logs, Debug info. No keys. |
 | Outside the 8 pages (no settings row) | `__APP_STATE_pref_downloaded_only`, `__APP_STATE_incognito_mode`, `__APP_STATE_onboarding_complete` | - | Downloaded only is the Library filter and Incognito a check in the app menu (the More menu is gone); the onboarding flag is first-run state. |
 
@@ -430,12 +430,12 @@ Not a registry key but you asked for it: **player quality and server choice**. A
 
 ### Data and storage (settings_data_storage, settings_create_backup)
 
-5 keys: 2 CUT, 3 KEEP.
+5 keys: 4 CUT, 1 KEEP.
 
 | Key | Where the user sees it | What it does | Verdict | If CUT: hard-code | Reason | Flags and import |
 |---|---|---|---|---|---|---|
-| `backup_interval` | Data and storage > Backup and restore > Automatic backup frequency | How often an automatic backup runs. | **KEEP** |  | Always keep: backup. | - |
-| `__APP_STATE_last_auto_backup_timestamp` | Data and storage > note under the backup rows | When the last automatic backup ran. | **KEEP** |  | State; shown as Last automatically backed up. | STATE |
+| `backup_interval` | Data and storage > Backup and restore > Automatic backup frequency | How often an automatic backup runs. | **CUT** (user, 2026-11-21) | no automatic backup | The user removed automatic backups entirely; Create backup and Restore backup stay. | import: key in `DROPPED_KEYS` |
+| `__APP_STATE_last_auto_backup_timestamp` | Data and storage > note under the backup rows | When the last automatic backup ran. | **CUT** (user, 2026-11-21) | - | State of the cut automatic backup. | STATE; key in `DROPPED_KEYS` |
 | `backup_flags` | Data and storage > Create backup > what to include | Remembered choices of the create-backup dialog (library, chapters, tracking, history, categories...). | **CUT** | all four flags (everything) | One button, one full backup; fewer ways to restore half a library. | import: keep accepting on import |
 | `__APP_STATE_storage_dir` | Data and storage > Storage location (moves to Downloads > Download location) | Base folder for downloads, backups, local source and mpv config. | **KEEP** |  | Always keep: download location. | - |
 | `auto_clear_chapter_cache` | Data and storage > Storage usage > Clear episode/chapter cache on app launch | Empties the reading cache at each start. | **CUT** | false | Micro option; the Clear cache button stays. | READ-BY-APP (src/main.rs); import: keep accepting on import |
@@ -488,7 +488,7 @@ Found by reading the code. They are real keys the app reads or writes with no re
 | `migrate_flags` | Browse > Migrate dialog (`src/browse/prefs.rs`) | What a manga migration carries over, remembered. | **CUT** | everything (i32::MAX) | Micro option. | OUTSIDE-REGISTRY; import: keep accepting on import |
 | `anime_migrate_flags` | Browse > Migrate dialog (`src/browse/anime/prefs.rs`) | Same for anime. | **CUT** | everything (i32::MAX) | Micro option. | OUTSIDE-REGISTRY; Kurobayomi-only |
 | `incognito_extensions` | Browse > extension details (`src/browse/ext_details_page.rs`) | Extensions that never write history. The registry has `incognito_manga_extensions` for the same job: two names for one thing. | **CUT** | {} | Per-extension micro option; global incognito covers it. | OUTSIDE-REGISTRY; import: keep accepting on import |
-| `__APP_STATE_backup_enabled_at` | none (`src/backup_run.rs`) | When automatic backup was switched on. | **KEEP** |  | State of the backup schedule. | OUTSIDE-REGISTRY; STATE |
+| `__APP_STATE_backup_enabled_at` | none (was `src/backup_run.rs`) | When automatic backup was switched on. | **CUT** (user, 2026-11-21) | - | State of the cut automatic backup schedule. | OUTSIDE-REGISTRY; STATE; key in `DROPPED_KEYS` |
 | `__APP_STATE_last_version_code` | none (`crates/kuro-prefs/src/migrate.rs`) | Version the migrations last ran for. | **KEEP** |  | State the migrations need. | OUTSIDE-REGISTRY; STATE |
 | `upcoming.week_start` | Updates > Upcoming (`src/updates/prefs.rs`) | Calendar starts on Monday, Sunday or by locale. | **CUT** | auto (locale) | Micro option; the locale decides. | OUTSIDE-REGISTRY; Kurobayomi-only |
 | `upcoming.home_returns_today` | Updates > Upcoming (`src/updates/prefs.rs`) | Home key jumps the calendar back to this month. | **CUT** | false | Micro option, off by default. | OUTSIDE-REGISTRY; Kurobayomi-only |

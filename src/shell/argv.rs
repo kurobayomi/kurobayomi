@@ -1,6 +1,6 @@
 //! Command-line parsing for the launch options `--action`, `--id`, `--search`, `--type` and positional file or URI
-//! arguments (T-53a-006, test TC-53-01). `--open`, `--version`, `--run-backup` and `--crash-report` belong to other
-//! handlers in `main.rs` and `kuro_platform::deep_link`, so they are skipped here.
+//! arguments (T-53a-006, test TC-53-01). `--open`, `--version` and `--crash-report` belong to other handlers
+//! in `main.rs` and `kuro_platform::deep_link`, so they are skipped here.
 
 use std::path::PathBuf;
 
@@ -20,7 +20,6 @@ Options:
   --type=KIND     anime (default) or manga, for --search
   --open=LINK     open a deep link, for example updates or manga=7
   --version       print the version and exit
-  --run-backup    run one automatic backup and exit
   --help          print this text and exit
 
 Quit policy: closing the last window quits the application, unless the torrent server or the HTTP server is running;
@@ -141,7 +140,7 @@ impl std::error::Error for ArgError {}
 /// Options that take a value and belong to other handlers, so their value is skipped too.
 const SKIPPED_WITH_VALUE: [&str; 2] = ["--open", "--crash-report"];
 /// Options without a value that belong to other handlers.
-const SKIPPED_FLAGS: [&str; 2] = ["--version", "--run-backup"];
+const SKIPPED_FLAGS: [&str; 1] = ["--version"];
 
 /// True for an `http://` or `https://` address (any case).
 pub fn is_web_address(text: &str) -> bool {
@@ -337,7 +336,7 @@ mod tests {
     #[test]
     fn other_handlers_options_are_skipped_with_their_values() {
         assert_eq!(parse_argv(&argv(&["--open", "updates", "--version"])), Ok(vec![]));
-        assert_eq!(parse_argv(&argv(&["--open=manga=7", "--run-backup"])), Ok(vec![]));
+        assert_eq!(parse_argv(&argv(&["--open=manga=7", "--version"])), Ok(vec![]));
         assert_eq!(parse_argv(&argv(&["--crash-report", "/tmp/x.json"])), Ok(vec![]));
     }
 

@@ -51,7 +51,7 @@ const CACHE: &str = "Android cache folder; covers and pages are fetched again wh
 #[cfg(test)]
 const MAL: &str = "MyAnimeList login is OAuth here; log in again if the tracker asks";
 #[cfg(test)]
-const JOB: &str = "Android job tag; the in-app scheduler owns library updates and backups";
+const JOB: &str = "Android job tag; the in-app scheduler owns library updates, and backups are made by hand";
 #[cfg(test)]
 const APP_STATE: &str = "app state of the old install; this install keeps its own";
 #[cfg(test)]

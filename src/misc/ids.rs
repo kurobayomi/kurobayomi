@@ -15,7 +15,7 @@ pub const NEW_CHAPTERS: &str = "new.chapters";
 pub const NEW_EPISODES: &str = "new.episodes";
 
 /// The notices other crates own, listed here so the registry names every slot of the app.
-pub use kuro_backup::notify::{ID_AUTO_WARNING, ID_BACKUP_PROGRESS, ID_BACKUP_RESULT, ID_RESTORE_PROGRESS, ID_RESTORE_RESULT};
+pub use kuro_backup::notify::{ID_BACKUP_PROGRESS, ID_BACKUP_RESULT, ID_RESTORE_PROGRESS, ID_RESTORE_RESULT};
 pub use kuro_downloads::notify::{ANIME_ERROR_ID, ANIME_PROGRESS_ID, ANIME_WARNING_ID, MANGA_ERROR_ID, MANGA_PROGRESS_ID, MANGA_WARNING_ID};
 pub use kuro_images::notify::PICTURE_NOTICE_ID;
 pub const SHARED_PICTURE: &str = "reader-shared-picture";
@@ -31,7 +31,7 @@ pub fn channel(id: &str) -> &'static str {
         MANGA_PROGRESS_ID | ANIME_PROGRESS_ID => "downloader_progress_channel",
         MANGA_WARNING_ID | ANIME_WARNING_ID | MANGA_ERROR_ID | ANIME_ERROR_ID => "downloader_error_channel",
         ID_BACKUP_PROGRESS | ID_RESTORE_PROGRESS => "backup_restore_progress_channel",
-        ID_BACKUP_RESULT | ID_RESTORE_RESULT | ID_AUTO_WARNING => "backup_restore_complete_channel_v2",
+        ID_BACKUP_RESULT | ID_RESTORE_RESULT => "backup_restore_complete_channel_v2",
         _ => "common_channel",
     }
 }
@@ -89,9 +89,9 @@ mod tests {
         assert!(library_progress(Kind::Manga).starts_with(LIBRARY_PROGRESS));
     }
 
-    const FIXED: [&str; 19] = [
+    const FIXED: [&str; 18] = [
         LIBRARY_PROGRESS, LIBRARY_ERROR, LIBRARY_SIZE_WARNING,
-        LIBRARY_SUMMARY, NEW_CHAPTERS, NEW_EPISODES, ID_AUTO_WARNING, ID_BACKUP_PROGRESS, ID_BACKUP_RESULT,
+        LIBRARY_SUMMARY, NEW_CHAPTERS, NEW_EPISODES, ID_BACKUP_PROGRESS, ID_BACKUP_RESULT,
         ID_RESTORE_PROGRESS, ID_RESTORE_RESULT, ANIME_ERROR_ID, ANIME_PROGRESS_ID, ANIME_WARNING_ID, MANGA_ERROR_ID,
         MANGA_PROGRESS_ID, MANGA_WARNING_ID, PICTURE_NOTICE_ID, SHARED_PICTURE,
     ];

@@ -12,7 +12,6 @@ use chrono::{Local, TimeZone};
 use kuro_backup::format::decode_file;
 use kuro_backup::restore::driver::{Targets, counts, restore_backup};
 use kuro_backup::restore::options::RestoreOptions;
-use kuro_backup::restore::prefs::IntervalScheduler;
 use kuro_backup::restore::sections::Run;
 use kuro_db::tables::{entries as entry_rows, items as item_rows, tracks};
 use kuro_platform::kind::Kind;
@@ -32,11 +31,9 @@ fn fresh() -> Dbs {
 
 fn restore(dbs: &mut Dbs, path: &Path, opts: RestoreOptions, cancel: &dyn Fn() -> bool) -> Run {
     let backup = decode_file(path).unwrap();
-    let off = |_: Option<u32>| {};
-    let sched = IntervalScheduler { store: &dbs.app, backup_timer: &off };
     let open = |_: &str| PrefStore::in_memory();
     let now = Local.with_ymd_and_hms(2026, 10, 9, 12, 0, 0).single().unwrap();
-    let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open, scheduler: &sched };
+    let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open };
     restore_backup(backup, opts, now, targets, cancel, &mut |_| {})
 }
 

@@ -134,8 +134,8 @@ pub fn take_renames() -> Vec<(Kind, kuro_downloads::unit::SourceKey, kuro_downlo
     std::mem::take(&mut *RENAMED.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))
 }
 
-/// Records every loaded source (id, language, name) in the stub table, as Aniyomi's sources table does, so a backup made while
-/// the sources are not loaded (`--run-backup`) and the restore screen can still name them.
+/// Records every loaded source (id, language, name) in the stub table, as Aniyomi's sources table does, so a backup made before
+/// the sources load and the restore screen can still name them.
 fn remember_stubs(kind: Kind, catalogues: &Catalogues) {
     if !crate::data::is_installed() {
         return;

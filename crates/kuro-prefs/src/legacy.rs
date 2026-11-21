@@ -117,11 +117,11 @@ mod tests {
     }
 
     #[test]
-    fn a_supported_interval_and_a_zero_backup_interval_pass_through() {
-        let mut e = vec![entry(UPDATE_INTERVAL, PrefValue::Int(12)), entry("backup_interval", PrefValue::Int(0))];
+    fn a_supported_interval_passes_through() {
+        let mut e = vec![entry(UPDATE_INTERVAL, PrefValue::Int(12))];
         let before = e.clone();
         assert!(convert(&mut e).is_empty());
-        assert_eq!(e, before, "backup_interval 0 stays 0: the auto-backup migration is not run on import");
+        assert_eq!(e, before);
     }
 
     #[test]

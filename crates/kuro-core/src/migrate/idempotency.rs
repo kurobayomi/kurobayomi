@@ -1,7 +1,7 @@
 //! The idempotency harness (T-11a-003). Every registered migration and every legacy conversion rule runs twice on
 //! the same fixture, and the two results must be the same, key by key. The Kotlin steps that were not idempotent
 //! (the rows marked "no" in the catalogue) pass here because a Rust rule changes a key only when its legacy key is
-//! present, and the three registered steps replace a job by name.
+//! present, and the three registered steps only cancel a job by name.
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
@@ -41,14 +41,13 @@ fn step_fixtures() -> Vec<(&'static str, Vec<(&'static str, PrefValue)>)> {
         (
             "everything on",
             vec![
-                ("backup_interval", PrefValue::Int(6)),
                 ("pref_library_update_interval_key", PrefValue::Int(24)),
                 ("library_update_restriction", set(&["wifi", "network_not_metered", "ac"])),
             ],
         ),
         (
             "everything off",
-            vec![("backup_interval", PrefValue::Int(0)), ("pref_library_update_interval_key", PrefValue::Int(0))],
+            vec![("pref_library_update_interval_key", PrefValue::Int(0))],
         ),
         (
             "retired restriction value",
@@ -57,7 +56,7 @@ fn step_fixtures() -> Vec<(&'static str, Vec<(&'static str, PrefValue)>)> {
                 ("library_update_restriction", set(&["battery_not_low"])),
             ],
         ),
-        ("negative interval", vec![("backup_interval", PrefValue::Int(-3))]),
+        ("negative interval", vec![("pref_library_update_interval_key", PrefValue::Int(-3))]),
     ]
 }
 

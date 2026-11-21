@@ -575,7 +575,8 @@ its look is remembered for every source, apart from the Library's, as in Aniyomi
 The systemd user units of T-21a-041 (`data/systemd/kurobayomi-backup.service` and `.timer`) are
 removed. No package installed them and the
 app never wrote or enabled them, and they worked on Linux only. Automatic backups run in the app's own loop while it is
-open (`src/backup_schedule.rs`). The `--run-backup` entry point stays: it is the same on every system.
+open (`src/backup_schedule.rs`). The `--run-backup` entry point stays: it is the same on every system. (Both are gone
+since 2026-11-21, with automatic backups; see below.)
 
 ## Automatic library update interval removed (2026-11-02)
 
@@ -586,3 +587,15 @@ than the chosen interval. What stays: the pass at every launch and the library's
 `DROPPED_KEYS`, so an old `config.toml` or an Aniyomi backup that carries it loads and a restore skips it. The
 library update migration steps now only cancel a job an earlier run registered. The translated strings stay in the
 catalog unused, as the i18n names rule says.
+
+## Automatic backups removed (2026-11-21)
+
+The user removed automatic backups entirely. Gone: the in-app backup loop (`src/backup_schedule.rs`,
+`kuro_backup::auto`), the `--run-backup` command line, the Data and storage > Backup and restore > Automatic backup
+frequency row and the "Last automatically backed up" line, the automatic folder naming and the keep-the-newest-four
+retention (`kuro_backup::file`), the restore's re-arm of the backup timer, and the warning after three failed runs. What
+stays: Create backup and Restore backup, unchanged, with the same file format. `backup_interval`,
+`__APP_STATE_last_auto_backup_timestamp` and `__APP_STATE_backup_enabled_at` are in `DROPPED_KEYS`, so an old
+`config.toml` or an Aniyomi backup that carries them loads and a restore skips them. The backup migration step now only
+cancels a job an earlier run registered, like the library update steps. Backup files already written to the
+`Backups` folder stay where they are. The translated strings stay in the catalog unused, as the i18n names rule says.

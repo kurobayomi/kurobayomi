@@ -1,4 +1,4 @@
-//! Single-flight slot shared by manual and automatic backup runs (area 21, T-21a-027). The slot is an atomic flag:
+//! Single-flight slot of the backup runs (area 21, T-21a-027). The slot is an atomic flag:
 //! a second acquire fails at once, and the guard releases the flag on drop, including when the run panics.
 
 use std::io;
@@ -145,11 +145,11 @@ mod tests {
     }
 
     #[test]
-    fn auto_tick_skipped_during_manual() {
+    fn a_second_acquire_fails_while_a_run_holds_the_slot() {
         let slot = JobSlot::new();
         let manual = slot.try_acquire().unwrap();
         let skipped = slot.try_acquire().is_none();
-        assert!(skipped, "an automatic tick cannot take the slot");
+        assert!(skipped, "a second run cannot take the slot");
         drop(manual);
         assert!(slot.try_acquire().is_some());
     }

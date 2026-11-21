@@ -1,8 +1,8 @@
 //! The registered migrations (T-11a-002).
 //!
-//! Three steps are registered, all `Version::Always`, in the order of `Migrations.kt`: they re-register the periodic
-//! jobs of the automatic backup and of the anime and manga library updates on every start, so a restored profile or
-//! a changed preference takes effect at the next launch.
+//! Three steps are registered, all `Version::Always`, in the order of `Migrations.kt`. Automatic backups and the
+//! automatic library update interval are cut, so on every start they only cancel the periodic jobs of the automatic
+//! backup and of the anime and manga library updates that an earlier run registered.
 //!
 //! The other 41 steps of `Migrations.kt` are not registered. Each one rewrites a key of the Android shared
 //! preferences file, deletes an Android directory, cancels an Android job or logs a tracker out, and a Kurobayomi
@@ -32,7 +32,7 @@
 //! 21  RemoveReaderTapMigration                 77   NORM  reader tap flag becomes a navigation mode
 //! 22  RenameEnumMigration                      81   NORM  enum names renamed
 //! 23  MergeSortTypeDirectionMigration          82   NORM  sort type and direction merged into one string
-//! 24  EnableAutoBackupMigration                84   NORM  a backup interval of 0 becomes 12
+//! 24  EnableAutoBackupMigration                84   DROP  automatic backups removed; the key is ignored on import
 //! 25  MoveChapterPreferencesMigration          85   NORM  chapter flags moved to library preferences
 //! 26  SplitPreferencesMigration                86   NORM  preference file split by purpose
 //! 27  PlayerPreferenceMigration                92   NORM  player settings renamed

@@ -2,7 +2,7 @@
 //! manual request to the running app, and the user timer that runs the automatic pass without a window (mode B).
 //!
 //! Decisions:
-//! - `main` reads the option before GTK starts, like `--run-backup`, so `shell::argv` never sees it as an option of its own.
+//! - `main` reads the option before GTK starts, like `--updates-json`, so `shell::argv` never sees it as an option of its own.
 //! - `manual` hands the request to the running app over D-Bus (`app.library-update`) and exits 0. With no app running
 //!   there is nobody to hand it to, so the same process runs the pass itself.
 //! - The unit folder is an argument: `kuro-platform` has no accessor for the user unit folder and is outside this lane.
@@ -83,7 +83,6 @@ mod tests {
         // T-26a-020, T-26a-029
         assert_eq!(parse_mode(&args(&["--library-update=auto"])), Ok(Some(Mode::Auto)));
         assert_eq!(parse_mode(&args(&["x.tachibk", "--library-update=manual"])), Ok(Some(Mode::Manual)));
-        assert_eq!(parse_mode(&args(&["--run-backup"])), Ok(None));
         assert_eq!(parse_mode(&args(&["--library-update-now"])), Ok(None));
         assert!(parse_mode(&args(&["--library-update=sometimes"])).is_err());
         assert!(parse_mode(&args(&["--library-update="])).is_err());

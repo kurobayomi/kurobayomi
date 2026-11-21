@@ -12,7 +12,7 @@ use kuro_platform::kind::Kind;
 
 pub use manager::{STORAGE_DIR_KEY, StorageManager};
 
-/// Folder of the automatic backups, under the base.
+/// Folder of the backups, under the base.
 pub const BACKUPS_PATH: &str = "Backups";
 /// Folder of downloaded anime episodes.
 pub const ANIME_DOWNLOADS_PATH: &str = "Anime";

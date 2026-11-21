@@ -16,13 +16,10 @@ pub const OPEN_FOLDER: &str = "Open folder";
 pub const GENERIC_RESTORE_TEXT: &str = "Restore in progress";
 pub const ID_BACKUP_PROGRESS: &str = "kurobayomi-backup-progress";
 pub const ID_BACKUP_RESULT: &str = "kurobayomi-backup-result";
-pub const ID_AUTO_WARNING: &str = "kurobayomi-auto-backup-warning";
 /// Restore ids: progress and every final notice (complete, canceled, failed) share one id,
 /// so the final notice replaces the progress one.
 pub const ID_RESTORE_PROGRESS: &str = "restore-progress";
 pub const ID_RESTORE_RESULT: &str = "restore-complete";
-/// Consecutive failed automatic runs before the one warning (E-10).
-pub const FAILURE_STREAK_WARNING: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Urgency {
@@ -36,7 +33,6 @@ pub enum Urgency {
 pub enum Action {
     ShowInFolder(PathBuf),
     OpenErrorLog(PathBuf),
-    OpenSettings,
     CancelRestore,
 }
 
@@ -60,12 +56,12 @@ impl Notice {
     }
 
     /// The desktop notice: a created backup is revealed by a click and by "Open folder", an error log by a click. The
-    /// settings and cancel actions are left to their own screens.
+    /// cancel action is left to its own screen.
     pub fn desktop(&self) -> platform::Notice {
         let (tap, buttons) = match &self.action {
             Some(Action::ShowInFolder(path)) => (Some(Tap::Reveal(path.clone())), vec![(OPEN_FOLDER.to_owned(), Tap::Reveal(path.clone()))]),
             Some(Action::OpenErrorLog(path)) => (Some(Tap::Reveal(path.clone())), Vec::new()),
-            Some(Action::OpenSettings | Action::CancelRestore) | None => (None, Vec::new()),
+            Some(Action::CancelRestore) | None => (None, Vec::new()),
         };
         platform::Notice {
             id: self.id.to_owned(),
@@ -107,17 +103,6 @@ pub fn manual_finished_report(notifier: &dyn Notifier, result: &Result<PathBuf, 
     }
 }
 
-/// Closes the progress notice. An automatic run is silent on success; a failure shows the warning only at the
-/// third consecutive failure (`streak`).
-pub fn auto_finished(notifier: &dyn Notifier, result: &Result<PathBuf, BackupError>, streak: u32) {
-    notifier.withdraw(ID_BACKUP_PROGRESS);
-    if result.is_err() {
-        if let Some(warning) = failure_warning(streak) {
-            warning.show(notifier);
-        }
-    }
-}
-
 /// "Creating backup", indeterminate, shown at the start of every run.
 pub fn create_progress() -> Notice {
     Notice::new(ID_BACKUP_PROGRESS, "Creating backup", None, Urgency::Low)
@@ -143,21 +128,6 @@ pub fn manual_created_skipping(path: &Path, skipped: usize) -> Notice {
 /// Manual failure: "Backup failed" with the key text, never the internal detail.
 pub fn manual_failed(error: &BackupError) -> Notice {
     Notice::new(ID_BACKUP_RESULT, "Backup failed", Some(error.user_text().to_owned()), Urgency::Normal)
-}
-
-/// Automatic failure: silent until the third consecutive failure, then one warning per streak (E-10).
-pub fn failure_warning(streak: u32) -> Option<Notice> {
-    if streak != FAILURE_STREAK_WARNING {
-        return None;
-    }
-    let mut n = Notice::new(
-        ID_AUTO_WARNING,
-        "Automatic backup failed",
-        Some("Check the backup folder and free space.".into()),
-        Urgency::Normal,
-    );
-    n.action = Some(Action::OpenSettings);
-    Some(n)
 }
 
 /// Restore progress: "Restoring backup" or "Syncing library", with the body hidden when asked (B-15, T-21a-030).
@@ -269,17 +239,6 @@ mod tests {
     }
 
     #[test]
-    fn automatic_success_is_silent_and_failure_warns_on_third() {
-        let rec = Recorder::default();
-        auto_finished(&rec, &Ok(PathBuf::from("/d/a.tachibk")), 0);
-        assert!(rec.shown.lock().unwrap().is_empty());
-        auto_finished(&rec, &Err(BackupError::CreateFile), 2);
-        assert!(rec.shown.lock().unwrap().is_empty());
-        auto_finished(&rec, &Err(BackupError::CreateFile), 3);
-        assert_eq!(rec.shown.lock().unwrap()[0].0, ID_AUTO_WARNING);
-    }
-
-    #[test]
     fn restore_duration_format() {
         assert_eq!(restore_duration(65_000), "01 min, 05 sec");
         assert_eq!(restore_duration(0), "00 min, 00 sec");
@@ -311,7 +270,6 @@ mod tests {
         assert_eq!(shown.title, "Syncing library");
         // Backup texts never depend on the setting.
         assert_eq!(create_progress().body, None);
-        assert_eq!(failure_warning(3).unwrap().body.as_deref(), Some("Check the backup folder and free space."));
     }
 
     #[test]
@@ -345,14 +303,6 @@ mod tests {
         assert_eq!(restore_done(1, 2, 0, None).urgency, Urgency::High);
         assert_eq!(restore_canceled().urgency, Urgency::Normal);
         assert_eq!(restore_failed("x").urgency, Urgency::High);
-    }
-
-    #[test]
-    fn automatic_warning_only_on_third_failure() {
-        assert!(failure_warning(1).is_none());
-        assert!(failure_warning(2).is_none());
-        assert_eq!(failure_warning(3).unwrap().title, "Automatic backup failed");
-        assert!(failure_warning(4).is_none());
     }
 
     #[test]

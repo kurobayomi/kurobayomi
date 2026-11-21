@@ -215,8 +215,7 @@ pub fn tree_with(id: &str, prefs: &Prefs, anime: &[Category], manga: &[Category]
 /// the storage usage group. `changed` runs after a new folder is stored or the cache is cleared.
 fn data_storage_rows(prefs: &Prefs, changed: Rc<dyn Fn()>) -> Vec<Preference> {
     let mut tree: Vec<Preference> = storage::rows(prefs, Rc::clone(&changed)).into_iter().map(rows::item).collect();
-    let interval = rows::ranged_choice(&tr(MsgKey::pref_backup_interval), &prefs.backup.backup_interval, |h| kuro_backup::settings::interval_label(h as u32).unwrap_or("").to_owned(), true);
-    tree.push(rows::group(&tr(MsgKey::label_backup), vec![interval, restore_backup_row(), rows::info(&backup_info(prefs))]));
+    tree.push(rows::group(&tr(MsgKey::label_backup), vec![restore_backup_row(), rows::info(&keep_copies())]));
     tree.push(rows::group(&tr(MsgKey::pref_storage_usage), vec![cache::size_row(prefs), cache::clear_row(Rc::clone(&changed))]));
     tree.push(rows::group(&tr(MsgKey::ui_maintenance), maintenance::data_rows()));
     tree.push(library_export::group_row());
@@ -230,16 +229,10 @@ fn without_export_dialog(mut tree: Vec<Preference>) -> Vec<Preference> {
     tree
 }
 
-/// The static backup info line of the spec page. The typed line below replaces it: it carries the last automatic backup.
+/// The backup info line: the advice to keep copies. The typed line replaces the static one of the spec page, so it
+/// shows in the active language.
 pub fn keep_copies() -> String {
     tr(MsgKey::backup_info)
-}
-
-/// The backup info line: the advice to keep copies, then when the last automatic backup ran (`backup_interval` page).
-fn backup_info(prefs: &Prefs) -> String {
-    let now = i64::try_from(kuro_core::crash::now_ms()).unwrap_or(i64::MAX);
-    let last = prefs.backup.last_auto_backup_timestamp.get();
-    format!("{}\n\n{}", keep_copies(), kuro_backup::settings::last_auto_info(last, now))
 }
 
 /// The spec rows without the static backup info line, which the typed one replaces.
@@ -668,5 +661,6 @@ mod tests {
         assert!(on_click.is_some(), "the row opens the folder chooser");
         assert_eq!(first.title(), "Storage location");
         assert!(group_titles(&tree, "Backup and restore").iter().any(|t| t == "Create backup"), "the rest of the spec page stays");
+        assert!(!group_titles(&tree, "Backup and restore").iter().any(|t| t == "Automatic backup frequency"), "automatic backups are cut");
     }
 }

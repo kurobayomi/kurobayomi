@@ -1,6 +1,6 @@
 //! The production adapters of the backup creator (T-21a-012, T-21a-019, T-21a-020): the library read over the two
 //! databases, the preference read over the app store, and the installed extension artifacts read from disk. All of it
-//! is GTK-free, so the GUI and `kurobayomi --run-backup` share it.
+//! is GTK-free.
 
 use kuro_platform::kind::Kind;
 use std::path::PathBuf;

@@ -1,24 +1,15 @@
 //! Integration tests (area 21, T-21a-040 section 4.11): a fake library, real files in a temp folder, and the decoder.
 
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicU32, Ordering};
-
-use chrono::{Duration as ChronoDuration, Local, TimeZone};
-use kuro_backup::auto::{AutoConfig, AutoHost, PowerState, run_loop};
-use kuro_backup::creator::{CreateInputs, EntryData, LibraryReader, PrefStore, SourcePrefStore, SourceRegistry, build_backup};
+use kuro_backup::creator::{CreateInputs, EntryData, LibraryReader, PrefStore, SourcePrefStore, SourceRegistry};
 use kuro_backup::error::BackupError;
-use kuro_backup::file::{MAX_AUTO_BACKUPS, Target, create_file, write_backup};
+use kuro_backup::file::{Target, create_file};
 use kuro_backup::format::decode_file;
-use kuro_backup::job::JobSlot;
 use kuro_backup::options::BackupOptions;
 use kuro_backup::schema::PrefValue;
 use kuro_data::category::Category;
 use kuro_data::entry::Entry;
 use kuro_data::item::Item;
 use kuro_platform::kind::Kind;
-use tokio::sync::watch;
 
 struct Library {
     manga: Vec<EntryData>,
@@ -107,76 +98,6 @@ fn manual_backup_round_trips_through_the_decoder() {
     assert!(!decoded.is_legacy);
     let names: Vec<String> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
     assert_eq!(names, vec!["manual.tachibk".to_string()], "no .part file is left behind");
-}
-
-#[test]
-fn automatic_runs_keep_the_newest_four() {
-    let dir = tempfile::tempdir().unwrap();
-    let auto_dir = dir.path().join("autobackup");
-    let lib = Library { manga: vec![one_manga(1)] };
-    let backup = build_backup(&inputs(&lib, &NoSources, &NoPrefs), &BackupOptions::default()).unwrap();
-    let start = Local.with_ymd_and_hms(2026, 10, 9, 8, 0, 0).unwrap();
-    for i in 0..6 {
-        let now = start + ChronoDuration::minutes(i);
-        write_backup(&backup, &Target::Automatic { dir: auto_dir.clone(), now }).unwrap();
-    }
-    let mut names: Vec<String> = std::fs::read_dir(&auto_dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
-    names.sort();
-    assert_eq!(names.len(), MAX_AUTO_BACKUPS);
-    assert_eq!(names.first().map(String::as_str), Some("kurobayomi_2026-10-09_08-02-00.tachibk"));
-    assert_eq!(names.last().map(String::as_str), Some("kurobayomi_2026-10-09_08-05-00.tachibk"));
-}
-
-struct Silent;
-impl kuro_platform::notifier::Notifier for Silent {
-    fn show(&self, _: &str, _: &str, _: Option<&str>) {}
-    fn withdraw(&self, _: &str) {}
-}
-
-struct CountingHost {
-    runs: AtomicU32,
-    restore: bool,
-    last: Mutex<i64>,
-    dir: PathBuf,
-}
-
-impl AutoHost for CountingHost {
-    fn now_ms(&self) -> i64 {
-        1_000_000_000_000
-    }
-    fn last_auto_ms(&self) -> i64 {
-        *self.last.lock().unwrap()
-    }
-    fn restore_running(&self) -> bool {
-        self.restore
-    }
-    fn power(&self) -> PowerState {
-        PowerState::default()
-    }
-    fn run_backup(&self) -> Result<PathBuf, BackupError> {
-        self.runs.fetch_add(1, Ordering::SeqCst);
-        let lib = Library { manga: vec![one_manga(0)] };
-        let backup = build_backup(&inputs(&lib, &NoSources, &NoPrefs), &BackupOptions::default())?;
-        let now = Local::now();
-        write_backup(&backup, &Target::Automatic { dir: self.dir.clone(), now })
-    }
-    fn save_last_auto_ms(&self, ms: i64) {
-        *self.last.lock().unwrap() = ms;
-    }
-    fn report_failure(&self, _streak: u32) {}
-}
-
-#[tokio::test(start_paused = true)]
-async fn restore_running_defers_the_automatic_run_and_writes_nothing() {
-    let dir = tempfile::tempdir().unwrap();
-    let host = Arc::new(CountingHost { runs: AtomicU32::new(0), restore: true, last: Mutex::new(0), dir: dir.path().join("autobackup") });
-    let (tx, rx) = watch::channel(AutoConfig { interval_hours: 6, last_auto_epoch_ms: 0, enabled_at_epoch_ms: 1, min_battery_percent: 15 });
-    let task = tokio::spawn(run_loop(rx, JobSlot::new(), Arc::clone(&host), Arc::new(Silent)));
-    tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
-    drop(tx);
-    task.await.unwrap();
-    assert_eq!(host.runs.load(Ordering::SeqCst), 0);
-    assert!(!host.dir.exists() || std::fs::read_dir(&host.dir).unwrap().next().is_none());
 }
 
 struct Prefs;

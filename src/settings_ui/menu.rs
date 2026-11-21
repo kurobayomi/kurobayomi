@@ -28,7 +28,7 @@ pub fn rows(about: &str) -> Vec<MenuRow> {
         row("Player", "Languages, quality, volume, autoplay, controls", "video-display-symbolic", "settings_player"),
         row("Downloads and storage", "Maximum downloads, auto-download, cleanup", "folder-download-symbolic", "settings_downloads"),
         row("Sources and tracking", "Sources, repositories, AniList, cookies", "compass-symbolic", "settings_browse"),
-        row("Backup and restore", "Automatic and manual backups, maintenance", "drive-harddisk-symbolic", "settings_data_storage"),
+        row("Backup and restore", "Create and restore backups, maintenance", "drive-harddisk-symbolic", "settings_data_storage"),
         row("About", about, "help-about-symbolic", "settings_about"),
     ]
 }

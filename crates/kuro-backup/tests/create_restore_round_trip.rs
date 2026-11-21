@@ -9,7 +9,6 @@ use kuro_backup::format::decode_file;
 use kuro_backup::options::BackupOptions;
 use kuro_backup::restore::driver::{Targets, restore_backup};
 use kuro_backup::restore::options::RestoreOptions;
-use kuro_backup::restore::prefs::IntervalScheduler;
 use kuro_backup::schema::PrefValue;
 use kuro_backup::validate::{TrackerRegistry, preflight_file};
 use kuro_data::category::Category;
@@ -134,11 +133,9 @@ fn fresh() -> Dbs {
 
 fn restore(dbs: &mut Dbs, path: &std::path::Path) {
     let backup = decode_file(path).unwrap();
-    let nothing = |_: Option<u32>| {};
-    let sched = IntervalScheduler { store: &dbs.app, backup_timer: &nothing };
     let source = dbs.source.clone();
     let open = move |_: &str| source.clone();
-    let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open, scheduler: &sched };
+    let targets = Targets { db: &mut dbs.db, app_prefs: &dbs.app, source_prefs: &open };
     let now = Local.with_ymd_and_hms(2026, 10, 9, 12, 0, 0).single().unwrap();
     let run = restore_backup(backup, RestoreOptions::from_bits([true; 7]), now, targets, &|| false, &mut |_| {});
     assert!(run.errors.is_empty(), "{:?}", run.errors);
