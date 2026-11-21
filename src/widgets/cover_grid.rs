@@ -12,13 +12,17 @@ pub fn cover_width(cover_size: i32) -> i32 {
     column_width(cover_size) - 2 * CELL_MARGIN_PX
 }
 
-/// Sets the column count of `grid` for a viewport `viewport_px` wide and the stored `cover_size`: as many columns of that
-/// size as fit, at least two. Never a forced minimum: a forced count makes the grid demand width, so the window could
-/// only grow.
+/// How many columns of the stored `cover_size` fit a viewport `viewport_px` wide: as many as fit, at least two. The
+/// Library's grid and Home's rows both count here, so they agree at every width.
+pub fn columns(viewport_px: i32, cover_size: i32) -> i32 {
+    (viewport_px / column_width(cover_size)).max(2)
+}
+
+/// Sets the column count of `grid` for a viewport `viewport_px` wide and the stored `cover_size` ([`columns`]). Never a
+/// forced minimum: a forced count makes the grid demand width, so the window could only grow.
 pub fn apply_columns(grid: &gtk::GridView, viewport_px: i32, cover_size: i32) {
-    let columns = (viewport_px / column_width(cover_size)).max(2);
     grid.set_min_columns(1);
-    grid.set_max_columns(columns as u32);
+    grid.set_max_columns(columns(viewport_px, cover_size) as u32);
 }
 
 #[cfg(test)]

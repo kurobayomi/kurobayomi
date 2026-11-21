@@ -185,17 +185,29 @@ fn update_library(button: &gtk::Button, kind: Kind) {
         }
     });
     if outcome == Outcome::Started {
-        spin_until_done(button, kind);
+        spin_until_done(button, &[kind]);
     }
 }
 
-/// Turns the button's arrow until the library pass of `kind` is no longer running.
-fn spin_until_done(button: &gtk::Button, kind: Kind) {
+/// Home's refresh button: starts the library pass of both kinds, says how it went in the app's toast (the first kind
+/// that started speaks for both), and spins until both passes end.
+pub(crate) fn update_libraries(button: &gtk::Button) {
+    let outcomes = [Kind::Anime, Kind::Manga].map(library_trigger::trigger);
+    let spoken = outcomes.iter().copied().find(|o| *o == Outcome::Started).unwrap_or(outcomes[0]);
+    crate::toast::notify(library_trigger::message(spoken));
+    if outcomes.contains(&Outcome::Started) {
+        spin_until_done(button, &[Kind::Anime, Kind::Manga]);
+    }
+}
+
+/// Turns the button's arrow until no library pass of `kinds` is running.
+fn spin_until_done(button: &gtk::Button, kinds: &[Kind]) {
     crate::ui::set_refreshing(button, true);
     let weak = button.downgrade();
+    let kinds = kinds.to_vec();
     glib::timeout_add_local(Duration::from_millis(500), move || {
         let Some(button) = weak.upgrade() else { return glib::ControlFlow::Break };
-        if library_trigger::running(kind) {
+        if kinds.iter().any(|kind| library_trigger::running(*kind)) {
             return glib::ControlFlow::Continue;
         }
         crate::ui::set_refreshing(&button, false);

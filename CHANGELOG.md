@@ -9,8 +9,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 ### Added
 
 - Home, first in the sidebar: what you're in the middle of (Continue) and the new episodes and chapters of your library
-  (New for you), anime and manga together, as many covers as fit the window. A cover resumes or opens the new episode or
-  chapter; See all opens History or Updates.
+  (New for you), anime and manga together. Its covers are the Library's, with the same badges, score, cover size, look
+  and right-click menu, and as many fit a row as fit a Library row. A cover resumes or opens the new episode or
+  chapter; See all opens History or Updates; search and refresh are in its top bar.
 
 ### Changed
 

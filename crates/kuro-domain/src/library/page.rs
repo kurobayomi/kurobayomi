@@ -69,7 +69,9 @@ pub fn build_pages(
         .collect()
 }
 
-fn item(
+/// One library card's item: `row` with the counts its badges show, each computed only while its badge is on. The
+/// Library's pages and Home's covers both build their items here, so the two show the same badges.
+pub fn item(
     row: &LibraryRow,
     badges: BadgeSettings,
     downloads: &impl Fn(&LibraryRow) -> i64,

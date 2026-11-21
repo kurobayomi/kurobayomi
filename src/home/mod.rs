@@ -1,11 +1,19 @@
 //! Home (docs/design/home.md): the page the app opens on. Two rows of covers, anime and manga together: Continue (what
 //! the user is in the middle of, from the History of both kinds) and New for you (new units of library titles, from the
-//! Updates feed of both kinds). Each row shows as many covers as fit the window; "See all" opens the full screen.
-//! The rules are in [`data`]; this file reads the database, draws and routes clicks.
+//! Updates feed of both kinds). "See all" opens the full screen.
+//!
+//! Home draws nothing of its own that the app already has (fix pass of docs/design/home.md): each cover is the Library's
+//! card (`library::view::card`) built from the Library's item (`kuro_domain::library::page::item`), so the badges, the
+//! score, the cover size and the display mode are the Library's; a row holds as many covers as the Library's column
+//! rule fits (`widgets::cover_grid::columns`); the right-click menu is the Library's (`library::mount::cover_menu`); the
+//! header is the shared page header (`ui::page`, built by the tab host) with the shared actions; the refresh button is
+//! the Updates page's (`updates::mount::update_libraries`); the welcome view is the Library's. The rules are in
+//! [`data`]; this file reads the database, draws and routes clicks.
 
 pub mod data;
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -16,10 +24,14 @@ use gtk::{Align, Box as GBox, Orientation as O};
 use kuro_db::handle::Db;
 use kuro_domain::history::model::HistoryWithRelations;
 use kuro_domain::history::repo::HistoryRepo;
+use kuro_domain::library::model::LibraryRow;
+use kuro_domain::library::page::LibraryItem;
 use kuro_domain::updates::model::UpdateRow;
 use kuro_domain::updates::repo::UpdatesRepo;
 use kuro_i18n::{Arg, MsgKey, tr, trf};
+use kuro_images::art::ArtRef;
 use kuro_platform::kind::Kind;
+use kuro_prefs::library::LibraryPrefs;
 
 use crate::browse::look;
 use crate::screens::Built;
@@ -27,25 +39,33 @@ use crate::theme::tokens::{SPACE_M, SPACE_S, SPACE_XS};
 use crate::updates::coalesce::watch_coalesced;
 use crate::updates::history::{COALESCE_MS, Resume};
 use crate::updates::history_data;
+use crate::widgets::cover_grid::{self, CELL_MARGIN_PX};
 use data::{NewCard, ROW_LIMIT, Spot};
-
-/// The space between two covers of a row.
-const GAP: i32 = 12;
 
 thread_local! {
     /// The Home screen; its widgets hold only weak references, so this keeps it alive with the page.
     static HOME: RefCell<Option<Rc<Home>>> = const { RefCell::new(None) };
 }
 
-/// The Home page. `None` before the app data is open.
+/// The Home page: its content and the shared header actions (search across sources, refresh the library). The tab host
+/// wraps it in the shared page header. `None` before the app data is open.
 pub fn page() -> Option<Built> {
     if !crate::data::is_installed() {
         return None;
     }
     let home = Home::new();
-    let content = home.root.clone().upcast();
+    let content = home.stack.clone().upcast();
+    let search = crate::ui::icon_button("system-search-symbolic", &tr(MsgKey::action_global_search));
+    search.connect_clicked(|_| crate::ui::open("global_search"));
+    let refresh = crate::ui::refresh_button(&tr(MsgKey::action_update_library));
+    refresh.connect_clicked(crate::updates::mount::update_libraries);
+    let end = crate::ui::HeaderActions { refresh: Some(refresh.upcast()), extra: vec![search.upcast()], ..Default::default() }.widgets();
     HOME.with(|h| *h.borrow_mut() = Some(home));
-    Some(Built { content, end: vec![] })
+    Some(Built { content, end })
+}
+
+fn slot(kind: Kind) -> usize {
+    usize::from(kind == Kind::Manga)
 }
 
 /// The rows each query last published, per kind (anime first).
@@ -53,96 +73,239 @@ pub fn page() -> Option<Built> {
 struct Rows {
     history: [Option<Vec<HistoryWithRelations>>; 2],
     updates: [Option<Vec<UpdateRow>>; 2],
+    /// The community score of each entry, per kind.
+    scores: [HashMap<i64, f64>; 2],
 }
 
-fn slot(kind: Kind) -> usize {
-    usize::from(kind == Kind::Manga)
+/// One cover as drawn: everything it shows and the unit it opens. Equal lists draw the same row, so a change elsewhere
+/// in the tables redraws nothing.
+#[derive(Clone, Debug, PartialEq)]
+struct Cover {
+    kind: Kind,
+    item: LibraryItem,
+    in_library: bool,
+    art: ArtRef,
+    score: Option<f64>,
+    line: String,
+    progress: Option<f64>,
+    unit_id: i64,
+}
+
+/// A row of covers: its group (heading, "See all", the covers), and what it shows now.
+struct Row {
+    group: GBox,
+    flow: gtk::FlowBox,
+    covers: RefCell<Vec<Cover>>,
+}
+
+impl Row {
+    fn new(title: &str, see_all: &str, screen: &'static str) -> Rc<Self> {
+        let heading = gtk::Label::builder().label(title).xalign(0.0).hexpand(true).css_classes(["heading"]).build();
+        let link = gtk::Button::with_label(see_all);
+        link.add_css_class("flat");
+        link.connect_clicked(move |_| crate::ui::open(screen));
+        let top = GBox::new(O::Horizontal, SPACE_S);
+        top.append(&heading);
+        top.append(&link);
+        // one line of covers: at most the columns that fit (`fit`), each cell the Library's column; its minimum is one cell
+        let flow = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .homogeneous(true)
+            .min_children_per_line(1)
+            .max_children_per_line(2)
+            .column_spacing(0)
+            .row_spacing(0)
+            .valign(Align::Start)
+            .activate_on_single_click(true)
+            .build();
+        let group = GBox::new(O::Vertical, SPACE_S);
+        group.append(&top);
+        group.append(&flow);
+        group.set_visible(false);
+        let row = Rc::new(Self { group, flow, covers: RefCell::default() });
+        // a click or Enter on a cover opens its unit, as a History or an Updates row does
+        let weak = Rc::downgrade(&row);
+        row.flow.connect_child_activated(move |_, child| {
+            let Some(row) = weak.upgrade() else { return };
+            let Some(cover) = usize::try_from(child.index()).ok().and_then(|i| row.covers.borrow().get(i).cloned()) else { return };
+            crate::updates::history_screen::open_unit_of(cover.kind, cover.item.row.id, cover.unit_id);
+        });
+        row
+    }
+
+    /// Draws `covers` when they differ from what the row shows (or always, with `force`: a new cover size or look).
+    fn draw(&self, covers: Vec<Cover>, mode: kuro_prefs::library::LibraryDisplayMode, force: bool) {
+        if !force && *self.covers.borrow() == covers {
+            return;
+        }
+        while let Some(child) = self.flow.first_child() {
+            self.flow.remove(&child);
+        }
+        for cover in &covers {
+            self.flow.append(&card(cover, mode));
+        }
+        // cells are the Library's: its margin on every side
+        let mut index = 0;
+        while let Some(child) = self.flow.child_at_index(index) {
+            crate::ui::margins(&child, CELL_MARGIN_PX);
+            index += 1;
+        }
+        *self.covers.borrow_mut() = covers;
+    }
+
+    /// Shows the covers that fit `columns`, hides the rest.
+    fn fit(&self, columns: i32) {
+        self.flow.set_max_children_per_line(u32::try_from(columns).unwrap_or(2));
+        let mut index = 0;
+        while let Some(child) = self.flow.child_at_index(index) {
+            child.set_visible(index < columns);
+            index += 1;
+        }
+    }
 }
 
 struct Home {
-    root: GBox,
-    /// Continue and New for you: each a heading, a row of covers and a "See all" link, hidden while it has nothing.
-    continue_group: GBox,
-    continue_row: GBox,
-    new_group: GBox,
-    new_row: GBox,
+    /// Loading, then the content: the shared state switcher.
+    stack: gtk::Stack,
+    scroller: gtk::ScrolledWindow,
+    /// The column's side margins, taken off the scroller's width when counting columns.
+    gutter: i32,
+    continue_row: Rc<Row>,
+    new_row: Rc<Row>,
     empty: gtk::Widget,
     /// The first run's welcome view (the Library's own), shown while no source repository exists.
     welcome: GBox,
+    prefs: Rc<LibraryPrefs>,
     rows: RefCell<Rows>,
     watches: RefCell<Vec<glib::JoinHandle<()>>>,
-    /// The width the rows were last fitted to.
-    width: std::cell::Cell<i32>,
+    /// Something changed while Home was not on screen: it redraws when it shows again.
+    stale: Cell<bool>,
+    /// The next draw rebuilds every cover (the cover size or the look changed).
+    force: Cell<bool>,
 }
 
 impl Home {
     fn new() -> Rc<Self> {
-        let header = crate::ui::header_bar();
-        header.set_title_widget(Some(&gtk::Label::new(None)));
-        crate::ui::window_buttons(&header);
-
-        let (continue_group, continue_row) = group(&tr(MsgKey::action_continue), &tr(MsgKey::home_see_all_history), "history");
-        let (new_group, new_row) = group(&tr(MsgKey::home_new_for_you), &tr(MsgKey::home_see_all_updates), "updates");
+        let continue_row = Row::new(&tr(MsgKey::action_continue), &tr(MsgKey::home_see_all_history), "history");
+        let new_row = Row::new(&tr(MsgKey::home_new_for_you), &tr(MsgKey::home_see_all_updates), "updates");
         let find = gtk::Button::with_label(&tr(MsgKey::home_find_something));
         find.add_css_class("suggested-action");
         find.add_css_class("pill");
         find.connect_clicked(|_| crate::ui::open("browse"));
         let empty: gtk::Widget = crate::widgets::status::page(Some("view-grid-symbolic"), &tr(MsgKey::home_empty), None, std::slice::from_ref(&find)).upcast();
-
-        let column = GBox::new(O::Vertical, SPACE_M * 2);
-        column.set_margin_start(SPACE_M + SPACE_S);
-        column.set_margin_end(SPACE_M + SPACE_S);
-        column.set_margin_top(SPACE_M);
-        column.set_margin_bottom(SPACE_M);
         let welcome = crate::library::view::welcome::Welcome::new().widget().clone();
         welcome.set_visible(false);
+
+        let gutter = SPACE_M + SPACE_S;
+        let column = GBox::new(O::Vertical, SPACE_M * 2);
+        column.set_margin_start(gutter);
+        column.set_margin_end(gutter);
+        column.set_margin_top(SPACE_M);
+        column.set_margin_bottom(SPACE_M);
         column.append(&welcome);
-        column.append(&continue_group);
-        column.append(&new_group);
+        column.append(&continue_row.group);
+        column.append(&new_row.group);
         column.append(&empty);
         let scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).child(&column).build();
 
-        let root = GBox::new(O::Vertical, 0);
-        root.append(&header);
-        root.append(&scroller);
+        let stack = crate::widgets::status::switcher();
+        stack.add_named(&crate::widgets::status::loading(None), Some("loading"));
+        stack.add_named(&scroller, Some("content"));
+        stack.set_visible_child_name("loading");
 
+        let prefs = Rc::new(LibraryPrefs::new(crate::data::app().base.store().clone()));
         let home = Rc::new(Self {
-            root,
-            continue_group,
+            stack,
+            scroller,
+            gutter,
             continue_row,
-            new_group,
             new_row,
             empty,
             welcome,
+            prefs,
             rows: RefCell::default(),
             watches: RefCell::default(),
-            width: std::cell::Cell::new(0),
+            stale: Cell::new(true),
+            force: Cell::new(false),
         });
-        // the rows follow the width of the page: as many covers as fit
-        let weak = Rc::downgrade(&home);
-        scroller.hadjustment().connect_page_size_notify(move |adjustment| {
+        home.wire();
+        home
+    }
+
+    fn wire(self: &Rc<Self>) {
+        // the rows follow the width of the page, as the Library's grid does
+        let weak = Rc::downgrade(self);
+        self.scroller.hadjustment().connect_page_size_notify(move |_| {
             if let Some(home) = weak.upgrade() {
-                home.fit(adjustment.page_size() as i32);
+                home.fit();
             }
         });
-        home.start();
+        // shown again after a change while away: draw it now
+        let weak = Rc::downgrade(self);
+        self.stack.connect_map(move |_| {
+            if let Some(home) = weak.upgrade().filter(|home| home.stale.get()) {
+                home.render();
+            }
+        });
+        // the Library's cover size and look apply here too, at once (the first call of each is the seed)
+        for redraw in [Self::bind_cover_size, Self::bind_display_mode] {
+            redraw(self);
+        }
+        self.start();
         // adding (or removing) a repository loads the sources again: the welcome view gives way to the rows, or back
-        let weak = Rc::downgrade(&home);
+        let weak = Rc::downgrade(self);
         crate::browse::glue::follow_changes(crate::recipe_sources::changes(), move |_| match weak.upgrade() {
             Some(home) => {
-                home.render();
+                home.changed();
                 true
             }
             None => false,
         });
-        home
+        for kind in [Kind::Anime, Kind::Manga] {
+            let Some(scores) = crate::community::follow_scores(kind) else { continue };
+            let weak = Rc::downgrade(self);
+            crate::browse::glue::follow_changes(scores, move |scores| match weak.upgrade() {
+                Some(home) => {
+                    home.rows.borrow_mut().scores[slot(kind)] = scores;
+                    home.changed();
+                    true
+                }
+                None => false,
+            });
+        }
+    }
+
+    fn bind_cover_size(self: &Rc<Self>) {
+        let (weak, seeded) = (Rc::downgrade(self), Cell::new(false));
+        crate::bind::bind(&self.stack, &self.prefs.cover_size, move |_, _| {
+            if !seeded.replace(true) {
+                return;
+            }
+            if let Some(home) = weak.upgrade() {
+                home.force.set(true);
+                home.changed();
+            }
+        });
+    }
+
+    fn bind_display_mode(self: &Rc<Self>) {
+        let (weak, seeded) = (Rc::downgrade(self), Cell::new(false));
+        crate::bind::bind(&self.stack, &self.prefs.display_mode, move |_, _| {
+            if !seeded.replace(true) {
+                return;
+            }
+            if let Some(home) = weak.upgrade() {
+                home.force.set(true);
+                home.changed();
+            }
+        });
     }
 
     fn db(&self) -> Arc<Db> {
         crate::data::app().db.clone()
     }
 
-    /// Follows the History and the Updates of both kinds; each change redraws the page.
+    /// Follows the History and the Updates of both kinds.
     fn start(self: &Rc<Self>) {
         let months = u32::try_from(kuro_domain::UPDATES_WINDOW_MONTHS).unwrap_or(3);
         let since = Local::now().checked_sub_months(Months::new(months)).map_or(0, |t| t.timestamp_millis());
@@ -155,7 +318,7 @@ impl Home {
                     Ok(rows) => home.rows.borrow_mut().history[slot(kind)] = Some((*rows).clone()),
                     Err(error) => tracing::warn!(%error, ?kind, "home: the history could not be read"),
                 }
-                home.render();
+                home.changed();
             }));
             let weak = Rc::downgrade(self);
             watches.push(watch_coalesced(UpdatesRepo::new(self.db()).watch_recent(kind, since), COALESCE_MS, move |published| {
@@ -164,78 +327,96 @@ impl Home {
                     Ok(rows) => home.rows.borrow_mut().updates[slot(kind)] = Some((*rows).clone()),
                     Err(error) => tracing::warn!(%error, ?kind, "home: the updates could not be read"),
                 }
-                home.render();
+                home.changed();
             }));
         }
         *self.watches.borrow_mut() = watches;
     }
 
-    fn render(self: &Rc<Self>) {
-        let (history, updates) = {
-            let rows = self.rows.borrow();
-            let history = rows.history.clone();
-            let updates: Vec<UpdateRow> = rows.updates.iter().flatten().flatten().cloned().collect();
-            (history, updates)
-        };
-        let [anime, manga] = history;
-        let continue_cards = self.continue_cards(anime.unwrap_or_default(), manga.unwrap_or_default());
-        let new_cards = data::group_new(&updates, ROW_LIMIT);
+    /// Something Home shows may have changed: it redraws now when it is on screen, else when it shows again. The player
+    /// saves its position every few seconds; while it plays, Home is not on screen and reads nothing.
+    fn changed(self: &Rc<Self>) {
+        if self.stack.is_mapped() {
+            self.render();
+        } else {
+            self.stale.set(true);
+        }
+    }
 
-        clear(&self.continue_row);
-        for card in &continue_cards {
-            self.continue_row.append(card);
-        }
-        clear(&self.new_row);
-        for card in &new_cards {
-            self.new_row.append(&new_cover(card));
-        }
+    fn render(self: &Rc<Self>) {
+        self.stale.set(false);
         let answered = {
             let rows = self.rows.borrow();
             rows.history.iter().all(Option::is_some) && rows.updates.iter().all(Option::is_some)
         };
-        let shown = data::shown(crate::library::view::repositories_exist(), answered, !continue_cards.is_empty(), !new_cards.is_empty());
+        let repositories = crate::library::view::repositories_exist();
+        // the spinner until the first answers, unless the welcome view has the page anyway
+        self.stack.set_visible_child_name(if answered || !repositories { "content" } else { "loading" });
+        if !answered && repositories {
+            return;
+        }
+        let (continue_covers, new_covers) = self.covers();
+        let shown = data::shown(repositories, answered, !continue_covers.is_empty(), !new_covers.is_empty());
+        let mode = data::cover_mode(self.prefs.display_mode.get());
+        let force = self.force.replace(false);
+        self.continue_row.draw(continue_covers, mode, force);
+        self.new_row.draw(new_covers, mode, force);
         self.welcome.set_visible(shown.welcome);
-        self.continue_group.set_visible(shown.continue_row);
-        self.new_group.set_visible(shown.new_row);
+        self.continue_row.group.set_visible(shown.continue_row);
+        self.new_row.group.set_visible(shown.new_row);
         self.empty.set_visible(shown.empty);
-        self.fit(self.width.get());
+        self.fit();
     }
 
-    /// The Continue covers: the newest history row of each title, both kinds, without the titles that have nothing
-    /// left (the resume a History row would make finds no unit).
-    fn continue_cards(&self, anime: Vec<HistoryWithRelations>, manga: Vec<HistoryWithRelations>) -> Vec<gtk::Widget> {
+    /// Both rows' covers from the published rows.
+    fn covers(&self) -> (Vec<Cover>, Vec<Cover>) {
+        let (history, updates, scores) = {
+            let rows = self.rows.borrow();
+            let updates: Vec<UpdateRow> = rows.updates.iter().flatten().flatten().cloned().collect();
+            (rows.history.clone(), updates, rows.scores.clone())
+        };
+        let items = Items::new(self.db());
+        let score = |kind: Kind, id: i64| scores[slot(kind)].get(&id).copied();
+
+        let [anime, manga] = history;
         let db = self.db();
-        let items = kuro_data::item::ItemRepo::new(db.clone());
-        // more rows than shown: finished titles drop out below
-        data::merge_by_time(anime, manga, |row| row.at, ROW_LIMIT * 2)
+        let item_repo = kuro_data::item::ItemRepo::new(db.clone());
+        // more rows than a row holds: titles with nothing left drop out below
+        let continue_covers: Vec<Cover> = data::merge_by_time(anime.unwrap_or_default(), manga.unwrap_or_default(), |row| row.at, ROW_LIMIT * 2)
             .into_iter()
             .filter_map(|(kind, row)| {
                 let Resume::Open(unit) = history_data::resume_row(&db, kind, row.entry_id, row.item_id) else { return None };
-                let stored = items.by_id(unit.id).ok().flatten();
+                let stored = item_repo.by_id(unit.id).ok().flatten();
                 let (progress, total) = stored.as_ref().map_or((0, None), |item| (item.progress, item.total_seconds));
                 let spot = data::spot(kind, unit.id == row.item_id, progress, total);
-                Some(continue_cover(kind, &row, &unit, spot))
+                let (item, in_library) = items.get(kind, row.entry_id, None)?;
+                let art = look::cover_art(kind, row.cover.entry_id, row.cover.source_id, row.cover.url.clone(), row.cover.favorite, row.cover.cover_last_modified);
+                Some(Cover { kind, item, in_library, art, score: score(kind, row.entry_id), line: spot_line(&unit.name, spot), progress: data::fraction(spot), unit_id: unit.id })
             })
             .take(ROW_LIMIT)
-            .collect()
+            .collect();
+
+        let new_covers: Vec<Cover> = data::group_new(&updates, ROW_LIMIT)
+            .into_iter()
+            .filter_map(|card: NewCard| {
+                // the unread badge counts the new units here
+                let (item, in_library) = items.get(card.kind, card.entry_id, Some(i64::try_from(card.count).unwrap_or(i64::MAX)))?;
+                let art = look::cover_art(card.kind, card.entry_id, card.source_id, card.thumbnail_url.clone(), true, card.cover_last_modified);
+                Some(Cover { kind: card.kind, item, in_library, art, score: score(card.kind, card.entry_id), line: card.first_unit_name.clone(), progress: None, unit_id: card.first_unit_id })
+            })
+            .collect();
+        (continue_covers, new_covers)
     }
 
-    /// Shows the covers of each row that fit `width`, hides the rest.
-    fn fit(&self, width: i32) {
+    /// Fits both rows to the page's width with the Library's column rule.
+    fn fit(&self) {
+        let width = self.scroller.width() - 2 * self.gutter;
         if width <= 0 {
             return;
         }
-        self.width.set(width);
-        let shown = data::fitting(width, cover_width(), GAP);
-        for row in [&self.continue_row, &self.new_row] {
-            let mut child = row.first_child();
-            let mut index = 0;
-            while let Some(widget) = child {
-                widget.set_visible(index < shown);
-                index += 1;
-                child = widget.next_sibling();
-            }
-        }
+        let columns = cover_grid::columns(width, self.prefs.cover_size.get());
+        self.continue_row.fit(columns);
+        self.new_row.fit(columns);
     }
 }
 
@@ -247,102 +428,98 @@ impl Drop for Home {
     }
 }
 
-/// The width of a Home cover: the Library's, for the stored cover size.
-fn cover_width() -> i32 {
-    crate::widgets::cover_grid::cover_width(crate::data::app().library.cover_size.get())
+/// The Library's items for Home's covers: a library title exactly as the Library reads it; a title only in the history
+/// gets the same row from its entry, its units counted. The badges are the Library's switches.
+struct Items {
+    db: Arc<Db>,
+    library: RefCell<HashMap<Kind, HashMap<i64, LibraryRow>>>,
+    badges: kuro_domain::library::page::BadgeSettings,
+    downloads: HashMap<Kind, Arc<dyn Fn(&LibraryRow) -> i64 + Send + Sync>>,
 }
 
-fn clear(row: &GBox) {
-    while let Some(child) = row.first_child() {
-        row.remove(&child);
+impl Items {
+    fn new(db: Arc<Db>) -> Self {
+        let index = crate::shell::host::Shell::get().and_then(|shell| shell.download_service()).map(|service| service.index().clone());
+        let downloads = [Kind::Anime, Kind::Manga].into_iter().map(|kind| (kind, crate::library::download_facts::lookup(kind, index.clone()))).collect();
+        Self { db, library: RefCell::default(), badges: crate::library::load::badges(), downloads }
+    }
+
+    /// The item of entry `id` and whether it is in the library; `unread` replaces the unread count (New for you counts
+    /// its new units). `None` for an entry that cannot be read.
+    fn get(&self, kind: Kind, id: i64, unread: Option<i64>) -> Option<(LibraryItem, bool)> {
+        let library_row = self.library_rows(kind).get(&id).cloned();
+        let in_library = library_row.is_some();
+        let row = match library_row {
+            Some(row) => row,
+            None => self.history_only_row(kind, id)?,
+        };
+        let db = self.db.clone();
+        let language = move |source: i64| crate::library::mount::source_info(&db, kind, source).language;
+        let downloads = self.downloads.get(&kind)?;
+        let mut item = kuro_domain::library::page::item(&row, self.badges, &|row: &LibraryRow| downloads(row), &language);
+        if let Some(count) = unread.filter(|_| self.badges.unread) {
+            item.unread_count = count;
+        }
+        Some((item, in_library))
+    }
+
+    /// The library rows of `kind`, read once per draw: the first row of each entry (an entry in two categories has two).
+    fn library_rows(&self, kind: Kind) -> std::cell::Ref<'_, HashMap<i64, LibraryRow>> {
+        if !self.library.borrow().contains_key(&kind) {
+            let rows: HashMap<i64, LibraryRow> = kuro_data::entry::EntryRepo::new(self.db.clone())
+                .library(kind)
+                .unwrap_or_default()
+                .iter()
+                .rev()
+                .map(|entry| (entry.entry.id, LibraryRow::from_entry(entry)))
+                .collect();
+            self.library.borrow_mut().insert(kind, rows);
+        }
+        std::cell::Ref::map(self.library.borrow(), |all| &all[&kind])
+    }
+
+    /// A title outside the library, as a library row: its entry with its units counted.
+    fn history_only_row(&self, kind: Kind, id: i64) -> Option<LibraryRow> {
+        let entry = kuro_data::entry::EntryRepo::new(self.db.clone()).by_id(id).ok()?;
+        let units = history_data::ordered_units(&self.db, kind, id);
+        let total = i64::try_from(units.len()).unwrap_or(i64::MAX);
+        let done = i64::try_from(units.iter().filter(|unit| unit.done).count()).unwrap_or(0);
+        let library_entry = kuro_data::entry::LibraryEntry { entry, category: 0, total, done, bookmarks: 0, fillermarks: 0, latest_upload: 0, item_fetched_at: 0, last_activity: 0 };
+        Some(LibraryRow::from_entry(&library_entry))
     }
 }
 
-/// A group: its heading with "See all" at the end, and the row its covers go in.
-fn group(title: &str, see_all: &str, screen: &'static str) -> (GBox, GBox) {
-    let heading = gtk::Label::builder().label(title).xalign(0.0).hexpand(true).css_classes(["heading"]).build();
-    let link = gtk::Button::with_label(see_all);
-    link.add_css_class("flat");
-    link.connect_clicked(move |_| crate::ui::open(screen));
-    let top = GBox::new(O::Horizontal, SPACE_S);
-    top.append(&heading);
-    top.append(&link);
-    let row = GBox::new(O::Horizontal, GAP);
-    let group = GBox::new(O::Vertical, SPACE_S);
-    group.append(&top);
-    group.append(&row);
-    group.set_visible(false);
-    (group, row)
-}
-
-/// The kind's name for the tag on a cover.
-fn kind_label(kind: Kind) -> String {
-    tr(if kind.is_anime() { MsgKey::label_anime } else { MsgKey::label_manga })
-}
-
-/// A cover with its badges over it, the title and the line under it. A click on the cover runs `open`; a click on the
-/// title opens the title's page.
-fn card(kind: Kind, entry_id: i64, title: &str, art: &kuro_images::art::ArtRef, badges: &[gtk::Widget], progress: Option<f64>, line: &str, open: impl Fn() + 'static) -> gtk::Widget {
-    let width = cover_width();
-    let height = crate::library::layout::cover_height(width);
-    let overlay = gtk::Overlay::new();
-    overlay.set_child(Some(&look::cover(title, Some(art), width, height)));
-    overlay.add_css_class("kb-card-cover");
-    overlay.set_overflow(gtk::Overflow::Hidden);
-    let tags = GBox::new(O::Horizontal, SPACE_XS);
-    tags.set_halign(Align::Start);
-    tags.set_valign(Align::Start);
-    tags.set_margin_start(SPACE_XS);
-    tags.set_margin_top(SPACE_XS);
-    for badge in badges {
-        tags.append(badge);
+/// The line under a Continue cover: the unit a click opens, and how far into it.
+fn spot_line(unit: &str, spot: Spot) -> String {
+    match spot {
+        Spot::Start => unit.to_owned(),
+        Spot::Watched { seconds, total } => format!("{unit} · {}", trf(MsgKey::home_minutes_left, &[("count", Arg::Int(data::minutes_left(seconds, total)))])),
+        Spot::Page { last_read } => format!("{unit} · {}", trf(MsgKey::home_page, &[("page", Arg::Int(last_read + 1))])),
     }
-    overlay.add_overlay(&tags);
-    if let Some(fraction) = progress {
-        let bar = gtk::ProgressBar::builder().fraction(fraction).valign(Align::End).css_classes(["osd"]).build();
+}
+
+/// A cover: the Library's card for the stored cover size and look, the theme's progress bar at the foot of the cover
+/// for an episode under way, Home's line under the card, and the Library's right-click menu.
+fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Widget {
+    let cover_size = crate::data::app().library.cover_size.get();
+    let extras = crate::library::view::card::Extras {
+        art: Some(&cover.art),
+        kind: cover.kind,
+        season_parent: false,
+        width: cover_grid::cover_width(cover_size),
+        score: cover.score,
+    };
+    let built = crate::library::view::card::build(&cover.item, mode, false, &extras);
+    if let (Some(fraction), Some(overlay)) = (cover.progress, built.root.first_child().and_downcast::<gtk::Overlay>()) {
+        let bar = gtk::ProgressBar::builder().fraction(fraction).valign(Align::End).margin_start(SPACE_S).margin_end(SPACE_S).margin_bottom(SPACE_S).can_target(false).build();
         overlay.add_overlay(&bar);
     }
-    let click = gtk::GestureClick::new();
-    click.connect_released(move |gesture, _, _, _| {
-        gesture.set_state(gtk::EventSequenceState::Claimed);
-        open();
-    });
-    overlay.add_controller(click);
-    overlay.set_cursor_from_name(Some("pointer"));
-
-    let name = gtk::Label::builder().label(title).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["kb-card-title"]).build();
-    let title_button = gtk::Button::builder().child(&name).css_classes(["flat"]).halign(Align::Fill).build();
-    title_button.connect_clicked(move |_| crate::screens::open_entry(kind, entry_id));
-    let under = gtk::Label::builder().label(line).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
-
-    let card = GBox::new(O::Vertical, SPACE_XS);
-    card.set_size_request(width, -1);
-    card.set_hexpand(false);
-    card.append(&overlay);
-    card.append(&title_button);
-    card.append(&under);
-    card.upcast()
-}
-
-/// A Continue cover: a click resumes as the History row would, straight into the player or the reader.
-fn continue_cover(kind: Kind, row: &HistoryWithRelations, unit: &history_data::Unit, spot: Spot) -> gtk::Widget {
-    let art = look::cover_art(kind, row.cover.entry_id, row.cover.source_id, row.cover.url.clone(), row.cover.favorite, row.cover.cover_last_modified);
-    let line = match spot {
-        Spot::Start => unit.name.clone(),
-        Spot::Watched { seconds, total } => format!("{} · {}", unit.name, trf(MsgKey::home_minutes_left, &[("count", Arg::Int(data::minutes_left(seconds, total)))])),
-        Spot::Page { last_read } => format!("{} · {}", unit.name, trf(MsgKey::home_page, &[("page", Arg::Int(last_read + 1))])),
-    };
-    let tag: gtk::Widget = look::badge(&kind_label(kind), false).upcast();
-    let (entry_id, unit_id) = (row.entry_id, unit.id);
-    card(kind, row.entry_id, &row.title, &art, &[tag], data::fraction(spot), &line, move || crate::updates::history_screen::open_unit_of(kind, entry_id, unit_id))
-}
-
-/// A New for you cover: a click opens the oldest new unit.
-fn new_cover(card_data: &NewCard) -> gtk::Widget {
-    let NewCard { kind, entry_id, first_unit_id, .. } = *card_data;
-    let art = look::cover_art(kind, entry_id, card_data.source_id, card_data.thumbnail_url.clone(), true, card_data.cover_last_modified);
-    let tag: gtk::Widget = look::badge(&kind_label(kind), false).upcast();
-    let count = i64::try_from(card_data.count).unwrap_or(i64::MAX);
-    let pill: gtk::Widget = look::badge(&trf(MsgKey::home_new_count, &[("count", Arg::Int(count))]), true).upcast();
-    card(kind, entry_id, &card_data.title, &art, &[tag, pill], None, &card_data.first_unit_name, move || crate::updates::history_screen::open_unit_of(kind, entry_id, first_unit_id))
+    if let Some(root) = built.root.downcast_ref::<GBox>() {
+        let line = gtk::Label::builder().label(&cover.line).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).max_width_chars(1).css_classes(["dim-label", "caption"]).build();
+        line.set_margin_top(-SPACE_XS);
+        root.append(&line);
+    }
+    let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
+    crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+    built.root
 }

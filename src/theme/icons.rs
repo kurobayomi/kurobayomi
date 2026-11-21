@@ -51,6 +51,8 @@ pub enum Icon {
     Compass,
     /// The Browse tab: a globe with a search lens (Material `travel_explore`, user 2026-10-14).
     BrowseTab,
+    /// The Home tab: Material's outlined `home`, drawn like the other tabs' icons (docs/design/home.md).
+    HomeTab,
     DownloadCircle,
     DoneMarkPrevious,
     OverflowVertical,
@@ -75,7 +77,7 @@ pub enum Icon {
 impl Icon {
     #[cfg(test)]
     /// Every variant, in declaration order.
-    pub const ALL: [Icon; 48] = [
+    pub const ALL: [Icon; 49] = [
         Icon::Close,
         Icon::Play,
         Icon::Pause,
@@ -106,6 +108,7 @@ impl Icon {
         Icon::UpdatesTab,
         Icon::Compass,
         Icon::BrowseTab,
+        Icon::HomeTab,
         Icon::DownloadCircle,
         Icon::DoneMarkPrevious,
         Icon::OverflowVertical,
@@ -159,6 +162,7 @@ impl Icon {
             Icon::UpdatesTab => "kb-updates-outline-symbolic",
             Icon::Compass => "kb-compass-symbolic",
             Icon::BrowseTab => "kb-travel-explore-symbolic",
+            Icon::HomeTab => "kb-home-symbolic",
             Icon::DownloadCircle => "kb-download-circle-symbolic",
             Icon::DoneMarkPrevious => "kb-done-previous-symbolic",
             Icon::OverflowVertical => "kb-overflow-vertical-symbolic",
@@ -194,6 +198,7 @@ impl Icon {
             Icon::UpdatesTab => "scalable/actions/kb-updates-outline-symbolic.svg",
             Icon::Compass => "scalable/actions/kb-compass-symbolic.svg",
             Icon::BrowseTab => "scalable/actions/kb-travel-explore-symbolic.svg",
+            Icon::HomeTab => "scalable/actions/kb-home-symbolic.svg",
             Icon::DownloadCircle => "scalable/actions/kb-download-circle-symbolic.svg",
             Icon::DoneMarkPrevious => "scalable/actions/kb-done-previous-symbolic.svg",
             Icon::OverflowVertical => "scalable/actions/kb-overflow-vertical-symbolic.svg",

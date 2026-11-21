@@ -5,8 +5,10 @@ use std::collections::HashMap;
 
 use kuro_domain::updates::model::UpdateRow;
 use kuro_platform::kind::Kind;
+use kuro_prefs::library::LibraryDisplayMode;
 
-/// The most covers a row is built with. The row shows as many as fit the window (`fitting`); the rest are behind "See all".
+/// The most covers a row is built with. The row shows as many as fit the page (`cover_grid::columns`); the rest are
+/// behind "See all".
 pub const ROW_LIMIT: usize = 20;
 
 /// The rows of both kinds in one list, newest first by `at`, each with its kind. Ties keep anime first, then the order
@@ -134,12 +136,13 @@ pub fn shown(repositories: bool, answered: bool, has_continue: bool, has_new: bo
     Shown { welcome: false, continue_row: has_continue, new_row: has_new, empty: answered && !has_continue && !has_new }
 }
 
-/// How many covers of `cover_width` fit a row `width` wide with `gap` between them; at least 1.
-pub fn fitting(width: i32, cover_width: i32, gap: i32) -> usize {
-    if cover_width <= 0 {
-        return 1;
+/// The look Home draws its covers in: the Library's display mode, except List, which becomes the comfortable grid (a
+/// row of covers is not a list).
+pub fn cover_mode(library: LibraryDisplayMode) -> LibraryDisplayMode {
+    match library {
+        LibraryDisplayMode::List => LibraryDisplayMode::ComfortableGrid,
+        grid => grid,
     }
-    usize::try_from(((width + gap) / (cover_width + gap)).max(1)).unwrap_or(1)
 }
 
 #[cfg(test)]
@@ -231,10 +234,10 @@ mod tests {
     }
 
     #[test]
-    fn as_many_covers_as_fit_and_never_none() {
-        assert_eq!(fitting(1000, 156, 12), 6, "6 covers and 5 gaps take 996 px");
-        assert_eq!(fitting(995, 156, 12), 5, "one pixel short of 6");
-        assert_eq!(fitting(100, 156, 12), 1);
-        assert_eq!(fitting(1000, 0, 12), 1);
+    fn home_draws_the_library_grid_and_a_list_as_the_comfortable_grid() {
+        for mode in [LibraryDisplayMode::CompactGrid, LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CoverOnlyGrid] {
+            assert_eq!(cover_mode(mode), mode);
+        }
+        assert_eq!(cover_mode(LibraryDisplayMode::List), LibraryDisplayMode::ComfortableGrid);
     }
 }
