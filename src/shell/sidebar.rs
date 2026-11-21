@@ -378,7 +378,7 @@ mod tests {
             let texts = labels(panel.upcast_ref());
             assert!(!texts.iter().any(|l| *l == tr(MsgKey::pref_category_about)), "About is in Settings only");
             let wanted = [incognito_label().to_owned(), tr(MsgKey::label_help)];
-            for title in ["Library", "Browse", "Updates", "History", "Downloads", "Settings", "Kurobayomi"].map(str::to_owned).iter().chain(&wanted) {
+            for title in ["Home", "Library", "Browse", "Updates", "History", "Downloads", "Settings", "Kurobayomi"].map(str::to_owned).iter().chain(&wanted) {
                 assert!(texts.iter().any(|l| l == title), "{title}");
             }
             assert!(!texts.iter().any(|l| l == "More"), "More is gone");

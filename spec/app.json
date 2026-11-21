@@ -1,6 +1,11 @@
 {
  "nav": [
   {
+   "id": "home",
+   "title": "Home",
+   "icon": "go-home-symbolic"
+  },
+  {
    "id": "library",
    "title": "Library",
    "icon": "view-grid-symbolic"
@@ -29,7 +34,7 @@
  "screens": [
   {
    "id": "home",
-   "title": "Kurobayomi",
+   "title": "Home",
    "kind": "custom",
    "toolbar": [],
    "menu": [],
@@ -37,7 +42,7 @@
    "groups": [],
    "sheets": [],
    "dialogs": [],
-   "notes": "Root container. Narrow window: bottom NavigationBar with icon + always-visible label (labelLarge, 1 line). Wide window: left NavigationRail with same items. Full tab set in order is Anime, Manga, Updates, History, Browse, More; the 'Navigation style' setting (bottom_rail_nav_style) removes exactly one of Manga / Updates / History / Browse from the bar and puts it as the first link row in More. Default style MOVE_HISTORY_TO_MORE -> bar shows Anime, Manga, Updates, Browse, More (the 'nav' array above) and History lives in More. Start screen default = Anime library. Badges: Updates icon shows a numeric Badge = new anime + new manga updates count (only if 'show unread count on Updates icon' pref is on); Browse icon shows a numeric Badge = pending extension updates (anime + manga). Re-selecting Updates opens Download queue; re-selecting History resumes last watched episode. Bottom bar hides while a screen is in selection mode. Content swaps with a 200ms material fade-through. Back on a non-start tab returns to the start tab. Library is NOT one tab with Anime/Manga sub-tabs: anime and manga libraries are two separate nav destinations with identical layouts. Updates, History, Download queue, Categories, Stats and Storage are each a single screen with a top 'Anime' | 'Manga' tab row (anime first)."
+   "notes": "Kurobayomi's Home (docs/design/home.md): the page the app opens on. Two rows of covers, anime and manga together: Continue (the History of both kinds, one title each, resumes on click) and New for you (new units of library titles, from the Updates feed of both kinds). Each row shows as many covers as fit; See all opens History or Updates."
   },
   {
    "id": "anime_library",

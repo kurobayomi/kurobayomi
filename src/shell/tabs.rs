@@ -134,8 +134,8 @@ mod tests {
     }
 
     #[test]
-    fn the_places_are_library_browse_updates_history_and_downloads_with_no_more() {
+    fn the_places_are_home_library_browse_updates_history_and_downloads_with_no_more() {
         let ids: Vec<String> = crate::ui::with_spec(|s| s.nav.iter().map(|n| n.id.clone()).collect());
-        assert_eq!(ids, ["library", "browse", "updates", "history", crate::shell::sidebar::DOWNLOADS]);
+        assert_eq!(ids, ["home", "library", "browse", "updates", "history", crate::shell::sidebar::DOWNLOADS]);
     }
 }

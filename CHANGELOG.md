@@ -6,6 +6,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Added
+
+- Home, first in the sidebar: what you're in the middle of (Continue) and the new episodes and chapters of your library
+  (New for you), anime and manga together, as many covers as fit the window. A cover resumes or opens the new episode or
+  chapter; See all opens History or Updates.
+
 ### Fixed
 
 - A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,

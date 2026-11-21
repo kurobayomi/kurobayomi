@@ -1160,3 +1160,30 @@ ui_add_sources = Add sources
 
 # source: kurobayomi
 ui_backup_holds_everything = The backup holds your library with its history and tracking, your categories, your repositories and your settings.
+
+# source: kurobayomi
+home_new_for_you = New for you
+
+# source: kurobayomi
+home_see_all_history = See all history
+
+# source: kurobayomi
+home_see_all_updates = See all updates
+
+# source: kurobayomi
+home_empty = What you watch and read, and the new episodes and chapters of your library, show here
+
+# source: kurobayomi
+home_find_something = Find something to watch or read
+
+# source: kurobayomi
+home_minutes_left = { $count } min left
+
+# source: kurobayomi
+home_page = page { $page }
+
+# source: kurobayomi
+home_new_count = +{ $count }
+
+# source: kurobayomi
+home_page_title = Home

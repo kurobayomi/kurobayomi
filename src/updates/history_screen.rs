@@ -351,6 +351,11 @@ impl HistoryScreen {
 /// and the external player opens through `open_route`, the one launcher hook; without a launcher the internal player
 /// is the fallback.
 fn open_unit(kind: Kind, entry_id: i64, unit: &Unit) {
+    open_unit_of(kind, entry_id, unit.id);
+}
+
+/// [`open_unit`] by the unit's id: how a History row opens a unit, shared with Home's covers.
+pub(crate) fn open_unit_of(kind: Kind, entry_id: i64, unit_id: i64) {
     let route = if uses_external(crate::misc::diet_defaults::PLAYER_ALWAYS_EXTERNAL, kind) { Route::External } else { Route::Internal };
-    open_route::open(kind, entry_id, unit.id, route);
+    open_route::open(kind, entry_id, unit_id, route);
 }

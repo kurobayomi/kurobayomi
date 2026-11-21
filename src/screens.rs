@@ -21,6 +21,7 @@ pub fn built(content: impl IsA<gtk::Widget>, end: Vec<gtk::Widget>) -> Option<Bu
 /// Builder for a screen's body + header actions, if it has a custom one.
 pub fn body(id: &str) -> Option<Built> {
     match id {
+        "home" => crate::home::page().or_else(|| unavailable(id)),
         "library" => libraries(),
         "anime_library" => Some(library(id, Kind::Anime)),
         "manga_library" => Some(library(id, Kind::Manga)),

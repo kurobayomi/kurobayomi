@@ -17,6 +17,7 @@ mod cli;
 mod community;
 // the thumbnail renderer is called by the cover loader, which does not exist yet
 mod feed;
+mod home;
 // No WebView host shows the window yet (T-12a-017 needs WebKitGTK).
 mod data;
 mod downloads;

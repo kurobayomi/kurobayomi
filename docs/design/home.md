@@ -21,8 +21,9 @@ The page has the usual top bar (window buttons, draggable; top bar rule in `CLAU
 - What the user is in the middle of, anime and manga together, most recent first: the newest rows of the History table
   of both kinds, one per title.
 - A title counts only while something is left: a finished last episode or last chapter drops it from the row.
-- Each card shows the cover, a small kind tag (Anime or Manga), the title, a progress bar and one line: "Ep 7 · 14 min
-  left" or "Ch 12 · page 8 of 22".
+- Each card shows the cover, a small kind tag (Anime or Manga), the title and one line: "Episode 7 · 14 min left" or
+  "Chapter 12 · page 8". Anime also gets a progress bar. A chapter's page count is not stored, so manga shows the page
+  only (no "of 22", no bar).
 - A click resumes exactly as a History row does (same code: `updates::history_screen`'s resume, with
   `updates::history_data::ordered_units` and `updates::history::next_units_from`), straight into the player or the
   reader. A click on the title opens the title's page.
@@ -32,9 +33,8 @@ The page has the usual top bar (window buttons, draggable; top bar rule in `CLAU
 
 - New episodes and chapters of **library** titles only, newest first, one card per title: the rows of the Updates feed
   of both kinds, grouped by title. A source's general "Latest" stays in Browse, where it is now.
-- Each card shows the cover, a count pill ("+2 eps", "+1 ch"), the title and one line: which units and when ("Ep 12, 13
-  · today").
-- A click opens the first new unit; the title opens the title's page.
+- Each card shows the cover, the kind tag, a count pill ("+2"), the title and one line: the oldest new unit's name.
+- A click opens that oldest new unit, so nothing is skipped; the title opens the title's page.
 - The footer link "See all updates" opens the Updates screen.
 
 ### Row size
