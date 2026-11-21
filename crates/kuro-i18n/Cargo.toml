@@ -17,6 +17,7 @@ quick-xml = "0.42.0"
 chrono = { workspace = true }
 icu_datetime = "2.3.0"
 icu_locale = "2.3.1"
+icu_decimal = { version = "2.3.0", features = ["alloc"] }
 tracing = { workspace = true }
 
 [build-dependencies]

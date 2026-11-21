@@ -3,7 +3,8 @@
 //! off while a text entry has focus. Alt and Meta combinations are left to the desktop.
 //!
 //! The desktop player's keys (user, 2026-11-02): Space pause, Left/Right seek (Shift: long), Up/Down
-//! volume, M mute, [ and ] speed, Backspace normal speed, F or F11 fullscreen, E episodes, Escape.
+//! volume, M mute, [ and ] speed, Backspace normal speed, F or F11 fullscreen, E episodes, Escape. C opens the
+//! episode's comments (docs/design/comments.md, 2026-11-21).
 //! The phone's lock, controls toggle, sheets, picture-in-picture, aspect, frame step and screenshot
 //! keys are not offered.
 
@@ -26,6 +27,8 @@ pub enum Action {
     SpeedStep(i32),
     SpeedReset,
     OpenEpisodeList,
+    /// The comments panel of the episode playing.
+    OpenComments,
     Escape,
     ToggleFullscreen,
 }
@@ -66,6 +69,7 @@ pub fn action_for(keyval: u32, mods: Modifiers, text_entry_focused: bool) -> Opt
         KS_F11 => Action::ToggleFullscreen,
         l if l == u32::from(b'm') => Action::ToggleMute,
         l if l == u32::from(b'e') => Action::OpenEpisodeList,
+        l if l == u32::from(b'c') => Action::OpenComments,
         l if l == u32::from(b'f') => Action::ToggleFullscreen,
         _ => return None,
     })
@@ -126,6 +130,7 @@ const ACTION_NAMES: &[(&str, Action)] = &[
     ("speed-up", Action::SpeedStep(1)),
     ("speed-reset", Action::SpeedReset),
     ("episodes", Action::OpenEpisodeList),
+    ("comments", Action::OpenComments),
     ("escape", Action::Escape),
     ("fullscreen", Action::ToggleFullscreen),
 ];
@@ -313,6 +318,10 @@ mod tests {
             Some(Action::OpenEpisodeList)
         );
         assert_eq!(
+            action_for(u32::from(b'C'), m(true, false), false),
+            Some(Action::OpenComments)
+        );
+        assert_eq!(
             action_for(KS_F11, none, false),
             Some(Action::ToggleFullscreen)
         );
@@ -329,7 +338,7 @@ mod tests {
 
     #[test]
     fn the_phone_keys_and_ctrl_combinations_are_not_shortcuts() {
-        for key in [b'l', b'c', b'a', b's', b'd', b'q', b'p', b'r', b',', b'.'] {
+        for key in [b'l', b'a', b's', b'd', b'q', b'p', b'r', b',', b'.'] {
             assert_eq!(action_for(u32::from(key), m(false, false), false), None, "{}", key as char);
         }
         assert_eq!(action_for(u32::from(b's'), m(false, true), false), None);

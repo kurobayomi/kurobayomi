@@ -12,9 +12,9 @@ Both are read-only and add no setting. Replying happens on AniList ("Open on Ani
 
 | What | AniList query | Notes |
 |---|---|---|
-| Episode threads | `Page{threads(mediaCategoryId: <anilist id>)}` | User-written threads in the "Release Discussion" category, titled like `[Spoilers] Sousou No Frieren - Episode 10 Discussion`. **A thread has no episode field**: the episode is read from the title. Seasonal anime have one per episode (Frieren, Dandadan, Nokotan); a premiere can share one thread (`Episodes 1-4`). |
-| Comments of a thread | `Page{threadComments(threadId)}` | `comment` text, `likeCount`, `createdAt`, `user{name}`, nested `childComments`. |
-| Reviews | `Media(id){reviews(sort: RATING_DESC)}` | `summary`, `score` (of 100), `rating` and `ratingAmount` (found helpful), `body`. No spoiler flag. Frieren has 500. |
+| Episode threads | `Page{threads(categoryId: 5, mediaCategoryId: <anilist id>)}` | User-written threads in the "Release Discussion" category (id 5; Frieren: its 25 on one page), titled like `[Spoilers] Sousou No Frieren - Episode 10 Discussion`. **A thread has no episode field**: the episode is read from the title. Seasonal anime have one per episode (Frieren, Dandadan, Nokotan); a premiere can share one thread (`Episodes 1-4`). |
+| Comments of a thread | `Page{threadComments(threadId)}` | `comment(asHtml: true)` (AniList renders its own Markdown), `likeCount`, `createdAt`, `user{name}`, and `childComments`: the replies as JSON with the same fields as asked, `null` when none. |
+| Reviews | `Media(id){reviews(sort: RATING_DESC)}` | `summary`, `score` (of 100), `rating` and `ratingAmount` (found helpful), `body(asHtml: true)`, `siteUrl`. No spoiler flag. Asked for 50, AniList answered 25 (2026-11-21). |
 
 - No login. The rate limit header said 30 requests a minute; the docs call that a temporary "degraded state" (normally
   90). An answer of 429 stops the panel's requests and shows the error state; nothing retries in a loop.
@@ -32,26 +32,28 @@ What AniList does, and the rule that follows from it:
 | `pageInfo.total` is not a count: Frieren's reviews said 500 on page 1 and 250 on page 11; thread lists stop at 5,000 (`lastPage` 100 for One Piece). | Paging follows `hasNextPage` only. No total from `pageInfo` is ever shown. The Reviews page shows no count. |
 | `threadComments` lists top-level comments only; replies are nested in `childComments`. The Frieren "Episodes 1-4" thread has `replyCount` 120 and 63 top-level comments. | The panel's "76 replies" is the thread's `replyCount`. Replies come with their parent comment. |
 | `threadComments` sorts only by `ID` or `ID_DESC` (oldest or newest first); there is no sort by likes. | The 50 comments are the oldest 50 (`ID`): the reactions from the week the episode aired. Top and New reorder those 50 in the app. |
-| `threads(search:)` is unreliable: "Episode 1100" found One Piece's thread, "Episode 10" found nothing for Frieren although the thread exists. | Search first; when it finds no match, list the threads newest first and stop at the match or after 5 pages (250 threads). |
+| `threads(search:)` is unreliable: "Episode 1100" found One Piece's thread, "Episode 10" found nothing for Frieren although the thread exists. Listing only a title's "Release Discussion" threads keeps the list short. | The newest page of the title's discussion threads first (a whole season fits); then the search; then pages 2 to 5 (250 threads in all). |
 | The rate limit header said 30 requests a minute. | Keep API use small (user, 2026-11-21): see the 50 cap below. |
 
 - **50 at most, one request each (user, 2026-11-21: "limit everything to top 50 comments"; a starting limit while the
   feature is new, to be revisited once it is in use; keep it one constant so raising it or adding paging is a small
   change).** The panel shows at most
   50 top-level comments of the episode (with their nested replies) and the Reviews page at most the 50 most helpful
-  reviews (`sort: RATING_DESC`, a real top 50). No next page and no loading on scroll. When the thread has more than
+  reviews (`sort: RATING_DESC`, a real top list; AniList gave 25). No next page and no loading on scroll. When the thread has more than
   50 top-level comments, the end of the list says so and offers "Open on AniList" for the rest.
-- **What one open costs:** the comments are 1 request. Finding the thread is 1 search, plus up to 5 list pages only
-  when the search misses (Frieren "Episode 10"), plus 1 id lookup when the entry has no AniList binding: 2 requests
-  usually, 8 at worst, and only the first time (memory, below).
+- **What one open costs:** the comments are 1 request. Finding the thread is 1 list page (most titles), then 1 search
+  and up to 4 more pages only for a long show whose episode is not on the newest page, plus 1 id lookup when the entry
+  has no AniList binding: 2 or 3 requests usually, 8 at worst, and only the first time (memory, below).
 - **Memory only, for the app's run:** the AniList id of an entry and the thread id of an episode, once found (or found
   missing), so reopening the panel or coming back to an episode costs one request. Comments are not kept.
 - **Only the latest request may show anything:** switching episodes fast, or closing the panel, drops the answers of the
   older requests (the generation counter of `src/entry_core/tracking/community_page.rs` is the pattern).
-- **429:** the panel shows the error state and asks nothing more until the minute is over (`Retry-After` when AniList
-  sends it; unverified whether it does).
-- **Big numbers:** likes and reply counts can reach the thousands. A new shared function in `kuro-i18n` writes them
-  compactly in the user's language (`1.2k`, `34k`); none exists today. It is used for every count in both places.
+- **429:** the panel and the page show the error state and ask nothing more until the wait is over: `Retry-After` when
+  AniList sends it (unverified whether it does), else a minute.
+- **Big numbers:** likes and reply counts can reach the thousands. `kuro_i18n::number::compact_count` writes them short:
+  `999`, `1.2K`, `34K`, `1.2M`, never rounded up. The digits and the decimal separator come from the UI locale (ICU4X's
+  `DecimalFormatter`; ICU4X's compact formatter is behind its `unstable` feature, so it is not used), and the `K` and
+  `M` are messages (`number_thousands`, `number_millions`).
 - **Long text:** a comment or review summary longer than about 12 lines is cut with "Show more", which expands it in
   place. The full review text opens on its own page.
 
@@ -85,8 +87,8 @@ comment), and "Open on AniList" at the bottom.
 - Fullscreen hides the header and its Comments button (the fullscreen rule in `CLAUDE.md`). The panel follows whatever
   the episode list does there (check when building: whether E still opens it in fullscreen).
 
-**Matching the thread to the episode:** search the media's threads for the episode, then, without a match, list them
-newest first (up to 5 pages, see Paging and limits), and take the one whose title names this episode number: `Episode 10`, `Ep 10`, or a range `Episodes 1-4` that contains it. More than one
+**Matching the thread to the episode:** the newest page of the title's "Release Discussion" threads, then AniList's
+search, then older pages (up to 5 in all, see Paging and limits), and take the one whose title names this episode number: `Episode 10`, `Ep 10`, or a range `Episodes 1-4` that contains it. More than one
 match: the one with the most replies. No match: "No discussion of this episode on AniList", with "Open on AniList"
 going to the media's forum page.
 
@@ -103,8 +105,10 @@ manga.
 
 ## Showing AniList text
 
-AniList comments and reviews mix Markdown, raw HTML and AniList's own tags. GTK shows none of that as is, so the text is
-turned into Pango markup by one converter, used by both places:
+AniList comments and reviews mix Markdown, raw HTML and AniList's own tags. The app asks for AniList's own HTML
+rendering (`asHtml: true`: Markdown done, spoilers as `<span class='markdown_spoiler'>`, images as `<img>`), and one
+converter (`src/comments/text.rs`) turns that HTML into GTK label markup for both places. All 325 comments of four live
+Frieren threads came out well nested (2026-11-21):
 
 - kept: paragraphs, bold, italic, strikethrough, headings (as bold), links (open in the browser), quotes (indented),
   lists, inline code;
@@ -118,13 +122,19 @@ turned into Pango markup by one converter, used by both places:
 
 ## Code layout
 
-- **`crates/kuro-comments`** (new): the AniList queries, the id lookup, the thread match, the parsers and the text
-  converter. Pure functions tested on saved AniList answers (fixtures), the network through `kuro_net::NetworkClient`
-  like `aniskip.rs`. AniList is not a source, so the source-only client rule does not apply.
-- **`src/player_view/comments_panel.rs`**: the panel. Small additive edits in `src/player_view/mod.rs` (the button, the
-  overlay, the key) and `kuro_player::shortcuts` (`Action::OpenComments` for C).
-- **`src/entry_core/details/reviews.rs`** (the title page lives in `src/entry_core/details/` today; follow it if the
-  entry page merge in `unified-entry-page.md` moves it): the button and the page.
+As built (2026-11-21). No new crate: the app already had an AniList query layer (Home's suggestions), so the comments
+go beside it (one way to do each thing).
+
+- **`crates/kuro-track/src/tracker/anilist/comments.rs`**: the queries, the parsers, the thread match and the async
+  asks, on the AniList `Transport` Home's discovery uses (no token). Tested on trimmed live answers with the fake
+  transport.
+- **`crates/kuro-i18n/src/number.rs`**: `compact_count`.
+- **`src/comments/`**: `mod.rs` (the id lookup, what is remembered for the run, the rate-limit stop), `text.rs` (the
+  converter), `view.rs` (a comment, the text label with its spoilers and "Show more"), `panel.rs` (the player panel),
+  `reviews.rs` (the Reviews page and the page of one whole review).
+- Small additive edits: `src/player_view/mod.rs` (the overlay, the header button, C and Esc, one panel at a time),
+  `kuro_player::shortcuts` (`Action::OpenComments` on C, named `comments` in `player.toml`), and the title page's
+  action row (`src/entry_core/action_row_view.rs`, `details/route.rs`: the Reviews button).
 - Strings in `kuro-i18n` (`MsgKey`), no literal text in the GUI.
 
 ## Tests

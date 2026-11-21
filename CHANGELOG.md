@@ -15,6 +15,10 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Home suggests what to watch or read next: Recommended for you (what AniList users recommend for your recent titles)
   and Trending now (anime and manga), refreshed at most once a day. A suggestion opens a search across your sources;
   titles you already have, and adult ones unless your setting allows them, are left out.
+- Comments in the player: the Comments button (or C) opens the AniList discussion of the episode playing beside the
+  video, like the episode list, and follows the episode. Up to 50 comments with their replies, Top or New; spoilers the
+  writer tagged stay hidden until clicked.
+- Reviews on a title's page: the Reviews button lists AniList's most helpful reviews, each opening its whole text.
 
 ### Changed
 

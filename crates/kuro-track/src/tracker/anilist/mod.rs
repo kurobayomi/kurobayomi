@@ -10,6 +10,7 @@
 
 pub mod api;
 pub mod auth;
+pub mod comments;
 pub mod convert;
 pub mod date;
 pub mod discovery;

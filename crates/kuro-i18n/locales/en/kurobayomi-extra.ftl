@@ -1193,3 +1193,67 @@ home_recommended_for_you = Recommended for you
 
 # source: kurobayomi
 home_trending_now = Trending now
+
+# source: kurobayomi
+number_thousands = { $value }K
+
+# source: kurobayomi
+number_millions = { $value }M
+
+# source: kurobayomi
+comments_title = Comments
+
+# source: kurobayomi
+comments_replies =
+    { $count ->
+        [one] { $shown } reply
+       *[other] { $shown } replies
+    }
+
+# source: kurobayomi
+comments_sort_top = Top
+
+# source: kurobayomi
+comments_more_on_anilist = More comments on AniList
+
+# source: kurobayomi
+comments_no_thread = No discussion of this episode on AniList
+
+# source: kurobayomi
+comments_not_on_anilist = This title was not found on AniList
+
+# source: kurobayomi
+comments_empty = No comments yet
+
+# source: kurobayomi
+comments_failed = Couldn't load comments
+
+# source: kurobayomi
+comments_rate_limited = AniList asked to slow down. Try again in a minute.
+
+# source: kurobayomi
+comments_spoiler = Spoiler
+
+# source: kurobayomi
+comments_image = Image
+
+# source: kurobayomi
+comments_video = Video
+
+# source: kurobayomi
+comments_show_more = Show more
+
+# source: kurobayomi
+reviews_title = Reviews
+
+# source: kurobayomi
+reviews_helpful = { $rating } of { $total } found it helpful
+
+# source: kurobayomi
+reviews_score = { $score }/100
+
+# source: kurobayomi
+reviews_none = No reviews on AniList
+
+# source: kurobayomi
+reviews_failed = Couldn't load reviews

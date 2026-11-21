@@ -49,6 +49,7 @@ use kuro_player::seekbar_model::{drags_enabled, duration_label, fraction, positi
 use kuro_player::session::prepare_mpv_dir;
 use kuro_player::shortcuts::{Action, action_for};
 
+use crate::comments::panel::CommentsPanel;
 use crate::reader::chapter_panel::ChapterPanel;
 
 use neighbours::{Step, neighbour};
@@ -347,7 +348,7 @@ fn apply_action(shared: &Shared, page: &gtk::Box, action: Action) -> bool {
         Action::SpeedReset => sheets::speed::reset(shared),
         Action::ToggleFullscreen => toggle_fullscreen(page),
         Action::Escape if fullscreen => toggle_fullscreen(page),
-        Action::Escape | Action::OpenEpisodeList => return false,
+        Action::Escape | Action::OpenEpisodeList | Action::OpenComments => return false,
     }
     true
 }
@@ -425,6 +426,9 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     // the episode list floats over the video's right side (the reader's chapter list)
     let episodes = ChapterPanel::new(tr(MsgKey::episodes), tr(MsgKey::player_episode_list_search));
     overlay.add_overlay(episodes.root());
+    // the comments of the episode float in the same place (docs/design/comments.md); one of the two shows at a time
+    let comments = CommentsPanel::new();
+    overlay.add_overlay(comments.root());
     // the ids of the rows the list shows, in the reader-list order its picks hand back
     let episode_ids: Rc<RefCell<Vec<i64>>> = Rc::default();
     // shown from the first frame until mpv knows the duration: the stream, its audio and its subtitles take a moment
@@ -469,11 +473,20 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     menu.set_icon_name("view-more-symbolic");
     let list = crate::ui::icon_button("view-list-symbolic", &format!("{} (E)", tr(MsgKey::episodes)));
     {
-        let (shared, episodes, episode_ids) = (Rc::clone(shared), Rc::clone(&episodes), Rc::clone(&episode_ids));
-        list.connect_clicked(move |_| toggle_episodes(&shared, &episodes, &episode_ids));
+        let (shared, episodes, episode_ids, comments) = (Rc::clone(shared), Rc::clone(&episodes), Rc::clone(&episode_ids), Rc::clone(&comments));
+        list.connect_clicked(move |_| {
+            comments.close();
+            toggle_episodes(&shared, &episodes, &episode_ids);
+        });
+    }
+    let talk = crate::ui::icon_button(crate::comments::panel::ICON, &format!("{} (C)", tr(MsgKey::comments_title)));
+    {
+        let (shared, episodes, comments) = (Rc::clone(shared), Rc::clone(&episodes), Rc::clone(&comments));
+        talk.connect_clicked(move |_| toggle_comments(&shared, &comments, &episodes));
     }
     header.pack_end(&menu);
     header.pack_end(&list);
+    header.pack_end(&talk);
     // the buttons packed here came after page_header::header made its pass, so they need their own
     crate::ui::no_sticky_focus(&header);
     // the bars hide by themselves while the video plays (`auto_hide`); with the setting off the header sits above it
@@ -506,9 +519,18 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
             }
         });
     }
+    // a panel that shuts gives the keys back to the page
     {
         let page = page.downgrade();
         episodes.connect_closed(move || {
+            if let Some(page) = page.upgrade() {
+                page.grab_focus();
+            }
+        });
+    }
+    {
+        let page = page.downgrade();
+        comments.connect_closed(move || {
             if let Some(page) = page.upgrade() {
                 page.grab_focus();
             }
@@ -566,7 +588,7 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     {
         let (shared, page) = (Rc::clone(shared), page.downgrade());
         let menus = [&menu, &subtitles, &speed, &quality].map(|m| m.downgrade());
-        let (episodes, episode_ids) = (Rc::clone(&episodes), Rc::clone(&episode_ids));
+        let (episodes, episode_ids, comments) = (Rc::clone(&episodes), Rc::clone(&episode_ids), Rc::clone(&comments));
         keys.connect_key_pressed(move |_, keyval, _, state| {
             let Some(page) = page.upgrade() else {
                 return glib::Propagation::Proceed;
@@ -579,12 +601,21 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
                 episodes.close();
                 return glib::Propagation::Stop;
             }
+            if comments.is_open() && keyval == gdk::Key::Escape {
+                comments.close();
+                return glib::Propagation::Stop;
+            }
             // typing in the episode list's search box, or moving through its rows, keeps the keys there
             let Some(action) = action_for(keyval.into_glib(), modifiers(state), episodes.has_focus()) else {
                 return glib::Propagation::Proceed;
             };
             if action == Action::OpenEpisodeList {
+                comments.close();
                 toggle_episodes(&shared, &episodes, &episode_ids);
+                return glib::Propagation::Stop;
+            }
+            if action == Action::OpenComments {
+                toggle_comments(&shared, &comments, &episodes);
                 return glib::Propagation::Stop;
             }
             if apply_action(&shared, &page, action) {
@@ -911,6 +942,19 @@ fn toggle_episodes(shared: &Shared, episodes: &ChapterPanel, episode_ids: &RefCe
     let Some((rows, ids)) = neighbours::episode_rows(current) else { return };
     *episode_ids.borrow_mut() = ids;
     episodes.open(rows);
+}
+
+/// Opens the comments of the episode playing, or shuts them; the episode list shuts first. The panel follows the episode
+/// while it is open.
+fn toggle_comments(shared: &Shared, comments: &Rc<CommentsPanel>, episodes: &ChapterPanel) {
+    if comments.is_open() {
+        comments.close();
+        return;
+    }
+    episodes.close();
+    let shared = Rc::downgrade(shared);
+    // a borrow held elsewhere (a tick) answers "cannot tell", and the panel keeps its episode
+    comments.open(Rc::new(move || shared.upgrade().and_then(|player| player.try_borrow().ok().map(|p| p.episode_id))));
 }
 
 /// Plays the episode before or after the one playing, in this window. At the ends a toast says so, unless

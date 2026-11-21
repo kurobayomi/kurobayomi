@@ -16,6 +16,7 @@ pub mod import;
 pub mod locale;
 pub mod names;
 pub mod notice;
+pub mod number;
 pub mod picker;
 pub mod source_names;
 pub mod time;

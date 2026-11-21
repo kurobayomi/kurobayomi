@@ -1,6 +1,7 @@
-//! The action row widget (T-38a-017, T-39a-026): four equal buttons under the entry header, drawn from the rules of
-//! `action_row`. The library button is the page's `LibraryButton`; the interval, tracking and Browser buttons are built
-//! here. Tracking and Browser appear only when the page passes a callback for them.
+//! The action row widget (T-38a-017, T-39a-026): equal buttons under the entry header, drawn from the rules of
+//! `action_row`. The library button is the page's `LibraryButton`; the interval, tracking, Reviews and Browser buttons
+//! are built here. Tracking, Reviews (docs/design/comments.md) and Browser appear only when the page passes a callback
+//! for them.
 
 use std::rc::Rc;
 
@@ -106,12 +107,14 @@ impl Slot {
 }
 
 #[derive(Clone)]
-/// The four-button row. `on_interval`, `on_tracking` and `on_webview` run the buttons' own actions.
+/// The button row. `on_interval`, `on_tracking`, `on_reviews` and `on_webview` run the buttons' own actions.
 pub struct ActionRow {
     pub root: GBox,
     pub library: LibraryButton,
     interval: Slot,
     tracking: Slot,
+    /// `None` when the page passed no Reviews callback.
+    reviews: Option<Slot>,
     webview: Slot,
 }
 
@@ -119,6 +122,7 @@ impl ActionRow {
     pub fn new(
         on_interval: Rc<dyn Fn()>,
         on_tracking: Option<Rc<dyn Fn()>>,
+        on_reviews: Option<Rc<dyn Fn()>>,
         on_webview: Option<Rc<dyn Fn()>>,
     ) -> Self {
         let root = GBox::new(O::Horizontal, 0);
@@ -144,13 +148,20 @@ impl ActionRow {
         }
         root.append(&tracking.button);
 
+        let reviews = on_reviews.map(|on_reviews| {
+            let reviews = Slot::new(crate::comments::reviews::ICON);
+            reviews.button.connect_clicked(move |_| on_reviews());
+            root.append(&reviews.button);
+            reviews
+        });
+
         let webview = Slot::new("web-browser-symbolic");
         if let Some(on_webview) = on_webview {
             webview.button.connect_clicked(move |_| on_webview());
         }
         root.append(&webview.button);
 
-        Self { root, library, interval, tracking, webview }
+        Self { root, library, interval, tracking, reviews, webview }
     }
 
     /// Draws the row for `state`: labels, colours, sensitivity and visibility.
@@ -176,6 +187,10 @@ impl ActionRow {
         };
         self.tracking.text(&tracking_text, tracking_tone(state.tracking_count));
         self.tracking.button.set_visible(tracking_visible(state.has_tracking));
+
+        if let Some(reviews) = &self.reviews {
+            reviews.text(&tr(MsgKey::reviews_title), Tone::Inactive);
+        }
 
         self.webview.text(&tr(MsgKey::ui_browser), Tone::Inactive);
         self.webview.button.set_visible(webview_visible(state.webview));

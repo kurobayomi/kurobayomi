@@ -69,7 +69,7 @@ impl DateFormat {
 /// The locale for a tag, or English when the tag does not parse. The numbering system is forced to
 /// Latin digits (`-u-nu-latn`), so ICU's native digits (Arabic-Indic and the like) never appear
 /// (T-51a-033: ASCII digits in every locale).
-fn locale_or_english(tag: &str) -> Locale {
+pub(crate) fn locale_or_english(tag: &str) -> Locale {
     Locale::try_from_str(&format!("{tag}-u-nu-latn"))
         .or_else(|_| Locale::try_from_str("en-u-nu-latn"))
         .expect("en is a valid locale")

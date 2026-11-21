@@ -350,8 +350,9 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
     list_head.append(&empty);
     list_head.append(&seasons.widget);
 
-    // the action row (T-39a-026): library, interval (the dialog of T-38a-028), tracking and Browser. Browser shows
-    // only for an HTTP source (`RowState::webview`) and opens the title's page in the system browser.
+    // the action row (T-39a-026): library, interval (the dialog of T-38a-028), tracking, Reviews and Browser. Reviews
+    // opens AniList's reviews of the title (docs/design/comments.md). Browser shows only for an HTTP source
+    // (`RowState::webview`) and opens the title's page in the system browser.
     let action_row = ActionRow::new(
         Rc::new({
             let weak = Rc::clone(&weak_view);
@@ -366,6 +367,14 @@ fn assemble(runner: Rc<EntryRunner>, show_airing: bool, env: Env) -> GBox {
             move || {
                 if let Some(view) = weak.borrow().upgrade() {
                     view.tracking_pressed();
+                }
+            }
+        })),
+        Some(Rc::new({
+            let weak = Rc::clone(&weak_view);
+            move || {
+                if let Some(view) = weak.borrow().upgrade() {
+                    view.reviews_pressed();
                 }
             }
         })),
@@ -1222,6 +1231,14 @@ impl View {
     fn tracking_pressed(&self) {
         self.claim_slot(EntryDialog::TrackSheet);
         self.open_tracking();
+    }
+
+    /// The Reviews button: AniList's reviews of the title on a page of their own.
+    fn reviews_pressed(&self) {
+        let entry_id = self.model.borrow().as_ref().filter(|m| m.accepts_dispatch()).map(|m| m.entry.id);
+        if let Some(entry_id) = entry_id {
+            crate::comments::reviews::open(entry_id, self.env.kind);
+        }
     }
 
     /// The Browser button and W (an HTTP source only): the entry's page in the system browser, as Open in browser.

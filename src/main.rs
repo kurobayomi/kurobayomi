@@ -14,6 +14,7 @@ mod banner;
 mod category_picker;
 mod duplicate_dialog;
 mod cli;
+mod comments;
 mod community;
 // the thumbnail renderer is called by the cover loader, which does not exist yet
 mod feed;

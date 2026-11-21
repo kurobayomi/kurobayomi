@@ -116,7 +116,7 @@ mod tests {
                 on_search: Rc::new(|_: SearchRequest| {}),
                 on_copy: Rc::new(|_: String| {}),
             };
-            let info = InfoBlock::new(ActionRow::new(Rc::new(|| {}), None, None));
+            let info = InfoBlock::new(ActionRow::new(Rc::new(|| {}), None, None, None));
             let expansion = Rc::new(Cell::new(Expansion::new(false, false)));
             let model = HeaderModel::from_parts("Title", Some("Author"), None, ("document-open-recent-symbolic", "Ongoing".into()), "Source", false);
 
@@ -147,7 +147,7 @@ mod tests {
                 on_search: Rc::new(|_: SearchRequest| {}),
                 on_copy: Rc::new(|_: String| {}),
             };
-            let info = InfoBlock::new(ActionRow::new(Rc::new(|| {}), None, None));
+            let info = InfoBlock::new(ActionRow::new(Rc::new(|| {}), None, None, None));
             let model = HeaderModel::from_parts("Title", Some("Author"), None, ("document-open-recent-symbolic", "Ongoing".into()), "Source", false);
             let shown = |info: &InfoBlock| info.score_row.borrow().as_ref().and_then(ScoreRow::shown);
             let line = ScoreLine { text: "8.2 on MyAnimeList".into(), tooltip: None };

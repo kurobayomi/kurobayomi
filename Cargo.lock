@@ -2733,6 +2733,7 @@ dependencies = [
  "icu_locale_fallback",
  "icu_plurals",
  "icu_provider",
+ "serde",
  "writeable",
  "zerovec",
 ]
@@ -3604,6 +3605,7 @@ dependencies = [
  "fluent-bundle",
  "fluent-syntax",
  "icu_datetime",
+ "icu_decimal",
  "icu_locale",
  "quick-xml",
  "tempfile",
