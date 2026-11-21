@@ -1,4 +1,5 @@
-//! Hidden web pages for sites that answer plain clients with Cloudflare's browser check ("Just a moment..."). A site's
+//! Hidden web pages for sites that answer plain clients with a browser check: Cloudflare's ("Just a moment...") or Anubis's
+//! proof of work ("Making sure you're not a bot!"). A site's
 //! page is opened once, unshown, in the system's web engine, which passes the check by itself, and the plug-ins'
 //! requests to that site are then sent with `fetch()` from inside the page: the pass only holds for the browser that
 //! earned it, so its cookie cannot be replayed from the app's own client. One page per site, closed after
@@ -111,26 +112,40 @@ pub fn origin_of(request_json: &str) -> Result<String, String> {
     Ok(url.origin().ascii_serialization())
 }
 
+/// The start of the cookie name Anubis (a proof-of-work bot check) sets while it shows its check page.
+pub const ANUBIS_COOKIE_PREFIX: &str = "techaro.lol-anubis-cookie-verification";
+/// A mark of Anubis's check page in its HTML: the element that carries the proof-of-work task.
+pub const ANUBIS_PAGE_MARK: &str = r#"id="anubis_challenge""#;
+
 /// Whether the page's answer is still the browser check (the pass ran out): the page is reloaded once and asked again.
+/// Cloudflare's check is a 403 or 503 with `cf-mitigated: challenge`. Anubis's is its check page, at any status: a page's
+/// `fetch` never shows `set-cookie` to a script, so the page's HTML tells it, and the cookie only where an engine passes it.
 pub fn still_challenged(answer: &str) -> bool {
     #[derive(Deserialize)]
     struct Answer {
         status: u16,
         headers: Vec<(String, String)>,
+        #[serde(default)]
+        body: String,
     }
     serde_json::from_str::<Answer>(answer).is_ok_and(|a| {
-        matches!(a.status, 403 | 503) && a.headers.iter().any(|(n, v)| n.eq_ignore_ascii_case("cf-mitigated") && v.eq_ignore_ascii_case("challenge"))
+        let header = |name: &str, test: &dyn Fn(&str) -> bool| a.headers.iter().any(|(n, v)| n.eq_ignore_ascii_case(name) && test(v));
+        let cloudflare = matches!(a.status, 403 | 503) && header("cf-mitigated", &|v| v.eq_ignore_ascii_case("challenge"));
+        let anubis = header("set-cookie", &|v| v.trim_start().starts_with(ANUBIS_COOKIE_PREFIX)) || (header("content-type", &|v| v.to_ascii_lowercase().starts_with("text/html")) && a.body.contains(ANUBIS_PAGE_MARK));
+        cloudflare || anubis
     })
 }
 
 /// The language the hidden pages browse in, whatever the system's. Cloudflare's check retitles its page in the browser's
-/// language ("Un instant…" on a French system), and [`is_check_page`] knows the English title only: a page in another
+/// language ("Un instant…" on a French system), and [`is_check_page`] knows the English titles only: a page in another
 /// language passed for cleared while the check still ran, and the site answered its requests with 403.
 pub const PAGE_LANGUAGE: &str = "en-US";
 
-/// Whether a page titled `title` is the check rather than the site. The pages browse in [`PAGE_LANGUAGE`].
+/// Whether a page titled `title` is a browser check rather than the site: Cloudflare's ("Just a moment...") or Anubis's
+/// ("Making sure you're not a bot!"). The pages browse in [`PAGE_LANGUAGE`].
 pub fn is_check_page(title: &str) -> bool {
-    title.to_lowercase().contains("just a moment")
+    let title = title.to_lowercase();
+    title.contains("just a moment") || (title.contains("making sure you") && title.contains("not a bot"))
 }
 
 /// How long a read's steps may take when the plug-in names no time.
@@ -350,6 +365,20 @@ mod tests {
         assert!(!still_challenged(r#"{"status":200,"headers":[],"url":"u","body":"{}"}"#));
         assert!(!still_challenged(r#"{"status":403,"headers":[],"url":"u","body":""}"#));
         assert!(is_check_page("Just a moment...") && !is_check_page("animepahe"));
+    }
+
+    #[test]
+    fn an_anubis_check_answer_reloads_the_page_at_any_status() {
+        // the page as inkstory.net served it on 2026-11-21 (Anubis v1.28.2), cut down to the mark
+        let page = r#"<!doctype html><html><head><title>Making sure you&#39;re not a bot!</title></head><body><script id="anubis_challenge" type="application/json">{}</script></body></html>"#;
+        let answer = |status: u16, headers: &str| serde_json::json!({ "status": status, "headers": serde_json::from_str::<serde_json::Value>(headers).unwrap(), "url": "u", "body": page }).to_string();
+        assert!(still_challenged(&answer(200, r#"[["content-type","text/html; charset=utf-8"]]"#)), "a page's fetch never shows set-cookie: the HTML tells");
+        assert!(still_challenged(&answer(401, r#"[["Content-Type","TEXT/HTML"]]"#)));
+        assert!(still_challenged(r#"{"status":200,"headers":[["set-cookie","techaro.lol-anubis-cookie-verification-347ddb4a=01a1; Path=/"]],"url":"u","body":""}"#));
+        assert!(!still_challenged(&answer(200, r#"[["content-type","application/json"]]"#)), "a JSON answer that quotes the mark is not the check");
+        assert!(!still_challenged(r#"{"status":200,"headers":[["content-type","text/html"],["set-cookie","session=1"]],"url":"u","body":"<title>InkStory</title>"}"#));
+        assert!(is_check_page("Making sure you're not a bot!") && is_check_page("Making sure you’re not a bot!"));
+        assert!(!is_check_page("InkStory") && !is_check_page("Not a bot? Read manga"));
     }
 
     fn hosts(list: &[&str]) -> Vec<String> {

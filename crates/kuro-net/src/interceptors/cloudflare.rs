@@ -1,6 +1,7 @@
-//! Cloudflare challenge handling (T-12a-015, T-12a-016, T-12a-021, T-12a-022).
-//! A 403 or 503 from a Cloudflare server is solved once per registrable domain in a WebView;
-//! the solve is shared by every request that hit the same domain, and each of them then retries once.
+//! Browser check handling (T-12a-015, T-12a-016, T-12a-021, T-12a-022).
+//! A 403 or 503 from a Cloudflare server is sent from the site's hidden page where the platform has them; elsewhere it is
+//! solved once per registrable domain in a WebView, the solve is shared by every request that hit the same domain, and each
+//! of them then retries once. Anubis's proof-of-work check ([`is_anubis`]) goes to the hidden page only.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -8,9 +9,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use async_trait::async_trait;
-use http::header::{HeaderMap, SERVER, USER_AGENT};
+use http::header::{HeaderMap, SERVER, SET_COOKIE, USER_AGENT};
 use http::StatusCode;
-use kuro_platform::hidden_pages::HiddenPages;
+use kuro_platform::hidden_pages::{ANUBIS_COOKIE_PREFIX, HiddenPages};
 use kuro_platform::toast::{ToastLength, Toaster};
 use kuro_platform::webview::{SolveFailure, SolveOutcome, SolveRequest, WebViewHost};
 use tokio::sync::{Semaphore, watch};
@@ -47,6 +48,12 @@ pub fn is_challenge(status: StatusCode, headers: &HeaderMap) -> bool {
             .get(SERVER)
             .and_then(|v| v.to_str().ok())
             .is_some_and(|server| CF_SERVER_VALUES.iter().any(|s| server.eq_ignore_ascii_case(s)))
+}
+
+/// `true` when the response is Anubis's bot check: one of its `set-cookie` headers sets a cookie whose name starts with
+/// [`ANUBIS_COOKIE_PREFIX`]. The status says nothing: Anubis answers its check with any (200 on the sites seen so far).
+pub fn is_anubis(headers: &HeaderMap) -> bool {
+    headers.get_all(SET_COOKIE).iter().filter_map(|v| v.to_str().ok()).any(|cookie| cookie.trim_start().starts_with(ANUBIS_COOKIE_PREFIX))
 }
 
 /// The single-flight key: the registrable domain (public suffix rules), or the host when there is none.
@@ -249,7 +256,8 @@ impl CloudflareInterceptor {
 
     /// Sends a challenged request from a hidden page of its site instead of solving the check for the app's own client:
     /// the pass is tied to the browser that earned it (its TLS fingerprint), so the app's client cannot reuse it. With hidden
-    /// pages the solve through [`WebViewHost`] (the system browser) is not used at all, even when a page fails.
+    /// pages the solve through [`WebViewHost`] (the system browser) is not used at all, even when a page fails. Anubis's check
+    /// is only ever answered this way.
     pub fn with_hidden_pages(mut self, pages: Option<Arc<dyn HiddenPages>>) -> Self {
         self.pages = pages;
         self
@@ -315,7 +323,13 @@ impl Interceptor for CloudflareInterceptor {
     async fn intercept(&self, chain: Chain<'_>, req: Request) -> Result<Response, NetError> {
         let retry = req.clone();
         let response = chain.proceed(req).await?;
-        if !is_challenge(response.status, &response.headers) {
+        // Anubis is cleared by a browser running its proof of work, which a hidden page does by itself; the solve through
+        // the system browser below only knows Cloudflare's pass cookie, so without hidden pages the check comes back as is
+        let anubis = is_anubis(&response.headers);
+        if anubis && self.pages.is_none() {
+            return Ok(response);
+        }
+        if !anubis && !is_challenge(response.status, &response.headers) {
             return Ok(response);
         }
         if let (Some(pages), Some(json)) = (&self.pages, page_request(&retry)) {
@@ -335,6 +349,10 @@ impl Interceptor for CloudflareInterceptor {
             // a platform with hidden pages does not open the system browser: the person would have to export cookies by hand,
             // and a cookie cannot clear a check that is tied to the browser that solved it. The challenge comes back as the
             // answer, and the source shows that it is not answering.
+            return Ok(response);
+        }
+        // a request a page cannot send (its body is not text) gets Anubis's check back: it never goes to the system browser
+        if anubis {
             return Ok(response);
         }
         if !self.webview.available() {
@@ -595,6 +613,85 @@ mod tests {
         assert!(is_challenge(StatusCode::SERVICE_UNAVAILABLE, &h));
         h.insert(SERVER, HeaderValue::from_static("Cloudflare"));
         assert!(is_challenge(StatusCode::FORBIDDEN, &h));
+    }
+
+    #[test]
+    fn an_anubis_cookie_marks_its_check_at_any_status() {
+        let mut h = HeaderMap::new();
+        h.append(SET_COOKIE, HeaderValue::from_static("__ddg8_=dMs4; Domain=.inkstory.net; Path=/"));
+        assert!(!is_anubis(&h));
+        h.append(SET_COOKIE, HeaderValue::from_static("techaro.lol-anubis-cookie-verification-347ddb4a=01a1fdb1; Path=/; Secure"));
+        assert!(is_anubis(&h), "any of the set-cookie headers");
+        let mut other = HeaderMap::new();
+        other.insert(SET_COOKIE, HeaderValue::from_static("session=techaro.lol-anubis-cookie-verification"));
+        assert!(!is_anubis(&other), "the name must start with it, not the value");
+        assert!(!is_challenge(StatusCode::OK, &h), "Cloudflare's test stays its own");
+    }
+
+    /// Anubis's check as inkstory.net served it on 2026-11-21: a 200 page with its verification cookie.
+    async fn anubis_server() -> MockServer {
+        let server = MockServer::start().await;
+        Mock::given(any())
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html; charset=utf-8")
+                    .insert_header("set-cookie", "techaro.lol-anubis-cookie-verification-347ddb4a=01a1fdb1; Path=/; Secure")
+                    .set_body_string("<title>Making sure you&#39;re not a bot!</title>"),
+            )
+            .mount(&server)
+            .await;
+        server
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn an_anubis_check_is_answered_by_the_hidden_page_and_never_by_the_browser() {
+        let server = anubis_server().await;
+        let dir = tempfile::tempdir().unwrap();
+        let webview = FakeWebView::new(cleared(), Duration::from_millis(10));
+        let pages = Arc::new(FakePages {
+            answer: Ok(format!(r#"{{"status":200,"headers":[["content-type","application/json"]],"url":"{}/_serverFn/x","body":"{{\"ok\":true}}"}}"#, server.uri())),
+            calls: AtomicUsize::new(0),
+            last: Mutex::new(String::new()),
+        });
+        let client = client_with_pages(webview.clone(), pages.clone(), dir.path());
+        let resp = client.execute(request::get(&format!("{}/_serverFn/x", server.uri())).unwrap()).await.unwrap();
+        assert_eq!(resp.status, StatusCode::OK);
+        assert_eq!(resp.headers.get("content-type").unwrap(), "application/json");
+        assert_eq!(&resp.bytes().await.unwrap()[..], br#"{"ok":true}"#);
+        assert_eq!(pages.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(webview.solves.load(Ordering::SeqCst), 0, "the system browser was not asked");
+        assert_eq!(server.received_requests().await.unwrap().len(), 1, "no retry from the app's own client");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn without_hidden_pages_an_anubis_check_comes_back_as_is() {
+        let server = anubis_server().await;
+        let dir = tempfile::tempdir().unwrap();
+        let webview = FakeWebView::new(cleared(), Duration::from_millis(10));
+        let (toaster, feed) = toast_channel();
+        let (client, _jar) = client(webview.clone(), toaster, dir.path());
+        let resp = client.execute(request::get(&format!("{}/", server.uri())).unwrap()).await.unwrap();
+        assert_eq!(resp.status, StatusCode::OK);
+        assert_eq!(&resp.bytes().await.unwrap()[..], b"<title>Making sure you&#39;re not a bot!</title>");
+        assert_eq!(webview.solves.load(Ordering::SeqCst), 0, "the system browser was not asked");
+        assert_eq!(next_toast(&feed).await, None);
+        assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn an_anubis_check_for_a_request_a_page_cannot_send_comes_back_as_is() {
+        let server = anubis_server().await;
+        let dir = tempfile::tempdir().unwrap();
+        let webview = FakeWebView::new(cleared(), Duration::from_millis(10));
+        let pages = Arc::new(FakePages { answer: Err("not asked".into()), calls: AtomicUsize::new(0), last: Mutex::new(String::new()) });
+        let client = client_with_pages(webview.clone(), pages.clone(), dir.path());
+        let mut req = request::get(&format!("{}/", server.uri())).unwrap();
+        req.method = request::Method::Post;
+        req.body = request::Body::Bytes { content_type: "application/octet-stream".into(), data: bytes::Bytes::from_static(b"\xff\xfe") };
+        let resp = client.execute(req).await.unwrap();
+        assert_eq!(resp.status, StatusCode::OK);
+        assert_eq!(pages.calls.load(Ordering::SeqCst), 0, "a body that is not text cannot go to a page");
+        assert_eq!(webview.solves.load(Ordering::SeqCst), 0, "the system browser was not asked");
     }
 
     #[test]

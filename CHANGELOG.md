@@ -8,6 +8,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Added
 
+- Sites behind Anubis's bot check ("Making sure you're not a bot!") work like sites behind Cloudflare's: the app passes
+  the check in its hidden browser page and sends the source's requests from there. InkStory needs it.
 - A source a repository adds shows a "New" pill and comes first in that repository's list of sources, until you have
   seen the list, also when you close the "new sources" notice without choosing.
 

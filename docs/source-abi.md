@@ -174,7 +174,13 @@ What a guest can and cannot do with it:
 - **The internet only.** Every connection of every hidden page goes through the app's gate (`kuro_net::page_gate`),
   which looks the name up itself and refuses this computer and the local network, as the app's client does for `http`.
 - **Checks are not answered.** A site's check that clears by itself in a real browser clears here. One that does not
-  (a click, a puzzle) fails the read after 25 s; the source then shows as blocked.
+  (a click, a puzzle) fails the read after 25 s; the source then shows as blocked. The app knows two checks by their
+  page title, in English whatever the system's language: Cloudflare's ("Just a moment...") and Anubis's proof of work
+  ("Making sure you're not a bot!").
+- **`http` uses the same pages.** An `http` request answered with one of those checks is sent again from the site's
+  hidden page with the page's own `fetch`, and the guest gets that answer: Cloudflare's is a 403 or 503 from a Cloudflare
+  `Server`, Anubis's any status with its `techaro.lol-anubis-cookie-verification…` cookie. Where there are no hidden
+  pages, Anubis's check comes back to the guest as is; Cloudflare's is solved as before (a web view, or the system browser).
 - **One read at a time** per site and source; the next waits. A page load keeps the source's `requestGapMs`. The time a
   read takes is host time, not guest run time.
 
