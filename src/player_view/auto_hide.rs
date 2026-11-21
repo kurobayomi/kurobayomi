@@ -2,8 +2,13 @@
 //! top bar, the control bar and the cursor fade out after [`IDLE`] without the mouse, a click or a key, and come back on
 //! any of them. They stay while paused or while one of their menus is open. Both bars float over the video, so
 //! hiding them never resizes it. With the setting off the header sits above the video and nothing hides.
+//!
+//! The side panels over the video (the episode list, the comments) sit between the bars, not under them
+//! ([`AutoHide::hold_for`]): their top starts under a floating header and their foot above the control bar, and the
+//! bars stay while one is open, as they do for an open menu (user, 2026-11-21: their title rows and their foot were
+//! hidden under the bars).
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -23,6 +28,14 @@ pub struct AutoHide {
     bar: gtk::Revealer,
     area: gtk::GLArea,
     last_input: Rc<Cell<Instant>>,
+    /// The side panels over the video, kept between the bars ([`Self::hold_for`]).
+    panels: RefCell<Vec<gtk::Revealer>>,
+}
+
+/// The room a side panel leaves at its top and its foot: the header's height when it floats over the video (auto-hide
+/// on), nothing when it sits above it; the control bar's height, which always floats.
+pub fn panel_insets(enabled: bool, header_height: i32, bar_height: i32) -> (i32, i32) {
+    (if enabled { header_height.max(0) } else { 0 }, bar_height.max(0))
 }
 
 impl AutoHide {
@@ -41,7 +54,14 @@ impl AutoHide {
             page.append(&header_revealer);
         }
         overlay.add_overlay(&bar_revealer);
-        let this = Rc::new(Self { enabled, header: header_revealer, bar: bar_revealer, area: area.clone(), last_input: Rc::new(Cell::new(Instant::now())) });
+        let this = Rc::new(Self {
+            enabled,
+            header: header_revealer,
+            bar: bar_revealer,
+            area: area.clone(),
+            last_input: Rc::new(Cell::new(Instant::now())),
+            panels: RefCell::new(Vec::new()),
+        });
         if enabled {
             // a pointer that really moved, a click or a key counts as input (GTK also reports motion when the layout
             // changes under a still pointer, which would keep the bars up for ever)
@@ -70,15 +90,41 @@ impl AutoHide {
         this
     }
 
-    /// Shows or hides the bars and the cursor for this moment. `paused` is the player's state.
+    /// Keeps `panel` (a side panel laid over the video, aligned to its edge) between the bars, and the bars up while it
+    /// is open.
+    pub fn hold_for(&self, panel: &gtk::Revealer) {
+        self.panels.borrow_mut().push(panel.clone());
+        self.fit_panels();
+    }
+
+    /// Gives every held panel the room of the bars, measured while they show (a hidden bar is not measured).
+    fn fit_panels(&self) {
+        if !self.header.reveals_child() {
+            return;
+        }
+        let (top, bottom) = panel_insets(self.enabled, self.header.height(), self.bar.height());
+        for panel in self.panels.borrow().iter() {
+            if panel.margin_top() != top {
+                panel.set_margin_top(top);
+            }
+            if panel.margin_bottom() != bottom {
+                panel.set_margin_bottom(bottom);
+            }
+        }
+    }
+
+    /// Shows or hides the bars and the cursor for this moment. `paused` is the player's state. An open side panel keeps
+    /// them, as an open menu does.
     pub fn tick(&self, paused: bool) {
         let menu_open = [self.header.upcast_ref::<gtk::Widget>(), self.bar.upcast_ref()].into_iter().any(has_open_menu);
-        let show = shown(self.enabled, paused, menu_open, self.last_input.get().elapsed());
+        let panel_open = self.panels.borrow().iter().any(|panel| panel.reveals_child());
+        let show = shown(self.enabled, paused, menu_open || panel_open, self.last_input.get().elapsed());
         if self.header.reveals_child() != show {
             self.header.set_reveal_child(show);
             self.bar.set_reveal_child(show);
             self.area.set_cursor_from_name(if show { None } else { Some("none") });
         }
+        self.fit_panels();
     }
 }
 
@@ -109,5 +155,12 @@ mod tests {
         assert!(shown(true, true, false, quiet), "paused: shown");
         assert!(shown(true, false, true, quiet), "a menu open: shown");
         assert!(shown(false, false, false, quiet), "auto-hide off: always shown");
+    }
+
+    #[test]
+    fn a_panel_starts_under_a_floating_header_and_ends_above_the_control_bar() {
+        assert_eq!(panel_insets(true, 46, 52), (46, 52), "auto-hide: both bars float over the video");
+        assert_eq!(panel_insets(false, 46, 52), (0, 52), "the header sits above the video: no room needed at the top");
+        assert_eq!(panel_insets(true, -1, 0), (0, 0), "an unmeasured bar takes no room");
     }
 }

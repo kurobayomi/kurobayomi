@@ -492,6 +492,9 @@ fn build_page(shared: &Shared, start: i64) -> gtk::Box {
     // the bars hide by themselves while the video plays (`auto_hide`); with the setting off the header sits above it
     let enabled = crate::data::is_installed() && crate::data::app().base.auto_hide_bars.get();
     let hiding = auto_hide::AutoHide::attach(enabled, &page, &overlay, &header, &bar, &area);
+    // the episode list and the comments sit between the bars, which stay while one is open
+    hiding.hold_for(episodes.root());
+    hiding.hold_for(comments.root());
     page.append(&overlay);
     watch_fullscreen(&page, &header, &fullscreen);
 
