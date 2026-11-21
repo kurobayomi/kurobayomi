@@ -22,7 +22,7 @@ pub fn about_subtitle(app: &str, release: bool, version: &str, commit: &str) -> 
 pub fn rows(about: &str) -> Vec<MenuRow> {
     let row = |title, subtitle: &str, icon, target| MenuRow { title, subtitle: subtitle.to_owned(), icon, target };
     vec![
-        row("Appearance", "Theme and start screen", "preferences-desktop-appearance-symbolic", "settings_appearance"),
+        row("Appearance", "Theme, colours and app language", "preferences-desktop-appearance-symbolic", "settings_appearance"),
         row("Library", "Categories, global update", "view-grid-symbolic", "settings_library"),
         row("Reader", "Reading mode, display, navigation", "x-office-document-symbolic", "settings_reader"),
         row("Player", "Languages, quality, volume, autoplay, controls", "video-display-symbolic", "settings_player"),

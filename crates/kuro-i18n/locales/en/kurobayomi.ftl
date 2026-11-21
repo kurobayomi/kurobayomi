@@ -4883,7 +4883,7 @@ spec_sources_repositories_anilist_cookies = Sources, repositories, AniList, cook
 spec_tag = Tag
 
 # source: kurobayomi
-spec_theme_and_start_screen = Theme and start screen
+spec_theme_colours_and_app_language = Theme, colours and app language
 
 # source: kurobayomi
 spec_track_search = Track search

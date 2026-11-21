@@ -98,11 +98,11 @@ mod tests {
     fn app_export_keeps_every_kind_and_is_sorted() {
         let store = store_with(&[
             ("show_nsfw_source", PrefValue::Bool(true)),
-            ("start_screen", PrefValue::Float(1.5)),
+            ("source_languages", PrefValue::Float(1.5)),
             ("__APP_STATE_incognito_mode", PrefValue::Bool(true)),
         ]);
         let out = export_app(&store, false);
-        assert_eq!(keys(&out), vec!["show_nsfw_source", "start_screen"]);
+        assert_eq!(keys(&out), vec!["show_nsfw_source", "source_languages"]);
         assert_eq!(out[0].1, PrefValue::Bool(true));
         assert_eq!(out[1].1, PrefValue::Float(1.5));
     }
