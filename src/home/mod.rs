@@ -11,6 +11,7 @@
 //! [`data`]; this file reads the database, draws and routes clicks.
 
 pub mod data;
+pub mod discovery;
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -75,7 +76,22 @@ struct Rows {
     updates: [Option<Vec<UpdateRow>>; 2],
     /// The community score of each entry, per kind.
     scores: [HashMap<i64, f64>; 2],
+    /// The last answer of the suggestions (`discovery`).
+    discovery: Option<Arc<discovery::Cached>>,
 }
+
+/// What a click (or Enter) on a cover does.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Action {
+    /// Opens this unit of the entry, as a History or an Updates row does.
+    Unit(i64),
+    /// A suggestion, not on a source yet: global search for its title, for its kind.
+    Search,
+}
+
+/// The source id of a suggestion's cover: no source has it, so the image cache fetches it with the shared client and no
+/// source headers (`kuro_images::fetch::SourceHttp`, edge E-IMG-31).
+const NO_SOURCE: i64 = -1;
 
 /// One cover as drawn: everything it shows and the unit it opens. Equal lists draw the same row, so a change elsewhere
 /// in the tables redraws nothing.
@@ -88,7 +104,7 @@ struct Cover {
     score: Option<f64>,
     line: String,
     progress: Option<f64>,
-    unit_id: i64,
+    action: Action,
 }
 
 /// A row of covers: its group (heading, "See all", the covers), and what it shows now.
@@ -99,14 +115,17 @@ struct Row {
 }
 
 impl Row {
-    fn new(title: &str, see_all: &str, screen: &'static str) -> Rc<Self> {
+    /// `see_all` is the link's text and the screen it opens; a row with no full list behind it has none.
+    fn new(title: &str, see_all: Option<(String, &'static str)>) -> Rc<Self> {
         let heading = gtk::Label::builder().label(title).xalign(0.0).hexpand(true).css_classes(["heading"]).build();
-        let link = gtk::Button::with_label(see_all);
-        link.add_css_class("flat");
-        link.connect_clicked(move |_| crate::ui::open(screen));
         let top = GBox::new(O::Horizontal, SPACE_S);
         top.append(&heading);
-        top.append(&link);
+        if let Some((text, screen)) = see_all {
+            let link = gtk::Button::with_label(&text);
+            link.add_css_class("flat");
+            link.connect_clicked(move |_| crate::ui::open(screen));
+            top.append(&link);
+        }
         // one line of covers: at most the columns that fit (`fit`), each cell the Library's column; its minimum is one cell
         let flow = gtk::FlowBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -123,12 +142,19 @@ impl Row {
         group.append(&flow);
         group.set_visible(false);
         let row = Rc::new(Self { group, flow, covers: RefCell::default() });
-        // a click or Enter on a cover opens its unit, as a History or an Updates row does
+        // a click or Enter on a cover runs its action
         let weak = Rc::downgrade(&row);
         row.flow.connect_child_activated(move |_, child| {
             let Some(row) = weak.upgrade() else { return };
             let Some(cover) = usize::try_from(child.index()).ok().and_then(|i| row.covers.borrow().get(i).cloned()) else { return };
-            crate::updates::history_screen::open_unit_of(cover.kind, cover.item.row.id, cover.unit_id);
+            match cover.action {
+                Action::Unit(unit_id) => crate::updates::history_screen::open_unit_of(cover.kind, cover.item.row.id, unit_id),
+                Action::Search => crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch {
+                    kind: cover.kind,
+                    source_id: None,
+                    query: cover.item.row.title.clone(),
+                }),
+            }
         });
         row
     }
@@ -172,6 +198,9 @@ struct Home {
     gutter: i32,
     continue_row: Rc<Row>,
     new_row: Rc<Row>,
+    /// The suggestions: AniList's recommendations for the recent titles, and what is trending.
+    recommended_row: Rc<Row>,
+    trending_row: Rc<Row>,
     empty: gtk::Widget,
     /// The first run's welcome view (the Library's own), shown while no source repository exists.
     welcome: GBox,
@@ -186,8 +215,10 @@ struct Home {
 
 impl Home {
     fn new() -> Rc<Self> {
-        let continue_row = Row::new(&tr(MsgKey::action_continue), &tr(MsgKey::home_see_all_history), "history");
-        let new_row = Row::new(&tr(MsgKey::home_new_for_you), &tr(MsgKey::home_see_all_updates), "updates");
+        let continue_row = Row::new(&tr(MsgKey::action_continue), Some((tr(MsgKey::home_see_all_history), "history")));
+        let new_row = Row::new(&tr(MsgKey::home_new_for_you), Some((tr(MsgKey::home_see_all_updates), "updates")));
+        let recommended_row = Row::new(&tr(MsgKey::home_recommended_for_you), None);
+        let trending_row = Row::new(&tr(MsgKey::home_trending_now), None);
         let find = gtk::Button::with_label(&tr(MsgKey::home_find_something));
         find.add_css_class("suggested-action");
         find.add_css_class("pill");
@@ -205,6 +236,8 @@ impl Home {
         column.append(&welcome);
         column.append(&continue_row.group);
         column.append(&new_row.group);
+        column.append(&recommended_row.group);
+        column.append(&trending_row.group);
         column.append(&empty);
         let scroller = gtk::ScrolledWindow::builder().hscrollbar_policy(gtk::PolicyType::Never).vexpand(true).child(&column).build();
 
@@ -220,6 +253,8 @@ impl Home {
             gutter,
             continue_row,
             new_row,
+            recommended_row,
+            trending_row,
             empty,
             welcome,
             prefs,
@@ -256,6 +291,16 @@ impl Home {
         let weak = Rc::downgrade(self);
         crate::browse::glue::follow_changes(crate::recipe_sources::changes(), move |_| match weak.upgrade() {
             Some(home) => {
+                home.changed();
+                true
+            }
+            None => false,
+        });
+        // the suggestions' cache: its last answer now, then each refresh
+        let weak = Rc::downgrade(self);
+        crate::browse::glue::follow_changes(discovery::follow(), move |cached| match weak.upgrade() {
+            Some(home) => {
+                home.rows.borrow_mut().discovery = cached;
                 home.changed();
                 true
             }
@@ -355,30 +400,45 @@ impl Home {
         if !answered && repositories {
             return;
         }
-        let (continue_covers, new_covers) = self.covers();
+        let (continue_covers, new_covers, recommended, trending) = self.covers();
         let shown = data::shown(repositories, answered, !continue_covers.is_empty(), !new_covers.is_empty());
+        // the suggestions show beside the rows (or on their own), never with the welcome view
+        let (show_recommended, show_trending) = (!shown.welcome && !recommended.is_empty(), !shown.welcome && !trending.is_empty());
         let mode = data::cover_mode(self.prefs.display_mode.get());
         let force = self.force.replace(false);
         self.continue_row.draw(continue_covers, mode, force);
         self.new_row.draw(new_covers, mode, force);
+        self.recommended_row.draw(recommended, mode, force);
+        self.trending_row.draw(trending, mode, force);
         self.welcome.set_visible(shown.welcome);
         self.continue_row.group.set_visible(shown.continue_row);
         self.new_row.group.set_visible(shown.new_row);
-        self.empty.set_visible(shown.empty);
+        self.recommended_row.group.set_visible(show_recommended);
+        self.trending_row.group.set_visible(show_trending);
+        self.empty.set_visible(shown.empty && !show_recommended && !show_trending);
         self.fit();
     }
 
-    /// Both rows' covers from the published rows.
-    fn covers(&self) -> (Vec<Cover>, Vec<Cover>) {
-        let (history, updates, scores) = {
+    /// Every row's covers from the published rows: Continue, New for you, Recommended for you, Trending now.
+    fn covers(&self) -> (Vec<Cover>, Vec<Cover>, Vec<Cover>, Vec<Cover>) {
+        let (history, updates, scores, cached) = {
             let rows = self.rows.borrow();
             let updates: Vec<UpdateRow> = rows.updates.iter().flatten().flatten().cloned().collect();
-            (rows.history.clone(), updates, rows.scores.clone())
+            (rows.history.clone(), updates, rows.scores.clone(), rows.discovery.clone())
         };
         let items = Items::new(self.db());
         let score = |kind: Kind, id: i64| scores[slot(kind)].get(&id).copied();
 
         let [anime, manga] = history;
+        // what the user has, so the suggestions leave it out: the titles of the library and the history, and the seeds
+        let mut known = discovery::Known::default();
+        for kind in [Kind::Anime, Kind::Manga] {
+            known.titles.extend(items.library_rows(kind).values().map(|row| discovery::fold(&row.title)));
+        }
+        known.titles.extend(anime.iter().chain(manga.iter()).flatten().map(|row| discovery::fold(&row.title)));
+        if let Some(cached) = &cached {
+            known.mal_ids.extend(cached.seeds.iter().map(|(_, id)| *id));
+        }
         let db = self.db();
         let item_repo = kuro_data::item::ItemRepo::new(db.clone());
         // more rows than a row holds: titles with nothing left drop out below
@@ -391,7 +451,7 @@ impl Home {
                 let spot = data::spot(kind, unit.id == row.item_id, progress, total);
                 let (item, in_library) = items.get(kind, row.entry_id, None)?;
                 let art = look::cover_art(kind, row.cover.entry_id, row.cover.source_id, row.cover.url.clone(), row.cover.favorite, row.cover.cover_last_modified);
-                Some(Cover { kind, item, in_library, art, score: score(kind, row.entry_id), line: spot_line(&unit.name, spot), progress: data::fraction(spot), unit_id: unit.id })
+                Some(Cover { kind, item, in_library, art, score: score(kind, row.entry_id), line: spot_line(&unit.name, spot), progress: data::fraction(spot), action: Action::Unit(unit.id) })
             })
             .take(ROW_LIMIT)
             .collect();
@@ -402,10 +462,19 @@ impl Home {
                 // the unread badge counts the new units here
                 let (item, in_library) = items.get(card.kind, card.entry_id, Some(i64::try_from(card.count).unwrap_or(i64::MAX)))?;
                 let art = look::cover_art(card.kind, card.entry_id, card.source_id, card.thumbnail_url.clone(), true, card.cover_last_modified);
-                Some(Cover { kind: card.kind, item, in_library, art, score: score(card.kind, card.entry_id), line: card.first_unit_name.clone(), progress: None, unit_id: card.first_unit_id })
+                Some(Cover { kind: card.kind, item, in_library, art, score: score(card.kind, card.entry_id), line: card.first_unit_name.clone(), progress: None, action: Action::Unit(card.first_unit_id) })
             })
             .collect();
-        (continue_covers, new_covers)
+
+        let adult = kuro_prefs::source::SourcePrefs::new(crate::data::app().base.store().clone()).show_nsfw_source.get();
+        let (recommended, trending) = match &cached {
+            Some(cached) => (
+                discovery::recommended(&cached.answer.recommended, &known, adult, ROW_LIMIT),
+                discovery::trending(&cached.answer.trending_anime, &cached.answer.trending_manga, &known, adult, ROW_LIMIT),
+            ),
+            None => (Vec::new(), Vec::new()),
+        };
+        (continue_covers, new_covers, recommended.iter().map(suggestion_cover).collect(), trending.iter().map(suggestion_cover).collect())
     }
 
     /// Fits both rows to the page's width with the Library's column rule.
@@ -489,6 +558,36 @@ impl Items {
     }
 }
 
+/// A suggestion's cover: the Library's card drawn from a row that holds only the title (no counts, so no unread or
+/// download badge), AniList's cover and score, the kind under it, and a search for it on click.
+fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion) -> Cover {
+    let row = LibraryRow {
+        id: 0,
+        source: NO_SOURCE,
+        title: title.title.clone(),
+        category: 0,
+        total: 0,
+        done: 0,
+        bookmarks: 0,
+        fillermarks: 0,
+        latest_upload: 0,
+        item_fetched_at: 0,
+        last_activity: 0,
+        last_update: 0,
+        date_added: 0,
+        status: 0,
+        fetch_interval: 0,
+        viewer_flags: 0,
+        always_update: false,
+        next_update: 0,
+    };
+    let not_computed = kuro_domain::library::page::NOT_COMPUTED;
+    let item = LibraryItem { row, download_count: not_computed, unread_count: not_computed, is_local: false, source_language: String::new() };
+    let art = look::cover_art(title.kind, 0, NO_SOURCE, title.cover.clone(), false, 0);
+    let line = tr(if title.kind.is_anime() { MsgKey::label_anime } else { MsgKey::label_manga });
+    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search }
+}
+
 /// The line under a Continue cover: the unit a click opens, and how far into it.
 fn spot_line(unit: &str, spot: Spot) -> String {
     match spot {
@@ -519,7 +618,10 @@ fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Wi
         line.set_margin_top(-SPACE_XS);
         root.append(&line);
     }
-    let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
-    crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+    // the Library's right-click menu, for a title on a source (a suggestion is not one yet)
+    if matches!(cover.action, Action::Unit(_)) {
+        let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
+        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+    }
     built.root
 }

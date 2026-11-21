@@ -59,6 +59,10 @@ pub trait Paths {
     fn browse_cache_dir(&self) -> PathBuf {
         self.cache_dir().join("browse_results")
     }
+    /// What Home suggests (AniList's trending titles and the recommendations of recent titles), fetched again once a day.
+    fn discovery_cache_file(&self) -> PathBuf {
+        self.cache_dir().join("discovery.json")
+    }
     /// The bulk lists of the score site (titles with their community scores) of one kind, fetched again once a day.
     fn score_lists_file(&self, kind: crate::kind::Kind) -> PathBuf {
         self.cache_dir().join("community_scores").join(format!("{}.json", kind.as_str()))
@@ -250,6 +254,7 @@ mod role_tests {
         assert_eq!(p.chapter_cache_dir(), PathBuf::from("/k/chapter_disk_cache"));
         assert_eq!(p.share_staging_dir(), PathBuf::from("/k/shared_image"));
         assert_eq!(p.browse_cache_dir(), PathBuf::from("/k/browse_results"));
+        assert_eq!(p.discovery_cache_file(), PathBuf::from("/k/discovery.json"));
         assert_eq!(p.score_lists_file(crate::kind::Kind::Anime), PathBuf::from("/k/community_scores/anime.json"));
         assert_eq!(p.score_lists_file(crate::kind::Kind::Manga), PathBuf::from("/k/community_scores/manga.json"));
         assert_eq!(p.subtitle_cache_dir(), PathBuf::from("/k/subtitles"));

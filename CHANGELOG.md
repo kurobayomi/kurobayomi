@@ -12,6 +12,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   (New for you), anime and manga together. Its covers are the Library's, with the same badges, score, cover size, look
   and right-click menu, and as many fit a row as fit a Library row. A cover resumes or opens the new episode or
   chapter; See all opens History or Updates; search and refresh are in its top bar.
+- Home suggests what to watch or read next: Recommended for you (what AniList users recommend for your recent titles)
+  and Trending now (anime and manga), refreshed at most once a day. A suggestion opens a search across your sources;
+  titles you already have, and adult ones unless your setting allows them, are left out.
 
 ### Changed
 

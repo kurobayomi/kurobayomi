@@ -1187,3 +1187,9 @@ home_new_count = +{ $count }
 
 # source: kurobayomi
 home_page_title = Home
+
+# source: kurobayomi
+home_recommended_for_you = Recommended for you
+
+# source: kurobayomi
+home_trending_now = Trending now

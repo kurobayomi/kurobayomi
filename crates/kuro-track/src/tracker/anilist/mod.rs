@@ -12,6 +12,7 @@ pub mod api;
 pub mod auth;
 pub mod convert;
 pub mod date;
+pub mod discovery;
 pub mod dto;
 pub mod error;
 pub mod html;

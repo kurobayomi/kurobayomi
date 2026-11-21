@@ -143,3 +143,75 @@ Home drew its own cards instead of the Library's, and it shows.
   display modes, the stale-while-hidden rule, the header actions.
 - On screen, in a local build, with screenshots: a wide window, a narrow window (two covers, nothing clipped), each
   display mode, a cover size change, and the welcome view on an empty profile.
+
+## Discovery rows: Recommended for you and Trending now (plan 2026-11-21, built the same day)
+
+Two more rows under New for you, both from AniList only (user, 2026-11-21: one provider, not MAL here and AniList
+there). Anime and manga together, like the rest of Home.
+
+### Verified against AniList's live API (2026-11-21, no login)
+
+One GraphQL request to `https://graphql.anilist.co` answered all of it:
+
+- `Page { media(type: ANIME | MANGA, sort: TRENDING_DESC, isAdult: false) { … } }` returns what is trending now, for both
+  kinds (manga includes manhwa and manhua, as AniList files them).
+- Every title has `recommendations(sort: RATING_DESC) { nodes { rating mediaRecommendation { … } } }`: users' "if you
+  liked X" votes with their count. A title is found by its MyAnimeList id: `Media(idMal: 52034, type: ANIME)` gave Oshi
+  no Ko, and its top recommendations Perfect Blue (438), Erased (287), Kaguya-sama (216).
+- Each result carries `id`, `idMal`, `type`, `isAdult`, `averageScore` (0 to 100), `title { romaji english }` and
+  `coverImage { large }` (on `s4.anilist.co`).
+- Rate limit: `X-RateLimit-Limit: 30` per minute today. Home makes one request a day.
+
+### What the rows show
+
+- **Recommended for you:** seeds are the 5 most recent titles of the history, both kinds, that have a MyAnimeList id in
+  the app's score store (`kuro_data::community_score`, `remote_id`). Their recommendations are merged: a title
+  recommended by several seeds, or with more votes, ranks higher (the sum of `rating`). Titles already in the library or
+  the history are left out (by MyAnimeList id against the score store, and by AniList id against the seeds).
+- **Trending now:** AniList's trending titles, anime and manga, interleaved so neither kind fills the row; titles in the
+  library are left out.
+- **Each cover:** AniList's cover, the title (romaji, as most sources name titles), and AniList's `averageScore / 10` on
+  the app's own star badge (`community::score_text`); no star when AniList has none. The line under it says the kind
+  ("Anime", "Manga"). No unread badge, no right-click menu: the title is not on a source yet.
+- **A click** opens global search for that kind with the title filled in (`browse::pending::open(BrowseRoute::
+  GlobalSearch { kind, source_id: None, query })`). The search box stays editable; the English title is one edit away.
+- **Adult titles** are left out unless the "show adult" setting is on (`SourcePrefs::show_nsfw_source`, the one the
+  sources read): `isAdult: false` in the query, and `isAdult` checked on each recommendation.
+- **Order and visibility:** Continue, New for you, Recommended for you, Trending now. Each row hides when empty and has
+  no "See all" (there is no full list behind it). No setting.
+
+### How it is built
+
+1. **The request**, in `kuro-track`'s AniList module (its `Transport`, user agent and rate limiter; no token): one query
+   with aliases (`trending_anime`, `trending_manga`, `rec0` to `rec4`), and the parsing into plain structs, with
+   fixture tests.
+2. **The cache:** the answer is stored as JSON with its fetch time in the app's cache folder, through a new `Paths`
+   accessor (`discovery_cache_file()`, with a test; no literal path joins). Home reads only the cache, so it never waits
+   on the network.
+3. **The refresh:** a background task beside the score refresh (`community::start`), a few seconds after start: it
+   asks again when the cache is older than a day, or when the seeds changed and the last ask is over an hour old. A
+   failed ask keeps the old cache and logs; nothing is shown to the user.
+4. **Covers:** to check first: how `kuro-images` loads a cover URL that belongs to no source (it picks a client by
+   source id). If it has no path for that, add one: the public-only client, no source headers, cached like every cover.
+5. **Home:** two more `Row`s fed from the cache, with their own card (the shared cover widget and score badge, the
+   kind line) since a suggestion is not a `LibraryItem`; the same column rule and flow box as the other rows.
+6. **Strings** in both language files: "Recommended for you", "Trending now".
+
+### Tests
+
+- The merge: votes summed across seeds, ties broken by score, titles in the library or history left out, the limit.
+- The trending interleave: anime and manga alternate; library titles left out.
+- The adult rule: an adult title shows only with the setting on.
+- The cache: a fresh cache is read without a request; an old one asks again; a failed ask keeps the old one.
+- The query and the parsing against a saved AniList answer (fixture).
+- The click: global search opens with the title and the kind.
+
+### Open
+
+- Covers for URLs with no source (step 4): checked, no new path needed. `kuro-images` fetches a cover whose source id
+  matches no source with the shared client and no source headers (`SourceHttp`, edge E-IMG-31); suggestions use
+  source id -1.
+- Titles the user has are left out by MyAnimeList id (the seeds) and by folded title against the library and the
+  history, not by every entry's MyAnimeList id: reading those for a large library on each draw would be slow.
+- Seeds without a MyAnimeList id in the score store (a title only in the history, never scored) are skipped; if that
+  leaves too few seeds, the AniList id from a bound tracker could be a second key.
