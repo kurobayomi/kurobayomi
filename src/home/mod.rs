@@ -57,7 +57,12 @@ pub fn page() -> Option<Built> {
     let home = Home::new();
     let content = home.stack.clone().upcast();
     let search = crate::ui::icon_button("system-search-symbolic", &tr(MsgKey::action_global_search));
-    search.connect_clicked(|_| crate::ui::open("global_search"));
+    // the search screen opens only on a parked request: an empty one of the kind the pages show, as the Browse
+    // search box would park it, so the page waits for text instead of showing the unavailable page
+    search.connect_clicked(|_| {
+        let kind = crate::shell::kind_choice::current();
+        crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch { kind, source_id: None, query: String::new() });
+    });
     let refresh = crate::ui::refresh_button(&tr(MsgKey::action_update_library));
     refresh.connect_clicked(crate::updates::mount::update_libraries);
     let options = view_options(&home.prefs);
