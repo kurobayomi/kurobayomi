@@ -39,9 +39,10 @@ when it is turned on and refreshed by the daily update check. A source that is o
 
 ## Coming back
 
+- Home, where the app opens (docs/design/home.md, user 2026-11-21): Continue (what you were in the middle of) and New
+  for you (new episodes and chapters of library titles), anime and manga together. Its See all links open the full
+  History and Updates pages, which are no longer sidebar items.
 - Library: shows what has new chapters or episodes, with a badge count.
-- Updates: shows what appeared since last time.
-- History: shows what you were in the middle of, with Continue.
 
 ## Tracking
 

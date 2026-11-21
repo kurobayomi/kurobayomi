@@ -81,8 +81,9 @@ Titles you add show up in **Library**. Until you add one, the Library tells you 
 
 The sidebar also has:
 
-- **Updates**: new episodes and chapters of the titles in your library.
-- **History**: what you watched and read recently.
+- **Home**, where the app opens: **Continue** shows what you're in the middle of, and **New for you** the new episodes
+  and chapters of the titles in your library, anime and manga together. A cover picks up where you left off or opens
+  the new episode or chapter. **See all history** and **See all updates** open the full lists.
 - **Downloads**: what is downloading and what is waiting; while something downloads, the sidebar shows how many are left.
 
 At the bottom of the sidebar are **Incognito** (while it is on, nothing you watch or read goes into History), **Keyboard

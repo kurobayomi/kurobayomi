@@ -12,10 +12,19 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   (New for you), anime and manga together, as many covers as fit the window. A cover resumes or opens the new episode or
   chapter; See all opens History or Updates.
 
+### Changed
+
+- The app opens on Home. Updates and History left the sidebar: Home's See all links open them, and the count of new
+  episodes and chapters moved to the Home item.
+
 ### Fixed
 
 - A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,
   so a source no longer says "Working" and "Not working right now" at once.
+
+### Removed
+
+- The Start screen setting: the app always opens on Home.
 
 ## [0.4.1] - 2026-11-21
 

@@ -218,7 +218,6 @@ define_prefs! {
     "__APP_STATE_pref_downloaded_only", AppState, Bool, false, "base", "downloaded_only";
     "__APP_STATE_incognito_mode", AppState, Bool, false, "base", "incognito_mode";
     "pref_theme_mode_key", Normal, Str, "SYSTEM", "ui", "theme_mode";
-    "start_screen", Normal, Str, "ANIME", "ui", "start_screen";
     "entry_cover_colours", Normal, Bool, true, "ui", "cover_colours";
     "app_colours", Normal, Str, "DESKTOP", "ui", "colours";
     "pref_display_mode_catalogue", Normal, Str, "COMPACT_GRID", "sources", "display_mode";
@@ -308,7 +307,7 @@ define_prefs! {
 /// The registry holds no row for them, a restore skips them ([`is_dropped`]) and nothing reads them, so an old
 /// `config.toml` or an Aniyomi backup that still carries one loads and restores without it. Each key and its reason
 /// is recorded in `docs/drop-decisions.md`.
-pub const DROPPED_KEYS: [&str; 281] = [
+pub const DROPPED_KEYS: [&str; 282] = [
     "extension_installer",
     "pref_hardware_bitmap_threshold",
     "eh_enable_source_blacklist",
@@ -594,6 +593,8 @@ pub const DROPPED_KEYS: [&str; 281] = [
     "backup_interval",
     "__APP_STATE_last_auto_backup_timestamp",
     "__APP_STATE_backup_enabled_at",
+    // the start screen, cut: the app always opens on Home (2026-11-21)
+    "start_screen",
 ];
 
 /// Whether `key` (as stored, without the backup prefix) belongs to a dropped feature.

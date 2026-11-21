@@ -48,10 +48,11 @@ fn refresh_index(kind: Kind) -> usize {
     usize::from(kind == Kind::Manga)
 }
 
-/// A tab with the Library's one-row header (docs/design/other-tabs.md): the Anime | Manga switch, the visible kind's
-/// search (when it has one) and its actions; no page title. Returns the page and the stack of the two kinds.
+/// A page with the Library's one-row header (docs/design/other-tabs.md): Back (Home opens these pages,
+/// docs/design/home.md), the Anime | Manga switch, the visible kind's search (when it has one) and its actions; no page
+/// title. Returns the page and the stack of the two kinds.
 fn tab_page(views: [Built; 2]) -> (GBox, gtk::Stack) {
-    let page = crate::screens::kind_page(views, false);
+    let page = crate::screens::kind_page(views, true);
     let stack = page.last_child().and_downcast::<gtk::Stack>().expect("the kinds stack follows the header");
     (page, stack)
 }

@@ -12,7 +12,6 @@ use kuro_downloads::anime::lifecycle::CLOSE_PROMPT;
 use kuro_i18n::{MsgKey, tr};
 use kuro_platform::notifier::Notifier;
 use kuro_platform::paths::Paths;
-use kuro_prefs::ui::StartScreen;
 
 use super::argv::LaunchRequest;
 use super::bootstrap::Bootstrap;
@@ -144,8 +143,8 @@ impl Shell {
     }
 
     /// The home tab selection. It is built once, the first time this runs, so a wide or narrow switch keeps it.
-    pub fn home_tabs(&self, start: StartScreen) -> Rc<RefCell<HomeTabs>> {
-        self.home.borrow_mut().get_or_insert_with(|| Rc::new(RefCell::new(HomeTabs::new(start)))).clone()
+    pub fn home_tabs(&self) -> Rc<RefCell<HomeTabs>> {
+        self.home.borrow_mut().get_or_insert_with(|| Rc::new(RefCell::new(HomeTabs::new()))).clone()
     }
 }
 
@@ -186,10 +185,10 @@ mod tests {
     fn one_home_selection_serves_every_layout() {
         let rt = rt();
         let shell = shell(&rt);
-        let first = shell.home_tabs(StartScreen::ANIME);
+        let first = shell.home_tabs();
         first.borrow_mut().select(Tab::Browse);
-        // a later layout asks again, even with other prefs: it gets the same selection
-        let again = shell.home_tabs(StartScreen::MANGA);
+        // a later layout asks again: it gets the same selection
+        let again = shell.home_tabs();
         assert!(Rc::ptr_eq(&first, &again));
         assert_eq!(again.borrow().current(), Tab::Browse);
     }

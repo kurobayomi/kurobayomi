@@ -554,10 +554,7 @@ mod tests {
     fn the_trees_the_index_reads_carry_the_typed_rows_and_the_spec_links() {
         let prefs = Prefs::in_memory();
         let appearance = tree_with("settings_appearance", &prefs, &[], &[], browse::RepoCounts::default());
-        let display = group_titles(&appearance, "Display");
-        for title in ["App language", "Start Screen"] {
-            assert!(display.iter().any(|t| t == title), "{title} is on the Display group");
-        }
+        assert_eq!(group_titles(&appearance, "Display"), ["App language"], "the start screen is cut");
         let browse = tree_with("settings_browse", &prefs, &[], &[], browse::RepoCounts::default());
         assert_eq!(group_titles(&browse, "Sources"), ["Source languages", "Repositories"]);
         let library = tree_with("settings_library", &prefs, &[], &[], browse::RepoCounts::default());

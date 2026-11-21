@@ -57,32 +57,15 @@ impl AppTheme {
 }
 
 /// A top-level destination (Kotlin `Tab`). Aniyomi's More tab is cut: its places are the panel items and the app
-/// menu. The old `bottom_rail_nav_style` key is a dropped key, so a stored value still loads.
+/// menu. The old `bottom_rail_nav_style` key is a dropped key, so a stored value still loads. Home is the start tab;
+/// Updates and History are pages Home opens, not tabs (docs/design/home.md), and the `start_screen` setting that chose
+/// another start tab is a dropped key (user, 2026-11-21).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tab {
+    Home,
     AnimeLibrary,
     MangaLibrary,
-    Updates,
-    History,
     Browse,
-}
-
-pref_enum! {
-    /// `start_screen`: the tab shown at launch.
-    pub enum StartScreen { ANIME, MANGA, UPDATES, HISTORY, BROWSE }
-}
-
-impl StartScreen {
-    /// The destination this screen opens.
-    pub fn tab(self) -> Tab {
-        match self {
-            Self::ANIME => Tab::AnimeLibrary,
-            Self::MANGA => Tab::MangaLibrary,
-            Self::UPDATES => Tab::Updates,
-            Self::HISTORY => Tab::History,
-            Self::BROWSE => Tab::Browse,
-        }
-    }
 }
 
 /// What the GTK layer must do for a theme mode.
@@ -106,11 +89,10 @@ pub fn apply_theme(mode: ThemeMode) -> ThemeChoice {
 }
 
 define_prefs! {
-    /// `[ui]` section: the seven keys of Aniyomi `UiPreferences` that a desktop has, and Kurobayomi's own switch for the
-    /// colour a title's page takes from its cover (`entry_cover_colours`).
+    /// `[ui]` section: the theme mode of Aniyomi `UiPreferences`, and Kurobayomi's own colours and switch for the colour
+    /// a title's page takes from its cover (`entry_cover_colours`).
     pub struct UiPrefs in "ui" {
         theme_mode: ThemeMode = "pref_theme_mode_key" => ThemeMode::SYSTEM;
-        start_screen: StartScreen = "start_screen" => StartScreen::ANIME;
         cover_colours: bool = "entry_cover_colours" => true;
         colours: AppColours = "app_colours" => AppColours::DESKTOP;
     }
@@ -133,7 +115,6 @@ mod tests {
             UiPrefs::FIELDS,
             &[
                 ("theme_mode", "pref_theme_mode_key"),
-                ("start_screen", "start_screen"),
                 ("cover_colours", "entry_cover_colours"),
                 ("colours", "app_colours"),
             ]
@@ -151,7 +132,6 @@ mod tests {
     fn defaults_are_the_plan_defaults() {
         let ui = UiPrefs::new(PrefStore::in_memory());
         assert_eq!(ui.theme_mode.get(), ThemeMode::SYSTEM);
-        assert_eq!(ui.start_screen.get(), StartScreen::ANIME);
         assert!(ui.cover_colours.get(), "a title's page takes its cover's colour unless it is turned off");
         assert_eq!(ui.colours.get(), AppColours::DESKTOP, "the desktop's colours until another choice is made");
         assert_eq!(AppColours::TOKYO_NIGHT.name(), "TOKYO_NIGHT");
@@ -164,24 +144,24 @@ mod tests {
         let store = PrefStore::in_memory();
         let ui = UiPrefs::new(store.clone());
         ui.theme_mode.set(ThemeMode::DARK).unwrap();
-        ui.start_screen.set(StartScreen::BROWSE).unwrap();
+        ui.colours.set(AppColours::NORD).unwrap();
         assert_eq!(
             store.get_raw("pref_theme_mode_key"),
             Some(PrefValue::Str("DARK".into()))
         );
         assert_eq!(
-            store.get_raw("start_screen"),
-            Some(PrefValue::Str("BROWSE".into()))
+            store.get_raw("app_colours"),
+            Some(PrefValue::Str("NORD".into()))
         );
     }
 
     #[test]
     fn an_unknown_stored_name_gives_the_default_and_stays_stored() {
         let store = PrefStore::in_memory();
-        store.set_raw("start_screen", PrefValue::Str("NOPE".into()));
+        store.set_raw("app_colours", PrefValue::Str("NOPE".into()));
         let ui = UiPrefs::new(store.clone());
-        assert_eq!(ui.start_screen.get(), StartScreen::ANIME);
-        assert!(ui.start_screen.is_set());
+        assert_eq!(ui.colours.get(), AppColours::DESKTOP);
+        assert!(ui.colours.is_set());
     }
 
     #[test]
@@ -191,16 +171,11 @@ mod tests {
         store.set_raw("tablet_ui_mode", PrefValue::Str("ALWAYS".into()));
         let ui = UiPrefs::new(store);
         assert_eq!(ui.theme_mode.get(), ThemeMode::SYSTEM);
-        assert_eq!(ui.start_screen.get(), StartScreen::ANIME);
     }
 
     #[test]
-    fn start_screens_open_their_tabs() {
-        assert_eq!(StartScreen::ANIME.tab(), Tab::AnimeLibrary);
-        assert_eq!(StartScreen::MANGA.tab(), Tab::MangaLibrary);
-        assert_eq!(StartScreen::UPDATES.tab(), Tab::Updates);
-        assert_eq!(StartScreen::HISTORY.tab(), Tab::History);
-        assert_eq!(StartScreen::BROWSE.tab(), Tab::Browse);
+    fn an_old_start_screen_is_a_dropped_key() {
+        assert!(crate::registry::is_dropped("start_screen"), "Home is always first; a stored start screen still loads");
     }
 
     #[test]
@@ -217,15 +192,15 @@ mod tests {
             let store = open(&paths).unwrap();
             let ui = UiPrefs::new(store.clone());
             ui.theme_mode.set(ThemeMode::LIGHT).unwrap();
-            ui.start_screen.set(StartScreen::UPDATES).unwrap();
+            ui.colours.set(AppColours::GRUVBOX).unwrap();
             store.flush().unwrap();
         }
         let store = open(&paths).unwrap();
         let ui = UiPrefs::new(store);
         assert_eq!(ui.theme_mode.get(), ThemeMode::LIGHT);
-        assert_eq!(ui.start_screen.get(), StartScreen::UPDATES);
+        assert_eq!(ui.colours.get(), AppColours::GRUVBOX);
         let doc = read_toml(&config_file(&paths.config_dir()));
         assert_eq!(doc["ui"]["theme_mode"].as_str(), Some("LIGHT"));
-        assert_eq!(doc["ui"]["start_screen"].as_str(), Some("UPDATES"));
+        assert_eq!(doc["ui"]["colours"].as_str(), Some("GRUVBOX"));
     }
 }

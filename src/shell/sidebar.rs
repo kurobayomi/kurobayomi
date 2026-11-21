@@ -293,7 +293,7 @@ pub fn build(tabs: &adw::ViewStack) -> GBox {
     let ids: Vec<String> = ui::with_spec(|s| s.nav.iter().map(|n| n.id.clone()).collect());
     for n in ui::with_spec(|s| s.nav.clone()) {
         let row = match n.id.as_str() {
-            "updates" => nav_row(&n.icon, &crate::spec::shown(&n.title), &[updates_badge().upcast_ref()]),
+            "home" => nav_row(&n.icon, &crate::spec::shown(&n.title), &[updates_badge().upcast_ref()]),
             DOWNLOADS => downloads_row(&n.icon, &crate::spec::shown(&n.title)),
             _ => nav_row(&n.icon, &crate::spec::shown(&n.title), &[]),
         };
@@ -378,7 +378,7 @@ mod tests {
             let texts = labels(panel.upcast_ref());
             assert!(!texts.iter().any(|l| *l == tr(MsgKey::pref_category_about)), "About is in Settings only");
             let wanted = [incognito_label().to_owned(), tr(MsgKey::label_help)];
-            for title in ["Home", "Library", "Browse", "Updates", "History", "Downloads", "Settings", "Kurobayomi"].map(str::to_owned).iter().chain(&wanted) {
+            for title in ["Home", "Library", "Browse", "Downloads", "Settings", "Kurobayomi"].map(str::to_owned).iter().chain(&wanted) {
                 assert!(texts.iter().any(|l| l == title), "{title}");
             }
             assert!(!texts.iter().any(|l| l == "More"), "More is gone");

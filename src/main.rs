@@ -247,10 +247,8 @@ fn build_window(app: &gtk::Application) {
     // the tabs are the root page: the first page of a navigation view is never popped
     ui::push(&widgets::status::crossfade_tabs(&tabs));
     let sidebar = shell::sidebar::build(&tabs);
-    let prefs = settings_ui::route::prefs();
-    settings_ui::appearance::open_start_tab(&tabs, &prefs);
-    // one selection for every layout: the sidebar and the bottom bar show the same tab (T-36a-004)
-    let home = host.home_tabs(prefs.ui.start_screen.get());
+    // one selection for every layout: the sidebar and the bottom bar show the same tab (T-36a-004); it starts on Home
+    let home = host.home_tabs();
     shell::tabs::bind(&tabs, &home);
     let sep = gtk::Separator::new(O::Vertical);
     // the sidebar and its separator: the narrow breakpoint hides each of them, the immersive rule hides this box

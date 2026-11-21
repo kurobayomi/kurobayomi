@@ -3,7 +3,7 @@
   {
    "id": "settings_appearance",
    "title": "Appearance",
-   "subtitle": "Theme and start screen",
+   "subtitle": "Theme, colours and app language",
    "icon": "preferences-desktop-appearance-symbolic"
   },
   {
@@ -110,25 +110,13 @@
        "type": "link",
        "title": "App language",
        "target": "settings_app_language"
-      },
-      {
-       "type": "list",
-       "title": "Start Screen",
-       "options": [
-        "Anime",
-        "Manga",
-        "Updates",
-        "History",
-        "Browse"
-       ],
-       "default": "Anime"
       }
      ]
     }
    ],
    "sheets": [],
    "dialogs": [],
-   "notes": "App theme row: a segmented button row (System / Light / Dark) above a horizontally scrolling row of theme preview cards (mini app mockups) with the theme name under each; selected card has a check badge. Pure black switch is disabled when theme mode is Light. Changing the start screen shows a \"Requires app restart to take effect\" toast. Search toolbar action exists on every SearchableSettings screen in two-pane mode only; listed for completeness."
+   "notes": "App theme row: a segmented button row (System / Light / Dark) above a horizontally scrolling row of theme preview cards (mini app mockups) with the theme name under each; selected card has a check badge. Pure black switch is disabled when theme mode is Light. Search toolbar action exists on every SearchableSettings screen in two-pane mode only; listed for completeness."
   },
   {
    "id": "settings_app_language",

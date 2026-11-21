@@ -16,16 +16,6 @@
    "icon": "kb-travel-explore-symbolic"
   },
   {
-   "id": "updates",
-   "title": "Updates",
-   "icon": "kb-updates-outline-symbolic"
-  },
-  {
-   "id": "history",
-   "title": "History",
-   "icon": "document-open-recent-symbolic"
-  },
-  {
    "id": "download_queue",
    "title": "Downloads",
    "icon": "folder-download-symbolic"

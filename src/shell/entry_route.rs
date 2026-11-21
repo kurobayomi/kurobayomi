@@ -24,8 +24,6 @@ pub enum OpenTab {
     AnimeLib { anime_id: Option<i64> },
     /// The manga library, optionally opening one manga.
     Library { manga_id: Option<i64> },
-    Updates,
-    History,
     /// The browse tab, optionally on the extensions page of the anime or manga catalogue.
     Browse { to_extensions: bool, kind: Kind },
     /// The Downloads page.
@@ -62,8 +60,6 @@ pub fn effects(open: OpenTab) -> Vec<Effect> {
             }
             out
         }
-        OpenTab::Updates => vec![Effect::Select(Tab::Updates)],
-        OpenTab::History => vec![Effect::Select(Tab::History)],
         OpenTab::Browse { to_extensions, kind } => {
             let mut out = Vec::new();
             if to_extensions {
@@ -91,7 +87,6 @@ pub fn open_tab(open: OpenTab, home: &mut HomeTabs, nav: &mut Navigator, mut sho
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kuro_prefs::ui::StartScreen;
 
     #[test]
     fn an_anime_with_an_id_selects_the_anime_library_and_pushes_its_entry() {
@@ -131,7 +126,7 @@ mod tests {
 
     #[test]
     fn open_tab_selects_the_tab_and_pushes_the_entry_on_the_navigator() {
-        let mut home = HomeTabs::new(StartScreen::ANIME);
+        let mut home = HomeTabs::new();
         let mut nav = Navigator::new();
         let mut asked = None;
         open_tab(OpenTab::AnimeLib { anime_id: Some(3) }, &mut home, &mut nav, |kind| asked = Some(kind));

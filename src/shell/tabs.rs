@@ -1,19 +1,19 @@
 //! Tab host rules (Kotlin `HomeScreen`): the start tab and the back rule. The window's places are the panel items
 //! (`shell::sidebar`); there is no More tab.
 //!
-//! The tab kinds and `StartScreen` come from `kuro_prefs::ui`; this module only holds the rules.
+//! The tab kinds come from `kuro_prefs::ui`; this module only holds the rules. Home is the start tab (docs/design/home.md):
+//! Updates and History are pages Home opens, not tabs.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use kuro_prefs::ui::{StartScreen, Tab};
+use kuro_prefs::ui::Tab;
 
 /// The id of the window's tab page for a tab. Both libraries are one page with an Anime | Manga switcher.
 pub fn nav_id(tab: Tab) -> &'static str {
     match tab {
+        Tab::Home => "home",
         Tab::AnimeLibrary | Tab::MangaLibrary => "library",
-        Tab::Updates => "updates",
-        Tab::History => "history",
         Tab::Browse => "browse",
     }
 }
@@ -22,10 +22,9 @@ pub fn nav_id(tab: Tab) -> &'static str {
 /// library keeps it. Downloads is a page of its own, not a tab the start screen can name.
 pub fn tab_for_id(id: &str, current: Tab) -> Option<Tab> {
     Some(match id {
+        "home" => Tab::Home,
         "library" if current == Tab::MangaLibrary => Tab::MangaLibrary,
         "library" => Tab::AnimeLibrary,
-        "updates" => Tab::Updates,
-        "history" => Tab::History,
         "browse" => Tab::Browse,
         _ => return None,
     })
@@ -66,10 +65,9 @@ pub struct HomeTabs {
 }
 
 impl HomeTabs {
-    /// Reads the start tab. Built once per Home build, so a changed start screen applies there.
-    pub fn new(start: StartScreen) -> Self {
-        let default = start.tab();
-        Self { current: default, default }
+    /// Starts on Home, the start tab.
+    pub fn new() -> Self {
+        Self { current: Tab::Home, default: Tab::Home }
     }
 
     pub fn current(&self) -> Tab {
@@ -95,29 +93,28 @@ impl HomeTabs {
     }
 }
 
+impl Default for HomeTabs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const PLACES: [Tab; 5] = [Tab::AnimeLibrary, Tab::MangaLibrary, Tab::Updates, Tab::History, Tab::Browse];
+    const PLACES: [Tab; 4] = [Tab::Home, Tab::AnimeLibrary, Tab::MangaLibrary, Tab::Browse];
 
     #[test]
-    fn home_tabs_keep_the_selection_and_go_back_to_start() {
-        let mut tabs = HomeTabs::new(StartScreen::MANGA);
-        assert_eq!(tabs.current(), Tab::MangaLibrary);
+    fn home_tabs_start_on_home_keep_the_selection_and_go_back_to_home() {
+        let mut tabs = HomeTabs::new();
+        assert_eq!(tabs.current(), Tab::Home);
         assert!(!tabs.back_enabled(), "back on the start tab is not the shell's");
+        tabs.select(Tab::MangaLibrary);
         tabs.select(Tab::Browse);
         assert!(tabs.back());
-        assert_eq!(tabs.current(), Tab::MangaLibrary);
+        assert_eq!(tabs.current(), Tab::Home);
         assert!(!tabs.back(), "back on the start tab is not handled");
-    }
-
-    #[test]
-    fn back_from_any_tab_returns_to_a_history_start_tab() {
-        let mut tabs = HomeTabs::new(StartScreen::HISTORY);
-        tabs.select(Tab::Updates);
-        assert!(tabs.back());
-        assert_eq!(tabs.current(), Tab::History);
     }
 
     #[test]
@@ -128,14 +125,15 @@ mod tests {
             assert!(ids.iter().any(|i| i == id), "{tab:?} has no page {id}");
             assert_eq!(tab_for_id(id, tab), Some(tab), "{tab:?}");
         }
-        assert_eq!(tab_for_id("library", Tab::Updates), Some(Tab::AnimeLibrary));
-        assert_eq!(tab_for_id("settings", Tab::Updates), None);
-        assert_eq!(tab_for_id(crate::shell::sidebar::DOWNLOADS, Tab::Updates), None, "Downloads leaves the selection alone");
+        assert_eq!(tab_for_id("library", Tab::Home), Some(Tab::AnimeLibrary));
+        assert_eq!(tab_for_id("settings", Tab::Home), None);
+        assert_eq!(tab_for_id("updates", Tab::Home), None, "Updates is a page Home opens, not a tab");
+        assert_eq!(tab_for_id(crate::shell::sidebar::DOWNLOADS, Tab::Home), None, "Downloads leaves the selection alone");
     }
 
     #[test]
-    fn the_places_are_home_library_browse_updates_history_and_downloads_with_no_more() {
+    fn the_places_are_home_library_browse_and_downloads_with_no_more() {
         let ids: Vec<String> = crate::ui::with_spec(|s| s.nav.iter().map(|n| n.id.clone()).collect());
-        assert_eq!(ids, ["home", "library", "browse", "updates", "history", crate::shell::sidebar::DOWNLOADS]);
+        assert_eq!(ids, ["home", "library", "browse", crate::shell::sidebar::DOWNLOADS]);
     }
 }

@@ -95,8 +95,12 @@ mod tests {
     #[test]
     fn the_nav_targets_exist_in_the_spec() {
         crate::ui::with_spec(|s| {
-            for id in ["library", "updates", "history", "browse"] {
+            for id in ["home", "library", "browse"] {
                 assert!(s.nav.iter().any(|n| n.id == id), "{id}");
+            }
+            // Updates and History are pages Home opens (docs/design/home.md): a link pushes them
+            for id in ["updates", "history"] {
+                assert!(s.screen(id).is_some() && !s.nav.iter().any(|n| n.id == id), "{id}");
             }
             assert!(s.screen("download_queue").is_some());
         });

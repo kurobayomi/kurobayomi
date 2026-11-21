@@ -599,3 +599,11 @@ stays: Create backup and Restore backup, unchanged, with the same file format. `
 `config.toml` or an Aniyomi backup that carries them loads and a restore skips them. The backup migration step now only
 cancels a job an earlier run registered, like the library update steps. Backup files already written to the
 `Backups` folder stay where they are. The translated strings stay in the catalog unused, as the i18n names rule says.
+
+## Start screen removed (2026-11-21)
+
+The app always opens on Home (`docs/design/home.md`), so the Settings > Appearance > Display > Start Screen list (Anime,
+Manga, Updates, History, Browse) has no reason left. Gone: the row, its spec entry, `kuro_prefs::ui::StartScreen`, and
+the start tab it chose (`HomeTabs` starts on Home). `start_screen` is in `DROPPED_KEYS`, so an old `config.toml` or an
+Aniyomi backup that carries it loads and a restore skips it. Updates and History left the sidebar with it: they are pages
+Home's See all links open. The translated strings stay in the catalog unused, as the i18n names rule says.
