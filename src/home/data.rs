@@ -205,7 +205,8 @@ mod tests {
 
     #[test]
     fn as_many_covers_as_fit_and_never_none() {
-        assert_eq!(fitting(1000, 156, 12), 5);
+        assert_eq!(fitting(1000, 156, 12), 6, "6 covers and 5 gaps take 996 px");
+        assert_eq!(fitting(995, 156, 12), 5, "one pixel short of 6");
         assert_eq!(fitting(100, 156, 12), 1);
         assert_eq!(fitting(1000, 0, 12), 1);
     }
