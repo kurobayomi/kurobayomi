@@ -331,13 +331,14 @@ mod tests {
             let (live, peak, started, gate, queries) =
                 (Arc::clone(&self.live), Arc::clone(&self.peak), Arc::clone(&self.started), Arc::clone(&self.gate), Arc::clone(&self.queries));
             Box::pin(async move {
+                // The query is recorded before the counters move: a test that sees a load counted also sees its query.
+                if let BrowseQuery::Search(text) = &query {
+                    queries.lock().expect("lock").push(text.clone());
+                }
                 let now = live.fetch_add(1, Ordering::SeqCst) + 1;
                 let _guard = Guard(Arc::clone(&live));
                 peak.fetch_max(now, Ordering::SeqCst);
                 started.fetch_add(1, Ordering::SeqCst);
-                if let BrowseQuery::Search(text) = &query {
-                    queries.lock().expect("lock").push(text.clone());
-                }
                 gate.acquire().await.expect("gate").forget();
                 Ok(ListedPage { items: vec![ListItem { id: 5, title: "found".into(), ..ListItem::default() }], has_next: false })
             })
