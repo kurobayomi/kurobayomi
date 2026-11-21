@@ -114,21 +114,22 @@ fn check(runtime: tokio::runtime::Handle) {
     });
 }
 
-/// The seeds: the most recent titles of the history, both kinds, that have a MyAnimeList id in the score store.
+/// The seeds: the most recent titles of the history that have a MyAnimeList id in the score store, both kinds in turn
+/// ([`mixed_seeds`]).
 fn seeds() -> Vec<(Kind, i64)> {
     let db = crate::data::app().db.clone();
     let history = kuro_domain::history::repo::HistoryRepo::new(db.clone());
     let scores = kuro_data::community_score::CommunityScoreRepo::new(db);
     let rows = |kind: Kind| history.list(kind, "").unwrap_or_default();
-    super::data::merge_by_time(rows(Kind::Anime), rows(Kind::Manga), |row| row.at, usize::MAX)
+    let recent: Vec<(Kind, i64)> = super::data::merge_by_time(rows(Kind::Anime), rows(Kind::Manga), |row| row.at, usize::MAX)
         .into_iter()
         .filter_map(|(kind, row)| {
             let stored = scores.by_entry(row.entry_id).ok().flatten()?;
             let mal = stored.remote_id.filter(|id| *id > 0 && stored.provider == "myanimelist")?;
             Some((kind, mal))
         })
-        .take(SEEDS)
-        .collect()
+        .collect();
+    mixed_seeds(recent, SEEDS)
 }
 
 // ---------- Rules ----------
@@ -162,9 +163,34 @@ impl Known {
     }
 }
 
-/// Recommended for you: the recommendations of every seed in one list, a title recommended by several seeds or by more
-/// users first (the sum of the votes), then by score. Titles the user has, adult ones unless `adult`, and the seeds
-/// themselves are left out. At most `limit`.
+/// The seeds from `recent` (the history's titles with a MyAnimeList id, newest first): the newest of each kind in turn,
+/// the kind of the newest title first, so a history of mostly manga still seeds anime when it has any. At most `limit`.
+pub fn mixed_seeds(recent: Vec<(Kind, i64)>, limit: usize) -> Vec<(Kind, i64)> {
+    let Some(first) = recent.first().map(|(kind, _)| *kind) else { return Vec::new() };
+    let (same, other): (Vec<_>, Vec<_>) = recent.into_iter().partition(|(kind, _)| *kind == first);
+    in_turn(same.into_iter(), other.into_iter(), limit)
+}
+
+/// `first` and `second` taken one each in turn, `first` leading, until `limit` or both are used up.
+pub fn in_turn<T>(mut first: impl Iterator<Item = T>, mut second: impl Iterator<Item = T>, limit: usize) -> Vec<T> {
+    let mut out = Vec::new();
+    while out.len() < limit {
+        let (a, b) = (first.next(), second.next());
+        if a.is_none() && b.is_none() {
+            break;
+        }
+        out.extend(a);
+        if out.len() < limit {
+            out.extend(b);
+        }
+    }
+    out
+}
+
+/// Recommended for you: the recommendations of every seed in one list, anime and manga in turn so neither kind fills the
+/// row (user, 2026-11-21: a manga seed's recommendations have hundreds of votes, an anime sequel's a handful). Within a
+/// kind, a title recommended by several seeds or by more users first (the sum of the votes), then by score. Titles the
+/// user has, adult ones unless `adult`, and the seeds themselves are left out. At most `limit`.
 pub fn recommended(per_seed: &[Vec<Suggestion>], known: &Known, adult: bool, limit: usize) -> Vec<Suggestion> {
     let mut by_id: HashMap<i64, (Suggestion, i64)> = HashMap::new();
     let mut order: Vec<i64> = Vec::new();
@@ -182,26 +208,15 @@ pub fn recommended(per_seed: &[Vec<Suggestion>], known: &Known, adult: bool, lim
     }
     let mut merged: Vec<(Suggestion, i64)> = order.into_iter().filter_map(|id| by_id.remove(&id)).collect();
     merged.sort_by(|(a, av), (b, bv)| bv.cmp(av).then(b.score.unwrap_or(0.0).total_cmp(&a.score.unwrap_or(0.0))));
-    merged.into_iter().map(|(title, votes)| Suggestion { votes, ..title }).take(limit).collect()
+    let (anime, manga): (Vec<_>, Vec<_>) = merged.into_iter().map(|(title, votes)| Suggestion { votes, ..title }).partition(|title| title.kind.is_anime());
+    in_turn(anime.into_iter(), manga.into_iter(), limit)
 }
 
 /// Trending now: AniList's trending anime and manga taken in turn, so neither kind fills the row. Titles the user has and
 /// adult ones unless `adult` are left out. At most `limit`.
 pub fn trending(anime: &[Suggestion], manga: &[Suggestion], known: &Known, adult: bool, limit: usize) -> Vec<Suggestion> {
     let keep = |title: &&Suggestion| !(title.adult && !adult) && !known.has(title);
-    let (mut a, mut m) = (anime.iter().filter(keep), manga.iter().filter(keep));
-    let mut out = Vec::new();
-    while out.len() < limit {
-        let (next_a, next_m) = (a.next(), m.next());
-        if next_a.is_none() && next_m.is_none() {
-            break;
-        }
-        out.extend(next_a.cloned());
-        if out.len() < limit {
-            out.extend(next_m.cloned());
-        }
-    }
-    out
+    in_turn(anime.iter().filter(keep).cloned(), manga.iter().filter(keep).cloned(), limit)
 }
 
 #[cfg(test)]
@@ -232,10 +247,30 @@ mod tests {
         ];
         let none = Known::default();
         let merged = recommended(&per_seed, &none, false, 10);
-        assert_eq!(merged.iter().map(|t| (t.anilist_id, t.votes)).collect::<Vec<_>>(), [(2, 480), (1, 400), (3, 100)], "two seeds outrank one");
+        assert_eq!(merged.iter().map(|t| (t.anilist_id, t.votes)).collect::<Vec<_>>(), [(2, 480), (3, 100), (1, 400)], "two seeds outrank one; the kinds take turns");
         let known = Known { titles: [fold("Perfect blue!")].into(), mal_ids: [1003].into() };
         assert_eq!(recommended(&per_seed, &known, false, 10).iter().map(|t| t.anilist_id).collect::<Vec<_>>(), [2], "by title and by MyAnimeList id");
         assert_eq!(recommended(&per_seed, &none, false, 1).len(), 1);
+    }
+
+    #[test]
+    fn a_manga_seed_with_many_votes_does_not_fill_the_row() {
+        // live votes of 2026-11-21: One Piece's recommendations against an anime sequel's
+        let per_seed = vec![
+            vec![title(1, Kind::Manga, "HUNTER x HUNTER", 700, None), title(2, Kind::Manga, "Dragon Ball", 350, None), title(3, Kind::Manga, "NARUTO", 265, None)],
+            vec![title(11, Kind::Anime, "WIND BREAKER", 9, None), title(12, Kind::Anime, "Kyou kara Ore wa!!", 2, None)],
+        ];
+        let row = recommended(&per_seed, &Known::default(), false, 4);
+        assert_eq!(row.iter().map(|t| t.anilist_id).collect::<Vec<_>>(), [11, 1, 12, 2]);
+    }
+
+    #[test]
+    fn seeds_take_each_kind_in_turn_newest_first() {
+        let recent = vec![(Kind::Manga, 13), (Kind::Manga, 114745), (Kind::Manga, 2), (Kind::Anime, 59088), (Kind::Anime, 1)];
+        assert_eq!(mixed_seeds(recent.clone(), 3), [(Kind::Manga, 13), (Kind::Anime, 59088), (Kind::Manga, 114745)]);
+        assert_eq!(mixed_seeds(recent, 10).len(), 5, "all of them when there is room");
+        assert_eq!(mixed_seeds(vec![(Kind::Anime, 5)], 5), [(Kind::Anime, 5)]);
+        assert!(mixed_seeds(Vec::new(), 5).is_empty());
     }
 
     #[test]

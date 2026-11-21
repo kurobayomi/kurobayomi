@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use kuro_track::auto_bind::normalize;
+use kuro_track::auto_bind::{loose, normalize};
 
 use crate::provider::Hit;
 
@@ -15,26 +15,29 @@ pub struct Catalogue {
     hits: Vec<Hit>,
     /// The titles of each name, by the name as the match compares it ([`normalize`]): a title's own name and its others.
     by_name: HashMap<String, Vec<usize>>,
+    /// The same by the match's second reading ([`loose`]: a plural `s` aside).
+    by_loose: HashMap<String, Vec<usize>>,
     by_id: HashMap<i64, usize>,
 }
 
 impl Catalogue {
     pub fn new(hits: Vec<Hit>) -> Self {
-        let mut by_name: HashMap<String, Vec<usize>> = HashMap::new();
+        let (mut by_name, mut by_loose): (HashMap<String, Vec<usize>>, HashMap<String, Vec<usize>>) = Default::default();
         for (index, hit) in hits.iter().enumerate() {
             for name in std::iter::once(&hit.title).chain(&hit.alt_titles) {
-                let key = normalize(name);
-                if key.is_empty() {
-                    continue;
-                }
-                let of_name = by_name.entry(key).or_default();
-                if !of_name.contains(&index) {
-                    of_name.push(index);
+                for (map, key) in [(&mut by_name, normalize(name)), (&mut by_loose, loose(name))] {
+                    if key.is_empty() {
+                        continue;
+                    }
+                    let of_name = map.entry(key).or_default();
+                    if !of_name.contains(&index) {
+                        of_name.push(index);
+                    }
                 }
             }
         }
         let by_id = hits.iter().enumerate().map(|(index, hit)| (hit.remote_id, index)).collect();
-        Self { hits, by_name, by_id }
+        Self { hits, by_name, by_loose, by_id }
     }
 
     /// The listed title of this id on the site.
@@ -55,13 +58,19 @@ impl Catalogue {
         &self.hits
     }
 
-    /// The one listed title of this name. `None` when no title has it, or more than one does: the rule of
-    /// `kuro_track::auto_bind::pick`, so a match here is as exact as a match by search.
+    /// The one listed title of this name; when none has it exactly, the one equal but for a plural `s`. `None` when no
+    /// title matches, or more than one does: the rule of `kuro_track::auto_bind::pick`, so a match here is as exact as a
+    /// match by search.
     pub fn find(&self, title: &str) -> Option<&Hit> {
-        match self.by_name.get(&normalize(title))?.as_slice() {
-            [index] => self.hits.get(*index),
-            _ => None,
-        }
+        let index = match self.by_name.get(&normalize(title)).map(Vec::as_slice) {
+            Some([index]) => *index,
+            Some([_, _, ..]) => return None,
+            _ => match self.by_loose.get(&loose(title))?.as_slice() {
+                [index] => *index,
+                _ => return None,
+            },
+        };
+        self.hits.get(index)
     }
 }
 
@@ -88,6 +97,7 @@ mod tests {
         assert_eq!(catalogue.find("my star").map(|hit| hit.remote_id), Some(52034));
         assert_eq!(catalogue.find("カウボーイビバップ").and_then(|hit| hit.score), Some(8.75));
         assert_eq!(catalogue.find("Oshi no Ko 3rd Season").map(|hit| hit.remote_id), None, "a title the lists do not hold");
+        assert_eq!(catalogue.find("My Stars").map(|hit| hit.remote_id), Some(52034), "a plural s aside, when nothing is exact");
         assert_eq!(catalogue.find("!!!").map(|hit| hit.remote_id), None, "a name with nothing to compare");
     }
 

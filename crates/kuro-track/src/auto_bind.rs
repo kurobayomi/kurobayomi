@@ -36,23 +36,43 @@ pub fn normalize(title: &str) -> String {
     out.join(" ")
 }
 
-/// The index of the one result whose display name or other names equal `title` after [`normalize`]. `None` when no
-/// result or more than one does.
+/// [`normalize`], with a plural `s` taken off every word of more than three letters (not a double `ss`): the second
+/// reading of [`pick`], for a source that drops or adds a plural ("War of the Three Titan Arc" for MyAnimeList's
+/// "War of the Three Titans Arc", seen 2026-11-21).
+pub fn loose(title: &str) -> String {
+    normalize(title)
+        .split(' ')
+        .map(|word| if word.len() > 3 && word.ends_with('s') && !word.ends_with("ss") { &word[..word.len() - 1] } else { word })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The indexes of the results that have a name equal to `wanted` as `key` reads names.
+fn named(hits: &[(&str, &[String])], wanted: &str, key: fn(&str) -> String) -> Vec<usize> {
+    hits.iter()
+        .enumerate()
+        .filter(|(_, (name, others))| std::iter::once(*name).chain(others.iter().map(String::as_str)).any(|n| key(n) == wanted))
+        .map(|(i, _)| i)
+        .collect()
+}
+
+/// The index of the one result whose display name or other names equal `title` after [`normalize`]. When no result
+/// does, the one result equal after [`loose`] (a plural `s` aside). `None` when no result matches, or more than one does
+/// in the reading that found any: two exact matches never fall back to the loose reading.
 pub fn pick<'a>(title: &str, hits: impl IntoIterator<Item = (&'a str, &'a [String])>) -> Option<usize> {
     let wanted = normalize(title);
     if wanted.is_empty() {
         return None;
     }
-    let mut found = None;
-    for (i, (name, others)) in hits.into_iter().enumerate() {
-        if std::iter::once(name).chain(others.iter().map(String::as_str)).any(|n| normalize(n) == wanted) {
-            if found.is_some() {
-                return None;
-            }
-            found = Some(i);
-        }
+    let hits: Vec<(&str, &[String])> = hits.into_iter().collect();
+    match named(&hits, &wanted, normalize).as_slice() {
+        [one] => Some(*one),
+        [] => match named(&hits, &loose(title), loose).as_slice() {
+            [one] => Some(*one),
+            _ => None,
+        },
+        _ => None,
     }
-    found
 }
 
 /// The queries the first search of an entry tries, in order: its title as the source names it, the part before a
@@ -188,5 +208,30 @@ mod tests {
         assert_eq!(pick("Berserk", hits.iter().map(|(n, o)| (*n, *o))), None, "the series and the remake share the name");
         assert_eq!(pick("Berserk: Golden Age", hits[..1].iter().map(|(n, o)| (*n, *o))), None, "a near name is not a match");
         assert_eq!(pick("!!", hits[..1].iter().map(|(n, o)| (*n, *o))), None);
+    }
+
+    #[test]
+    fn a_plural_s_counts_only_when_no_name_matches_exactly() {
+        // MyAnimeList's names of the title a source calls "War of the Three Titan Arc" (seen 2026-11-21)
+        let santen = names(&["Tokyo Revengers: War of the Three Titans Arc", "東京リベンジャーズ 三天戦争編"]);
+        let first = names(&["Tokyo Revengers"]);
+        let hits = [("Tokyo Revengers: Santen Sensou-hen", santen.as_slice()), ("Tokyo Revengers", first.as_slice())];
+        assert_eq!(pick("Tokyo Revengers: War of the Three Titan Arc", hits.iter().map(|(n, o)| (*n, *o))), Some(0));
+        let none: Vec<String> = Vec::new();
+        let both = [("Monster", none.as_slice()), ("Monsters", none.as_slice())];
+        assert_eq!(pick("Monster", both.iter().map(|(n, o)| (*n, *o))), Some(0), "the exact name wins over the plural");
+        assert_eq!(pick("Monsterz", both.iter().map(|(n, o)| (*n, *o))), None);
+        let two_plurals = [("Girls", none.as_slice()), ("Girl", none.as_slice())];
+        assert_eq!(pick("Girl!", two_plurals[..1].iter().map(|(n, o)| (*n, *o))), Some(0));
+        let twins = [("Cats", none.as_slice()), ("Cat", none.as_slice())];
+        assert_eq!(pick("Catss", twins.iter().map(|(n, o)| (*n, *o))), None, "\"ss\" stays");
+        assert_eq!(pick("Cat Eye", [("Cats Eye", none.as_slice()), ("Cat Eyes", none.as_slice())].into_iter()), None, "two loose matches are none");
+    }
+
+    #[test]
+    fn loose_drops_only_a_plural_s_of_a_longer_word() {
+        assert_eq!(loose("War of the Three Titans Arc"), "war of the three titan arc");
+        assert_eq!(loose("The Class"), "the class", "a double s stays");
+        assert_eq!(loose("Bus Gas"), "bus gas", "short words stay");
     }
 }

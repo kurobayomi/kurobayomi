@@ -164,9 +164,11 @@ One GraphQL request to `https://graphql.anilist.co` answered all of it:
 
 ### What the rows show
 
-- **Recommended for you:** seeds are the 5 most recent titles of the history, both kinds, that have a MyAnimeList id in
-  the app's score store (`kuro_data::community_score`, `remote_id`). Their recommendations are merged: a title
-  recommended by several seeds, or with more votes, ranks higher (the sum of `rating`). Titles already in the library or
+- **Recommended for you:** seeds are up to 5 recent titles of the history that have a MyAnimeList id in the app's score
+  store (`kuro_data::community_score`, `remote_id`), the newest of each kind in turn, so a mostly-manga history still
+  seeds its anime. Their recommendations are merged: within a kind, a title recommended by several seeds, or with more
+  votes, ranks higher (the sum of `rating`); the row takes anime and manga in turn, like Trending (user, 2026-11-21: "should
+  be anime and manga"; One Piece's recommendations carry 700 votes, an anime sequel's 9). Titles already in the library or
   the history are left out (by MyAnimeList id against the score store, and by AniList id against the seeds).
 - **Trending now:** AniList's trending titles, anime and manga, interleaved so neither kind fills the row; titles in the
   library are left out.
