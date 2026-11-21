@@ -1076,21 +1076,142 @@ impl std::io::Write for Captured {
     }
 }
 
-impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Captured {
-    type Writer = Captured;
+thread_local! {
+    /// The buffer and level of the capture running on this thread, if any.
+    static CAPTURE: std::cell::RefCell<Option<(Captured, tracing::Level)>> = const { std::cell::RefCell::new(None) };
+}
 
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
+fn capture_wants(meta: &tracing::Metadata<'_>) -> bool {
+    CAPTURE
+        .try_with(|c| {
+            c.borrow()
+                .as_ref()
+                .is_some_and(|(_, level)| meta.level() <= level)
+        })
+        .unwrap_or(false)
+}
+
+/// Lets a log statement through only on a thread that is capturing, at that capture's level. It never lets tracing
+/// cache an answer per log statement: the answer depends on the thread asking.
+struct CaptureFilter;
+
+impl<S> tracing_subscriber::layer::Filter<S> for CaptureFilter {
+    fn enabled(
+        &self,
+        meta: &tracing::Metadata<'_>,
+        _: &tracing_subscriber::layer::Context<'_, S>,
+    ) -> bool {
+        capture_wants(meta)
+    }
+
+    fn callsite_enabled(
+        &self,
+        _: &'static tracing::Metadata<'static>,
+    ) -> tracing::subscriber::Interest {
+        tracing::subscriber::Interest::sometimes()
+    }
+
+    fn max_level_hint(&self) -> Option<tracing_subscriber::filter::LevelFilter> {
+        Some(tracing_subscriber::filter::LevelFilter::TRACE)
     }
 }
 
-/// Captures the log lines of this thread at `level` and above until the guard drops. Tests run in parallel, so another
-/// thread may have cached a log statement as unwatched just before this subscriber arrived; the cache is rebuilt after
-/// installing it, or that statement would stay silent here and the test fail at random.
-pub fn capture_logs(level: tracing::Level) -> (Captured, tracing::subscriber::DefaultGuard) {
-    let captured = Captured::default();
-    let subscriber = tracing_subscriber::fmt().with_writer(captured.clone()).with_ansi(false).with_max_level(level).finish();
-    let guard = tracing::subscriber::set_default(subscriber);
+/// Writes a formatted line into the buffer of the capture running on the writing thread.
+struct CaptureSink;
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CaptureSink {
+    type Writer = Box<dyn std::io::Write>;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        match CAPTURE.try_with(|c| c.borrow().as_ref().map(|(buf, _)| buf.clone())) {
+            Ok(Some(buf)) => Box::new(buf),
+            _ => Box::new(std::io::sink()),
+        }
+    }
+}
+
+/// Ends the capture of [`capture_logs`] when dropped. It belongs to the thread that started the capture.
+pub struct CaptureGuard {
+    previous: Option<(Captured, tracing::Level)>,
+    _not_send: std::marker::PhantomData<*const ()>,
+}
+
+impl Drop for CaptureGuard {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        let _ = CAPTURE.try_with(|c| *c.borrow_mut() = previous);
+    }
+}
+
+/// Captures the log lines of this thread at `level` and above until the guard drops.
+///
+/// Tracing caches, per log statement and for the whole process, whether any subscriber wants it. A subscriber set only
+/// for this thread does not survive that: while it is the only one alive, tracing asks only the thread that first
+/// reaches a statement, so a parallel test on a thread with no subscriber caches "never" and the statement stays
+/// silent here too. So one subscriber is installed for the whole test binary instead, and it decides per event on
+/// whichever thread is capturing; every statement stays "sometimes", whichever thread reaches it first.
+pub fn capture_logs(level: tracing::Level) -> (Captured, CaptureGuard) {
+    use tracing_subscriber::Layer as _;
+    use tracing_subscriber::layer::SubscriberExt as _;
+
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let layer = tracing_subscriber::fmt::layer()
+            .with_writer(CaptureSink)
+            .with_ansi(false)
+            .with_filter(CaptureFilter);
+        tracing::subscriber::set_global_default(tracing_subscriber::registry().with(layer))
+            .expect("the kuro-track tests install no other global log subscriber");
+    });
+    // A statement first reached on another thread while the subscriber above was being installed may have stored
+    // "never" just after the install refreshed the cache; refresh it again before this capture starts.
     tracing::callsite::rebuild_interest_cache();
-    (captured, guard)
+
+    let captured = Captured::default();
+    let previous = CAPTURE.with(|c| c.borrow_mut().replace((captured.clone(), level)));
+    (
+        captured,
+        CaptureGuard {
+            previous,
+            _not_send: std::marker::PhantomData,
+        },
+    )
+}
+
+#[cfg(test)]
+mod capture_tests {
+    use super::capture_logs;
+
+    /// A log statement first reached on a thread that captures nothing is still captured on the thread that does, and
+    /// the other thread's line is not.
+    #[test]
+    fn a_statement_first_reached_on_another_thread_is_still_captured_here() {
+        fn probe() {
+            tracing::warn!("capture probe");
+        }
+        let (captured, _guard) = capture_logs(tracing::Level::TRACE);
+        std::thread::spawn(probe).join().unwrap();
+        probe();
+        let text = captured.text();
+        assert_eq!(text.matches("capture probe").count(), 1, "{text}");
+    }
+
+    /// Lines below the capture's level are left out, and nothing is captured once the guard drops.
+    #[test]
+    fn the_level_and_the_guard_bound_the_capture() {
+        let (captured, guard) = capture_logs(tracing::Level::WARN);
+        tracing::info!("below the level");
+        tracing::warn!("at the level");
+        drop(guard);
+        tracing::error!("after the guard");
+        let text = captured.text();
+        assert!(
+            text.contains("WARN") && text.contains("at the level"),
+            "{text}"
+        );
+        assert!(
+            !text.contains("below the level") && !text.contains("after the guard"),
+            "{text}"
+        );
+    }
 }
