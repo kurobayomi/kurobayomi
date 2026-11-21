@@ -477,15 +477,16 @@ impl Home {
         (continue_covers, new_covers, recommended.iter().map(suggestion_cover).collect(), trending.iter().map(suggestion_cover).collect())
     }
 
-    /// Fits both rows to the page's width with the Library's column rule.
+    /// Fits every row to the page's width with the Library's column rule: one line each, as many covers as fit.
     fn fit(&self) {
         let width = self.scroller.width() - 2 * self.gutter;
         if width <= 0 {
             return;
         }
         let columns = cover_grid::columns(width, self.prefs.cover_size.get());
-        self.continue_row.fit(columns);
-        self.new_row.fit(columns);
+        for row in [&self.continue_row, &self.new_row, &self.recommended_row, &self.trending_row] {
+            row.fit(columns);
+        }
     }
 }
 
