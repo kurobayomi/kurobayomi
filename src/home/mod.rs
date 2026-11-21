@@ -67,6 +67,8 @@ struct Home {
     new_group: GBox,
     new_row: GBox,
     empty: gtk::Widget,
+    /// The first run's welcome view (the Library's own), shown while no source repository exists.
+    welcome: GBox,
     rows: RefCell<Rows>,
     watches: RefCell<Vec<glib::JoinHandle<()>>>,
     /// The width the rows were last fitted to.
@@ -92,6 +94,9 @@ impl Home {
         column.set_margin_end(SPACE_M + SPACE_S);
         column.set_margin_top(SPACE_M);
         column.set_margin_bottom(SPACE_M);
+        let welcome = crate::library::view::welcome::Welcome::new().widget().clone();
+        welcome.set_visible(false);
+        column.append(&welcome);
         column.append(&continue_group);
         column.append(&new_group);
         column.append(&empty);
@@ -108,6 +113,7 @@ impl Home {
             new_group,
             new_row,
             empty,
+            welcome,
             rows: RefCell::default(),
             watches: RefCell::default(),
             width: std::cell::Cell::new(0),
@@ -120,7 +126,15 @@ impl Home {
             }
         });
         home.start();
-        home.render();
+        // adding (or removing) a repository loads the sources again: the welcome view gives way to the rows, or back
+        let weak = Rc::downgrade(&home);
+        crate::browse::glue::follow_changes(crate::recipe_sources::changes(), move |_| match weak.upgrade() {
+            Some(home) => {
+                home.render();
+                true
+            }
+            None => false,
+        });
         home
     }
 
@@ -175,14 +189,15 @@ impl Home {
         for card in &new_cards {
             self.new_row.append(&new_cover(card));
         }
-        self.continue_group.set_visible(!continue_cards.is_empty());
-        self.new_group.set_visible(!new_cards.is_empty());
-        // nothing yet: the page points to Browse; while the first answers are on their way it stays blank
         let answered = {
             let rows = self.rows.borrow();
             rows.history.iter().all(Option::is_some) && rows.updates.iter().all(Option::is_some)
         };
-        self.empty.set_visible(answered && continue_cards.is_empty() && new_cards.is_empty());
+        let shown = data::shown(crate::library::view::repositories_exist(), answered, !continue_cards.is_empty(), !new_cards.is_empty());
+        self.welcome.set_visible(shown.welcome);
+        self.continue_group.set_visible(shown.continue_row);
+        self.new_group.set_visible(shown.new_row);
+        self.empty.set_visible(shown.empty);
         self.fit(self.width.get());
     }
 

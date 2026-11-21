@@ -6,7 +6,7 @@
 mod card;
 mod options;
 mod tabs;
-mod welcome;
+pub(crate) mod welcome;
 
 use std::cell::{Cell as FlagCell, RefCell};
 use std::collections::{BTreeSet, HashMap};
@@ -642,8 +642,9 @@ impl LibraryView {
     }
 }
 
-/// Whether any manga or anime source repository is set up. Decides what the empty library offers.
-fn repositories_exist() -> bool {
+/// Whether any manga or anime source repository is set up. Decides what the empty library offers; without one the
+/// Library and Home show the welcome view.
+pub(crate) fn repositories_exist() -> bool {
     if !crate::data::is_installed() {
         return false;
     }

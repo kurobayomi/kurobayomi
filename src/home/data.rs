@@ -115,6 +115,25 @@ pub fn fraction(spot: Spot) -> Option<f64> {
     }
 }
 
+/// What Home shows: the welcome view, or its two rows, or the empty line that points to Browse.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shown {
+    pub welcome: bool,
+    pub continue_row: bool,
+    pub new_row: bool,
+    pub empty: bool,
+}
+
+/// Decides what Home shows. Without a source repository it is the welcome view only, as the first run's one screen
+/// (docs/design/app-flow.md). With one, each row shows when it has covers, and the empty line only once both queries
+/// answered with nothing (so it never flashes while they load).
+pub fn shown(repositories: bool, answered: bool, has_continue: bool, has_new: bool) -> Shown {
+    if !repositories {
+        return Shown { welcome: true, continue_row: false, new_row: false, empty: false };
+    }
+    Shown { welcome: false, continue_row: has_continue, new_row: has_new, empty: answered && !has_continue && !has_new }
+}
+
 /// How many covers of `cover_width` fit a row `width` wide with `gap` between them; at least 1.
 pub fn fitting(width: i32, cover_width: i32, gap: i32) -> usize {
     if cover_width <= 0 {
@@ -201,6 +220,14 @@ mod tests {
         assert_eq!(minutes_left(1430, 1440), 1, "a few seconds left is one minute");
         assert_eq!(fraction(Spot::Watched { seconds: 360, total: 1440 }), Some(0.25));
         assert_eq!(fraction(Spot::Page { last_read: 3 }), None);
+    }
+
+    #[test]
+    fn without_a_repository_home_is_the_welcome_view_only() {
+        assert_eq!(shown(false, true, true, true), Shown { welcome: true, continue_row: false, new_row: false, empty: false }, "even with an old history");
+        assert_eq!(shown(true, true, false, false), Shown { welcome: false, continue_row: false, new_row: false, empty: true });
+        assert_eq!(shown(true, false, false, false), Shown { welcome: false, continue_row: false, new_row: false, empty: false }, "no empty line while loading");
+        assert_eq!(shown(true, true, true, false), Shown { welcome: false, continue_row: true, new_row: false, empty: false });
     }
 
     #[test]
