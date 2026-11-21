@@ -2,7 +2,7 @@
 //! run in parallel (at most five), entries of one source run one after another, progress and summary to the host,
 //! and a cancel token per running pass. The host posts notifications and queues downloads; this module decides.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -98,6 +98,9 @@ pub struct PassSettings {
     pub auto_update_metadata: bool,
     pub download: DownloadPolicy,
     pub hide_content: bool,
+    /// The sources the user switched off (`source_switch::off_ids_of`): their titles are skipped. Read where the pass is
+    /// set up, from the preference store: the pass runs on a runtime worker, where the GTK thread's app data is not.
+    pub off_sources: HashSet<i64>,
 }
 
 impl PassSettings {
@@ -113,6 +116,7 @@ impl PassSettings {
             auto_update_metadata: false,
             download: DownloadPolicy::default(),
             hide_content: false,
+            off_sources: HashSet::new(),
         }
     }
 }
@@ -361,7 +365,6 @@ where
             }
         }
 
-        let off_sources = crate::source_switch::off_ids();
         let queue = build_queue(&QueueInput {
             library: &library,
             explicit_category: settings.category,
@@ -371,7 +374,7 @@ where
             include_season_children: settings.include_season_children,
             release_window_upper_ms: window.upper_ms,
             season_children: &season_children,
-            off_sources: &off_sources,
+            off_sources: &settings.off_sources,
         });
         for (entry_id, reason) in &queue.skipped {
             tracing::debug!(entry_id, reason = reason.message(), "library update skipped entry");
@@ -645,6 +648,22 @@ mod tests {
         assert_eq!(summaries.len(), 1);
         assert_eq!(summaries[0].len(), 3);
         assert_eq!(runner.deps.host.hidden_flags.lock().unwrap().as_slice(), &[false]);
+    }
+
+    #[tokio::test]
+    async fn a_title_of_a_source_that_is_off_is_skipped_and_its_source_never_asked() {
+        let mut registry = FakeRegistry::default();
+        registry.sources.insert(1, FakeSource::ok(vec![item(1.0, 0)]));
+        let off = FakeSource::ok(vec![item(1.0, 0)]);
+        let off_calls = Arc::clone(&off.calls);
+        registry.sources.insert(2, off);
+        let runner = runner(FakeStore::with(vec![entry(1, 1, "On"), entry(2, 2, "Off")]), registry);
+        let settings = PassSettings { off_sources: HashSet::from([2]), ..settings() };
+        let outcome = runner.run(settings, Trigger::Manual).await;
+        assert_eq!(outcome.status, PassStatus::Success);
+        assert_eq!(outcome.updates.len(), 1, "only the title of the source that is on");
+        assert_eq!(off_calls.load(Ordering::SeqCst), 0, "the source that is off is never asked");
+        assert!(outcome.failures.is_empty(), "a skipped title is no failure");
     }
 
     #[tokio::test]

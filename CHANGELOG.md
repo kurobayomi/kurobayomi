@@ -30,6 +30,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Fixed
 
+- Library updates skip the titles of sources you switched off again (they were checked anyway), also for
+  `--library-update`.
 - A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,
   so a source no longer says "Working" and "Not working right now" at once.
 

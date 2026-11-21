@@ -225,7 +225,9 @@ fn live() -> Option<SourcePrefs> {
     crate::data::is_installed().then(|| SourcePrefs::new(crate::data::app().base.store().clone()))
 }
 
-/// The ids of the sources that are off now; empty before the app data is open. The library update skips their titles.
+/// The ids of the sources that are off now, read on the GTK thread; empty before the app data is open, and on any other
+/// thread (the app data lives on the GTK thread). Work on a runtime worker reads them with [`off_ids_of`] from the
+/// store instead, as the library update does (`misc::runner::pass_settings`).
 pub fn off_ids() -> HashSet<i64> {
     live().map(|prefs| off_ids_of(&prefs)).unwrap_or_default()
 }

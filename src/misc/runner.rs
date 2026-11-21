@@ -201,6 +201,8 @@ type Runner = PassRunner<LiveRegistry, SqliteLibraryStore, DbItemSync, PrefsHost
 /// The preferences a pass reads each time it starts.
 pub struct Inputs {
     pub download: DownloadPrefs,
+    /// The source switches: a pass skips the titles of the sources that are off.
+    pub sources: kuro_prefs::source::SourcePrefs,
 }
 
 /// The download policy of a pass (T-26a-090, T-26a-091): the chapter or episode toggle. The unread-only switch and the
@@ -237,6 +239,8 @@ pub fn pass_settings(kind: Kind, category: Option<i64>, inputs: &Inputs) -> Pass
         auto_update_metadata: diet::LIBRARY_AUTO_UPDATE_METADATA,
         include_season_children: diet::LIBRARY_UPDATE_SEASON,
         hide_content: diet::NOTIFICATION_HIDE_CONTENT,
+        // read here, on the caller's thread, from the store: the pass itself runs on a runtime worker
+        off_sources: crate::source_switch::off_ids_of(&inputs.sources),
         ..PassSettings::new(kind)
     }
 }
@@ -364,6 +368,7 @@ pub fn start() {
     let app = crate::data::app();
     let inputs = Arc::new(Inputs {
         download: DownloadPrefs::new(app.base.store()),
+        sources: kuro_prefs::source::SourcePrefs::new(app.base.store().clone()),
     });
     METADATA.with(|m| *m.borrow_mut() = Some(metadata_passes()));
 
@@ -483,6 +488,7 @@ pub fn run_headless(trigger: Trigger) -> u8 {
     let store = library.prefs.clone();
     let inputs = Inputs {
         download: DownloadPrefs::new(&store),
+        sources: kuro_prefs::source::SourcePrefs::new(store.clone()),
     };
     let runner = runner_over(library.db, &store);
     runtime.block_on(headless_passes(&runner, &inputs, trigger))
@@ -495,7 +501,18 @@ mod tests {
 
     fn inputs() -> (PrefStore, Inputs) {
         let store = PrefStore::in_memory();
-        (store.clone(), Inputs { download: DownloadPrefs::new(&store) })
+        (store.clone(), Inputs { download: DownloadPrefs::new(&store), sources: kuro_prefs::source::SourcePrefs::new(store.clone()) })
+    }
+
+    #[test]
+    fn a_pass_carries_the_sources_that_are_off_from_the_store() {
+        let (_store, inputs) = inputs();
+        assert!(pass_settings(Kind::Manga, None, &inputs).off_sources.is_empty(), "no source known: none off");
+        inputs.sources.source_keys.set(["5=src.five".to_owned(), "7=src.seven".to_owned()].into()).unwrap();
+        inputs.sources.enabled_sources.set(["src.seven".to_owned()].into()).unwrap();
+        assert_eq!(pass_settings(Kind::Manga, None, &inputs).off_sources, std::collections::HashSet::from([5]), "known and not on: off");
+        // the reading needs no app data: it is what lets the pass, on a worker thread, see the switches
+        assert!(!crate::data::is_installed());
     }
 
     #[test]
