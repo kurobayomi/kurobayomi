@@ -15,7 +15,7 @@ use kuro_backup::job::JobSlot;
 use kuro_backup::options::BackupOptions;
 use kuro_backup::restore::options::RestoreOptions;
 use kuro_backup::restore::screen::{Check, RestoreScreen};
-use kuro_backup::screen::{Card, CreateScreen, DialogOutcome, OptionId, ScreenAction};
+use kuro_backup::screen::{CreateScreen, DialogOutcome, OptionId, ScreenAction};
 use kuro_backup::schema::Backup;
 use kuro_backup::text;
 use kuro_backup::validate::check_file;
@@ -57,32 +57,6 @@ fn host() -> Option<Rc<BackupHost>> {
     HOST.with(|h| h.borrow().clone())
 }
 
-fn card_title(card: Card) -> String {
-    tr(match card {
-        Card::Library => MsgKey::label_library,
-        Card::Settings => MsgKey::label_settings,
-        Card::Extensions => MsgKey::label_extensions,
-    })
-}
-
-fn option_label(id: OptionId) -> String {
-    tr(match id {
-        OptionId::LibraryEntries => MsgKey::entries,
-        OptionId::Chapters => MsgKey::chapters_episodes,
-        OptionId::Tracking => MsgKey::track,
-        OptionId::History => MsgKey::history,
-        OptionId::Categories => MsgKey::categories,
-        OptionId::ReadEntries => MsgKey::non_library_settings,
-        OptionId::AppSettings => MsgKey::app_settings,
-        OptionId::ExtensionStores => MsgKey::extensionStores,
-        OptionId::CustomButtons => MsgKey::custom_button_settings,
-        OptionId::SourceSettings => MsgKey::source_settings,
-        OptionId::PrivateSettings => MsgKey::private_settings,
-        OptionId::Extensions => MsgKey::label_extensions,
-    })
-}
-
-/// The restore options' labels, in the order of `RestoreOptions::to_bits`.
 fn restore_label(index: usize) -> String {
     tr(match index {
         0 => MsgKey::label_library,
@@ -128,56 +102,29 @@ fn check_row(label: &str, active: bool) -> (adw::ActionRow, gtk::CheckButton) {
 
 // ---------- create ----------
 
-/// The Create backup page: three cards of options and a Create button pinned at the bottom.
+/// The Create backup page: one sentence on what the backup holds, one switch for the tracker logins (off: a backup with
+/// them must not be shared), and a Create button pinned at the bottom. Everything else is always in the backup
+/// (`BackupOptions::default`): a backup with part of the library left out is only a way to lose data (user,
+/// 2026-11-21).
 pub fn create_page() -> Option<Built> {
     let screen = Rc::new(RefCell::new(CreateScreen::default()));
-    let updating = Rc::new(Cell::new(false));
     let column = crate::ui::column();
-    let mut rows: Vec<(OptionId, adw::ActionRow, gtk::CheckButton)> = Vec::new();
-    for card in [Card::Library, Card::Settings, Card::Extensions] {
-        column.append(&crate::ui::heading(&card_title(card)));
-        let list = crate::ui::boxed_list();
-        for (_, id) in OptionId::ROWS.iter().filter(|(c, _)| *c == card) {
-            let (row, check) = check_row(&option_label(*id), id.get(&screen.borrow().options));
-            list.append(&row);
-            rows.push((*id, row, check));
-        }
-        column.append(&list);
-        if card == Card::Extensions {
-            // Android APK extensions are replaced by Kurobayomi extension files in a backup (T-21a-019)
-            column.append(&crate::ui::dim(&crate::backup_host::shown(text::BACKUP_EXTENSIONS_INFO)));
-        }
-    }
+    column.append(&crate::ui::message(&tr(MsgKey::ui_backup_holds_everything)));
+    let logins = crate::widgets::row::switch(&tr(MsgKey::private_settings), None, None, OptionId::PrivateSettings.get(&screen.borrow().options));
+    let list = crate::ui::boxed_list();
+    list.append(&logins);
+    column.append(&list);
     let warning = crate::ui::dim(kuro_backup::screen::CREDENTIALS_WARNING);
+    warning.set_visible(screen.borrow().credentials_warning().is_some());
     column.append(&warning);
+    logins.connect_active_notify({
+        let (screen, warning) = (screen.clone(), warning.clone());
+        move |row| {
+            OptionId::PrivateSettings.set(&mut screen.borrow_mut().options, row.is_active());
+            warning.set_visible(screen.borrow().credentials_warning().is_some());
+        }
+    });
     let create = gtk::Button::with_label(&tr(MsgKey::action_create));
-    let rows = Rc::new(rows);
-
-    let refresh = {
-        let (screen, rows, create, warning, updating) = (screen.clone(), rows.clone(), create.clone(), warning.clone(), updating.clone());
-        Rc::new(move || {
-            let screen = screen.borrow();
-            updating.set(true);
-            for (id, row, check) in rows.iter() {
-                row.set_sensitive(id.enabled(&screen.options));
-                check.set_active(id.get(&screen.options));
-            }
-            updating.set(false);
-            create.set_sensitive(screen.create_enabled());
-            warning.set_visible(screen.credentials_warning().is_some());
-        })
-    };
-    refresh();
-    for (id, _, check) in rows.iter() {
-        let (id, screen, refresh, updating) = (*id, screen.clone(), refresh.clone(), updating.clone());
-        check.connect_toggled(move |c| {
-            if updating.get() {
-                return;
-            }
-            id.set(&mut screen.borrow_mut().options, c.is_active());
-            refresh();
-        });
-    }
     create.connect_clicked({
         let screen = screen.clone();
         move |_| on_create(&screen)
@@ -356,20 +303,35 @@ mod tests {
     use kuro_backup::creator::SourceRegistry;
     use kuro_backup::validate::{TrackerRegistry, preflight_file};
 
+    /// The only choice is the logins; the rest is always backed up, and extension packages never (they come back from
+    /// their repositories).
     #[test]
-    fn t_47b_029_the_three_cards_and_ten_rows_come_from_the_string_table() {
-        assert_eq!(card_title(Card::Library), "Library");
-        assert_eq!(card_title(Card::Settings), "Settings");
-        assert_eq!(card_title(Card::Extensions), "Extensions");
-        let labels: Vec<String> = OptionId::ROWS.iter().map(|(_, id)| option_label(*id)).collect();
-        assert_eq!(labels.len(), 10);
-        assert_eq!(labels[0], "Library entries");
-        assert_eq!(labels[1], "Chapters and episodes");
-        assert_eq!(labels[5], "All read/watched entries");
-        assert_eq!(labels[8], "Include sensitive settings (e.g., tracker login tokens)");
+    fn a_backup_holds_everything_but_the_logins_unless_asked() {
+        assert_eq!(tr(MsgKey::private_settings), OptionId::PrivateSettings.label(), "the switch: the table and kuro-backup agree");
+        let options = CreateScreen::default().options;
         for (_, id) in OptionId::ROWS {
-            assert_eq!(option_label(id), id.label(), "{id:?}: the table and kuro-backup agree");
+            assert_eq!(id.get(&options), !matches!(id, OptionId::PrivateSettings | OptionId::Extensions), "{id:?}");
         }
+    }
+
+    #[test]
+    fn the_create_page_has_one_switch_and_the_warning_follows_it() {
+        crate::testing::with_display(|| {
+            let built = create_page().expect("the Create backup page");
+            let all = crate::screens::alone::descendants(&built.content);
+            let switches: Vec<adw::SwitchRow> = all.iter().filter_map(|w| w.downcast_ref::<adw::SwitchRow>().cloned()).collect();
+            assert_eq!(switches.len(), 1, "the logins");
+            assert!(!all.iter().any(|w| w.is::<gtk::CheckButton>()), "no checklist");
+            let warning = all
+                .iter()
+                .filter_map(|w| w.downcast_ref::<gtk::Label>())
+                .find(|label| label.text().as_str() == kuro_backup::screen::CREDENTIALS_WARNING)
+                .cloned()
+                .expect("the warning");
+            assert!(!warning.is_visible(), "no logins, no warning");
+            switches[0].set_active(true);
+            assert!(warning.is_visible(), "a backup with logins says to keep it private");
+        });
     }
 
     #[test]

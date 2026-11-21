@@ -1160,3 +1160,6 @@ ui_colours_rose_pine = Rosé Pine
 
 # source: kurobayomi
 ui_add_sources = Add sources
+
+# source: kurobayomi
+ui_backup_holds_everything = The backup holds your library with its history and tracking, your categories, your repositories and your settings.

@@ -11,6 +11,11 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - A source a repository adds shows a "New" pill and comes first in that repository's list of sources, until you have
   seen the list, also when you close the "new sources" notice without choosing.
 
+### Changed
+
+- Create backup is one button: the backup always holds your library, its history and tracking, your categories, your
+  repositories and your settings, and the only choice left is whether to include tracker logins.
+
 ### Removed
 
 - Automatic backups and their frequency setting. Create a backup from Settings when you want one; a restore of an older
