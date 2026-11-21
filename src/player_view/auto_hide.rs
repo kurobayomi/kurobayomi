@@ -32,11 +32,7 @@ pub struct AutoHide {
     panels: RefCell<Vec<gtk::Revealer>>,
 }
 
-/// The room a side panel leaves at its top and its foot: the header's height when it floats over the video (auto-hide
-/// on), nothing when it sits above it; the control bar's height, which always floats.
-pub fn panel_insets(enabled: bool, header_height: i32, bar_height: i32) -> (i32, i32) {
-    (if enabled { header_height.max(0) } else { 0 }, bar_height.max(0))
-}
+use crate::reader::chapter_panel::panel_insets;
 
 impl AutoHide {
     /// Lays out `header` and `bar` on `page` and `overlay` (which holds `area`, the video) and follows the input.
@@ -155,12 +151,5 @@ mod tests {
         assert!(shown(true, true, false, quiet), "paused: shown");
         assert!(shown(true, false, true, quiet), "a menu open: shown");
         assert!(shown(false, false, false, quiet), "auto-hide off: always shown");
-    }
-
-    #[test]
-    fn a_panel_starts_under_a_floating_header_and_ends_above_the_control_bar() {
-        assert_eq!(panel_insets(true, 46, 52), (46, 52), "auto-hide: both bars float over the video");
-        assert_eq!(panel_insets(false, 46, 52), (0, 52), "the header sits above the video: no room needed at the top");
-        assert_eq!(panel_insets(true, -1, 0), (0, 0), "an unmeasured bar takes no room");
     }
 }

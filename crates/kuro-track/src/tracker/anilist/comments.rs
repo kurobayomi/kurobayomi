@@ -1,10 +1,13 @@
-//! The comments and reviews AniList already has (docs/design/comments.md): an episode's discussion thread with its
-//! comments, and a title's reviews. Read-only, sent without a token, asked only when the player's panel or the Reviews
-//! page opens, and kept nowhere but in the caller's memory (AniList's terms forbid using the API as storage).
+//! The comments and reviews AniList already has (docs/design/comments.md): an episode's or a chapter's discussion thread
+//! with its comments, and a title's reviews. Read-only, sent without a token, asked only when the comments panel (player
+//! or reader) or the Reviews page opens, and kept nowhere but in the caller's memory (AniList's terms forbid using the API as storage).
 //!
 //! What the live API was seen to do (2026-11-21):
 //! - a thread has no episode field. Episode threads are user posts in the "Release Discussion" category (id 5), titled
 //!   like `[Spoilers] Sousou No Frieren - Episode 10 Discussion`; a premiere can share one (`Premiere/Episodes 1-4`);
+//! - chapter threads are the same, in the same category (2026-11-22): `[Spoilers] Chainsaw Man - Chapter 232
+//!   Discussion`, `[Spoilers] Jujutsu Kaisen - Chapter 271 (Finale) Discussion`, and part chapters such as
+//!   `Chapter 262.2`, which are not chapter 262;
 //! - `threads(categoryId: 5, mediaCategoryId:)` lists a title's episode threads (Frieren: its 25 on one page), and
 //!   `search:` finds an old one of a long show ("Episode 1100" for One Piece) but missed "Episode 10" for Frieren;
 //! - `threadComments` sorts only by `ID` or `ID_DESC` and lists top-level comments; replies come nested in
@@ -90,13 +93,18 @@ pub fn threads_request(media_id: i64, page: u32) -> Value {
     ) })
 }
 
-/// The title's discussion threads that AniList's search finds for `episode`.
-pub fn thread_search_request(media_id: i64, episode: i64) -> Value {
+/// The word a thread title names a unit of `kind` with: `Episode` or `Chapter`.
+fn unit_word(kind: Kind) -> &'static str {
+    if kind.is_anime() { "Episode" } else { "Chapter" }
+}
+
+/// The title's discussion threads that AniList's search finds for unit `number` of `kind`.
+pub fn thread_search_request(media_id: i64, kind: Kind, number: i64) -> Value {
     json!({
         "query": format!(
             "query ($search: String) {{ Page(perPage: {LIMIT}) {{ pageInfo {{ hasNextPage }} threads(categoryId: {RELEASE_DISCUSSION}, mediaCategoryId: {media_id}, search: $search) {{ {THREAD_FIELDS} }} }} }}"
         ),
-        "variables": { "search": format!("Episode {episode}") },
+        "variables": { "search": format!("{} {number}", unit_word(kind)) },
     })
 }
 
@@ -202,9 +210,9 @@ pub fn parse_reviews(body: &[u8]) -> Result<Vec<Review>, AniListError> {
         .unwrap_or_default())
 }
 
-/// The whole number of an episode the matching works on: `None` for an unknown (negative) or a part number (10.5),
-/// whose thread a title cannot name.
-pub fn whole_episode(number: f64) -> Option<i64> {
+/// The whole number of an episode or a chapter the matching works on: `None` for an unknown (negative) or a part number
+/// (10.5), which the matching does not tell from its whole one.
+pub fn whole_number(number: f64) -> Option<i64> {
     (number >= 0.0 && number.fract() == 0.0 && number < 1e9).then_some(number as i64)
 }
 
@@ -216,17 +224,25 @@ fn leading_number(text: &str) -> Option<(i64, &str)> {
     Some((number, &text[digits..]))
 }
 
-/// Whether a thread title names `episode`: after a word `episode`, `episodes` or `ep` comes that number, or a range that
-/// holds it (`Episodes 1-4`, `Ep 1 ~ 2`, `Episodes 1 to 3`, `Episodes 1 & 2`). The number must end there, so episode 1
-/// does not match "Episode 10".
-pub fn names_episode(title: &str, episode: i64) -> bool {
+/// The short word a title may name a unit of `kind` with, and the endings that make it whole: `ep`, `episode`,
+/// `episodes`; `ch`, `chapter`, `chapters`.
+fn unit_words(kind: Kind) -> (&'static str, [&'static str; 2]) {
+    if kind.is_anime() { ("ep", ["isodes", "isode"]) } else { ("ch", ["apters", "apter"]) }
+}
+
+/// Whether a thread title names unit `number` of `kind`: after the kind's word (`episode`, `episodes` or `ep`; `chapter`,
+/// `chapters` or `ch`) comes that number, or a range that holds it (`Episodes 1-4`, `Ep 1 ~ 2`, `Chapters 1 to 3`,
+/// `Episodes 1 & 2`). The number must end there, so 1 does not match "Episode 10", and a part number is not its whole
+/// one ("Chapter 262.2" is not chapter 262).
+pub fn names_unit(title: &str, kind: Kind, number: i64) -> bool {
+    let (short, endings) = unit_words(kind);
     let lower = title.to_lowercase();
     let mut rest = lower.as_str();
-    while let Some(at) = rest.find("ep") {
+    while let Some(at) = rest.find(short) {
         let before_ok = at == 0 || !rest[..at].chars().next_back().is_some_and(char::is_alphanumeric);
-        let after_word = &rest[at + 2..];
-        let after_word = after_word.strip_prefix("isodes").or_else(|| after_word.strip_prefix("isode")).unwrap_or(after_word);
-        rest = &rest[at + 2..];
+        let after_word = &rest[at + short.len()..];
+        let after_word = endings.iter().find_map(|ending| after_word.strip_prefix(ending)).unwrap_or(after_word);
+        rest = &rest[at + short.len()..];
         if !before_ok {
             continue;
         }
@@ -234,19 +250,24 @@ pub fn names_episode(title: &str, episode: i64) -> bool {
         if tail.chars().next().is_some_and(|c| c.is_ascii_digit() || c.is_alphabetic()) {
             continue;
         }
+        // a part number: `262.2`, `10.5`
+        if tail.strip_prefix('.').and_then(|t| t.chars().next()).is_some_and(|c| c.is_ascii_digit()) {
+            continue;
+        }
         let tail = tail.trim_start();
         let range_rest = ["-", "\u{2013}", "~", "&", "to ", "and "].iter().find_map(|sep| tail.strip_prefix(sep));
         let last = range_rest.and_then(leading_number).map_or(first, |(last, _)| last);
-        if (first..=last.max(first)).contains(&episode) {
+        if (first..=last.max(first)).contains(&number) {
             return true;
         }
     }
     false
 }
 
-/// The thread of `episode` among `threads`: one whose title names it; of several, the one with the most replies.
-pub fn pick_thread(threads: &[Thread], episode: i64) -> Option<Thread> {
-    threads.iter().filter(|t| names_episode(&t.title, episode)).max_by_key(|t| t.replies).cloned()
+/// The thread of unit `number` of `kind` among `threads`: one whose title names it; of several, the one with the most
+/// replies.
+pub fn pick_thread(threads: &[Thread], kind: Kind, number: i64) -> Option<Thread> {
+    threads.iter().filter(|t| names_unit(&t.title, kind, number)).max_by_key(|t| t.replies).cloned()
 }
 
 /// One request; a status other than 2xx is an error (429 says when to ask again, when AniList says so).
@@ -270,24 +291,24 @@ pub async fn media_id(transport: &dyn Transport, mal_id: i64, kind: Kind) -> Res
     }
 }
 
-/// The discussion thread of `episode`: the newest page of the title's discussions, then AniList's search, then up to
-/// [`SCAN_PAGES`] pages in all. `None` when no title names the episode.
-pub async fn find_thread(transport: &dyn Transport, media_id: i64, episode: i64) -> Result<Option<Thread>, AniListError> {
+/// The discussion thread of unit `number` of `kind` (an episode or a chapter): the newest page of the title's
+/// discussions, then AniList's search, then up to [`SCAN_PAGES`] pages in all. `None` when no title names it.
+pub async fn find_thread(transport: &dyn Transport, media_id: i64, kind: Kind, number: i64) -> Result<Option<Thread>, AniListError> {
     let (first, mut more) = parse_threads(&send(transport, &threads_request(media_id, 1)).await?)?;
-    if let Some(thread) = pick_thread(&first, episode) {
+    if let Some(thread) = pick_thread(&first, kind, number) {
         return Ok(Some(thread));
     }
     if !more {
         return Ok(None);
     }
-    let (found, _) = parse_threads(&send(transport, &thread_search_request(media_id, episode)).await?)?;
-    if let Some(thread) = pick_thread(&found, episode) {
+    let (found, _) = parse_threads(&send(transport, &thread_search_request(media_id, kind, number)).await?)?;
+    if let Some(thread) = pick_thread(&found, kind, number) {
         return Ok(Some(thread));
     }
     let mut page = 2;
     while more && page <= SCAN_PAGES {
         let (threads, next) = parse_threads(&send(transport, &threads_request(media_id, page)).await?)?;
-        if let Some(thread) = pick_thread(&threads, episode) {
+        if let Some(thread) = pick_thread(&threads, kind, number) {
             return Ok(Some(thread));
         }
         more = next;
@@ -338,44 +359,58 @@ mod tests {
     #[test]
     fn a_title_names_its_episode_and_only_that_one() {
         let ten = "[Spoilers] Sousou No Frieren - Episode 10 Discussion";
-        assert!(names_episode(ten, 10));
-        assert!(!names_episode(ten, 1), "episode 1 is not in episode 10");
-        assert!(!names_episode(ten, 11));
-        assert!(names_episode("[Spoilers] One Piece-Episode 1100 discussion", 1100));
-        assert!(names_episode("Ep. 7 discussion", 7));
-        assert!(names_episode("Ep 7 discussion", 7));
-        assert!(names_episode("Episode #3", 3));
+        assert!(names_unit(ten, Kind::Anime, 10));
+        assert!(!names_unit(ten, Kind::Anime, 1), "episode 1 is not in episode 10");
+        assert!(!names_unit(ten, Kind::Anime, 11));
+        assert!(names_unit("[Spoilers] One Piece-Episode 1100 discussion", Kind::Anime, 1100));
+        assert!(names_unit("Ep. 7 discussion", Kind::Anime, 7));
+        assert!(names_unit("Ep 7 discussion", Kind::Anime, 7));
+        assert!(names_unit("Episode #3", Kind::Anime, 3));
     }
 
     #[test]
     fn a_range_holds_every_episode_in_it() {
         let premiere = "[Spoilers] Sousou No Frieren - Premiere/Episodes 1-4 Discussion";
-        assert!((1..=4).all(|n| names_episode(premiere, n)));
-        assert!(!names_episode(premiere, 5));
-        assert!(names_episode("Episodes 1 ~ 2", 2));
-        assert!(names_episode("Episodes 5 to 7 discussion", 6));
-        assert!(names_episode("Episodes 1 & 2", 2));
+        assert!((1..=4).all(|n| names_unit(premiere, Kind::Anime, n)));
+        assert!(!names_unit(premiere, Kind::Anime, 5));
+        assert!(names_unit("Episodes 1 ~ 2", Kind::Anime, 2));
+        assert!(names_unit("Episodes 5 to 7 discussion", Kind::Anime, 6));
+        assert!(names_unit("Episodes 1 & 2", Kind::Anime, 2));
     }
 
     #[test]
     fn words_that_only_contain_ep_do_not_count() {
-        assert!(!names_episode("Deep 10 thoughts", 10), "\"deep\" is not \"ep\"");
-        assert!(!names_episode("Episode 10b recap", 10));
-        assert!(!names_episode("Season 2 discussion", 2));
+        assert!(!names_unit("Deep 10 thoughts", Kind::Anime, 10), "\"deep\" is not \"ep\"");
+        assert!(!names_unit("Episode 10b recap", Kind::Anime, 10));
+        assert!(!names_unit("Season 2 discussion", Kind::Anime, 2));
+    }
+
+    /// Titles from the live answers of 2026-11-22 (Chainsaw Man and Jujutsu Kaisen, category 5).
+    #[test]
+    fn a_chapter_thread_names_its_chapter_and_a_part_chapter_is_its_own() {
+        assert!(names_unit("[Spoilers] Chainsaw Man - Chapter 232 Discussion ", Kind::Manga, 232));
+        assert!(!names_unit("[Spoilers] Chainsaw Man - Chapter 232 Discussion ", Kind::Manga, 23));
+        assert!(names_unit("[Spoilers] Jujutsu Kaisen - Chapter 271 (Finale) Discussion\n", Kind::Manga, 271));
+        assert!(!names_unit("[Spoilers] Jujutsu Kaisen - Chapter 262.2 Discussion\n", Kind::Manga, 262), "262.2 is not 262");
+        assert!(!names_unit("Episode 10 Discussion", Kind::Manga, 10), "a manga thread names a chapter");
+        assert!(!names_unit("Chapter 10 Discussion", Kind::Anime, 10), "an anime thread names an episode");
+        assert!(names_unit("Ch. 57 discussion", Kind::Manga, 57));
+        assert!(names_unit("Chapters 1-3", Kind::Manga, 2));
+        assert!(!names_unit("Episode 10.5 recap", Kind::Anime, 10), "a part episode is not its whole one");
     }
 
     #[test]
     fn of_several_matches_the_busiest_thread_wins() {
         let threads = [thread(1, "Episode 3 Discussion", 4), thread(2, "Episode 3 Discussion (mirror)", 40), thread(3, "Episode 30 Discussion", 99)];
-        assert_eq!(pick_thread(&threads, 3).map(|t| t.id), Some(2));
-        assert_eq!(pick_thread(&threads, 4), None);
+        assert_eq!(pick_thread(&threads, Kind::Anime, 3).map(|t| t.id), Some(2));
+        assert_eq!(pick_thread(&threads, Kind::Anime, 4), None);
     }
 
     #[test]
-    fn only_whole_known_episode_numbers_are_matched() {
-        assert_eq!(whole_episode(10.0), Some(10));
-        assert_eq!(whole_episode(10.5), None);
-        assert_eq!(whole_episode(-1.0), None);
+    fn only_whole_known_numbers_are_matched() {
+        assert_eq!(whole_number(10.0), Some(10));
+        assert_eq!(whole_number(10.5), None);
+        assert_eq!(whole_number(-1.0), None);
     }
 
     #[test]
@@ -399,12 +434,13 @@ mod tests {
 
     #[test]
     fn the_requests_ask_for_fifty_at_most() {
-        for body in [comments_request(1), reviews_request(1), threads_request(1, 1), thread_search_request(1, 10)] {
+        for body in [comments_request(1), reviews_request(1), threads_request(1, 1), thread_search_request(1, Kind::Anime, 10)] {
             let query = body["query"].as_str().unwrap();
             assert!(query.contains("perPage: 50"), "{query}");
         }
         assert!(comments_request(1)["query"].as_str().unwrap().contains("sort: ID"), "AniList sorts comments by id only");
-        assert_eq!(thread_search_request(1, 10)["variables"]["search"], "Episode 10");
+        assert_eq!(thread_search_request(1, Kind::Anime, 10)["variables"]["search"], "Episode 10");
+        assert_eq!(thread_search_request(1, Kind::Manga, 232)["variables"]["search"], "Chapter 232");
         assert!(threads_request(7, 2)["query"].as_str().unwrap().contains("Page(page: 2,"));
     }
 
@@ -417,7 +453,7 @@ mod tests {
     #[tokio::test]
     async fn the_first_page_of_discussions_usually_holds_the_thread() {
         let transport = FakeTransport::new(vec![ok(&page(&[(5, "Episode 5 Discussion", 22), (10, "Episode 10 Discussion", 76)], true))]);
-        let found = find_thread(transport.as_ref(), 154587, 10).await.unwrap();
+        let found = find_thread(transport.as_ref(), 154587, Kind::Anime, 10).await.unwrap();
         assert_eq!(found.map(|t| t.id), Some(10));
         assert_eq!(transport.calls(), 1);
         assert_eq!(transport.bearers(), [None], "no token");
@@ -426,7 +462,7 @@ mod tests {
     #[tokio::test]
     async fn a_short_list_without_the_episode_asks_nothing_more() {
         let transport = FakeTransport::new(vec![ok(&page(&[(5, "Episode 5 Discussion", 22)], false))]);
-        assert_eq!(find_thread(transport.as_ref(), 1, 10).await.unwrap(), None);
+        assert_eq!(find_thread(transport.as_ref(), 1, Kind::Anime, 10).await.unwrap(), None);
         assert_eq!(transport.calls(), 1);
     }
 
@@ -436,10 +472,10 @@ mod tests {
         let none = page(&[], false);
         // page 1, the search, then pages 2 to 5 that each say a next page exists
         let transport = FakeTransport::new(vec![ok(&busy), ok(&none), ok(&busy), ok(&busy), ok(&busy), ok(&busy), ok(&busy)]);
-        assert_eq!(find_thread(transport.as_ref(), 21, 3).await.unwrap(), None);
+        assert_eq!(find_thread(transport.as_ref(), 21, Kind::Anime, 3).await.unwrap(), None);
         assert_eq!(transport.calls(), 6, "page 1, the search, pages 2 to 5");
         let transport = FakeTransport::new(vec![ok(&busy), ok(&page(&[(72940, "[Spoilers] One Piece-Episode 1100 discussion", 8)], false))]);
-        assert_eq!(find_thread(transport.as_ref(), 21, 1100).await.unwrap().map(|t| t.id), Some(72940));
+        assert_eq!(find_thread(transport.as_ref(), 21, Kind::Anime, 1100).await.unwrap().map(|t| t.id), Some(72940));
         assert_eq!(transport.calls(), 2);
     }
 

@@ -331,6 +331,8 @@ pub struct TopBarActions {
     pub on_bookmark: Box<dyn Fn()>,
     /// Opens or closes the chapter list.
     pub on_chapters: Box<dyn Fn()>,
+    /// Opens or closes the chapter's comments.
+    pub on_comments: Box<dyn Fn()>,
 }
 
 /// The top bar before a chapter is known (the page list is loading, or the load failed): Back and the window buttons,
@@ -344,7 +346,7 @@ pub fn build_bare_top_bar(on_back: impl Fn() + 'static) -> adw::HeaderBar {
 /// the bookmark and the menu on the right. The bar is never hidden. The menu's actions come from the page's
 /// [`ACTION_GROUP`]; the returned title takes the page position.
 pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (adw::HeaderBar, page_header::TwoLineTitle) {
-    let TopBarActions { on_back, on_bookmark, on_chapters } = actions;
+    let TopBarActions { on_back, on_bookmark, on_chapters, on_comments } = actions;
     let (header, title) = page_header::media_header(&page_header::MediaTitle::new(&bar.manga_title, &bar.chapter_name), on_back);
 
     let bookmark = gtk::ToggleButton::builder()
@@ -363,10 +365,16 @@ pub fn build_top_bar(bar: &TopBar, actions: TopBarActions) -> (adw::HeaderBar, p
     let chapters = gtk::Button::builder().icon_name("view-list-symbolic").tooltip_text(chapters_tooltip()).build();
     chapters.connect_clicked(move |_| on_chapters());
 
-    // pack_end puts the first widget packed at the far right: the menu, then the bookmark, then the chapter list
+    // the player's Comments button, the same icon and tooltip
+    let comments = crate::ui::icon_button(crate::comments::panel::ICON, &format!("{} (C)", tr(MsgKey::comments_title)));
+    comments.connect_clicked(move |_| on_comments());
+
+    // pack_end puts the first widget packed at the far right: the menu, then the bookmark, the chapter list and the
+    // comments
     header.pack_end(&menu);
     header.pack_end(&bookmark);
     header.pack_end(&chapters);
+    header.pack_end(&comments);
     // the buttons packed here came after page_header::header made its pass, so they need their own
     crate::ui::no_sticky_focus(&header);
     (header, title)

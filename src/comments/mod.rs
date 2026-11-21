@@ -1,9 +1,9 @@
-//! Comments and reviews that AniList already has (docs/design/comments.md): the comments of the playing episode in a
-//! panel of the player ([`panel`]), and a title's reviews on a page of their own ([`reviews`]). Read-only, without a
-//! login, nothing stored: what was found lives in memory for the app's run.
+//! Comments and reviews that AniList already has (docs/design/comments.md): the comments of the episode playing or the
+//! chapter being read in one panel for both kinds ([`panel`]), and a title's reviews on a page of their own ([`reviews`]).
+//! Read-only, without a login, nothing stored: what was found lives in memory for the app's run.
 //!
-//! What is remembered: the AniList id of an entry, and the thread of an episode, once found or found missing, so a
-//! second look costs one request. A rate limit stops every ask until AniList's wait (or a minute) is over.
+//! What is remembered: the AniList id of an entry, and the thread of an episode or chapter, once found or found
+//! missing, so a second look costs one request. A rate limit stops every ask until AniList's wait (or a minute) is over.
 
 pub mod panel;
 pub mod reviews;
@@ -37,7 +37,8 @@ pub struct Ids {
 thread_local! {
     /// Entry id to AniList id; `None` for a title AniList does not know.
     static MEDIA: RefCell<HashMap<i64, Option<i64>>> = RefCell::default();
-    /// (AniList id, episode) to its thread; `None` for an episode without one.
+    /// (AniList id, episode or chapter number) to its thread; `None` for one without a thread. AniList ids are one space
+    /// for anime and manga, so a number never meets the other kind's.
     static THREADS: RefCell<HashMap<(i64, i64), Option<Thread>>> = RefCell::default();
     /// No ask before this moment (a rate limit).
     static BLOCKED_UNTIL: Cell<Option<Instant>> = const { Cell::new(None) };
@@ -66,12 +67,12 @@ pub fn remember_media(entry_id: i64, media: Option<i64>) {
     MEDIA.with(|m| m.borrow_mut().insert(entry_id, media));
 }
 
-pub fn remembered_thread(media: i64, episode: i64) -> Option<Option<Thread>> {
-    THREADS.with(|t| t.borrow().get(&(media, episode)).cloned())
+pub fn remembered_thread(media: i64, number: i64) -> Option<Option<Thread>> {
+    THREADS.with(|t| t.borrow().get(&(media, number)).cloned())
 }
 
-pub fn remember_thread(media: i64, episode: i64, thread: Option<Thread>) {
-    THREADS.with(|t| t.borrow_mut().insert((media, episode), thread));
+pub fn remember_thread(media: i64, number: i64, thread: Option<Thread>) {
+    THREADS.with(|t| t.borrow_mut().insert((media, number), thread));
 }
 
 /// The AniList id from the binding, else asked by the MyAnimeList id; `None` when there is neither, or AniList does not

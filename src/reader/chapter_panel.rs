@@ -10,8 +10,16 @@ use std::rc::Rc;
 use gtk::glib;
 use gtk::prelude::*;
 
-/// How wide the panel is, in px. The reader's floating bottom bar stops this far from the right edge while it is open.
+/// How wide the panel is, in px.
 pub const WIDTH: i32 = 320;
+
+/// The room a side panel (this list, or the comments) leaves at its top and its foot, the same in the reader and the
+/// player: it sits between the bars, never under them, and the bars keep their full width (user, 2026-11-22: "should
+/// be consistent like the one in anime"). The top bar's height when it floats over the pages or the video (auto-hide on),
+/// nothing when it sits above them; the bottom bar's height, which always floats.
+pub fn panel_insets(top_floats: bool, top_height: i32, bottom_height: i32) -> (i32, i32) {
+    (if top_floats { top_height.max(0) } else { 0 }, bottom_height.max(0))
+}
 
 /// One chapter of the reader's list, as the panel shows it.
 #[derive(Debug, Clone, PartialEq)]
@@ -326,6 +334,13 @@ mod tests {
             downloaded: false,
             current: false,
         }
+    }
+
+    #[test]
+    fn a_panel_starts_under_a_floating_top_bar_and_ends_above_the_bottom_bar() {
+        assert_eq!(panel_insets(true, 46, 52), (46, 52), "auto-hide: both bars float over the pages or the video");
+        assert_eq!(panel_insets(false, 46, 52), (0, 52), "the top bar sits above: no room needed at the top");
+        assert_eq!(panel_insets(true, -1, 0), (0, 0), "an unmeasured bar takes no room");
     }
 
     #[test]

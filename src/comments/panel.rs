@@ -1,10 +1,11 @@
-//! The comments of the episode playing, in a panel over the right side of the video (docs/design/comments.md): the
-//! same kind and place as the episode list (`reader::chapter_panel`), opened by the header's Comments button and C, shut
-//! by its close button and Esc. It follows the episode: a new one reloads it. The video keeps playing.
+//! The comments of the episode playing or the chapter being read, in a panel over the right side of the video or the
+//! pages (docs/design/comments.md): one panel for both kinds, the same kind and place as the episode and chapter list
+//! (`reader::chapter_panel`), opened by the header's Comments button and C, shut by its close button and Esc. It follows
+//! the episode or chapter: a new one reloads it. The video keeps playing.
 //!
-//! What it shows comes from AniList's discussion thread of the episode: at most 50 comments (the oldest, the week the
-//! episode aired), Top (most liked first) or New, each with its replies, and "Open on AniList". Spoilers show at once
-//! (user, 2026-11-21); only text the author tagged as a spoiler waits for a click.
+//! What it shows comes from AniList's discussion thread of the episode or chapter (the kind is the item's own): at most
+//! 50 comments (the oldest, the week it came out), Top (most liked first) or New, each with its replies, and "Open on
+//! AniList". Spoilers show at once (user, 2026-11-21); only text the author tagged as a spoiler waits for a click.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -22,7 +23,7 @@ use kuro_track::tracker::anilist::error::AniListError;
 use super::{Ids, view};
 use crate::reader::chapter_panel::WIDTH;
 
-/// How often an open panel checks whether the episode changed.
+/// How often an open panel checks whether the episode or chapter changed.
 const FOLLOW_EVERY: Duration = Duration::from_millis(500);
 /// The comments icon, the header button's and the empty state's.
 pub const ICON: &str = "chat-message-new-symbolic";
@@ -49,6 +50,7 @@ pub fn sorted(comments: &[Comment], sort: Sort) -> Vec<&Comment> {
 
 /// What one load found.
 struct Loaded {
+    kind: Kind,
     /// The title's AniList id; `None` when AniList does not know it.
     media: Option<i64>,
     thread: Option<Thread>,
@@ -58,8 +60,9 @@ struct Loaded {
 /// What the panel shows now.
 #[derive(Default)]
 struct State {
-    episode_id: i64,
-    episode_name: String,
+    /// The episode or chapter shown.
+    unit_id: i64,
+    unit_name: String,
     thread: Option<Thread>,
     comments: Vec<Comment>,
     sort: Sort,
@@ -78,7 +81,7 @@ pub struct CommentsPanel {
     state: RefCell<State>,
     /// Only the latest load may show anything.
     generation: Cell<u64>,
-    /// The episode playing now, asked while the panel is open.
+    /// The episode playing or the chapter read now, asked while the panel is open.
     current: RefCell<Option<Rc<dyn Fn() -> Option<i64>>>>,
     /// The check that follows the episode runs (one at a time, even when the panel is shut and opened quickly).
     following: Cell<bool>,
@@ -181,7 +184,7 @@ impl CommentsPanel {
         panel
     }
 
-    /// The widget to put over the video, aligned to its right edge.
+    /// The widget to put over the video or the pages, aligned to their right edge.
     pub fn root(&self) -> &gtk::Revealer {
         &self.revealer
     }
@@ -190,20 +193,20 @@ impl CommentsPanel {
         self.revealer.reveals_child()
     }
 
-    /// Called after the panel closed, so the player takes the keys back.
+    /// Called after the panel closed, so the player or the reader takes the keys back.
     pub fn connect_closed(&self, f: impl Fn() + 'static) {
         *self.on_closed.borrow_mut() = Some(Rc::new(f));
     }
 
-    /// Opens the panel on the episode `current` names, and follows it while open. `current` answers `None` while it
-    /// cannot tell; the panel then keeps what it shows.
+    /// Opens the panel on the episode or chapter `current` names, and follows it while open. `current` answers `None`
+    /// while it cannot tell; the panel then keeps what it shows.
     pub fn open(self: &Rc<Self>, current: Rc<dyn Fn() -> Option<i64>>) {
-        let Some(episode_id) = current() else { return };
+        let Some(unit_id) = current() else { return };
         *self.current.borrow_mut() = Some(current);
         self.revealer.set_visible(true);
         self.revealer.set_reveal_child(true);
-        if episode_id != self.state.borrow().episode_id || self.state.borrow().link.is_none() {
-            self.load(episode_id);
+        if unit_id != self.state.borrow().unit_id || self.state.borrow().link.is_none() {
+            self.load(unit_id);
         }
         if self.following.replace(true) {
             return;
@@ -216,7 +219,7 @@ impl CommentsPanel {
                 return glib::ControlFlow::Break;
             }
             let now = panel.current.borrow().as_ref().and_then(|current| current());
-            if let Some(now) = now.filter(|now| *now != panel.state.borrow().episode_id) {
+            if let Some(now) = now.filter(|now| *now != panel.state.borrow().unit_id) {
                 panel.load(now);
             }
             glib::ControlFlow::Continue
@@ -235,26 +238,27 @@ impl CommentsPanel {
         }
     }
 
-    /// Looks up the comments of `episode_id`: what is remembered first, then AniList.
-    fn load(self: &Rc<Self>, episode_id: i64) {
+    /// Looks up the comments of `unit_id` (an episode or a chapter): what is remembered first, then AniList.
+    fn load(self: &Rc<Self>, unit_id: i64) {
         let generation = self.generation.get() + 1;
         self.generation.set(generation);
         {
             let mut state = self.state.borrow_mut();
-            *state = State { episode_id, sort: state.sort, ..State::default() };
+            *state = State { unit_id, sort: state.sort, ..State::default() };
         }
         self.subtitle.set_text("");
-        let item = crate::data::is_installed().then(|| ItemRepo::new(crate::data::app().db.clone()).by_id(episode_id).ok().flatten()).flatten();
+        let item = crate::data::is_installed().then(|| ItemRepo::new(crate::data::app().db.clone()).by_id(unit_id).ok().flatten()).flatten();
         let Some(item) = item else { return self.show_status(&tr(MsgKey::comments_no_thread), false) };
+        let kind = item.kind;
         self.subtitle.set_text(&item.name);
-        self.state.borrow_mut().episode_name = item.name.clone();
-        let Some(episode) = api::whole_episode(item.number) else { return self.show_status(&tr(MsgKey::comments_no_thread), false) };
+        self.state.borrow_mut().unit_name = item.name.clone();
+        let Some(number) = api::whole_number(item.number) else { return self.show_status(&no_thread(kind), false) };
         if super::blocked() {
             return self.show_status(&tr(MsgKey::comments_rate_limited), true);
         }
         let ids: Ids = super::ids_of(item.entry_id);
         let known_media = super::remembered_media(item.entry_id);
-        let known_thread = known_media.flatten().and_then(|media| super::remembered_thread(media, episode));
+        let known_thread = known_media.flatten().and_then(|media| super::remembered_thread(media, number));
         let Some(runtime) = super::runtime() else { return self.show_status(&tr(MsgKey::comments_failed), true) };
         self.stack.set_visible_child_name("loading");
         let entry_id = item.entry_id;
@@ -265,18 +269,18 @@ impl CommentsPanel {
                 let transport = super::transport()?;
                 let media = match known_media {
                     Some(media) => media,
-                    None => super::resolve_media(&transport, ids, Kind::Anime).await?,
+                    None => super::resolve_media(&transport, ids, kind).await?,
                 };
-                let Some(id) = media else { return Ok(Loaded { media: None, thread: None, comments: Vec::new() }) };
+                let Some(id) = media else { return Ok(Loaded { kind, media: None, thread: None, comments: Vec::new() }) };
                 let thread = match known_thread {
                     Some(thread) => thread,
-                    None => api::find_thread(&transport, id, episode).await?,
+                    None => api::find_thread(&transport, id, kind, number).await?,
                 };
                 let comments = match &thread {
                     Some(thread) => api::comments(&transport, thread.id).await?,
                     None => Vec::new(),
                 };
-                Ok::<Loaded, AniListError>(Loaded { media, thread, comments })
+                Ok::<Loaded, AniListError>(Loaded { kind, media, thread, comments })
             },
             move |answer| {
                 let Some(panel) = weak.upgrade().filter(|p| p.generation.get() == generation) else { return };
@@ -284,12 +288,12 @@ impl CommentsPanel {
                     Some(Ok(loaded)) => {
                         super::remember_media(entry_id, loaded.media);
                         if let Some(media) = loaded.media {
-                            super::remember_thread(media, episode, loaded.thread.clone());
+                            super::remember_thread(media, number, loaded.thread.clone());
                         }
                         panel.show(loaded);
                     }
                     Some(Err(error)) => {
-                        tracing::warn!(%error, episode_id, "comments: AniList did not answer");
+                        tracing::warn!(%error, unit_id, "comments: AniList did not answer");
                         super::note_error(&error);
                         panel.show_status(&super::error_text(Some(&error), MsgKey::comments_failed), true);
                     }
@@ -305,12 +309,12 @@ impl CommentsPanel {
             return self.show_status(&tr(MsgKey::comments_not_on_anilist), false);
         };
         let Some(thread) = loaded.thread else {
-            self.state.borrow_mut().link = Some(api::media_url(media, Kind::Anime));
+            self.state.borrow_mut().link = Some(api::media_url(media, loaded.kind));
             self.open_link.set_visible(true);
-            return self.show_status(&tr(MsgKey::comments_no_thread), false);
+            return self.show_status(&no_thread(loaded.kind), false);
         };
         let replies = tr_plural(MsgKey::comments_replies, thread.replies, &[("shown", Arg::Str(&compact_count(thread.replies)))]);
-        let name = self.state.borrow().episode_name.clone();
+        let name = self.state.borrow().unit_name.clone();
         self.subtitle.set_text(&format!("{name} \u{b7} {replies}"));
         {
             let mut state = self.state.borrow_mut();
@@ -361,8 +365,8 @@ impl CommentsPanel {
             let weak = Rc::downgrade(self);
             crate::widgets::status::error(text, None, Some(move || {
                 if let Some(panel) = weak.upgrade() {
-                    let episode_id = panel.state.borrow().episode_id;
-                    panel.load(episode_id);
+                    let unit_id = panel.state.borrow().unit_id;
+                    panel.load(unit_id);
                 }
             }))
         } else {
@@ -374,6 +378,11 @@ impl CommentsPanel {
         self.open_link.set_visible(self.state.borrow().link.is_some());
         self.stack.set_visible_child_name("status");
     }
+}
+
+/// "No discussion of this episode" or "of this chapter".
+fn no_thread(kind: Kind) -> String {
+    tr(if kind.is_anime() { MsgKey::comments_no_thread } else { MsgKey::comments_no_chapter_thread })
 }
 
 #[cfg(test)]

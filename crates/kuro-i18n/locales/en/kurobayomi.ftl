@@ -5400,6 +5400,9 @@ comments_more_on_anilist = More comments on AniList
 comments_no_thread = No discussion of this episode on AniList
 
 # source: kurobayomi
+comments_no_chapter_thread = No discussion of this chapter on AniList
+
+# source: kurobayomi
 comments_not_on_anilist = This title was not found on AniList
 
 # source: kurobayomi

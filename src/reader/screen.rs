@@ -31,6 +31,7 @@ use kuro_prefs::reader::{MangaReaderPrefs, ReaderPrefs, ReadingMode};
 use tokio::sync::watch;
 
 use super::chapter_panel::{self, ChapterPanel};
+use crate::comments::panel::CommentsPanel;
 use super::chapters::ListOptions;
 use super::delete_queue::Pending;
 use super::chrome::{self, MenuHandlers, TopBar, TopBarActions, build_bare_top_bar, build_error_card, build_top_bar};
@@ -753,6 +754,8 @@ struct Screen {
     /// An adjacent load is waiting for its frame or running; further presses are ignored.
     stepping: Cell<bool>,
     chapter_panel: Rc<ChapterPanel>,
+    /// The comments of the chapter being read, in the chapter list's place (one of the two shows at a time).
+    comments: Rc<CommentsPanel>,
     /// The "Back to chapter" button shown for a moment after a jump from the chapter list.
     back_button: gtk::Button,
     /// The chapter and page (0-based) the back button returns to.
@@ -842,6 +845,9 @@ pub fn open_with(
     // the chapter list floats over the pages' right side, below a floating top bar so the window buttons stay reachable
     let chapter_panel = ChapterPanel::new(tr(MsgKey::chapters), tr(MsgKey::reader_chapter_list_search));
     page_layer.add_overlay(chapter_panel.root());
+    // the comments of the chapter float in the same place, as in the player (docs/design/comments.md)
+    let comments = CommentsPanel::new();
+    page_layer.add_overlay(comments.root());
     // with auto-hide (`auto_hide_bars`) the top bar floats over the pages too, so hiding it never moves them; without it
     // the bar sits above the pages and never covers one
     let auto_hide = auto_hide_bars();
@@ -894,6 +900,7 @@ pub fn open_with(
         keep_awake: KeepAwake::default(),
         stepping: Cell::new(false),
         chapter_panel: Rc::clone(&chapter_panel),
+        comments: Rc::clone(&comments),
         back_button: back_button.clone(),
         back_to: Cell::new(None),
         back_shown: Cell::new(0),
@@ -932,14 +939,17 @@ pub fn open_with(
             jump(&s, index, None, true);
         }
     });
-    let closed = weak.clone();
-    chapter_panel.connect_closed(move || {
-        let Some(screen) = closed.upgrade() else { return };
-        room_for_chapter_panel(&screen, false);
-        if let Some(root) = screen.root.upgrade() {
-            root.grab_focus();
+    // a side panel that closes gives the keys back to the reader
+    let give_back = |closed: std::rc::Weak<Screen>| {
+        move || {
+            let Some(screen) = closed.upgrade() else { return };
+            if let Some(root) = screen.root.upgrade() {
+                root.grab_focus();
+            }
         }
-    });
+    };
+    chapter_panel.connect_closed(give_back(weak.clone()));
+    comments.connect_closed(give_back(weak.clone()));
     let back = weak.clone();
     back_button.connect_clicked(move |button| {
         button.set_visible(false);
@@ -1082,13 +1092,15 @@ fn auto_hide_bars() -> bool {
 }
 
 fn set_menu(screen: &Screen, visible: bool) {
+    // the bars stay while a side panel is open, as in the player: the panel sits between them
+    let visible = visible || side_panel_open(screen);
     screen.ui.borrow_mut().set_menu_visible(visible);
     screen.menu_open.set(visible);
     // with auto-hide the top bar follows the menu as the bottom bar does (a tap in the middle, a page turn); without it
     // the top bar stays
     screen.top.set_reveal_child(visible || !screen.auto_hide);
     screen.bottom.set_reveal_child(visible);
-    room_for_chapter_panel(screen, screen.chapter_panel.is_open());
+    room_for_side_panels(screen);
     refresh(screen);
 }
 
@@ -1101,6 +1113,10 @@ fn handle_key(screen: &Rc<Screen>, key: gtk::gdk::Key, modifiers: gtk::gdk::Modi
     }
     if key == gtk::gdk::Key::Escape && screen.chapter_panel.is_open() {
         screen.chapter_panel.close();
+        return glib::Propagation::Stop;
+    }
+    if key == gtk::gdk::Key::Escape && screen.comments.is_open() {
+        screen.comments.close();
         return glib::Propagation::Stop;
     }
     if key == gtk::gdk::Key::Escape {
@@ -1127,8 +1143,12 @@ fn handle_key(screen: &Rc<Screen>, key: gtk::gdk::Key, modifiers: gtk::gdk::Modi
     if let Some(propagation) = shortcut(screen, key, modifiers) {
         return propagation;
     }
-    if is_chapter_list_key(key, modifiers) {
+    if is_plain_letter(key, modifiers, 'l') {
         toggle_chapter_panel(screen);
+        return glib::Propagation::Stop;
+    }
+    if is_plain_letter(key, modifiers, 'c') {
+        toggle_comments(screen);
         return glib::Propagation::Stop;
     }
     // the reader's focus is on the root, so the keys the viewer owns (arrows, page keys) come through here
@@ -1496,35 +1516,32 @@ fn sync_top_bar(screen: &Rc<Screen>) {
     }
 }
 
-/// L, with no Ctrl or Alt, opens and closes the chapter list.
-fn is_chapter_list_key(key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType) -> bool {
+/// `letter` with no Ctrl or Alt: L opens and closes the chapter list, C the comments (Ctrl+C copies the page).
+fn is_plain_letter(key: gtk::gdk::Key, modifiers: gtk::gdk::ModifierType, letter: char) -> bool {
     let held = gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::ALT_MASK;
-    !modifiers.intersects(held) && key.to_unicode().is_some_and(|c| c.eq_ignore_ascii_case(&'l'))
+    !modifiers.intersects(held) && key.to_unicode().is_some_and(|c| c.eq_ignore_ascii_case(&letter))
 }
 
-/// The room the bars leave the open chapter list: the floating bottom bar's end margin, and the list's top margin. With
-/// auto-hide the top bar floats over the pages, so the list starts under it while it shows and at the top edge while it
-/// is hidden; the bottom bar always stops beside the list. Neither bar then covers the list when it comes back. A shut
-/// list takes no room.
-fn chapter_panel_room(open: bool, auto_hide: bool, top_bar_shown: bool, top_bar_height: i32) -> (i32, i32) {
-    match (open, auto_hide && top_bar_shown) {
-        (false, _) => (0, 0),
-        (true, true) => (chapter_panel::WIDTH, top_bar_height),
-        (true, false) => (chapter_panel::WIDTH, 0),
+/// Whether the chapter list or the comments is open.
+fn side_panel_open(screen: &Screen) -> bool {
+    screen.chapter_panel.is_open() || screen.comments.is_open()
+}
+
+/// Fits the side panels between the bars as they are now, by the player's rule (`chapter_panel::panel_insets`): the
+/// bars keep their full width, and a panel starts under a floating top bar and ends above the bottom bar. Called when
+/// a panel opens and whenever the bars hide or come back.
+fn room_for_side_panels(screen: &Screen) {
+    // a bar's natural height, measured even while it is hidden; a hidden bar leaves no room
+    let height = |bar: &gtk::Revealer| if bar.reveals_child() { bar.child().map_or(0, |child| child.measure(gtk::Orientation::Vertical, -1).1) } else { 0 };
+    let (top, bottom) = chapter_panel::panel_insets(screen.auto_hide, height(&screen.top), height(&screen.bottom));
+    for panel in [screen.chapter_panel.root(), screen.comments.root()] {
+        panel.set_margin_top(top);
+        panel.set_margin_bottom(bottom);
     }
 }
 
-/// Fits the chapter list between the bars as they are now; called when the list opens or closes and whenever the bars
-/// hide or come back.
-fn room_for_chapter_panel(screen: &Screen, open: bool) {
-    // the bar's natural height, measured even while it is hidden
-    let top_bar = screen.top.child().map_or(0, |bar| bar.measure(gtk::Orientation::Vertical, -1).1);
-    let (bottom_end, panel_top) = chapter_panel_room(open, screen.auto_hide, screen.top.reveals_child(), top_bar);
-    screen.bottom.set_margin_end(bottom_end);
-    screen.chapter_panel.root().set_margin_top(panel_top);
-}
-
-/// Opens the chapter list, or closes it when it is open. Nothing opens before a chapter is loaded.
+/// Opens the chapter list, or closes it when it is open; the comments close first. Nothing opens before a chapter is
+/// loaded.
 fn toggle_chapter_panel(screen: &Rc<Screen>) {
     if screen.chapter_panel.is_open() {
         screen.chapter_panel.close();
@@ -1532,9 +1549,24 @@ fn toggle_chapter_panel(screen: &Rc<Screen>) {
     }
     let rows = screen.core.chapter_rows();
     if !rows.is_empty() {
-        keep_menu_for_a_moment(screen);
-        room_for_chapter_panel(screen, true);
+        screen.comments.close();
         screen.chapter_panel.open(rows);
+        set_menu(screen, true);
+    }
+}
+
+/// Opens the comments of the chapter being read, or closes them; the chapter list closes first. The panel follows the
+/// chapter while it is open, as it follows the episode in the player.
+fn toggle_comments(screen: &Rc<Screen>) {
+    if screen.comments.is_open() {
+        screen.comments.close();
+        return;
+    }
+    screen.chapter_panel.close();
+    let weak = Rc::downgrade(screen);
+    screen.comments.open(Rc::new(move || weak.upgrade().and_then(|screen| screen.core.current_chapter_id())));
+    if screen.comments.is_open() {
+        set_menu(screen, true);
     }
 }
 
@@ -1609,6 +1641,14 @@ fn rebuild_top_bar(screen: &Rc<Screen>) {
             Box::new(move || {
                 if let Some(screen) = screen.upgrade() {
                     toggle_chapter_panel(&screen);
+                }
+            })
+        },
+        on_comments: {
+            let screen = Rc::downgrade(screen);
+            Box::new(move || {
+                if let Some(screen) = screen.upgrade() {
+                    toggle_comments(&screen);
                 }
             })
         },
@@ -2420,11 +2460,12 @@ mod tests {
     }
 
     #[test]
-    fn the_bars_leave_room_for_the_open_chapter_list() {
-        assert_eq!(chapter_panel_room(false, true, true, 46), (0, 0), "a shut list takes no room");
-        assert_eq!(chapter_panel_room(true, true, true, 46), (chapter_panel::WIDTH, 46), "the list starts under the floating top bar");
-        assert_eq!(chapter_panel_room(true, true, false, 46), (chapter_panel::WIDTH, 0), "with the bars hidden it reaches the top edge");
-        assert_eq!(chapter_panel_room(true, false, true, 46), (chapter_panel::WIDTH, 0), "a top bar above the pages already clears it");
+    fn l_and_c_open_the_panels_and_ctrl_c_does_not() {
+        use gtk::gdk::{Key, ModifierType};
+        assert!(is_plain_letter(Key::l, ModifierType::empty(), 'l'));
+        assert!(is_plain_letter(Key::C, ModifierType::SHIFT_MASK, 'c'));
+        assert!(!is_plain_letter(Key::c, ModifierType::CONTROL_MASK, 'c'), "Ctrl+C copies the page");
+        assert!(!is_plain_letter(Key::c, ModifierType::empty(), 'l'));
     }
 
     #[test]

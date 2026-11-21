@@ -3,7 +3,8 @@
 Kurobayomi shows comments and reviews that already exist on AniList. It does not run a comment system of its own: no
 accounts, no storage, no moderation. Two places:
 
-1. **Episode comments inside the player**, in a panel built like the episode list.
+1. **Episode and chapter comments**, inside the player and the reader: one panel for both kinds, in the place of the
+   episode or chapter list (user, 2026-11-22: "manga/anime should do both things").
 2. **Reviews of a title**, on their own page, opened from the title page.
 
 Both are read-only and add no setting. Replying happens on AniList ("Open on AniList").
@@ -69,7 +70,16 @@ The first that gives an id wins:
 No search by name: a wrong match would show comments of another show. The AniSkip lookup (`crates/kuro-player/src/aniskip.rs`)
 already does the opposite turn (AniList id to MAL id) and is the model for the query code.
 
-## 1. Episode comments in the player
+## 1. Episode and chapter comments (the player and the reader)
+
+One panel (`src/comments/panel.rs`) for both kinds: it takes the kind from the episode or chapter it shows, matches
+`Episode N` or `Chapter N` threads, and links to the anime or manga page. The reader has the same button (left of the
+chapter list button), the same C key (Ctrl+C still copies the page) and the same place as its chapter list; both
+panels sit between the bars there too, and the bars stay while one is open (`chapter_panel::panel_insets`, shared with
+the player). Manga threads were checked live on 2026-11-22: AniList titles them `[Spoilers] Chainsaw Man - Chapter 232
+Discussion` in the same Release Discussion category, and part chapters (`Chapter 262.2`) are their own, never the
+whole chapter's. A title with few chapter threads shows the empty state ("No discussion of this chapter on AniList").
+The player's details follow.
 
 **Layout** (`docs/design/player-controls.md`): a Comments button in the player header, beside the episode list button,
 with the key **C** (free today; the taken keys are in `crates/kuro-player/src/shortcuts.rs`). It opens a panel over the
@@ -155,8 +165,8 @@ go beside it (one way to do each thing).
 
 - **Posting** comments or reviews. AniList allows it with the login the app already has (the `SaveThreadComment`
   mutation, not tried). A power-user feature to decide with the user.
-- **Manga chapter comments in the reader.** AniList chapter threads are patchy (Chainsaw Man 101, Solo Leveling 22, The
-  Apothecary Diaries none). The real per-chapter comments live on source sites (MangaDex gives each chapter's comment
+- **Source comments for chapters.** The reader shows AniList's chapter threads (built 2026-11-22), but they are
+  patchy (Chainsaw Man 101, Solo Leveling 22, The Apothecary Diaries none). The real per-chapter comments live on source sites (MangaDex gives each chapter's comment
   thread id and reply count; atsu.moe, comix.to and kagane.org run their own). That needs an optional `comments` op in
   the source ABI (an old source answers "unknown op", so it breaks nothing) and a panel in the reader.
 - Disqus sites (KickAssAnime): its API needs a key; limits and terms unverified.
