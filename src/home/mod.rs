@@ -60,9 +60,33 @@ pub fn page() -> Option<Built> {
     search.connect_clicked(|_| crate::ui::open("global_search"));
     let refresh = crate::ui::refresh_button(&tr(MsgKey::action_update_library));
     refresh.connect_clicked(crate::updates::mount::update_libraries);
-    let end = crate::ui::HeaderActions { refresh: Some(refresh.upcast()), extra: vec![search.upcast()], ..Default::default() }.widgets();
+    let options = view_options(&home.prefs);
+    let end = crate::ui::HeaderActions { refresh: Some(refresh.upcast()), extra: vec![search.upcast()], options: Some(options), ..Default::default() }.widgets();
     HOME.with(|h| *h.borrow_mut() = Some(home));
     Some(Built { content, end })
+}
+
+/// The Library's view options on Home (user, 2026-11-21: the same pieces as the Library): View, Grid style and Cover
+/// size (`widgets::view_look`), writing the Library's own settings, so both pages always look alike. Home follows them
+/// through its watches of the display mode and the cover size.
+fn view_options(prefs: &Rc<LibraryPrefs>) -> gtk::Widget {
+    use crate::widgets::view_look;
+    let menu = crate::widgets::view_options::ViewOptions::new(&tr(MsgKey::ui_view_options), &view_look::sections());
+    view_look::install(&menu, &prefs.cover_size);
+    let written = Rc::clone(prefs);
+    menu.connect(move |pick| {
+        if let Some(next) = view_look::picked(&pick, written.display_mode.get()) {
+            kuro_domain::category::service::set_display_mode(&written, next);
+        }
+    });
+    // the radios show what is stored, also after a change on the Library's own menu
+    let shown = menu.downgrade();
+    crate::bind::bind(&menu.widget, &prefs.display_mode, move |_, mode| {
+        if let Some(menu) = shown() {
+            view_look::sync(&menu, mode);
+        }
+    });
+    menu.widget.clone().upcast()
 }
 
 fn slot(kind: Kind) -> usize {
@@ -159,7 +183,8 @@ impl Row {
         row
     }
 
-    /// Draws `covers` when they differ from what the row shows (or always, with `force`: a new cover size or look).
+    /// Draws `covers` when they differ from what the row shows (or always, with `force`: a new cover size or look). The
+    /// Library's List mode draws the Library's list rows, one under the other; a grid mode its cards.
     fn draw(&self, covers: Vec<Cover>, mode: kuro_prefs::library::LibraryDisplayMode, force: bool) {
         if !force && *self.covers.borrow() == covers {
             return;
@@ -168,7 +193,8 @@ impl Row {
             self.flow.remove(&child);
         }
         for cover in &covers {
-            self.flow.append(&card(cover, mode));
+            let built = if mode == kuro_prefs::library::LibraryDisplayMode::List { list_row(cover) } else { card(cover, mode) };
+            self.flow.append(&built);
         }
         // cells are the Library's: its margin on every side
         let mut index = 0;
@@ -179,12 +205,15 @@ impl Row {
         *self.covers.borrow_mut() = covers;
     }
 
-    /// Shows the covers that fit `columns`, hides the rest.
-    fn fit(&self, columns: i32) {
-        self.flow.set_max_children_per_line(u32::try_from(columns).unwrap_or(2));
+    /// Lays the titles out at most `per_line` to a line and shows the first `shown`, hiding the rest. A short row keeps
+    /// the Library's cell width: a card asks for no more than its cover (`card::title_label`), so the line still counts
+    /// `per_line` cells.
+    fn fit(&self, (per_line, shown): (i32, i32)) {
+        let per_line = u32::try_from(per_line.max(1)).unwrap_or(1);
+        self.flow.set_max_children_per_line(per_line);
         let mut index = 0;
         while let Some(child) = self.flow.child_at_index(index) {
-            child.set_visible(index < columns);
+            child.set_visible(index < shown);
             index += 1;
         }
     }
@@ -415,7 +444,7 @@ impl Home {
         let shown = data::shown(repositories, answered, !continue_covers.is_empty(), !new_covers.is_empty());
         // the suggestions show beside the rows (or on their own), never with the welcome view
         let (show_recommended, show_trending) = (!shown.welcome && !recommended.is_empty(), !shown.welcome && !trending.is_empty());
-        let mode = data::cover_mode(self.prefs.display_mode.get());
+        let mode = self.prefs.display_mode.get();
         let force = self.force.replace(false);
         self.continue_row.draw(continue_covers, mode, force);
         self.new_row.draw(new_covers, mode, force);
@@ -504,9 +533,9 @@ impl Home {
         if width <= 0 {
             return;
         }
-        let columns = cover_grid::columns(width, self.prefs.cover_size.get());
+        let layout = data::layout_of(self.prefs.display_mode.get(), cover_grid::columns(width, self.prefs.cover_size.get()));
         for row in [&self.continue_row, &self.new_row, &self.recommended_row, &self.trending_row] {
-            row.fit(columns);
+            row.fit(layout);
         }
     }
 }
@@ -631,16 +660,46 @@ fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Wi
         score: cover.score,
     };
     let built = crate::library::view::card::build(&cover.item, mode, false, &extras);
-    if let (Some(fraction), Some(overlay)) = (cover.progress, built.root.first_child().and_downcast::<gtk::Overlay>()) {
-        let bar = gtk::ProgressBar::builder().fraction(fraction).valign(Align::End).margin_start(SPACE_S).margin_end(SPACE_S).margin_bottom(SPACE_S).can_target(false).build();
-        overlay.add_overlay(&bar);
-    }
+    add_progress(&built.root, cover.progress);
     if let Some(root) = built.root.downcast_ref::<GBox>() {
         let line = gtk::Label::builder().label(&cover.line).xalign(0.0).ellipsize(gtk::pango::EllipsizeMode::End).max_width_chars(1).css_classes(["dim-label", "caption"]).build();
         line.set_margin_top(-SPACE_XS);
         root.append(&line);
     }
     // the Library's right-click menu, for a title on a source (a suggestion is not one yet)
+    if matches!(cover.action, Action::Unit(_)) {
+        let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
+        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+    }
+    built.root
+}
+
+/// The thin line of how far a title is (`kb-cover-progress`), on the bottom edge of the cover that leads `root`.
+fn add_progress(root: &gtk::Widget, progress: Option<f64>) {
+    let Some(fraction) = progress else { return };
+    let Some(overlay) = root.first_child().and_downcast::<gtk::Overlay>() else { return };
+    let bar = gtk::ProgressBar::builder().fraction(fraction).valign(Align::End).halign(Align::Fill).can_target(false).css_classes(["kb-cover-progress"]).build();
+    overlay.add_overlay(&bar);
+}
+
+/// A title as the Library's List mode row (`card::build_list`, its row height), with Home's line at its end and the
+/// Library's right-click menu.
+fn list_row(cover: &Cover) -> gtk::Widget {
+    let extras = crate::library::view::card::Extras {
+        art: Some(&cover.art),
+        kind: cover.kind,
+        season_parent: false,
+        width: 0,
+        score: cover.score,
+    };
+    let window = crate::ui::window();
+    let row_height = crate::library::layout::page_list_row_height(window.width(), f64::from(window.height()));
+    let built = crate::library::view::card::build_list(&cover.item, false, row_height, &extras);
+    add_progress(&built.root, cover.progress);
+    if let Some(root) = built.root.downcast_ref::<GBox>() {
+        let line = gtk::Label::builder().label(&cover.line).xalign(1.0).valign(Align::Center).ellipsize(gtk::pango::EllipsizeMode::End).css_classes(["dim-label", "caption"]).build();
+        root.append(&line);
+    }
     if matches!(cover.action, Action::Unit(_)) {
         let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
         crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));

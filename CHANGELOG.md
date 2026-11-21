@@ -19,6 +19,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   video, like the episode list, and follows the episode. Up to 50 comments with their replies, Top or New; spoilers the
   writer tagged stay hidden until clicked.
 - Reviews on a title's page: the Reviews button lists AniList's most helpful reviews, each opening its whole text.
+- Home has the Library's view options (View, Grid style, Cover size), shared with the Library; in List view its
+  sections show the Library's list rows.
 - Show anime and manga, anime only or manga only (Settings > Appearance). With one kind, the pages show only it, without
   the Anime | Manga switch, and Home and the badges count only it. Nothing is deleted: switching back brings everything
   back.

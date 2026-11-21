@@ -136,12 +136,15 @@ pub fn shown(repositories: bool, answered: bool, has_continue: bool, has_new: bo
     Shown { welcome: false, continue_row: has_continue, new_row: has_new, empty: answered && !has_continue && !has_new }
 }
 
-/// The look Home draws its covers in: the Library's display mode, except List, which becomes the comfortable grid (a
-/// row of covers is not a list).
-pub fn cover_mode(library: LibraryDisplayMode) -> LibraryDisplayMode {
-    match library {
-        LibraryDisplayMode::List => LibraryDisplayMode::ComfortableGrid,
-        grid => grid,
+/// How many titles a section shows in the Library's List mode; "See all" has the rest.
+pub const LIST_ROWS: i32 = 5;
+
+/// How a section lays out its titles in the Library's display `mode` (Home shares the Library's view options): as many
+/// per line as `columns` and that many shown for a grid; one per line and [`LIST_ROWS`] shown for the list.
+pub fn layout_of(mode: LibraryDisplayMode, columns: i32) -> (i32, i32) {
+    match mode {
+        LibraryDisplayMode::List => (1, LIST_ROWS),
+        _ => (columns, columns),
     }
 }
 
@@ -234,10 +237,10 @@ mod tests {
     }
 
     #[test]
-    fn home_draws_the_library_grid_and_a_list_as_the_comfortable_grid() {
+    fn a_grid_fills_one_line_and_the_list_shows_a_few_rows() {
         for mode in [LibraryDisplayMode::CompactGrid, LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CoverOnlyGrid] {
-            assert_eq!(cover_mode(mode), mode);
+            assert_eq!(layout_of(mode, 7), (7, 7), "{mode:?}: one line of as many as fit");
         }
-        assert_eq!(cover_mode(LibraryDisplayMode::List), LibraryDisplayMode::ComfortableGrid);
+        assert_eq!(layout_of(LibraryDisplayMode::List, 7), (1, LIST_ROWS), "the Library's rows, one per line");
     }
 }

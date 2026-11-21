@@ -121,15 +121,19 @@ Home drew its own cards instead of the Library's, and it shows.
    `LibraryItem` per title: library titles from the Library's own read (`library::load::snapshot`, so the unread,
    download, Local and language badges and the score are exactly the Library's); a title only in the history gets the
    same row read from its entry, with its unread count. The badge switches are the Library's (`load::badges`).
-2. **The Library's settings, followed live:** cover size (bound like the Library binds it), display mode (title on the
-   cover, under it, or none; in List mode Home uses the comfortable grid, since a list of one row each is not a list),
-   and the continue button rule.
+2. **The Library's settings, followed live, and the Library's menu to change them** (user, 2026-11-21: "should be
+   modular and use the same things as the Library"): Home's header has the Library's view options (`widgets::view_look`:
+   View, Grid style, Cover size), writing the Library's own settings, so both pages always look alike. In List mode each
+   section shows the Library's list rows (`card::build_list`, the Library's row height), at most `data::LIST_ROWS`, with
+   See all for the rest; the continue button rule is the Library's.
 3. **Home's own line under the card**, kept short: "Episode 1 · 25 min left", "Chapter 1199 · page 9", or the oldest new
-   unit for New for you, with the count of new units as the unread badge. The anime progress bar is the theme's normal
-   bar at the foot of the cover.
+   unit for New for you, with the count of new units as the unread badge. How far a title is shows as a 3 px accent
+   line on the cover's bottom edge (`kb-cover-progress`, user 2026-11-21: the theme's thick bar looked bad).
 4. **Responsive like the Library:** each row is a flow box whose minimum width is one card, cells of the Library's
    column width and margins (`cover_grid`), and as many covers as fit the row's own width (the Library's column rule,
-   shared from `cover_grid`, so both count alike). No sideways scrolling, nothing clipped.
+   shared from `cover_grid`, so both count alike). No sideways scrolling, nothing clipped. A card asks for no more width
+   than its cover (`card::title_label`): before, a long title (a long romaji name in Trending) widened every cell of its
+   row and left a short row of very wide cells.
 5. **Header:** "Home" as the page's title at the start, global search, and Refresh, which starts the library update of
    both kinds and turns while it runs (the Updates page's button, shared).
 6. **Loading:** the page's spinner until the first answers (the shared state switcher, as every page has).

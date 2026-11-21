@@ -56,6 +56,18 @@ button.kb-spin-once image {
   border-radius: 8px;
   background-color: alpha(@theme_fg_color, 0.06);
 }
+/* how far a title is (Home's Continue): a 3 px line on the cover's bottom edge, the accent over a faint track */
+progressbar.kb-cover-progress > trough {
+  min-height: 3px;
+  min-width: 0;
+  border-radius: 0;
+  background-color: alpha(black, 0.35);
+}
+progressbar.kb-cover-progress > trough > progress {
+  min-height: 3px;
+  border-radius: 0;
+  background-color: @accent_bg_color;
+}
 /* Hover, press, focus and the selected fill of a cover card are libadwaita's own (`gridview > child`). */
 .kb-cover-initials {
   background-color: alpha(@theme_selected_bg_color, 0.22);

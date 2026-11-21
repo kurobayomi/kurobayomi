@@ -37,6 +37,13 @@ pub fn list_row_height(page_height: f64, entries: usize) -> f64 {
     (page_height / n - 3.0 / n).max(48.0)
 }
 
+/// The row height of List mode on a page `page_height` px high in a window `window_width` px wide, with the list size
+/// the settings diet keeps (Auto): the one rule of the Library and of Home's sections.
+pub fn page_list_row_height(window_width: i32, page_height: f64) -> f64 {
+    use crate::misc::diet_defaults as diet;
+    list_row_height(page_height, list_size(window_width, diet::LIBRARY_COLUMNS, diet::LIBRARY_COLUMNS))
+}
+
 /// The list size of the page: the portrait or landscape slider value for a window `width` pixels wide (the same
 /// split the grids read), clamped to `0..=10`. 0 is Auto.
 pub fn list_size(width: i32, portrait: i32, landscape: i32) -> usize {

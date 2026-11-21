@@ -956,8 +956,7 @@ fn is_list_mode(st: &Inner) -> bool {
 
 /// The row height of List mode for the current page height and list size (T-37a-021).
 fn list_row_height(st: &Inner) -> f64 {
-    let size = layout::list_size(window_width(&st.scroller), diet::LIBRARY_COLUMNS, diet::LIBRARY_COLUMNS);
-    layout::list_row_height(f64::from(st.scroller.height()), size)
+    layout::page_list_row_height(window_width(&st.scroller), f64::from(st.scroller.height()))
 }
 
 /// Width of the window that holds `widget`, or of the widget itself before it has a window.

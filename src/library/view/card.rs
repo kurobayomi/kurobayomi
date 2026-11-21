@@ -103,6 +103,9 @@ fn continue_button(mode: LibraryDisplayMode) -> gtk::Button {
     button
 }
 
+/// A title of up to two lines, cut with an ellipsis. It asks for no width of its own (`max_width_chars(1)`): a wrapping
+/// label otherwise asks for its whole text on one line, and a long title made a card wider than its cover wherever the
+/// card is not in a grid of fixed columns (Home's rows, user 2026-11-21). It takes the width it is given.
 fn title_label(text: &str, class: &str) -> gtk::Label {
     let label = gtk::Label::new(Some(text));
     label.add_css_class(class);
@@ -110,6 +113,7 @@ fn title_label(text: &str, class: &str) -> gtk::Label {
     label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
     label.set_lines(2);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    label.set_max_width_chars(1);
     label.set_xalign(0.0);
     label
 }
@@ -231,6 +235,20 @@ mod tests {
             assert!(tile.has_css_class("kb-cover-initials"));
             assert_eq!(tile.size_request(), (COLUMN_WIDTH_PX, layout::cover_height(COLUMN_WIDTH_PX)), "2:3");
             assert_eq!(cover.next_sibling().and_downcast::<gtk::Label>().map(|l| l.label().to_string()).as_deref(), Some("Core Concepts"), "the title sits under the cover");
+        });
+    }
+
+    #[test]
+    fn a_long_title_never_makes_a_card_wider_than_its_cover() {
+        crate::testing::with_display(|| {
+            let extras = Extras { art: None, kind: Kind::Manga, season_parent: false, width: COLUMN_WIDTH_PX, score: None };
+            let row = kuro_domain::library::model::LibraryRow { title: "Mabeop Hakgyo Apjeommyeol Cheonjae-ga Doeeotda ".repeat(3), ..local_anime().row };
+            let item = LibraryItem { row, ..local_anime() };
+            for mode in [LibraryDisplayMode::ComfortableGrid, LibraryDisplayMode::CompactGrid] {
+                let card = build(&item, mode, false, &extras);
+                let (_, natural, _, _) = card.root.measure(O::Horizontal, -1);
+                assert_eq!(natural, COLUMN_WIDTH_PX, "{mode:?}: the cover's width, whatever the title");
+            }
         });
     }
 
