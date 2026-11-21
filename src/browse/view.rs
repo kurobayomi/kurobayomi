@@ -119,12 +119,11 @@ pub fn source_row(
     stub: bool,
     action: Option<&gtk::Widget>,
 ) -> adw::ActionRow {
-    source_row_with(name, language, icon, icon_file, None, stub, false, action)
+    source_row_with(name, language, icon, icon_file, None, stub, action)
 }
 
-/// [`source_row`] for the Sources lists: `picture` is the saved icon of a repo source, shown in place of the letter tile;
-/// `failing` adds the "Not working right now" line of a source that failed several times in a row
-/// (`errors::is_failing`).
+/// [`source_row`] for the Sources lists: `picture` is the saved icon of a repo source, shown in place of the letter tile.
+/// Whether a source works is its repository's status (in `action`); the app adds no verdict of its own.
 #[allow(clippy::too_many_arguments)]
 pub fn source_row_with(
     name: &str,
@@ -133,10 +132,9 @@ pub fn source_row_with(
     icon_file: Option<&str>,
     picture: Option<&Path>,
     stub: bool,
-    failing: bool,
     action: Option<&gtk::Widget>,
 ) -> adw::ActionRow {
-    // the shared row of `look`; the notes of a stub or a failing source go in red before the action
+    // the shared row of `look`; the note of a stub goes in red before the action
     let cover: gtk::Widget = if let Some(path) = picture {
         repo_picture(path).upcast()
     } else if icon == SourceIcon::Letter && icon_file.is_none() {
@@ -144,10 +142,9 @@ pub fn source_row_with(
     } else {
         icon_image(icon, icon_file).upcast()
     };
-    let notes = [stub.then(|| tr(kuro_i18n::MsgKey::not_installed)), (failing && !stub).then(super::errors::not_working_badge)];
     let trailing = GBox::new(O::Horizontal, SPACE_S);
-    for note in notes.into_iter().flatten() {
-        trailing.append(&Label::builder().label(note).css_classes(["error"]).build());
+    if stub {
+        trailing.append(&Label::builder().label(tr(kuro_i18n::MsgKey::not_installed)).css_classes(["error"]).build());
     }
     if let Some(action) = action {
         trailing.append(action);
@@ -349,7 +346,7 @@ pub(crate) mod tests {
             let dir = tempfile::tempdir().expect("dir");
             let file = dir.path().join("icon.png");
             image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 255])).save(&file).expect("a png");
-            let row = source_row_with("Repo", None, SourceIcon::Letter, None, Some(&file), false, false, None);
+            let row = source_row_with("Repo", None, SourceIcon::Letter, None, Some(&file), false, None);
             let picture = icon_of(&row).downcast::<gtk::Image>().expect("the saved icon");
             assert!(picture.has_css_class("kb-row-cover"), "the letter tile's rounded corners");
             assert_eq!(picture.pixel_size(), ICON_HEIGHT_PX);

@@ -129,4 +129,5 @@ A source can stop working when its website changes. Kurobayomi then shows a shor
 1. Click **Retry**, or try again later.
 2. Repositories are checked for fixes every day, so a source that fails today often works again after the next update.
 
-If a source keeps failing, it shows **Not working right now** in the Browse list.
+Each source in the Browse list shows the status its repository gives it: **Working**, **Temporarily blocked by the site** or
+**Broken: waiting for a fix**. The repository checks every source's site every few hours.

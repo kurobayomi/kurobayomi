@@ -1,14 +1,12 @@
 //! The one place where a failed source request becomes a sentence for the user. A source request is never allowed to
 //! leave a spinner on screen: [`limited`] ends it after [`LOAD_TIMEOUT`], [`settle`] also catches a panic, and
 //! [`plain_message`] words the failure in plain English. The technical text (signature, key, HTTP code, parse
-//! error) goes to the log only. [`note`] counts the failures in a row of each source for the "Not working right now"
-//! badge of the Sources list.
+//! error) goes to the log only. Whether a source works is the repository's word (its status in the Sources list), not a
+//! count the app keeps.
 
 use kuro_i18n::{Arg, MsgKey, tr, trf};
-use std::collections::HashMap;
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
-use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 use futures::FutureExt;
@@ -29,14 +27,6 @@ pub fn offline() -> String {
 pub fn generic() -> String {
     tr(MsgKey::browse_errors_generic)
 }
-
-/// The badge of a source that failed [`BADGE_AFTER`] times in a row.
-pub fn not_working_badge() -> String {
-    tr(MsgKey::browse_errors_not_working_badge)
-}
-
-/// Failures in a row after which the Sources list shows [`not_working_badge()`].
-pub const BADGE_AFTER: u32 = 3;
 
 /// What went wrong, in the three kinds the user is told apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,43 +124,6 @@ pub async fn settle<T>(limit: Duration, source: &str, load: impl Future<Output =
     }
 }
 
-/// The failures in a row of each source in this session.
-#[derive(Default)]
-struct Streaks(HashMap<i64, u32>);
-
-impl Streaks {
-    /// Records one result. True when the source's badge turned on or off by it.
-    fn record(&mut self, source_id: i64, ok: bool) -> bool {
-        let before = self.failing(source_id);
-        if ok {
-            self.0.remove(&source_id);
-        } else {
-            let count = self.0.entry(source_id).or_insert(0);
-            *count = count.saturating_add(1);
-        }
-        before != self.failing(source_id)
-    }
-
-    fn failing(&self, source_id: i64) -> bool {
-        self.0.get(&source_id).is_some_and(|count| *count >= BADGE_AFTER)
-    }
-}
-
-static STREAKS: LazyLock<Mutex<Streaks>> = LazyLock::new(Mutex::default);
-
-/// Records the result of a source's listing. The Sources lists read again when a badge turns on or off.
-pub fn note(source_id: i64, ok: bool) {
-    let changed = STREAKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).record(source_id, ok);
-    if changed {
-        crate::recipe_sources::notify_changed();
-    }
-}
-
-/// Whether the source failed [`BADGE_AFTER`] times in a row, with no success since.
-pub fn is_failing(source_id: i64) -> bool {
-    STREAKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).failing(source_id)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,23 +195,5 @@ mod tests {
         assert_eq!(panic, Err(says("Comix", Trouble::Broken)));
         assert_eq!(run(settle(Duration::from_secs(5), "Comix", async { Ok::<_, String>(1) })), Ok(1));
         assert_eq!(run(settle(Duration::from_secs(5), "Comix", async { Err::<(), _>("mine".to_owned()) })), Err("mine".to_owned()));
-    }
-
-    #[test]
-    fn three_failures_in_a_row_turn_the_badge_on_and_one_success_turns_it_off() {
-        let mut streaks = Streaks::default();
-        assert!(!streaks.record(1, false));
-        assert!(!streaks.record(1, false));
-        assert!(!streaks.failing(1));
-        assert!(streaks.record(1, false), "the third failure turns the badge on");
-        assert!(!streaks.record(1, false), "no change after that");
-        assert!(!streaks.failing(2), "other sources are not touched");
-        assert!(streaks.record(1, true), "a success turns it off");
-        assert!(!streaks.failing(1));
-        streaks.record(1, false);
-        streaks.record(1, true);
-        streaks.record(1, false);
-        streaks.record(1, false);
-        assert!(!streaks.failing(1), "a success in between restarts the count");
     }
 }

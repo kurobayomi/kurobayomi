@@ -8,9 +8,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ### Fixed
 
-- A source in Browse → Sources shows one status, not two: a broken source no longer also says "Not working right now",
-  and a source the repository calls working that keeps failing on your computer says "Not working right now" in place
-  of "Working".
+- A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,
+  so a source no longer says "Working" and "Not working right now" at once.
 
 ## [0.4.1] - 2026-11-21
 

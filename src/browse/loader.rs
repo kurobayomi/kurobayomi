@@ -124,7 +124,6 @@ impl PageLoader for SourceLoader {
         let (source, store) = (self.source.clone(), Arc::clone(&self.store));
         Box::pin(async move {
             let result = list_page(&source, store, query, filters, page).await;
-            errors::note(source.id(), result.is_ok());
             result
         })
     }

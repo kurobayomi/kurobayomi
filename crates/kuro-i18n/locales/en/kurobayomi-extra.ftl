@@ -174,9 +174,6 @@ browse_errors_offline = You're offline. Check your connection and try again.
 browse_errors_generic = Something went wrong. Try again in a moment.
 
 # source: kurobayomi
-browse_errors_not_working_badge = Not working right now
-
-# source: kurobayomi
 browse_global_search_empty_hint = Search a source by title
 
 # source: kurobayomi
