@@ -6,6 +6,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-21
+
 ### Added
 
 - Sites behind Anubis's bot check ("Making sure you're not a bot!") work like sites behind Cloudflare's: the app passes
