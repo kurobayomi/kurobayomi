@@ -83,14 +83,10 @@ jobs:
       - name: Update Rust
         run: rustup update stable
 
-      - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          # restore only: a cache saved under a tag can be used by no later run (each tag is its own scope), so saving
-          # it just takes about 1 GB of the repository's 10 GB cache space
-          save-if: false
-
       - name: Build
+        # No build cache, on purpose: the stable profile (thin LTO, one codegen unit, the `updater` feature) shares no
+        # compiled crate with the nightly's quick profile, and a cache saved under a tag serves no later run (each tag is
+        # its own scope). v0.4.1 restored the nightly's Windows cache as a full match and still compiled 517 crates.
         # the stable build has no KB_CHANNEL (it is not a nightly); the release checker of the About page is on and reads
         # this repository's releases, wherever it lives
         # Kurobayomi's Shikimori client comes from the repository secrets (`crates/kuro-track/src/shikimori/config.rs`).
@@ -170,15 +166,8 @@ jobs:
             toolchain:p rust:p pkgconf:p cmake:p nasm:p ntldd:p
             gtk4:p libadwaita:p mpv:p dav1d:p libarchive:p
 
-      - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          # the nightly's Windows cache (same job name and key), read from main; a tag's own cache would serve no later run
-          key: release
-          save-if: false
-
       - name: Build
-        # as the AppImage above: no KB_CHANNEL, the release checker on
+        # as the AppImage above: no build cache, no KB_CHANNEL, the release checker on
         env:
           KB_UPDATE_REPOSITORY: ${{ github.repository }}
           KB_SHIKIMORI_CLIENT_ID: ${{ secrets.SHIKIMORI_CLIENT_ID }}
