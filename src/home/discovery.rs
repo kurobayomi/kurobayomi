@@ -256,7 +256,8 @@ mod tests {
         assert_eq!(row.iter().map(|t| t.anilist_id).collect::<Vec<_>>(), [1, 11, 2, 3]);
         assert_eq!(trending(&anime, &manga, &Known::default(), false, 3).len(), 3);
         let known = Known { titles: [fold("A1")].into(), mal_ids: HashSet::new() };
-        assert_eq!(trending(&anime, &manga, &known, false, 10)[0].anilist_id, 11);
+        let without = trending(&anime, &manga, &known, false, 10);
+        assert_eq!(without.iter().map(|t| t.anilist_id).collect::<Vec<_>>(), [2, 11, 3], "a title the user has is left out; the turns go on");
     }
 
     #[test]
