@@ -6,7 +6,15 @@
 
 use std::collections::BTreeSet;
 
+use crate::pref_enum;
 use crate::registry::define_prefs;
+
+pref_enum! {
+    /// `kinds_shown`: the kinds the app shows (user, 2026-11-21: for people who only watch anime or only read manga).
+    /// With one kind, the pages show only it and lose their Anime | Manga switch; the other kind's data stays, and
+    /// `BOTH` brings it back. A stored name that is no choice reads as `BOTH`.
+    pub enum KindsShown { BOTH, ANIME, MANGA }
+}
 
 define_prefs! {
     /// `[base]` section: the keys that the desktop keeps of Aniyomi `BasePreferences`, plus the muted channels.
@@ -23,6 +31,8 @@ define_prefs! {
         appimage_menu_removed: bool = "__APP_STATE_appimage_menu_removed" => false;
         // the reader's and the player's bars hide by themselves while reading or watching (off by default)
         auto_hide_bars: bool = "auto_hide_bars" => true;
+        // the kinds the pages show: both, or anime or manga alone (Settings > Appearance > Show)
+        kinds_shown: KindsShown = "kinds_shown" => KindsShown::BOTH;
     }
 }
 
@@ -50,6 +60,7 @@ mod tests {
                 ("last_kind", "__APP_STATE_last_kind"),
                 ("appimage_menu_removed", "__APP_STATE_appimage_menu_removed"),
                 ("auto_hide_bars", "auto_hide_bars"),
+                ("kinds_shown", "kinds_shown"),
             ]
         );
         assert_eq!(BasePrefs::TABLE, "base");
@@ -68,6 +79,17 @@ mod tests {
         assert!(!base.incognito_mode.get());
         assert!(base.muted_notification_channels.get().is_empty(), "no channel is muted by default");
         assert!(base.check_app_updates.get(), "updates are on by default");
+        assert_eq!(base.kinds_shown.get(), KindsShown::BOTH, "both kinds until the user picks one");
+    }
+
+    #[test]
+    fn the_kinds_shown_are_stored_by_name_and_an_unknown_name_shows_both() {
+        let store = PrefStore::in_memory();
+        let base = BasePrefs::new(store.clone());
+        base.kinds_shown.set(KindsShown::MANGA).unwrap();
+        assert_eq!(store.get_raw("kinds_shown"), Some(PrefValue::Str("MANGA".into())));
+        store.set_raw("kinds_shown", PrefValue::Str("NOVELS".into()));
+        assert_eq!(BasePrefs::new(store).kinds_shown.get(), KindsShown::BOTH);
     }
 
     #[test]

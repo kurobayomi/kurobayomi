@@ -88,11 +88,14 @@ impl BrowseShell {
         refresh.connect_clicked(move |button| on_refresh(button));
         // the add button first (user, 2026-11-20), then search, Refresh and the page's own buttons, as on every page
         // (user, 2026-10-25)
+        // the Anime | Manga switch hides while Show keeps the app to one kind
+        let switch = gtk::StackSwitcher::builder().stack(&inner.stack).build();
+        crate::shell::kind_choice::register_switch(&switch);
         let end = crate::ui::HeaderActions {
             add: Some(inner.add_button().upcast()),
             search: Some(inner.search.clone()),
             refresh: Some(refresh.clone().upcast()),
-            extra: vec![gtk::StackSwitcher::builder().stack(&inner.stack).build().upcast()],
+            extra: vec![switch.upcast()],
             options: Some(options),
             ..Default::default()
         }
@@ -107,7 +110,7 @@ impl BrowseShell {
             }
         });
         // after the handler above, so a kept Manga choice loads its page
-        crate::shell::kind_choice::follow(&inner.stack, ["0", "1"]);
+        crate::shell::kind_choice::follow(&inner.stack, ["0", "1"], crate::shell::kind_choice::Lock::Shown);
         // Enter searches every source of the visible kind (the global search is the way in, not a filter of the list)
         let (weak, search) = (Rc::downgrade(&inner), inner.search.clone());
         search.connect_activate(move |entry| {
@@ -160,7 +163,10 @@ impl Inner {
         }
         match browse_shortcut(key, modifiers) {
             Some(BrowseShortcut::SubTab(n)) if (1..=2).contains(&n) => {
-                self.select(SOURCE_PAGES[usize::from(n) - 1]);
+                // the page of a kind Show hides is not offered
+                if crate::shell::kind_choice::is_shown(if n == 1 { kuro_platform::kind::Kind::Anime } else { kuro_platform::kind::Kind::Manga }) {
+                    self.select(SOURCE_PAGES[usize::from(n) - 1]);
+                }
                 true
             }
             _ => false,

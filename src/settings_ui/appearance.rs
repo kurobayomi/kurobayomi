@@ -1,5 +1,6 @@
-//! Theme mode (task T-47a-011), the colours and the cover colours of a title's page. The App theme strip, the app lock
-//! and the start screen are cut (settings diet; the app always opens on Home, docs/design/home.md).
+//! Theme mode (task T-47a-011), the colours and the cover colours of a title's page, and which kinds the app shows. The
+//! App theme strip, the app lock and the start screen are cut (settings diet; the app always opens on Home,
+//! docs/design/home.md).
 //!
 //! Theme mode changes the look through one path, `theme::apply` (`update_settings`): the
 //! window marks and the GTK dark preference are set together, with no restart.
@@ -47,11 +48,25 @@ pub fn cover_colours_row(prefs: &Prefs) -> PreferenceItem {
     switch_with(&tr(MsgKey::ui_cover_colours_on_a_titles_page), None, &prefs.ui.cover_colours, true, on_change)
 }
 
-/// The rows of the Appearance page this module binds to the typed preferences: the Theme group. The rest of the page
-/// (the Display group's App language link) stays as the spec builds it.
+/// Show: both kinds, or anime or manga alone (user, 2026-11-21). With one kind the pages show only it and lose their
+/// Anime | Manga switch; the change applies at once (`shell::kind_choice::start`), and the other kind's data stays.
+pub fn show_kinds_row(prefs: &Prefs) -> PreferenceItem {
+    use kuro_prefs::base::KindsShown;
+    let options = [
+        (KindsShown::BOTH, tr(MsgKey::ui_kinds_both)),
+        (KindsShown::ANIME, tr(MsgKey::ui_kinds_anime_only)),
+        (KindsShown::MANGA, tr(MsgKey::ui_kinds_manga_only)),
+    ];
+    let options: Vec<_> = options.iter().map(|(value, label)| (*value, label.as_str())).collect();
+    enum_choice(&tr(MsgKey::ui_show_kinds), &prefs.base.kinds_shown, &options, true)
+}
+
+/// The rows of the Appearance page this module binds to the typed preferences: the Theme group, and Show in the Display
+/// group. The rest of the page (the Display group's App language link) stays as the spec builds it.
 pub fn page_rows(prefs: &Prefs) -> Vec<Preference> {
     vec![
         group(&tr(MsgKey::pref_category_theme), vec![theme_mode_row(prefs), colours_row(prefs), cover_colours_row(prefs)]),
+        group(&tr(MsgKey::pref_category_display), vec![show_kinds_row(prefs)]),
     ]
 }
 
@@ -79,11 +94,23 @@ mod tests {
     }
 
     #[test]
-    fn the_start_screen_is_cut_and_the_display_group_keeps_the_app_language() {
+    fn the_start_screen_is_cut_and_the_display_group_keeps_the_app_language_and_shows_the_kinds() {
         let prefs = Prefs::in_memory();
-        assert_eq!(page_rows(&prefs).len(), 1, "only the Theme group is typed");
+        assert_eq!(page_rows(&prefs).len(), 2, "the Theme group and Show in Display are typed");
         let tree = crate::settings_ui::route::tree_with("settings_appearance", &prefs, &[], &[], crate::settings_ui::browse::RepoCounts::default());
-        assert_eq!(titles_of(&tree, "Display"), ["App language"]);
+        assert_eq!(titles_of(&tree, "Display"), ["App language", "Show"]);
+    }
+
+    #[test]
+    fn show_offers_both_kinds_or_one_and_starts_on_both() {
+        let prefs = Prefs::in_memory();
+        let PreferenceItem::BasicList { value, entries, .. } = show_kinds_row(&prefs) else { panic!("a list") };
+        assert_eq!(value, "BOTH");
+        assert_eq!(entries.iter().map(|(key, label)| (key.as_str(), label.as_str())).collect::<Vec<_>>(), [
+            ("BOTH", "Anime and manga"),
+            ("ANIME", "Anime only"),
+            ("MANGA", "Manga only"),
+        ]);
     }
 
     #[test]

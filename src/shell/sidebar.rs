@@ -36,13 +36,14 @@ pub fn downloads_summary(percents: &[u8]) -> Option<(usize, u8)> {
 }
 
 /// The percent done of every unit in the queue that is still going (a unit waiting for its source counts as 0), and then
-/// how many units failed. A failed unit is not "downloading": it waits for a retry on the Downloads page. Empty when no
-/// download service runs.
+/// how many units failed. A failed unit is not "downloading": it waits for a retry on the Downloads page. Only the kinds
+/// Show allows count (the Downloads page shows only those). Empty when no download service runs.
 fn queued_percents() -> (Vec<u8>, usize) {
     let Some(downloads) = crate::downloads::live::downloads() else { return (Vec::new(), 0) };
     let snapshot = downloads.snapshot();
-    let failed = snapshot.items.iter().filter(|unit| unit.state == kuro_downloads::DownloadState::Error).count();
-    let percents = snapshot.items.iter().filter(|unit| unit.state != kuro_downloads::DownloadState::Error).map(|unit| unit.progress.percent()).collect();
+    let shown: Vec<_> = snapshot.items.iter().filter(|unit| crate::shell::kind_choice::is_shown(unit.kind)).collect();
+    let failed = shown.iter().filter(|unit| unit.state == kuro_downloads::DownloadState::Error).count();
+    let percents = shown.iter().filter(|unit| unit.state != kuro_downloads::DownloadState::Error).map(|unit| unit.progress.percent()).collect();
     (percents, failed)
 }
 

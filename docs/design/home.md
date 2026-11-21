@@ -168,7 +168,10 @@ One GraphQL request to `https://graphql.anilist.co` answered all of it:
   store (`kuro_data::community_score`, `remote_id`), the newest of each kind in turn, so a mostly-manga history still
   seeds its anime. Their recommendations are merged: within a kind, a title recommended by several seeds, or with more
   votes, ranks higher (the sum of `rating`); the row takes anime and manga in turn, like Trending (user, 2026-11-21: "should
-  be anime and manga"; One Piece's recommendations carry 700 votes, an anime sequel's 9). Titles already in the library or
+  be anime and manga"; One Piece's recommendations carry 700 votes, an anime sequel's 9).
+- **Show (Settings > Appearance, 2026-11-21):** with one kind shown alone, every row (Continue, New for you,
+  Recommended, Trending) holds only that kind, filtered before a row is cut to size so it still fills. AniList is still
+  asked for both kinds (background work stays as it is). Titles already in the library or
   the history are left out (by MyAnimeList id against the score store, and by AniList id against the seeds).
 - **Trending now:** AniList's trending titles, anime and manga, interleaved so neither kind fills the row; titles in the
   library are left out.

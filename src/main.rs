@@ -288,6 +288,8 @@ fn build_window(app: &gtk::Application) {
     startup::start_sources(base.store());
     // the library update runner behind the refresh button and the automatic schedule
     misc::start();
+    // Show (Settings > Appearance): a new choice applies at once, from the page or from a restored backup
+    shell::kind_choice::start();
     // the community scores of the library fill in and refresh in the background
     community::start();
     // Home's suggestions: the last answer at once, then a fresh one at most once a day (docs/design/home.md)

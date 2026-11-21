@@ -279,6 +279,7 @@ define_prefs! {
     "__APP_STATE_last_kind", AppState, Str, "anime", "base", "last_kind";
     "__APP_STATE_appimage_menu_removed", AppState, Bool, false, "base", "appimage_menu_removed";
     "auto_hide_bars", Normal, Bool, true, "base", "auto_hide_bars";
+    "kinds_shown", Normal, Str, "BOTH", "base", "kinds_shown";
     "pref_player_default_quality", Normal, Int, 1080, "player", "default_quality";
     "pref_auto_skip_opening", Normal, Bool, false, "player", "auto_skip_opening";
     "pref_auto_skip_ending", Normal, Bool, false, "player", "auto_skip_ending";

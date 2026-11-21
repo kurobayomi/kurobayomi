@@ -315,7 +315,8 @@ pub fn body(migrating: bool) -> Option<Built> {
         let kind = match (&intent, &route) {
             (Some(intent), _) => intent.kind,
             (None, Some(BrowseRoute::GlobalSearch { kind, .. })) => *kind,
-            _ => caller.unwrap_or(Kind::Manga),
+            // with no kind asked for: the entry page's that asked, else the kind the pages show (Show)
+            _ => caller.unwrap_or_else(crate::shell::kind_choice::current),
         };
         (kind, None, start_for(false, None, intent, route, entry_text))
     };

@@ -45,7 +45,7 @@ pub const KURO_PREFIX: &str = "kuro_";
 
 /// Registry rows that Aniyomi does not have (no match in its source; `anime_ext_last_check` is Aniyomi's
 /// `last_ext_check` under another name). They are exported with [`KURO_PREFIX`] like keys outside the registry.
-pub const KURO_ONLY_KEYS: &[&str] = &["anime_ext_last_check"];
+pub const KURO_ONLY_KEYS: &[&str] = &["anime_ext_last_check", "kinds_shown"];
 
 /// The backup key for a stored key. A key Aniyomi knows keeps its name. A Kurobayomi-only normal key (outside the
 /// registry, or listed in [`KURO_ONLY_KEYS`]) gets [`KURO_PREFIX`]. App state and private keys are handled by their

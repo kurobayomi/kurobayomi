@@ -132,6 +132,8 @@ pub fn apply(app: &gtk::Application, win: &gtk::ApplicationWindow, request: &Lau
     match target_of(request) {
         Ok(Target::Link(link)) => crate::open_link::dispatch(app, win, &link.to_arg()),
         Ok(Target::Search { query, kind }) => {
+            // a search runs in the kinds the pages show (Show): one for a hidden kind searches the shown kind's sources
+            let kind = if crate::shell::kind_choice::is_shown(kind) { kind } else { crate::shell::kind_choice::current() };
             win.present();
             crate::ui::over_root(|| {
                 if argv::is_web_address(&query) {

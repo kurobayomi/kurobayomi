@@ -304,10 +304,19 @@ pub fn switch_with_narrow_row(header: &adw::HeaderBar, switch: &gtk::StackSwitch
     }
     // the first frame already shows the right place: a switch in a narrow header pushes the window wider
     let narrow = window_width().is_some_and(|w| w < crate::shell::layout::WIDE_MIN_WIDTH_PX);
-    row.set_visible(narrow);
-    switch.set_visible(!narrow);
+    // a kind switch hides in both places while Show keeps the app to one kind (`shell::kind_choice`)
+    let hidden = crate::shell::kind_choice::switch_hidden(switch);
+    row.set_visible(narrow && !hidden);
+    switch.set_visible(!narrow && !hidden);
     let (switch, narrow_row) = (switch.clone(), row.clone());
     header.add_tick_callback(move |header, _| {
+        if crate::shell::kind_choice::switch_hidden(&switch) {
+            if switch.is_visible() || narrow_row.is_visible() {
+                switch.set_visible(false);
+                narrow_row.set_visible(false);
+            }
+            return glib::ControlFlow::Continue;
+        }
         // no width yet (the first frames) decides nothing: taken as wide, it put the switch back for a frame and the window
         // grew to fit it
         let Some(width) = header.root().map(|root| root.width()).filter(|w| *w > 0 && header.width() > 0) else { return glib::ControlFlow::Continue };
@@ -316,7 +325,8 @@ pub fn switch_with_narrow_row(header: &adw::HeaderBar, switch: &gtk::StackSwitch
         let extra = if shown { 0 } else { narrow_row.measure(O::Horizontal, -1).0 };
         let need = header.measure(O::Horizontal, -1).0 + extra;
         let narrow = width < crate::shell::layout::WIDE_MIN_WIDTH_PX || !switch_fits(header.width(), need, shown);
-        if shown == narrow {
+        // both are set when either is wrong: after a hidden spell (Show) neither shows until this puts one back
+        if shown == narrow || narrow_row.is_visible() != narrow {
             switch.set_visible(!narrow);
             narrow_row.set_visible(narrow);
         }

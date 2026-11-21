@@ -142,20 +142,28 @@ pub fn desktop_file_name(app_id: &str) -> String {
     format!("{app_id}.desktop")
 }
 
-/// Keeps the launcher badge at the unread updates of the last three months, cleared at 0. Needs the data to be installed.
+/// Keeps the launcher badge at the unread updates of the last three months, cleared at 0. With one kind shown alone
+/// (Show, Settings > Appearance) only its updates count. Needs the data to be installed.
 pub fn publish_launcher_badge(app_id: &str) {
     let desktop = desktop_file_name(app_id);
     let counts = Rc::new(Cell::new([0_i64; 2]));
+    const KINDS: [Kind; 2] = [Kind::Manga, Kind::Anime];
     let push: Rc<dyn Fn()> = Rc::new({
         let counts = Rc::clone(&counts);
         move || {
-            let badge = launcher::badge(counts.get().iter().sum());
+            let total = KINDS.iter().zip(counts.get()).filter(|(kind, _)| crate::shell::kind_choice::is_shown(**kind)).map(|(_, count)| count).sum();
+            let badge = launcher::badge(total);
             let desktop = desktop.clone();
             tokio::spawn(async move { launcher::publish(&desktop, badge).await });
         }
     });
+    // a new Show setting counts again
+    crate::shell::kind_choice::on_change({
+        let push = Rc::clone(&push);
+        move || push()
+    });
     let since = three_months_ago(&Local::now());
-    for (slot, kind) in [Kind::Manga, Kind::Anime].into_iter().enumerate() {
+    for (slot, kind) in KINDS.into_iter().enumerate() {
         let (counts, push) = (Rc::clone(&counts), Rc::clone(&push));
         let feed = UpdatesRepo::new(data::app().db.clone()).watch_with_read(kind, false, since);
         bind_watch(feed, move |rows| {

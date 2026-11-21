@@ -1257,3 +1257,15 @@ reviews_none = No reviews on AniList
 
 # source: kurobayomi
 reviews_failed = Couldn't load reviews
+
+# source: kurobayomi
+ui_show_kinds = Show
+
+# source: kurobayomi
+ui_kinds_both = Anime and manga
+
+# source: kurobayomi
+ui_kinds_anime_only = Anime only
+
+# source: kurobayomi
+ui_kinds_manga_only = Manga only

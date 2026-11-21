@@ -265,6 +265,10 @@ pub fn build<T: Keyed + Send + 'static>(
                 page.refilter();
             }
         });
+        // the sources start on the kind Show keeps the app to; the drop-down still offers every kind
+        if let Some(kind) = crate::shell::kind_choice::only() {
+            kinds.set_selected(if kind.is_anime() { 1 } else { 2 });
+        }
     }
     if let Some(languages) = &languages {
         let weak = Rc::downgrade(&inner);

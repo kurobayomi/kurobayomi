@@ -282,8 +282,9 @@ impl Home {
                 home.render();
             }
         });
-        // the Library's cover size and look apply here too, at once (the first call of each is the seed)
-        for redraw in [Self::bind_cover_size, Self::bind_display_mode] {
+        // the Library's cover size and look apply here too, at once (the first call of each is the seed), and so does
+        // Show (Settings > Appearance): with one kind shown alone, every row holds only it
+        for redraw in [Self::bind_cover_size, Self::bind_display_mode, Self::bind_kinds_shown] {
             redraw(self);
         }
         self.start();
@@ -339,6 +340,16 @@ impl Home {
             if !seeded.replace(true) {
                 return;
             }
+            if let Some(home) = weak.upgrade() {
+                home.force.set(true);
+                home.changed();
+            }
+        });
+    }
+
+    fn bind_kinds_shown(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        crate::shell::kind_choice::on_change(move || {
             if let Some(home) = weak.upgrade() {
                 home.force.set(true);
                 home.changed();
@@ -421,9 +432,12 @@ impl Home {
 
     /// Every row's covers from the published rows: Continue, New for you, Recommended for you, Trending now.
     fn covers(&self) -> (Vec<Cover>, Vec<Cover>, Vec<Cover>, Vec<Cover>) {
+        // the kinds Show allows (Settings > Appearance): a hidden kind's titles leave every row before it is cut to size
+        let shown = crate::shell::kind_choice::is_shown;
         let (history, updates, scores, cached) = {
             let rows = self.rows.borrow();
-            let updates: Vec<UpdateRow> = rows.updates.iter().flatten().flatten().cloned().collect();
+            let updates: Vec<UpdateRow> =
+                [Kind::Anime, Kind::Manga].into_iter().filter(|kind| shown(*kind)).flat_map(|kind| rows.updates[slot(kind)].iter().flatten().cloned()).collect();
             (rows.history.clone(), updates, rows.scores.clone(), rows.discovery.clone())
         };
         let items = Items::new(self.db());
@@ -442,7 +456,8 @@ impl Home {
         let db = self.db();
         let item_repo = kuro_data::item::ItemRepo::new(db.clone());
         // more rows than a row holds: titles with nothing left drop out below
-        let continue_covers: Vec<Cover> = data::merge_by_time(anime.unwrap_or_default(), manga.unwrap_or_default(), |row| row.at, ROW_LIMIT * 2)
+        let of_kind = |kind: Kind, rows: Option<Vec<_>>| if shown(kind) { rows.unwrap_or_default() } else { Vec::new() };
+        let continue_covers: Vec<Cover> = data::merge_by_time(of_kind(Kind::Anime, anime), of_kind(Kind::Manga, manga), |row| row.at, ROW_LIMIT * 2)
             .into_iter()
             .filter_map(|(kind, row)| {
                 let Resume::Open(unit) = history_data::resume_row(&db, kind, row.entry_id, row.item_id) else { return None };
@@ -469,8 +484,14 @@ impl Home {
         let adult = kuro_prefs::source::SourcePrefs::new(crate::data::app().base.store().clone()).show_nsfw_source.get();
         let (recommended, trending) = match &cached {
             Some(cached) => (
-                discovery::recommended(&cached.answer.recommended, &known, adult, ROW_LIMIT),
-                discovery::trending(&cached.answer.trending_anime, &cached.answer.trending_manga, &known, adult, ROW_LIMIT),
+                discovery::recommended(&discovery::of_kinds(&cached.answer.recommended, shown), &known, adult, ROW_LIMIT),
+                discovery::trending(
+                    if shown(Kind::Anime) { cached.answer.trending_anime.as_slice() } else { &[] },
+                    if shown(Kind::Manga) { cached.answer.trending_manga.as_slice() } else { &[] },
+                    &known,
+                    adult,
+                    ROW_LIMIT,
+                ),
             ),
             None => (Vec::new(), Vec::new()),
         };

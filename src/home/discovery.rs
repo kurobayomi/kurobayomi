@@ -212,6 +212,11 @@ pub fn recommended(per_seed: &[Vec<Suggestion>], known: &Known, adult: bool, lim
     in_turn(anime.into_iter(), manga.into_iter(), limit)
 }
 
+/// The recommendations of each seed whose kind `shown` keeps (Show, Settings > Appearance).
+pub fn of_kinds(per_seed: &[Vec<Suggestion>], shown: impl Fn(Kind) -> bool) -> Vec<Vec<Suggestion>> {
+    per_seed.iter().map(|titles| titles.iter().filter(|title| shown(title.kind)).cloned().collect()).collect()
+}
+
 /// Trending now: AniList's trending anime and manga taken in turn, so neither kind fills the row. Titles the user has and
 /// adult ones unless `adult` are left out. At most `limit`.
 pub fn trending(anime: &[Suggestion], manga: &[Suggestion], known: &Known, adult: bool, limit: usize) -> Vec<Suggestion> {
@@ -262,6 +267,14 @@ mod tests {
         ];
         let row = recommended(&per_seed, &Known::default(), false, 4);
         assert_eq!(row.iter().map(|t| t.anilist_id).collect::<Vec<_>>(), [11, 1, 12, 2]);
+    }
+
+    #[test]
+    fn a_hidden_kind_leaves_the_recommendations_of_every_seed() {
+        let per_seed = vec![vec![title(1, Kind::Manga, "M", 9, None), title(2, Kind::Anime, "A", 3, None)], vec![title(3, Kind::Manga, "N", 1, None)]];
+        let anime_only = of_kinds(&per_seed, |kind| kind == Kind::Anime);
+        assert_eq!(anime_only.iter().map(|seed| seed.iter().map(|t| t.anilist_id).collect::<Vec<_>>()).collect::<Vec<_>>(), [vec![2], vec![]]);
+        assert_eq!(of_kinds(&per_seed, |_| true), per_seed, "both kinds: all of them");
     }
 
     #[test]

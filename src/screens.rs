@@ -193,8 +193,15 @@ fn libraries() -> Option<Built> {
 /// start of the header row, the visible kind's search toggle first among its other `end` widgets at the end (the view
 /// hands its `gtk::SearchEntry` first in `Built.end`, when it has one), and that kind's search bar under the header
 /// (`ui::search_row`); `back` adds Back before the switch, for a pushed page. Library, Updates, History, Downloads,
-/// Categories and Storage use it (`updates::mount` for the tabs).
+/// Categories and Storage use it (`updates::mount` for the tabs). The page keeps to the kind Show allows
+/// (`kind_choice::Lock::Shown`): with one kind shown alone it shows that kind and no switch.
 pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
+    kind_page_with(views, back, crate::shell::kind_choice::Lock::Shown)
+}
+
+/// [`kind_page`] for a page that edits a given kind and opens on either one whatever Show says (Categories: Settings
+/// opens it for anime or for manga).
+pub(crate) fn kind_page_with(views: [Built; 2], back: bool, lock: crate::shell::kind_choice::Lock) -> GBox {
     let kinds = gtk::Stack::new();
     kinds.set_transition_type(gtk::StackTransitionType::Crossfade);
     kinds.set_vexpand(true);
@@ -228,7 +235,7 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     for follower in [&bars, &end] {
         kinds.bind_property("visible-child-name", follower, "visible-child-name").sync_create().build();
     }
-    crate::shell::kind_choice::follow(&kinds, ["anime", "manga"]);
+    crate::shell::kind_choice::follow(&kinds, ["anime", "manga"], lock);
     let header = crate::ui::header_bar();
     crate::ui::window_buttons(&header);
     if back {
@@ -240,6 +247,9 @@ pub(crate) fn kind_page(views: [Built; 2], back: bool) -> GBox {
     }
     let switch = gtk::StackSwitcher::builder().stack(&kinds).build();
     header.pack_start(&switch);
+    if lock == crate::shell::kind_choice::Lock::Shown {
+        crate::shell::kind_choice::register_switch(&switch);
+    }
     let narrow_row = crate::ui::switch_with_narrow_row(&header, &switch);
     // an empty box, not None: without a title widget GTK shows the window title
     header.set_title_widget(Some(&GBox::new(O::Horizontal, 0)));
@@ -287,7 +297,7 @@ fn downloads_view(kind: Kind) -> Built {
 
 /// Categories: a page per kind under the shared header, with Add (for that kind) at the end.
 fn categories() -> Option<Built> {
-    built(kind_page([Kind::Anime, Kind::Manga].map(crate::live::categories_content), true), vec![])
+    built(kind_page_with([Kind::Anime, Kind::Manga].map(crate::live::categories_content), true, crate::shell::kind_choice::Lock::Free), vec![])
 }
 
 fn storage() -> Option<Built> {
