@@ -6,8 +6,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-21
+
 ### Added
 
+- Sources for sites that fill their pages from their own script: the app opens such a page in its hidden browser
+  page and hands the source what the page shows. The Comix source needs it.
 - Community scores: a title shows its MyAnimeList score with a star on its cover and its list row, in the library and
   on Browse, and the details page shows it beside your own tracker score. The scores fill in by themselves in the
   background, starting a few seconds after the app, and refresh over time.
