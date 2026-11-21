@@ -585,9 +585,9 @@ fn check_on_start(links: Vec<String>) {
                     // a repository that moved is read under its new link
                     let link = &synced.link;
                     let Some(index) = saved_index(link) else { continue };
-                    let new = index.sources.iter().filter(|entry| !before.contains(&entry.id)).count();
+                    let new: Vec<String> = index.sources.iter().filter(|entry| !before.contains(&entry.id)).map(|entry| entry.id.clone()).collect();
                     // a link whose saved index was missing has nothing to compare with
-                    if new > 0 && !before.is_empty() {
+                    if !new.is_empty() && !before.is_empty() {
                         let repo = index.name.clone().filter(|name| !name.trim().is_empty()).unwrap_or_else(|| link.clone());
                         crate::source_switch::announce_new(link.clone(), repo, new);
                     }

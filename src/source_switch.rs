@@ -6,8 +6,12 @@
 //!
 //! A source is known by its numeric id once it has loaded; `source_keys` remembers which entry each id came from, so a
 //! source that is off now is still recognised by its titles.
+//!
+//! A source a repository added since its last check is new: `new_sources` keeps it until a list of its repository's
+//! sources has been on screen, and meanwhile its row comes first and carries a "New" pill.
 
 use crate::ui::DialogOpen as _;
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,6 +39,35 @@ pub fn set_on(prefs: &SourcePrefs, key: &str, on: bool) {
             tracing::warn!(%error, key, "the source switch could not be saved");
         }
     }
+}
+
+/// Remembers sources the start check found new, so their rows carry the "New" pill until a list of them has been seen.
+pub fn mark_new(prefs: &SourcePrefs, ids: &[String]) {
+    let mut set = prefs.new_sources.get();
+    let before = set.len();
+    set.extend(ids.iter().cloned());
+    if set.len() != before {
+        if let Err(error) = prefs.new_sources.set(set) {
+            tracing::warn!(%error, "the new sources could not be saved");
+        }
+    }
+}
+
+/// Forgets that the sources `ids` are new: a list of them has been on screen.
+fn mark_seen(prefs: &SourcePrefs, ids: &[String]) {
+    let mut set = prefs.new_sources.get();
+    let before = set.len();
+    set.retain(|id| !ids.contains(id));
+    if set.len() != before {
+        if let Err(error) = prefs.new_sources.set(set) {
+            tracing::warn!(%error, "the seen sources could not be saved");
+        }
+    }
+}
+
+/// Where a source's row goes in a list: the new ones first, then anime before manga, by language, by name.
+fn list_order(entry: &Entry, new: &BTreeSet<String>) -> (bool, bool, String, String) {
+    (!new.contains(&entry.id), entry.kind != Kind::Anime, entry.lang.clone(), entry.name.to_lowercase())
 }
 
 /// The entry ids every saved index lists.
@@ -341,13 +374,31 @@ pub fn sources_list(link: &str, filter: Rc<std::cell::RefCell<SourceFilter>>) ->
     let index = crate::recipe_sources::saved_index(link)?;
     let prefs = live()?;
     let list = crate::ui::boxed_list();
+    let new = prefs.new_sources.get();
     let mut entries: Vec<&Entry> = index.sources.iter().collect();
-    entries.sort_by(|a, b| (a.kind != Kind::Anime, &a.lang, a.name.to_lowercase()).cmp(&(b.kind != Kind::Anime, &b.lang, b.name.to_lowercase())));
+    entries.sort_by_key(|entry| list_order(entry, &new));
+    let fresh: Vec<String> = entries.iter().filter(|entry| new.contains(&entry.id)).map(|entry| entry.id.clone()).collect();
     let languages: Vec<String> = entries.iter().map(|entry| entry.lang.clone()).collect::<BTreeSet<_>>().into_iter().collect();
     // what each row is found by, in row order: rows are never removed, so a row's index names its source
     let rows: Vec<(String, Kind, String)> = entries.iter().map(|entry| (search_text(entry), entry.kind, entry.lang.clone())).collect();
     for entry in entries {
-        list.append(&picker_row(&prefs, link, entry));
+        list.append(&picker_row(&prefs, link, entry, new.contains(&entry.id)));
+    }
+    // a pill is for a source not seen yet: once the list has been on screen, its new sources are seen, and the next
+    // list of them shows no pill (this one keeps its pills while it is open)
+    if !fresh.is_empty() {
+        let shown = Rc::new(Cell::new(false));
+        list.connect_map({
+            let shown = Rc::clone(&shown);
+            move |_| shown.set(true)
+        });
+        list.connect_unmap(move |_| {
+            if shown.get() {
+                if let Some(prefs) = live() {
+                    mark_seen(&prefs, &fresh);
+                }
+            }
+        });
     }
     list.set_filter_func(move |row| {
         usize::try_from(row.index()).ok().and_then(|i| rows.get(i)).is_none_or(|(text, kind, lang)| filter.borrow().shows(text, *kind, lang))
@@ -389,8 +440,9 @@ fn search_text(entry: &Entry) -> String {
     format!("{} {language} {kind} {about}", entry.name)
 }
 
-/// One row of the picker: icon, name, language and kind, and the switch.
-fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow {
+/// One row of the picker: icon, name, language and kind, the "New" pill for a source the repository added since its last
+/// check, and the switch.
+fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry, new: bool) -> adw::ActionRow {
     let kind = tr(if entry.kind == Kind::Anime { MsgKey::label_anime } else { MsgKey::label_manga });
     let mut subtitle = format!("{} · {kind}", crate::browse::names::localized_display_name(&entry.lang));
     if let Some(about) = crate::recipe_sources::described(entry) {
@@ -440,6 +492,9 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow 
         gtk::glib::Propagation::Stop
     });
     let suffix = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_S);
+    if new {
+        suffix.append(&crate::ui::new_pill());
+    }
     suffix.append(&spinner);
     suffix.append(&switch);
     let row = crate::ui::row(&entry.name, Some(&subtitle), Some(suffix.upcast()));
@@ -451,11 +506,15 @@ fn picker_row(prefs: &SourcePrefs, link: &str, entry: &Entry) -> adw::ActionRow 
     row
 }
 
-/// The notice of a daily check that found sources a repository added since: "2 new sources in <repo>", with Choose,
-/// which opens the picker. Callable from any thread.
-pub fn announce_new(link: String, repo: String, count: usize) {
+/// The notice of a daily check that found sources a repository added since (`ids`): "2 new sources in <repo>", with
+/// Choose, which opens the picker. The sources are remembered as new, so their rows carry the "New" pill even when the
+/// notice is closed. Callable from any thread.
+pub fn announce_new(link: String, repo: String, ids: Vec<String>) {
     gtk::glib::MainContext::default().invoke(move || {
-        let text = tr_plural(MsgKey::source_switch_new_sources, i64::try_from(count).unwrap_or(i64::MAX), &[("repo", Arg::Str(&repo))]);
+        if let Some(prefs) = live() {
+            mark_new(&prefs, &ids);
+        }
+        let text = tr_plural(MsgKey::source_switch_new_sources, i64::try_from(ids.len()).unwrap_or(i64::MAX), &[("repo", Arg::Str(&repo))]);
         crate::toast::notify_action(&text, &tr(MsgKey::source_switch_choose), None, move || open_picker(&link));
     });
 }
@@ -625,7 +684,7 @@ mod tests {
                 .sources
                 .iter()
                 .map(|entry| {
-                    let row = picker_row(&prefs, "https://repo.test/index.min.json", entry);
+                    let row = picker_row(&prefs, "https://repo.test/index.min.json", entry, false);
                     picker_switch(&row).is_active()
                 })
                 .collect();
@@ -647,13 +706,51 @@ mod tests {
         crate::testing::with_display(|| {
             let prefs = SourcePrefs::new(PrefStore::in_memory());
             let repo = index(&["a"]);
-            let row = picker_row(&prefs, "https://repo.test/index.min.json", &repo.sources[0]);
+            let row = picker_row(&prefs, "https://repo.test/index.min.json", &repo.sources[0], false);
             let switch = picker_switch(&row);
             let spinner = switch.prev_sibling().and_downcast::<gtk::Spinner>().expect("the spinner is beside the switch");
             assert!(!spinner.is_visible(), "no spinner at rest");
             switch.set_active(true);
             assert!(spinner.is_visible(), "the spinner shows while the file is fetched");
             assert!(!switch.is_sensitive(), "the switch is locked meanwhile");
+        });
+    }
+
+    #[test]
+    fn a_new_source_is_new_until_a_list_of_it_has_been_seen() {
+        let prefs = SourcePrefs::new(PrefStore::in_memory());
+        mark_new(&prefs, &["a".to_owned(), "b".to_owned()]);
+        mark_new(&prefs, &["b".to_owned(), "c".to_owned()]);
+        assert_eq!(prefs.new_sources.get(), set(&["a", "b", "c"]), "a later check adds to the ones not seen yet");
+        mark_seen(&prefs, &["a".to_owned(), "b".to_owned()]);
+        assert_eq!(prefs.new_sources.get(), set(&["c"]), "a list showed a and b: c, of another list, stays new");
+    }
+
+    #[test]
+    fn new_sources_come_first_then_anime_then_manga() {
+        let mut repo = index(&["old-anime", "new-manga", "old-manga"]);
+        repo.sources[0].kind = Kind::Anime;
+        let new = set(&["new-manga"]);
+        let mut entries: Vec<&Entry> = repo.sources.iter().collect();
+        entries.sort_by_key(|entry| list_order(entry, &new));
+        let ids: Vec<&str> = entries.iter().map(|entry| entry.id.as_str()).collect();
+        assert_eq!(ids, ["new-manga", "old-anime", "old-manga"]);
+    }
+
+    /// A new source's row carries the "New" pill before its spinner and switch; a known one has none.
+    #[test]
+    fn a_new_sources_row_carries_the_new_pill() {
+        crate::testing::with_display(|| {
+            let prefs = SourcePrefs::new(PrefStore::in_memory());
+            let repo = index(&["a"]);
+            let pills = |new: bool| {
+                let row = picker_row(&prefs, "https://repo.test/index.min.json", &repo.sources[0], new);
+                let switch = picker_switch(&row);
+                let spinner = switch.prev_sibling().expect("the spinner is beside the switch");
+                spinner.prev_sibling().and_downcast::<gtk::Label>().filter(|label| label.has_css_class("kb-nav-badge")).map(|label| label.label().to_string())
+            };
+            assert_eq!(pills(true).as_deref(), Some("New"));
+            assert_eq!(pills(false), None);
         });
     }
 

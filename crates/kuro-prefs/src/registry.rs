@@ -287,6 +287,7 @@ define_prefs! {
     "pref_auto_skip_ending", Normal, Bool, false, "player", "auto_skip_ending";
     "enabled_sources", Normal, Set, &[], "sources", "enabled_sources";
     "__APP_STATE_source_keys", AppState, Set, &[], "sources", "source_keys";
+    "__APP_STATE_new_sources", AppState, Set, &[], "sources", "new_sources";
     "cache_size_mb", Normal, Int, 500, "storage", "cache_size_mb";
     "library_cover_size", Normal, Int, 160, "library", "cover_size";
     "manga_reader_theme_{id}", Normal, Int, 1, "reader.manga_reader_theme", "";

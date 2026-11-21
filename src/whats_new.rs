@@ -92,7 +92,8 @@ fn refresh_pills() {
 
 /// The "New" pill, for the sidebar's Settings row and the About row of Settings, shown while an update notice is unseen.
 pub fn pill() -> gtk::Label {
-    let pill = gtk::Label::builder().label(&tr(MsgKey::ui_new)).css_classes(["kb-nav-badge"]).valign(gtk::Align::Center).visible(unseen()).build();
+    let pill = crate::ui::new_pill();
+    pill.set_visible(unseen());
     pill.set_tooltip_text(Some(&tr(MsgKey::ui_update_waiting_open_about)));
     PILLS.with(|pills| pills.borrow_mut().push(pill.downgrade()));
     pill

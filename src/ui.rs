@@ -646,6 +646,12 @@ pub fn heading(text: &str) -> Label {
 /// The style class of a group heading: the stylesheet adds the extra gap above every one but the first of a column.
 pub const GROUP_HEADING: &str = "kb-group-heading";
 
+/// The "New" pill: a small round label in the accent colour, beside something the user has not seen yet (an update's
+/// notes, a source a repository added).
+pub fn new_pill() -> Label {
+    Label::builder().label(tr(MsgKey::ui_new)).css_classes(["kb-nav-badge"]).valign(Align::Center).build()
+}
+
 pub fn dim(text: &str) -> Label {
     Label::builder().label(text).xalign(0.0).wrap(true).css_classes(["dim-label", "caption"]).build()
 }

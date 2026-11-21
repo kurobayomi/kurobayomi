@@ -23,6 +23,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   shows the day and time under the count, on your own clock ("5 days", "Wed 14:00"), as MyAnimeList lists it. A break
   is not known to MyAnimeList, so the count is to the weekly slot. Other titles keep the estimate.
 
+- A source a repository adds shows a "New" pill and comes first in that repository's list of sources, until you have
+  seen the list, also when you close the "new sources" notice without choosing.
 - Colours for the whole app, in Settings, Appearance: the desktop's own (as before, and the default), or Tokyo Night,
   Catppuccin, Dracula, Nord, Gruvbox or Rosé Pine, each with the colours its own project publishes, or Black. Each
   works in light and in dark.

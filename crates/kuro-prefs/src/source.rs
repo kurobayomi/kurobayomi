@@ -49,6 +49,9 @@ define_prefs! {
         // "<source id>=<entry id>": the repository entry each loaded source came from, so a source that is off now is
         // still known by its id
         source_keys: BTreeSet<String> = "__APP_STATE_source_keys" => BTreeSet::new();
+        // the repository sources the start check found new, by their entry id, until a list of them has been on screen:
+        // their rows carry a "New" pill
+        new_sources: BTreeSet<String> = "__APP_STATE_new_sources" => BTreeSet::new();
     }
 }
 
@@ -68,7 +71,7 @@ mod tests {
     #[test]
     fn every_field_is_a_registered_sources_key_with_the_same_name() {
         assert_eq!(SourcePrefs::TABLE, "sources");
-        assert_eq!(SourcePrefs::FIELDS.len(), 10, "the settings diet kept nine keys, and the source view came back");
+        assert_eq!(SourcePrefs::FIELDS.len(), 11, "the settings diet kept nine keys, the source view came back, and the new sources are remembered");
         for (field, key) in SourcePrefs::FIELDS {
             let row = REGISTRY.iter().find(|m| m.key == *key).unwrap_or_else(|| panic!("{field}: {key} not registered"));
             assert_eq!(row.table, "sources", "{key}");
@@ -109,7 +112,7 @@ mod tests {
     fn every_default_of_the_kept_keys_holds_on_an_empty_store() {
         let prefs = SourcePrefs::new(PrefStore::in_memory());
         assert!(prefs.trusted_extensions.get().is_empty());
-        assert!(prefs.enabled_sources.get().is_empty() && prefs.source_keys.get().is_empty());
+        assert!(prefs.enabled_sources.get().is_empty() && prefs.source_keys.get().is_empty() && prefs.new_sources.get().is_empty());
         assert!(prefs.disabled_anime_sources.get().is_empty());
         assert!(prefs.manga_extension_repos.get().is_empty() && prefs.anime_extension_repos.get().is_empty());
     }
