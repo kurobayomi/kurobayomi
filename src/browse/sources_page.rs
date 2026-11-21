@@ -182,8 +182,10 @@ impl Inner {
             (icon, file, home)
         };
         let actions = gtk::Box::new(gtk::Orientation::Horizontal, SPACE_XS);
-        if let Some(status) = crate::recipe_sources::status(source.id) {
-            actions.append(&status_dot(status));
+        let repo_status = crate::recipe_sources::status(source.id);
+        let failing = crate::browse::errors::is_failing(source.id);
+        if let Some((class, text)) = repo_status.map(|status| status_words(status, failing)) {
+            actions.append(&status_dot(class, &text));
         }
 
         // the language (Last used only), then the repository's description of the source
@@ -192,7 +194,8 @@ impl Inner {
             (language, about) => language.or(about),
         };
         let picture = crate::recipe_sources::icon_path(source.id);
-        let row = source_row_with(&source.name, language.as_deref(), icon, file.as_deref(), picture.as_deref(), source.is_stub, crate::browse::errors::is_failing(source.id), Some(actions.upcast_ref()));
+        // a repository source says it in its status; only a source without one gets the row's own red note
+        let row = source_row_with(&source.name, language.as_deref(), icon, file.as_deref(), picture.as_deref(), source.is_stub, failing && repo_status.is_none(), Some(actions.upcast_ref()));
         let (open, menu, id, name) = (Rc::downgrade(self), Rc::downgrade(self), source.id, source.name.clone());
         list_row(
             &row,
@@ -211,16 +214,23 @@ impl Inner {
     }
 }
 
-/// A repo source's status, written out with its dot on the right: green when it works, orange when its site blocks the
-/// app for now, red when broken. The text says it, so a colour alone never has to.
-fn status_dot(status: kuro_extensions::repo::Status) -> gtk::Box {
+/// The one status a repo source's row shows (style class, words). The repository's verdict comes first: it checks the
+/// site for everyone. A source it calls working that failed here several times in a row (`failing`) says so instead of
+/// "Working", so the row never shows two verdicts.
+fn status_words(status: kuro_extensions::repo::Status, failing: bool) -> (&'static str, String) {
     use kuro_extensions::repo::Status;
-    let (class, text) = match status {
+    match status {
+        Status::Active if failing => ("error", crate::browse::errors::not_working_badge()),
         Status::Active => ("success", tr(MsgKey::source_status_active)),
         Status::Blocked => ("warning", tr(MsgKey::source_status_blocked)),
         Status::Broken => ("error", tr(MsgKey::source_status_broken)),
-    };
-    let label = gtk::Label::builder().label(&text).valign(gtk::Align::Center).css_classes(["caption", class]).build();
+    }
+}
+
+/// A repo source's status, written out with its dot on the right: green when it works, orange when its site blocks the
+/// app for now, red when broken or failing here. The text says it, so a colour alone never has to.
+fn status_dot(class: &str, text: &str) -> gtk::Box {
+    let label = gtk::Label::builder().label(text).valign(gtk::Align::Center).css_classes(["caption", class]).build();
     let dot = gtk::Box::builder().valign(gtk::Align::Center).css_classes(["kb-status", class]).build();
     let status = gtk::Box::builder().orientation(gtk::Orientation::Horizontal).spacing(SPACE_XS).margin_end(SPACE_S).build();
     status.append(&label);
@@ -317,6 +327,18 @@ pub(crate) mod tests {
             (item.run)();
         }
         assert_eq!(*log.borrow(), ["open 2 Popular", "site https://two.test"]);
+    }
+
+    #[test]
+    fn a_repository_source_shows_one_status_and_the_repository_speaks_first() {
+        use kuro_extensions::repo::Status;
+        let not_working = crate::browse::errors::not_working_badge();
+        assert_eq!(status_words(Status::Active, false), ("success", tr(MsgKey::source_status_active)));
+        assert_eq!(status_words(Status::Active, true), ("error", not_working), "failing here replaces Working");
+        for failing in [false, true] {
+            assert_eq!(status_words(Status::Broken, failing), ("error", tr(MsgKey::source_status_broken)), "no second verdict");
+            assert_eq!(status_words(Status::Blocked, failing), ("warning", tr(MsgKey::source_status_blocked)));
+        }
     }
 
     #[test]

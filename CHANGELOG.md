@@ -6,6 +6,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Fixed
+
+- A source in Browse → Sources shows one status, not two: a broken source no longer also says "Not working right now",
+  and a source the repository calls working that keeps failing on your computer says "Not working right now" in place
+  of "Working".
+
 ## [0.4.1] - 2026-11-21
 
 ### Added
