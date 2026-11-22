@@ -1275,3 +1275,6 @@ ui_kinds_manga_only = Manga only
 
 # source: kurobayomi
 home_refresh = Refresh
+
+# source: kurobayomi
+cover_menu_open = Open

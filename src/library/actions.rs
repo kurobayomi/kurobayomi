@@ -212,7 +212,7 @@ pub fn cover_menu(kind: Kind, local: bool) -> Vec<(CoverAction, String, u8)> {
         Kind::Manga => (tr(MsgKey::ui_mark_all_as_read), tr(MsgKey::ui_download_unread)),
         Kind::Anime => (tr(MsgKey::ui_mark_all_as_watched), tr(MsgKey::ui_download_unwatched)),
     };
-    let mut menu = vec![(CoverAction::Open, "Open".to_owned(), 0), (CoverAction::MarkAllViewed, mark.to_owned(), 1)];
+    let mut menu = vec![(CoverAction::Open, tr(MsgKey::cover_menu_open), 0), (CoverAction::MarkAllViewed, mark.to_owned(), 1)];
     if !local {
         menu.push((CoverAction::DownloadUnviewed, download.to_owned(), 1));
     }

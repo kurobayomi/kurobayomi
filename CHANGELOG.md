@@ -6,6 +6,11 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+### Changed
+
+- Home's Continue and New for you show only titles in your library; a title you read without adding it stays in
+  History. Every Home cover now has the Library's whole right-click menu.
+
 ## [0.5.0] - 2026-11-22
 
 ### Added

@@ -120,8 +120,10 @@ Home drew its own cards instead of the Library's, and it shows.
 
 1. **The Library's card, not a copy.** Home builds each cover with `library::view::card::build` (made shareable), from a
    `LibraryItem` per title: library titles from the Library's own read (`library::load::snapshot`, so the unread,
-   download, Local and language badges and the score are exactly the Library's); a title only in the history gets the
-   same row read from its entry, with its unread count. The badge switches are the Library's (`load::badges`).
+   download, Local and language badges and the score are exactly the Library's). Continue and New for you show library
+   titles only (user, 2026-11-22): a title read from a source without adding it to the library stays in History, not on
+   Home, so every Home cover has the Library's whole right-click menu. The badge switches are the Library's
+   (`load::badges`).
 2. **The Library's settings, followed live, and the Library's menu to change them** (user, 2026-11-21: "should be
    modular and use the same things as the Library"): Home's header has the Library's view options (`widgets::view_look`:
    View, Grid style, Cover size), writing the Library's own settings, so both pages always look alike. In List mode each
@@ -148,7 +150,7 @@ Home drew its own cards instead of the Library's, and it shows.
 
 ### Checked before it is committed
 
-- Tests: the shared column rule (Home and Library agree at every width), the item built for a history-only title, the
+- Tests: the shared column rule (Home and Library agree at every width), the
   display modes, the stale-while-hidden rule, the header actions.
 - On screen, in a local build, with screenshots: a wide window, a narrow window (two covers, nothing clipped), each
   display mode, a cover size change, and the welcome view on an empty profile.

@@ -89,8 +89,8 @@ fn visible(kind: Option<Kind>) -> Option<LibraryView> {
 
 /// The Library's right-click menu for a cover of `kind` shown outside the Library (Home), through the mounted view of
 /// that kind; empty before the Library is built.
-pub fn cover_menu(kind: Kind, row: &kuro_domain::library::model::LibraryRow, in_library: bool) -> Vec<crate::widgets::context_menu::Item> {
-    visible(Some(kind)).map(|view| view.cover_menu(row, in_library)).unwrap_or_default()
+pub fn cover_menu(kind: Kind, row: &kuro_domain::library::model::LibraryRow) -> Vec<crate::widgets::context_menu::Item> {
+    visible(Some(kind)).map(|view| view.cover_menu(row)).unwrap_or_default()
 }
 
 /// Reloads the library of `kind`, for changes made outside it such as a local folder scan.

@@ -166,8 +166,8 @@ pub struct LibraryView {
 impl LibraryView {
     /// The right-click menu of a cover of this view's kind, for a cover shown elsewhere (Home): the same items acting
     /// through this view, as on the Library's own covers.
-    pub fn cover_menu(&self, row: &LibraryRow, in_library: bool) -> Vec<Item> {
-        cover_menu(&Rc::downgrade(&self.inner), row, in_library)
+    pub fn cover_menu(&self, row: &LibraryRow) -> Vec<Item> {
+        cover_menu(&Rc::downgrade(&self.inner), row)
     }
 
     pub fn new(deps: Deps, nav: Nav) -> std::io::Result<Self> {
@@ -1259,7 +1259,7 @@ fn bind_item(weak: &Weak<RefCell<Inner>>, list_item: &gtk::ListItem) {
     card.root.add_controller(long);
     // the right click (and the Menu key) open the cover's menu; the long press selects
     let weak_menu = weak.clone();
-    context_menu::attach_without_long_press(&card.root, move |_, _| cover_menu(&weak_menu, &row, true));
+    context_menu::attach_without_long_press(&card.root, move |_, _| cover_menu(&weak_menu, &row));
 
     if let Some(button) = card.continue_button {
         let weak_resume = weak.clone();
@@ -1298,15 +1298,12 @@ fn cover_art(st: &Inner, item: &LibraryItem) -> Option<ArtRef> {
 
 /// The right-click menu of one cover (`actions::cover_menu`). Each item acts on this entry only and leaves any
 /// selection as it is; the items run on idle after the menu closed, so no borrow of the view is held.
-/// `in_library` false (a title Home shows from the history only) leaves out the two items about the library itself:
-/// Change categories and Remove from library.
-fn cover_menu(weak: &Weak<RefCell<Inner>>, row: &LibraryRow, in_library: bool) -> Vec<Item> {
+fn cover_menu(weak: &Weak<RefCell<Inner>>, row: &LibraryRow) -> Vec<Item> {
     let Some(inner) = weak.upgrade() else { return Vec::new() };
     let kind = inner.borrow().deps.kind;
     let id = row.id;
     actions::cover_menu(kind, row.is_local())
         .into_iter()
-        .filter(|(action, _, _)| in_library || !matches!(action, actions::CoverAction::ChangeCategories | actions::CoverAction::Remove))
         .map(|(action, label, section)| {
             let weak = weak.clone();
             Item::new(label, section, move || {

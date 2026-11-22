@@ -137,7 +137,6 @@ const NO_SOURCE: i64 = -1;
 struct Cover {
     kind: Kind,
     item: LibraryItem,
-    in_library: bool,
     art: ArtRef,
     score: Option<f64>,
     line: String,
@@ -508,9 +507,9 @@ impl Home {
                 // an episode's length, a chapter's page count: the size the progress is measured against
                 let (progress, total) = stored.as_ref().map_or((0, None), |item| (item.progress, if kind.is_anime() { item.total_seconds } else { item.page_count }));
                 let spot = data::spot(kind, unit.id == row.item_id, progress, total);
-                let (item, in_library) = items.get(kind, row.entry_id, None)?;
+                let item = items.get(kind, row.entry_id, None)?;
                 let art = look::cover_art(kind, row.cover.entry_id, row.cover.source_id, row.cover.url.clone(), row.cover.favorite, row.cover.cover_last_modified);
-                Some(Cover { kind, item, in_library, art, score: score(kind, row.entry_id), line: spot_line(&unit.name, spot), progress: data::fraction(spot), action: Action::Unit(unit.id) })
+                Some(Cover { kind, item, art, score: score(kind, row.entry_id), line: spot_line(&unit.name, spot), progress: data::fraction(spot), action: Action::Unit(unit.id) })
             })
             .take(ROW_LIMIT)
             .collect();
@@ -519,9 +518,9 @@ impl Home {
             .into_iter()
             .filter_map(|card: NewCard| {
                 // the unread badge counts the new units here
-                let (item, in_library) = items.get(card.kind, card.entry_id, Some(i64::try_from(card.count).unwrap_or(i64::MAX)))?;
+                let item = items.get(card.kind, card.entry_id, Some(i64::try_from(card.count).unwrap_or(i64::MAX)))?;
                 let art = look::cover_art(card.kind, card.entry_id, card.source_id, card.thumbnail_url.clone(), true, card.cover_last_modified);
-                Some(Cover { kind: card.kind, item, in_library, art, score: score(card.kind, card.entry_id), line: card.first_unit_name.clone(), progress: None, action: Action::Unit(card.first_unit_id) })
+                Some(Cover { kind: card.kind, item, art, score: score(card.kind, card.entry_id), line: card.first_unit_name.clone(), progress: None, action: Action::Unit(card.first_unit_id) })
             })
             .collect();
 
@@ -579,15 +578,10 @@ impl Items {
         Self { db, library: RefCell::default(), badges: crate::library::load::badges(), downloads }
     }
 
-    /// The item of entry `id` and whether it is in the library; `unread` replaces the unread count (New for you counts
-    /// its new units). `None` for an entry that cannot be read.
-    fn get(&self, kind: Kind, id: i64, unread: Option<i64>) -> Option<(LibraryItem, bool)> {
-        let library_row = self.library_rows(kind).get(&id).cloned();
-        let in_library = library_row.is_some();
-        let row = match library_row {
-            Some(row) => row,
-            None => self.history_only_row(kind, id)?,
-        };
+    /// The item of library title `id`; `unread` replaces the unread count (New for you counts its new units). `None` for
+    /// a title that is not in the library: Continue and New for you show library titles only (user, 2026-11-22).
+    fn get(&self, kind: Kind, id: i64, unread: Option<i64>) -> Option<LibraryItem> {
+        let row = self.library_rows(kind).get(&id).cloned()?;
         let db = self.db.clone();
         let language = move |source: i64| crate::library::mount::source_info(&db, kind, source).language;
         let downloads = self.downloads.get(&kind)?;
@@ -595,7 +589,7 @@ impl Items {
         if let Some(count) = unread.filter(|_| self.badges.unread) {
             item.unread_count = count;
         }
-        Some((item, in_library))
+        Some(item)
     }
 
     /// The library rows of `kind`, read once per draw: the first row of each entry (an entry in two categories has two).
@@ -611,16 +605,6 @@ impl Items {
             self.library.borrow_mut().insert(kind, rows);
         }
         std::cell::Ref::map(self.library.borrow(), |all| &all[&kind])
-    }
-
-    /// A title outside the library, as a library row: its entry with its units counted.
-    fn history_only_row(&self, kind: Kind, id: i64) -> Option<LibraryRow> {
-        let entry = kuro_data::entry::EntryRepo::new(self.db.clone()).by_id(id).ok()?;
-        let units = history_data::ordered_units(&self.db, kind, id);
-        let total = i64::try_from(units.len()).unwrap_or(i64::MAX);
-        let done = i64::try_from(units.iter().filter(|unit| unit.done).count()).unwrap_or(0);
-        let library_entry = kuro_data::entry::LibraryEntry { entry, category: 0, total, done, bookmarks: 0, fillermarks: 0, latest_upload: 0, item_fetched_at: 0, last_activity: 0 };
-        Some(LibraryRow::from_entry(&library_entry))
     }
 }
 
@@ -653,7 +637,7 @@ fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion)
     let item = LibraryItem { row, download_count: not_computed, unread_count: not_computed, is_local: false, source_language: String::new() };
     let art = look::cover_art(title.kind, 0, NO_SOURCE, title.cover.clone(), false, 0);
     let line = tr(if title.kind.is_anime() { MsgKey::label_anime } else { MsgKey::label_manga });
-    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search }
+    Cover { kind: title.kind, item, art, score: title.score, line, progress: None, action: Action::Search }
 }
 
 /// The line under a Continue cover: the unit a click opens, and how far into it.
@@ -685,8 +669,8 @@ fn card(cover: &Cover, mode: kuro_prefs::library::LibraryDisplayMode) -> gtk::Wi
     }
     // the Library's right-click menu, for a title on a source (a suggestion is not one yet)
     if matches!(cover.action, Action::Unit(_)) {
-        let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
-        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+        let (kind, row) = (cover.kind, cover.item.row.clone());
+        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row));
     }
     built.root
 }
@@ -710,8 +694,8 @@ fn list_row(cover: &Cover) -> gtk::Widget {
         root.append(&line);
     }
     if matches!(cover.action, Action::Unit(_)) {
-        let (kind, row, in_library) = (cover.kind, cover.item.row.clone(), cover.in_library);
-        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row, in_library));
+        let (kind, row) = (cover.kind, cover.item.row.clone());
+        crate::widgets::context_menu::attach(&built.root, move |_, _| crate::library::mount::cover_menu(kind, &row));
     }
     built.root
 }
