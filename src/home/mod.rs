@@ -7,8 +7,8 @@
 //! score, the cover size and the display mode are the Library's; a row holds as many covers as the Library's column
 //! rule fits (`widgets::cover_grid::columns`); the right-click menu is the Library's (`library::mount::cover_menu`); the
 //! header is the shared page header (`ui::page`, built by the tab host) with the shared actions; the refresh button is
-//! the Updates page's (`updates::mount::update_libraries`); the welcome view is the Library's. The rules are in
-//! [`data`]; this file reads the database, draws and routes clicks.
+//! the Updates page's (`updates::mount::update_libraries`), and also asks for new suggestions; the welcome view is the
+//! Library's. The rules are in [`data`]; this file reads the database, draws and routes clicks.
 
 pub mod data;
 pub mod discovery;
@@ -63,12 +63,21 @@ pub fn page() -> Option<Built> {
         let kind = crate::shell::kind_choice::current();
         crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch { kind, source_id: None, query: String::new() });
     });
-    let refresh = crate::ui::refresh_button(&tr(MsgKey::action_update_library));
-    refresh.connect_clicked(crate::updates::mount::update_libraries);
+    let refresh = crate::ui::refresh_button(&tr(MsgKey::home_refresh));
+    refresh.connect_clicked(refresh_home);
     let options = view_options(&home.prefs);
     let end = crate::ui::HeaderActions { refresh: Some(refresh.upcast()), extra: vec![search.upcast()], options: Some(options), ..Default::default() }.widgets();
     HOME.with(|h| *h.borrow_mut() = Some(home));
     Some(Built { content, end })
+}
+
+/// Home's refresh button refreshes all Home shows (user, 2026-11-22): the library update of the kinds Show allows,
+/// which brings New for you its new episodes and chapters, and AniList's suggestions, asked now. Continue needs nothing:
+/// it follows the history by itself. The button turns until both are done.
+fn refresh_home(button: &gtk::Button) {
+    let kinds: Vec<Kind> = [Kind::Anime, Kind::Manga].into_iter().filter(|kind| crate::shell::kind_choice::is_shown(*kind)).collect();
+    discovery::refresh_now();
+    crate::updates::mount::update_libraries(button, &kinds, discovery::is_asking);
 }
 
 /// The Library's view options on Home (user, 2026-11-21: the same pieces as the Library): View, Grid style and Cover
@@ -110,13 +119,12 @@ struct Rows {
 }
 
 /// What a click (or Enter) on a cover does.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Action {
     /// Opens this unit of the entry, as a History or an Updates row does.
     Unit(i64),
-    /// A suggestion, not on a source yet: global search for its kind with this text, the romaji title (the card shows the
-    /// English one when AniList has it).
-    Search(String),
+    /// A suggestion, not on a source yet: global search for its kind with the title the card shows.
+    Search,
 }
 
 /// The source id of a suggestion's cover: no source has it, so the image cache fetches it with the shared client and no
@@ -179,7 +187,11 @@ impl Row {
             let Some(cover) = usize::try_from(child.index()).ok().and_then(|i| row.covers.borrow().get(i).cloned()) else { return };
             match cover.action {
                 Action::Unit(unit_id) => crate::updates::history_screen::open_unit_of(cover.kind, cover.item.row.id, unit_id),
-                Action::Search(query) => crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch { kind: cover.kind, source_id: None, query }),
+                Action::Search => crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch {
+                    kind: cover.kind,
+                    source_id: None,
+                    query: cover.item.row.title.clone(),
+                }),
             }
         });
         row
@@ -614,8 +626,8 @@ impl Items {
 
 /// A suggestion's cover: the Library's card drawn from a row that holds only the title (no counts, so no unread or
 /// download badge), AniList's cover and score, the kind under it, and a search for it on click. The card shows AniList's
-/// English title, else the romaji one (user, 2026-11-22: "Bireomeogeul Hwansaeng" said nothing); the search keeps the
-/// romaji title, as most sources name titles.
+/// English title, else the romaji one (user, 2026-11-22: "Bireomeogeul Hwansaeng" said nothing), and a click searches
+/// that same title, so what is clicked is what is searched.
 fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion) -> Cover {
     let row = LibraryRow {
         id: 0,
@@ -641,7 +653,7 @@ fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion)
     let item = LibraryItem { row, download_count: not_computed, unread_count: not_computed, is_local: false, source_language: String::new() };
     let art = look::cover_art(title.kind, 0, NO_SOURCE, title.cover.clone(), false, 0);
     let line = tr(if title.kind.is_anime() { MsgKey::label_anime } else { MsgKey::label_manga });
-    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search(title.title.clone()) }
+    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search }
 }
 
 /// The line under a Continue cover: the unit a click opens, and how far into it.

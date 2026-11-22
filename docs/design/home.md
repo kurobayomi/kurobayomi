@@ -137,8 +137,10 @@ Home drew its own cards instead of the Library's, and it shows.
    shared from `cover_grid`, so both count alike). No sideways scrolling, nothing clipped. A card asks for no more width
    than its cover (`card::title_label`): before, a long title (a long romaji name in Trending) widened every cell of its
    row and left a short row of very wide cells.
-5. **Header:** "Home" as the page's title at the start, global search, and Refresh, which starts the library update of
-   both kinds and turns while it runs (the Updates page's button, shared).
+5. **Header:** "Home" as the page's title at the start, global search, and Refresh, which refreshes all Home shows
+   (user, 2026-11-22): the library update of the kinds Show allows (it brings New for you its new episodes and
+   chapters; the Updates page's function, shared) and an ask to AniList for the suggestions, whatever their age. It
+   turns until both are done. Continue needs nothing: it follows the history by itself.
 6. **Loading:** the page's spinner until the first answers (the shared state switcher, as every page has).
 7. **Quiet while hidden:** changes mark Home stale; it redraws when it is on screen, and on screen only when what it
    shows changed (the titles, units, progress or badges of the shown covers), not on every write.
@@ -186,9 +188,10 @@ One GraphQL request to `https://graphql.anilist.co` answered all of it:
   and Chinese names said nothing), and AniList's `averageScore / 10` on
   the app's own star badge (`community::score_text`); no star when AniList has none. The line under it says the kind
   ("Anime", "Manga"). No unread badge, no right-click menu: the title is not on a source yet.
-- **A click** opens global search for that kind with the romaji title filled in, as most sources name titles
-  (`browse::pending::open(BrowseRoute::GlobalSearch { kind, source_id: None, query })`). The search box stays editable.
-  Which title finds manhwa best on the user's sources (romaji, English or the scanlation name) is unchecked.
+- **A click** opens global search for that kind with the title the card shows filled in (user, 2026-11-22: what is
+  clicked is what is searched; `browse::pending::open(BrowseRoute::GlobalSearch { kind, source_id: None, query })`).
+  The search box stays editable. Which title finds the most on the user's sources (English, romaji or a scanlation
+  name) is unchecked.
 - **Adult titles** are left out unless the "show adult" setting is on (`SourcePrefs::show_nsfw_source`, the one the
   sources read): `isAdult: false` in the query, and `isAdult` checked on each recommendation.
 - **Order and visibility:** Continue, New for you, Recommended for you, Trending now. Each row hides when empty and has
@@ -203,8 +206,9 @@ One GraphQL request to `https://graphql.anilist.co` answered all of it:
    accessor (`discovery_cache_file()`, with a test; no literal path joins). Home reads only the cache, so it never waits
    on the network.
 3. **The refresh:** a background task beside the score refresh (`community::start`), a few seconds after start: it
-   asks again when the cache is older than a day, or when the seeds changed and the last ask is over an hour old. A
-   failed ask keeps the old cache and logs; nothing is shown to the user.
+   asks again when the cache is older than a day, or when the seeds changed and the last ask is over an hour old, and
+   at once when Home's Refresh is pressed (one ask at a time). A failed ask keeps the old cache and logs; nothing is
+   shown to the user.
 4. **Covers:** to check first: how `kuro-images` loads a cover URL that belongs to no source (it picks a client by
    source id). If it has no path for that, add one: the public-only client, no source headers, cached like every cover.
 5. **Home:** two more `Row`s fed from the cache, with their own card (the shared cover widget and score badge, the

@@ -5452,3 +5452,6 @@ ui_kinds_anime_only = Anime only
 
 # source: kurobayomi
 ui_kinds_manga_only = Manga only
+
+# source: kurobayomi
+home_refresh = Refresh

@@ -1,6 +1,6 @@
 //! Home's suggestions (docs/design/home.md, discovery rows): what AniList answers for the user's recent titles and what
 //! it calls trending, kept in one cache file (`Paths::discovery_cache_file`) and refreshed in the background, at most
-//! once a day (or an hour after the seeds changed). Home reads only the cache, through [`follow`], so it never waits on
+//! once a day (or an hour after the seeds changed), and when Home's refresh button asks ([`refresh_now`]). Home reads only the cache, through [`follow`], so it never waits on
 //! the network. A failed ask keeps the old answer and logs; the user is told nothing.
 //!
 //! The pure rules (when to ask, how the recommendations of several seeds merge, how the trending lists interleave, what
@@ -35,6 +35,13 @@ pub struct Cached {
 }
 
 static LATEST: OnceLock<watch::Sender<Option<Arc<Cached>>>> = OnceLock::new();
+/// The app's runtime, kept by [`start`] for the asks Home's refresh button makes later.
+static RUNTIME: OnceLock<tokio::runtime::Handle> = OnceLock::new();
+
+thread_local! {
+    /// An ask is on its way; a second one waits for it instead of asking twice.
+    static ASKING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
 
 fn latest() -> &'static watch::Sender<Option<Arc<Cached>>> {
     LATEST.get_or_init(|| watch::channel(read_cache().map(Arc::new)).0)
@@ -78,23 +85,41 @@ pub fn start() {
     };
     // the cache is read now, so Home shows the last answer at once
     let _ = latest();
+    let _ = RUNTIME.set(runtime.clone());
     glib::timeout_add_local_once(FIRST_CHECK, move || {
-        check(runtime.clone());
+        check(runtime.clone(), false);
         glib::timeout_add_local(CHECK_EVERY, move || {
-            check(runtime.clone());
+            check(runtime.clone(), false);
             glib::ControlFlow::Continue
         });
     });
 }
 
-/// One check: the seeds from the history, and an ask when [`due`].
-fn check(runtime: tokio::runtime::Handle) {
+/// Home's refresh button (user, 2026-11-22: refresh refreshes Home, suggestions included): asks AniList now, whatever
+/// the age of the answer. Nothing happens before [`start`] or while an ask is on its way.
+pub fn refresh_now() {
+    if let Some(runtime) = RUNTIME.get() {
+        check(runtime.clone(), true);
+    }
+}
+
+/// Whether an ask is on its way (the refresh button turns until it is not).
+pub fn is_asking() -> bool {
+    ASKING.with(std::cell::Cell::get)
+}
+
+/// One check: the seeds from the history, and an ask when [`due`] or `forced`. One ask at a time.
+fn check(runtime: tokio::runtime::Handle, forced: bool) {
+    if is_asking() {
+        return;
+    }
     let seeds = seeds();
     let now = kuro_data::time::now_millis();
     let cached = latest().borrow().clone();
-    if !due(now, cached.as_deref(), &seeds) {
+    if !forced && !due(now, cached.as_deref(), &seeds) {
         return;
     }
+    ASKING.with(|asking| asking.set(true));
     let adult = kuro_prefs::source::SourcePrefs::new(crate::data::app().base.store().clone()).show_nsfw_source.get();
     let asked = seeds.clone();
     let task = runtime.spawn(async move {
@@ -102,7 +127,9 @@ fn check(runtime: tokio::runtime::Handle) {
         kuro_track::tracker::anilist::discovery::fetch(&transport, &asked, adult).await.map_err(|e| e.to_string())
     });
     glib::spawn_future_local(async move {
-        match task.await {
+        let answer = task.await;
+        ASKING.with(|asking| asking.set(false));
+        match answer {
             Ok(Ok(answer)) => {
                 let cached = Cached { fetched_at: now, seeds, answer };
                 write_cache(&cached);

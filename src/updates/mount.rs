@@ -185,29 +185,32 @@ fn update_library(button: &gtk::Button, kind: Kind) {
         }
     });
     if outcome == Outcome::Started {
-        spin_until_done(button, &[kind]);
+        spin_until_done(button, &[kind], || false);
     }
 }
 
-/// Home's refresh button: starts the library pass of both kinds, says how it went in the app's toast (the first kind
-/// that started speaks for both), and spins until both passes end.
-pub(crate) fn update_libraries(button: &gtk::Button) {
-    let outcomes = [Kind::Anime, Kind::Manga].map(library_trigger::trigger);
-    let spoken = outcomes.iter().copied().find(|o| *o == Outcome::Started).unwrap_or(outcomes[0]);
-    crate::toast::notify(library_trigger::message(spoken));
-    if outcomes.contains(&Outcome::Started) {
-        spin_until_done(button, &[Kind::Anime, Kind::Manga]);
+/// Home's refresh button: starts the library pass of each of `kinds`, says how it went in the app's toast (the first kind
+/// that started speaks for all), and spins until the passes end and `also_busy` (Home's other refresh, the
+/// suggestions) answers false.
+pub(crate) fn update_libraries(button: &gtk::Button, kinds: &[Kind], also_busy: impl Fn() -> bool + 'static) {
+    let outcomes: Vec<Outcome> = kinds.iter().map(|kind| library_trigger::trigger(*kind)).collect();
+    if let Some(first) = outcomes.first() {
+        let spoken = outcomes.iter().copied().find(|o| *o == Outcome::Started).unwrap_or(*first);
+        crate::toast::notify(library_trigger::message(spoken));
+    }
+    if outcomes.contains(&Outcome::Started) || also_busy() {
+        spin_until_done(button, kinds, also_busy);
     }
 }
 
-/// Turns the button's arrow until no library pass of `kinds` is running.
-fn spin_until_done(button: &gtk::Button, kinds: &[Kind]) {
+/// Turns the button's arrow until no library pass of `kinds` is running and `also_busy` answers false.
+fn spin_until_done(button: &gtk::Button, kinds: &[Kind], also_busy: impl Fn() -> bool + 'static) {
     crate::ui::set_refreshing(button, true);
     let weak = button.downgrade();
     let kinds = kinds.to_vec();
     glib::timeout_add_local(Duration::from_millis(500), move || {
         let Some(button) = weak.upgrade() else { return glib::ControlFlow::Break };
-        if kinds.iter().any(|kind| library_trigger::running(*kind)) {
+        if kinds.iter().any(|kind| library_trigger::running(*kind)) || also_busy() {
             return glib::ControlFlow::Continue;
         }
         crate::ui::set_refreshing(&button, false);
