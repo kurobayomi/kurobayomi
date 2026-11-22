@@ -6,6 +6,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-22
+
 ### Added
 
 - Home, first in the sidebar: what you're in the middle of (Continue) and the new episodes and chapters of your library
@@ -40,6 +42,10 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 - Library updates skip the titles of sources you switched off again (they were checked anyway), also for
   `--library-update`.
+- With the bars hiding by themselves, the player's episode list sits between them: its heading was hidden under the top
+  bar.
+- A title whose name differs from MyAnimeList's only by a plural s ("War of the Three Titan Arc" and "Titans Arc") finds
+  its score.
 - Global search no longer cuts card titles after the first line, and a card alone in its row no longer stretches while
   sources are still answering: once the results were taller than the window, the page gave each row only its smallest
   height. Every scrolling page now lays its content out at full height.
