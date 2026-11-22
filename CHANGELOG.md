@@ -40,6 +40,9 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 - Library updates skip the titles of sources you switched off again (they were checked anyway), also for
   `--library-update`.
+- Global search no longer cuts card titles after the first line, and a card alone in its row no longer stretches while
+  sources are still answering: once the results were taller than the window, the page gave each row only its smallest
+  height. Every scrolling page now lays its content out at full height.
 - A global search card is never wider than its cover: a title the source joins with no-break spaces stretched its card
   as wide as the title (seen on Kagane and Mangakakalot); it wraps under the cover now, as in the Library.
 - A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,

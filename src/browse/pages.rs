@@ -676,7 +676,8 @@ pub fn global_search(nav: GlobalSearchNav, ready: watch::Receiver<bool>) -> Glob
     entry.connect_changed(move |entry| *typing.typed.borrow_mut() = entry.text().to_string());
     let options = search_options(&view);
     body.append(&view.progress);
-    body.append(&gtk::ScrolledWindow::builder().child(&view.column).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build());
+    // the shared page scroller: the rows get their full height, so no card is cut or stretched (`ui::scrolled`)
+    body.append(&crate::ui::scrolled(&view.column));
     // the registry's readiness gates the whole page: the existing source gate shows the spinner, then crossfades in
     let root = crate::source_gate::when_sources_ready(&kuro_core::sources::SourceGate::new(ready), &body);
     GlobalSearchPage { root, entry, view, actions: vec![toggle.upcast(), options.widget.clone().upcast()] }

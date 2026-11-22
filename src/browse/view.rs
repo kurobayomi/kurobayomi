@@ -354,6 +354,42 @@ pub(crate) mod tests {
         });
     }
 
+    /// The shared page scroller lays its rows out at their full height, even when the page is taller than the window: with
+    /// GTK's default (the minimum height) a card was cut on its second title line, and a card alone in its row stretched
+    /// to fit its title on one line (user, 2026-11-22, global search: 24 cards cut and 4 stretched at 300 px, none now).
+    #[test]
+    fn a_page_taller_than_the_window_neither_cuts_nor_stretches_a_card() {
+        crate::testing::with_display(|| {
+            let load: CoverLoader = Rc::new(|_, w, h| crate::entry_core::cover_view::CoverView::new(w, h).frame.upcast());
+            let column = GBox::builder().orientation(O::Vertical).spacing(SPACE_M).valign(Align::Start).build();
+            let mut rows = Vec::new();
+            for titles in [vec!["My Blasted Reincarnated Life"], vec!["My Little Sister Can't Be This Cute", "My Boss's Kitty", "My Hero!"]] {
+                for _ in 0..3 {
+                    let row = GBox::new(O::Horizontal, SPACE_S);
+                    let mut cards = Vec::new();
+                    for title in &titles {
+                        let item = ListItem { title: (*title).into(), ..ListItem::default() };
+                        let cell = grid_cell_lines(Some(&item), LibraryDisplayMode::ComfortableGrid, &load, 96, 3);
+                        let card = gtk::Button::builder().child(&cell).css_classes(["flat"]).valign(Align::Start).build();
+                        row.append(&card);
+                        cards.push((card, cell));
+                    }
+                    let shown = gtk::ScrolledWindow::builder().child(&row).vscrollbar_policy(gtk::PolicyType::Never).propagate_natural_height(true).build();
+                    column.append(&shown);
+                    rows.push((shown, cards));
+                }
+            }
+            let page = crate::ui::scrolled(&column);
+            page.allocate(1050, 300, -1, None);
+            for (shown, cards) in &rows {
+                for (card, cell) in cards {
+                    assert_eq!(cell.width(), 96, "a card is as wide as its cover");
+                    assert!(card.height() <= shown.height(), "a card {} px tall in a row {} px tall is cut", card.height(), shown.height());
+                }
+            }
+        });
+    }
+
     fn favorite(title: &str) -> ListItem {
         ListItem { title: title.into(), favorite: true, ..ListItem::default() }
     }

@@ -537,10 +537,23 @@ pub const PAGE_WIDTH: i32 = 720;
 /// The widest a header search entry gets.
 pub const SEARCH_WIDTH: i32 = 420;
 
+/// A page that scrolls up and down. Its content is laid out at its preferred height, even once it is taller than the
+/// window: GTK's default (`ScrollablePolicy::Minimum`) gives it only its minimum height then, and a wrapping title's
+/// minimum is one line, so cards were cut on their second line and a card with room beside it stretched to fit its
+/// title on one line (user, 2026-11-22, global search; measured: 24 cards cut, 4 stretched, none with `Natural`). A
+/// list that scrolls itself (a `ListView`, a `GridView`) goes in as it is, so it still builds only the rows it shows.
 pub fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
     let child = child.as_ref();
     let child = if child.has_css_class("column") { clamp(child, PAGE_WIDTH).upcast() } else { child.clone() };
-    gtk::ScrolledWindow::builder().child(&child).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build()
+    let content: gtk::Widget = if child.is::<gtk::Scrollable>() {
+        child
+    } else {
+        let viewport = gtk::Viewport::new(None::<&gtk::Adjustment>, None::<&gtk::Adjustment>);
+        viewport.set_vscroll_policy(gtk::ScrollablePolicy::Natural);
+        viewport.set_child(Some(&child));
+        viewport.upcast()
+    };
+    gtk::ScrolledWindow::builder().child(&content).vexpand(true).hscrollbar_policy(gtk::PolicyType::Never).build()
 }
 
 /// `child` at most `max` px wide, centred; narrower windows shrink it down to its own minimum.
