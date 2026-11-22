@@ -14,7 +14,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
   chapter; See all opens History or Updates; search and refresh are in its top bar.
 - Home suggests what to watch or read next: Recommended for you (what AniList users recommend for your recent titles)
   and Trending now (anime and manga), refreshed at most once a day. A suggestion opens a search across your sources;
-  titles you already have, and adult ones unless your setting allows them, are left out.
+  titles you already have, and adult ones unless your setting allows them, are left out. A suggestion shows its
+  English title when AniList has one.
 - Comments in the player and the reader: the Comments button (or C) opens the AniList discussion of the episode playing
   or the chapter being read, in the place of the episode or chapter list, and follows it. Up to 50 comments with their
   replies, Top or New; spoilers the writer tagged stay hidden until clicked.

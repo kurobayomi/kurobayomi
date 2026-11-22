@@ -182,11 +182,13 @@ One GraphQL request to `https://graphql.anilist.co` answered all of it:
   the history are left out (by MyAnimeList id against the score store, and by AniList id against the seeds).
 - **Trending now:** AniList's trending titles, anime and manga, interleaved so neither kind fills the row; titles in the
   library are left out.
-- **Each cover:** AniList's cover, the title (romaji, as most sources name titles), and AniList's `averageScore / 10` on
+- **Each cover:** AniList's cover, the title (AniList's English one, else romaji; user, 2026-11-22: romanised Korean
+  and Chinese names said nothing), and AniList's `averageScore / 10` on
   the app's own star badge (`community::score_text`); no star when AniList has none. The line under it says the kind
   ("Anime", "Manga"). No unread badge, no right-click menu: the title is not on a source yet.
-- **A click** opens global search for that kind with the title filled in (`browse::pending::open(BrowseRoute::
-  GlobalSearch { kind, source_id: None, query })`). The search box stays editable; the English title is one edit away.
+- **A click** opens global search for that kind with the romaji title filled in, as most sources name titles
+  (`browse::pending::open(BrowseRoute::GlobalSearch { kind, source_id: None, query })`). The search box stays editable.
+  Which title finds manhwa best on the user's sources (romaji, English or the scanlation name) is unchecked.
 - **Adult titles** are left out unless the "show adult" setting is on (`SourcePrefs::show_nsfw_source`, the one the
   sources read): `isAdult: false` in the query, and `isAdult` checked on each recommendation.
 - **Order and visibility:** Continue, New for you, Recommended for you, Trending now. Each row hides when empty and has

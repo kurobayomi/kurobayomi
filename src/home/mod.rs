@@ -110,12 +110,13 @@ struct Rows {
 }
 
 /// What a click (or Enter) on a cover does.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Action {
     /// Opens this unit of the entry, as a History or an Updates row does.
     Unit(i64),
-    /// A suggestion, not on a source yet: global search for its title, for its kind.
-    Search,
+    /// A suggestion, not on a source yet: global search for its kind with this text, the romaji title (the card shows the
+    /// English one when AniList has it).
+    Search(String),
 }
 
 /// The source id of a suggestion's cover: no source has it, so the image cache fetches it with the shared client and no
@@ -178,11 +179,7 @@ impl Row {
             let Some(cover) = usize::try_from(child.index()).ok().and_then(|i| row.covers.borrow().get(i).cloned()) else { return };
             match cover.action {
                 Action::Unit(unit_id) => crate::updates::history_screen::open_unit_of(cover.kind, cover.item.row.id, unit_id),
-                Action::Search => crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch {
-                    kind: cover.kind,
-                    source_id: None,
-                    query: cover.item.row.title.clone(),
-                }),
+                Action::Search(query) => crate::browse::pending::open(crate::browse::route::BrowseRoute::GlobalSearch { kind: cover.kind, source_id: None, query }),
             }
         });
         row
@@ -616,12 +613,14 @@ impl Items {
 }
 
 /// A suggestion's cover: the Library's card drawn from a row that holds only the title (no counts, so no unread or
-/// download badge), AniList's cover and score, the kind under it, and a search for it on click.
+/// download badge), AniList's cover and score, the kind under it, and a search for it on click. The card shows AniList's
+/// English title, else the romaji one (user, 2026-11-22: "Bireomeogeul Hwansaeng" said nothing); the search keeps the
+/// romaji title, as most sources name titles.
 fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion) -> Cover {
     let row = LibraryRow {
         id: 0,
         source: NO_SOURCE,
-        title: title.title.clone(),
+        title: title.english.clone().unwrap_or_else(|| title.title.clone()),
         category: 0,
         total: 0,
         done: 0,
@@ -642,7 +641,7 @@ fn suggestion_cover(title: &kuro_track::tracker::anilist::discovery::Suggestion)
     let item = LibraryItem { row, download_count: not_computed, unread_count: not_computed, is_local: false, source_language: String::new() };
     let art = look::cover_art(title.kind, 0, NO_SOURCE, title.cover.clone(), false, 0);
     let line = tr(if title.kind.is_anime() { MsgKey::label_anime } else { MsgKey::label_manga });
-    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search }
+    Cover { kind: title.kind, item, in_library: false, art, score: title.score, line, progress: None, action: Action::Search(title.title.clone()) }
 }
 
 /// The line under a Continue cover: the unit a click opens, and how far into it.
