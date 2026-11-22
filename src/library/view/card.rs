@@ -112,18 +112,27 @@ fn continue_button(mode: LibraryDisplayMode) -> gtk::Button {
     button
 }
 
-/// A title of up to two lines, cut with an ellipsis. It asks for no width of its own (`max_width_chars(1)`): a wrapping
-/// label otherwise asks for its whole text on one line, and a long title made a card wider than its cover wherever the
-/// card is not in a grid of fixed columns (Home's rows, user 2026-11-21). It takes the width it is given.
-fn title_label(text: &str, class: &str) -> gtk::Label {
+/// A card's title, the one every card under a cover uses (the Library's, Home's and Browse's): up to `lines` lines, cut
+/// with an ellipsis. It never makes a card wider than its cover, whatever the text: it asks for no width of its own
+/// (`max_width_chars(1)`; a wrapping label otherwise asks for its whole text on one line, user 2026-11-21), and it breaks
+/// inside a word when a word does not fit (`WordChar`), so a title with no place to break, such as one joined by
+/// no-break spaces, wraps too (user, 2026-11-22: Kagane and Mangakakalot cards in global search were as wide as their
+/// titles). It takes the width it is given.
+pub(crate) fn title_label(text: &str, lines: i32) -> gtk::Label {
     let label = gtk::Label::new(Some(text));
-    label.add_css_class(class);
     label.set_wrap(true);
     label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-    label.set_lines(2);
+    label.set_lines(lines);
     label.set_ellipsize(gtk::pango::EllipsizeMode::End);
     label.set_max_width_chars(1);
     label.set_xalign(0.0);
+    label
+}
+
+/// A Library card's title: two lines, with the card's own class.
+fn card_title(text: &str, class: &str) -> gtk::Label {
+    let label = title_label(text, 2);
+    label.add_css_class(class);
     label
 }
 
@@ -147,7 +156,7 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, 
     ui_inset(&end);
     overlay.add_overlay(&end);
     if model.title_place == TitlePlace::OnCover {
-        let title = title_label(&model.title, "kb-card-title-scrim");
+        let title = card_title(&model.title, "kb-card-title-scrim");
         title.set_valign(Align::End);
         overlay.add_overlay(&title);
     }
@@ -168,7 +177,7 @@ pub fn build(item: &LibraryItem, mode: LibraryDisplayMode, show_continue: bool, 
     root.set_halign(Align::Center);
     root.append(&overlay);
     if model.title_place == TitlePlace::Below {
-        root.append(&title_label(&model.title, "kb-card-title"));
+        root.append(&card_title(&model.title, "kb-card-title"));
     }
     Card { root: root.upcast(), continue_button }
 }
@@ -192,7 +201,7 @@ pub fn build_list(item: &LibraryItem, show_continue: bool, row_height: f64, extr
     root.set_margin_start(layout::SPACE_L);
     root.set_margin_end(layout::SPACE_L);
     root.append(&overlay);
-    let title = title_label(&model.title, "kb-card-title");
+    let title = card_title(&model.title, "kb-card-title");
     title.set_hexpand(true);
     title.set_valign(Align::Center);
     root.append(&title);

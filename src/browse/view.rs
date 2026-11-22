@@ -199,18 +199,6 @@ fn in_library_badge() -> Label {
     badge
 }
 
-fn title_label(text: &str, lines: i32) -> Label {
-    let label = Label::new(Some(text));
-    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-    label.set_lines(lines);
-    label.set_wrap(true);
-    // the label never asks for more than one character's width, so a long title wraps to the cover's width and never
-    // widens its card (a lone card in a global-search row is otherwise given its title's full width)
-    label.set_max_width_chars(1);
-    label.set_xalign(0.0);
-    label
-}
-
 /// A grid cell for the comfortable, compact or cover-only mode. A `None` slot is a placeholder and draws nothing.
 /// The cell carries half the gap on every side; the container (see `listing_view`) carries the rest of the padding. The
 /// cover is `cover_width` px wide and 2:3.
@@ -242,7 +230,7 @@ pub fn grid_cell_lines(
     }
     match mode {
         LibraryDisplayMode::CompactGrid => {
-            let title = title_label(&item.title, title_lines);
+            let title = crate::library::view::card::title_label(&item.title, title_lines);
             title.add_css_class("kb-card-title-scrim");
             title.set_valign(Align::End);
             title.set_halign(Align::Fill);
@@ -251,7 +239,7 @@ pub fn grid_cell_lines(
         }
         LibraryDisplayMode::ComfortableGrid | LibraryDisplayMode::List => {
             cell.append(&stage);
-            let title = title_label(&item.title, title_lines);
+            let title = crate::library::view::card::title_label(&item.title, title_lines);
             title.add_css_class("kb-card-title");
             cell.append(&title);
         }
@@ -356,10 +344,13 @@ pub(crate) mod tests {
     #[test]
     fn a_long_title_never_makes_a_card_wider_than_its_cover() {
         crate::testing::with_display(|| {
-            let item = ListItem { title: "Omniscient Reader's Viewpoint, the long edition".into(), ..ListItem::default() };
-            let cell = grid_cell_lines(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), 96, 3);
-            let (_, natural, _, _) = cell.measure(O::Horizontal, -1);
-            assert!(natural <= 96 + 2 * CELL_MARGIN_PX, "the card asks for {natural} px");
+            // the second is joined by no-break spaces: no place to break between its words (user, 2026-11-22)
+            for title in ["Omniscient Reader's Viewpoint, the long edition", "You're\u{a0}the\u{a0}Only\u{a0}One\u{a0}I\u{a0}Can\u{a0}See"] {
+                let item = ListItem { title: title.into(), ..ListItem::default() };
+                let cell = grid_cell_lines(Some(&item), LibraryDisplayMode::ComfortableGrid, &loader(), 96, 3);
+                let (minimum, natural, _, _) = cell.measure(O::Horizontal, -1);
+                assert!(minimum <= 96 + 2 * CELL_MARGIN_PX && natural <= 96 + 2 * CELL_MARGIN_PX, "{title:?}: the card asks for {minimum}/{natural} px");
+            }
         });
     }
 

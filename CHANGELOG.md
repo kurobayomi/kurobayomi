@@ -11,11 +11,12 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 - Home, first in the sidebar: what you're in the middle of (Continue) and the new episodes and chapters of your library
   (New for you), anime and manga together. Its covers are the Library's, with the same badges, score, cover size, look
   and right-click menu, and as many fit a row as fit a Library row. A cover resumes or opens the new episode or
-  chapter; See all opens History or Updates; search and refresh are in its top bar.
+  chapter; See all opens History or Updates; search and refresh are in its top bar. Refresh updates the library (only
+  the kinds you show) and asks AniList for new suggestions.
 - Home suggests what to watch or read next: Recommended for you (what AniList users recommend for your recent titles)
   and Trending now (anime and manga), refreshed at most once a day. A suggestion opens a search across your sources;
-  titles you already have, and adult ones unless your setting allows them, are left out. A suggestion shows its
-  English title when AniList has one.
+  titles you already have, and adult ones unless your setting allows them, are left out. A suggestion shows, and
+  searches, its English title when AniList has one.
 - Comments in the player and the reader: the Comments button (or C) opens the AniList discussion of the episode playing
   or the chapter being read, in the place of the episode or chapter list, and follows it. Up to 50 comments with their
   replies, Top or New; spoilers the writer tagged stay hidden until clicked.
@@ -39,6 +40,8 @@ reads it), so the section must exist and have notes before its tag is pushed (se
 
 - Library updates skip the titles of sources you switched off again (they were checked anyway), also for
   `--library-update`.
+- A global search card is never wider than its cover: a title the source joins with no-break spaces stretched its card
+  as wide as the title (seen on Kagane and Mangakakalot); it wraps under the cover now, as in the Library.
 - A source in Browse → Sources shows one status, its repository's: the app's own "Not working right now" label is gone,
   so a source no longer says "Working" and "Not working right now" at once.
 
