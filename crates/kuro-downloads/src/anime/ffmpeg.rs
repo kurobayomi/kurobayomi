@@ -402,8 +402,10 @@ mod tests {
         format!("{name}{}", std::env::consts::EXE_SUFFIX)
     }
     use crate::anime::model::VideoStatus;
+    // the one lock and script helper of every anime test that runs a program (`test_scripts`)
+    use crate::anime::test_scripts::spawn_guard;
     #[cfg(unix)]
-    use std::os::unix::fs::PermissionsExt;
+    use crate::anime::test_scripts::{script, spawn_guard_blocking};
 
     fn os(args: &[&str]) -> Vec<OsString> {
         args.iter().map(OsString::from).collect()
@@ -555,22 +557,6 @@ mod tests {
         assert_eq!(parse_progress_line("garbage line"), None);
     }
 
-    /// Script tests fork children. A script written by one test while another forks can fail to run with "Text file
-    /// busy", so these tests run one at a time.
-    static SPAWN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
-    async fn spawn_guard() -> tokio::sync::MutexGuard<'static, ()> {
-        SPAWN_LOCK.lock().await
-    }
-
-    /// Writes an executable shell script into `dir` and returns its path.
-    #[cfg(unix)]
-    fn script(dir: &Path, name: &str, body: &str) -> std::path::PathBuf {
-        let path = dir.join(name);
-        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-        path
-    }
 
     #[cfg(unix)]
     #[tokio::test]
@@ -663,6 +649,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn only_a_playlist_gets_the_lenient_segment_option_and_only_from_an_ffprobe_that_knows_it() {
+        // it writes and runs scripts like the async tests, so it takes the same lock (it took none: "Text file busy")
+        let _guard = spawn_guard_blocking();
         let dir = tempfile::tempdir().unwrap();
         let new = script(dir.path(), "ffprobe-new", "echo '  -extension_picky   <boolean>'");
         let old = script(dir.path(), "ffprobe-old", "echo '  -allowed_extensions <string>'");

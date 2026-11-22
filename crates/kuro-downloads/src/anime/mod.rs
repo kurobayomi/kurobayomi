@@ -10,4 +10,6 @@ pub mod offline;
 pub mod progress;
 pub mod resolve;
 pub mod runner;
+#[cfg(test)]
+mod test_scripts;
 pub mod torrent;

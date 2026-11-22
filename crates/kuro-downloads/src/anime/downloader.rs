@@ -260,17 +260,12 @@ mod tests {
     use crate::anime::model::{AnimeRef, AnimeSource, EpisodeRef};
     use crate::model::DownloadState;
     use async_trait::async_trait;
+    // the one lock and script helper of every anime test that starts a program (`test_scripts`)
     #[cfg(unix)]
-    use std::os::unix::fs::PermissionsExt;
+    use crate::anime::test_scripts::script;
+    use crate::anime::test_scripts::spawn_guard;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Duration;
-
-    static SPAWN_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-
-    #[cfg(unix)]
-    async fn spawn_guard() -> tokio::sync::MutexGuard<'static, ()> {
-        SPAWN_LOCK.lock().await
-    }
 
     /// One download of `item` into its anime folder under `root`, as `anime::runner` does it.
     async fn run(engine: &EpisodeEngine, root: &Path, item: Arc<AnimeDownload>, cancel: CancellationToken) -> Result<(), DownloadError> {
@@ -279,13 +274,6 @@ mod tests {
         engine.download(&item, &anime_dir, &cancel).await.map(|_| ())
     }
 
-    #[cfg(unix)]
-    fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
-        let path = dir.join(name);
-        fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-        path
-    }
 
     struct Hoster {
         answer: Option<Video>,
@@ -561,6 +549,8 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn a_missing_ffmpeg_fails_at_once_with_ffmpeg_missing() {
+        // trying to start the missing program still forks, so it takes the lock of the script tests
+        let _guard = spawn_guard().await;
         let tmp = tempfile::tempdir().unwrap();
         let (engine, _) =
             engine(tmp.path(), Path::new("/nonexistent/kuro-ffmpeg"), Path::new("/nonexistent/kuro-ffprobe"));
